@@ -15,17 +15,53 @@
 //! ✅ Token 过期后可以刷新
 
 use std::env;
-use std::sync::Arc;
 
 // 引入被测模块
 use seredeli_room::{
-    config::{AppConfig, DatabaseConfig, JwtConfig, ServerConfig},
+    config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,
-    models::user::{LoginRequest, RegisterRequest, UserResponse},
+    models::user::{LoginRequest, RegisterRequest},
     services::{auth_service::AuthService, user_service::UserService},
     utils::validation::{validate_email_format, validate_password_strength, validate_username},
 };
+
+/// 测试辅助函数：加载测试环境变量
+fn load_test_env() {
+    // 加载 .env.test 文件
+    if std::path::Path::new(".env.test").exists() {
+        dotenvy::from_filename(".env.test").ok();
+    } else if std::path::Path::new("../.env.test").exists() {
+        dotenvy::from_filename("../.env.test").ok();
+    }
+}
+
+/// 测试辅助函数：创建测试数据库连接
+async fn setup_test_db() -> Database {
+    // 确保环境变量已加载
+    load_test_env();
+
+    // 使用 .env.test 中的 DATABASE_URL
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set in .env.test or environment");
+
+    let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+
+    let db_config = DatabaseConfig {
+        url: database_url,
+        max_connections,
+    };
+
+    let db = Database::new(&db_config).await.expect("Failed to connect to test database");
+    
+    // 运行数据库迁移
+    db.migrate().await.expect("Failed to run migrations");
+    
+    db
+}
 
 /// 测试用户模型验证
 #[cfg(test)]
@@ -335,16 +371,8 @@ mod auth_service_integration_tests {
     /// 测试完整的注册流程
     #[tokio::test]
     async fn test_user_registration_flow() {
-        // 加载测试配置
-        dotenvy::from_filename(".env.test").ok();
-
-        let db_config = DatabaseConfig {
-            url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set in .env.test file"),
-            max_connections: 5,
-        };
-
-        let db = Database::new(&db_config).await.expect("数据库连接失败");
+        // 使用统一的测试数据库连接函数
+        let db = setup_test_db().await;
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
@@ -391,16 +419,8 @@ mod auth_service_integration_tests {
     /// 测试完整的登录流程
     #[tokio::test]
     async fn test_user_login_flow() {
-        // 加载测试配置
-        dotenvy::from_filename(".env.test").ok();
-
-        let db_config = DatabaseConfig {
-            url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set in .env.test file"),
-            max_connections: 5,
-        };
-
-        let db = Database::new(&db_config).await.expect("数据库连接失败");
+        // 使用统一的测试数据库连接函数
+        let db = setup_test_db().await;
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
@@ -539,15 +559,8 @@ mod acceptance_tests {
     /// - 用户信息正确存储
     #[tokio::test]
     async fn acceptance_user_registration() {
-        dotenvy::from_filename(".env.test").ok();
-
-        let db_config = DatabaseConfig {
-            url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set in .env.test file"),
-            max_connections: 5,
-        };
-
-        let db = Database::new(&db_config).await.expect("数据库连接失败");
+        // 使用统一的测试数据库连接函数
+        let db = setup_test_db().await;
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
@@ -594,15 +607,8 @@ mod acceptance_tests {
     /// - 不存在的邮箱登录失败
     #[tokio::test]
     async fn acceptance_user_login() {
-        dotenvy::from_filename(".env.test").ok();
-
-        let db_config = DatabaseConfig {
-            url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set in .env.test file"),
-            max_connections: 5,
-        };
-
-        let db = Database::new(&db_config).await.expect("数据库连接失败");
+        // 使用统一的测试数据库连接函数
+        let db = setup_test_db().await;
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {

@@ -472,17 +472,17 @@ impl RoomService {
         &self,
         room_id: Uuid,
     ) -> Result<Vec<RoomMemberWithUser>> {
-        let members = sqlx::query_as::<_, RoomMemberWithUser>(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 rm.room_id,
                 rm.user_id,
-                rm.role as "role: MemberRole",
+                rm.role as "role",
                 rm.joined_at,
                 u.username,
                 u.email,
                 u.avatar_url,
-                u.status as "user_status: crate::models::user::UserStatus"
+                u.status as "user_status"
             FROM room_members rm
             JOIN users u ON rm.user_id = u.id
             WHERE rm.room_id = $1
@@ -492,6 +492,23 @@ impl RoomService {
         .bind(room_id)
         .fetch_all(self.db.pool())
         .await?;
+
+        let members = rows
+            .into_iter()
+            .map(|row| {
+                use sqlx::Row;
+                RoomMemberWithUser {
+                    room_id: row.get("room_id"),
+                    user_id: row.get("user_id"),
+                    role: row.get("role"),
+                    joined_at: row.get("joined_at"),
+                    username: row.get("username"),
+                    email: row.get("email"),
+                    avatar_url: row.get("avatar_url"),
+                    user_status: row.get("user_status"),
+                }
+            })
+            .collect();
 
         Ok(members)
     }

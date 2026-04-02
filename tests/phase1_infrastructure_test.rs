@@ -25,6 +25,43 @@ use seredeli_room::{
     websocket::manager::WebSocketManager,
 };
 
+/// 测试辅助函数：加载测试环境变量
+fn load_test_env() {
+    // 加载 .env.test 文件
+    if std::path::Path::new(".env.test").exists() {
+        dotenvy::from_filename(".env.test").ok();
+    } else if std::path::Path::new("../.env.test").exists() {
+        dotenvy::from_filename("../.env.test").ok();
+    }
+}
+
+/// 测试辅助函数：创建测试数据库连接
+async fn setup_test_db() -> Database {
+    // 确保环境变量已加载
+    load_test_env();
+
+    // 使用 .env.test 中的 DATABASE_URL
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set in .env.test or environment");
+
+    let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+
+    let db_config = DatabaseConfig {
+        url: database_url,
+        max_connections,
+    };
+
+    let db = Database::new(&db_config).await.expect("Failed to connect to test database");
+    
+    // 运行数据库迁移
+    db.migrate().await.expect("Failed to run migrations");
+    
+    db
+}
+
 /// 测试配置管理模块
 #[cfg(test)]
 mod config_tests {
@@ -402,27 +439,11 @@ mod acceptance_tests {
     /// 此测试使用 .env.test 配置文件中的数据库连接
     #[tokio::test]
     async fn acceptance_database_connection() {
-        // 加载 .env.test 配置文件
-        dotenvy::from_filename(".env.test").ok();
-
-        let db_config = DatabaseConfig {
-            url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set in .env.test file"),
-            max_connections: 5,
-        };
-
-        let db = Database::new(&db_config).await;
-        assert!(db.is_ok(), "数据库连接应该成功: {:?}", db.err());
-
-        let db = db.unwrap();
-
-        // 测试迁移
-        let migrate_result = db.migrate().await;
-        assert!(
-            migrate_result.is_ok(),
-            "数据库迁移应该成功: {:?}",
-            migrate_result.err()
-        );
+        // 使用统一的测试数据库连接函数
+        let db = setup_test_db().await;
+        
+        // 验证数据库连接成功
+        assert!(db.pool().is_closed() == false, "数据库连接池应该处于打开状态");
     }
 
     /// 验收标准 1.3: 错误处理

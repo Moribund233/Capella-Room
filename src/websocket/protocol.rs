@@ -96,6 +96,60 @@ pub enum WebSocketMessage {
     
     /// 房间信息更新
     RoomUpdated { room_id: Uuid, name: Option<String>, description: Option<String> },
+    
+    // ========== 断线重连 ==========
+    /// 重连请求（携带上次断开时间）
+    Reconnect { 
+        token: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        last_disconnect_at: Option<DateTime<Utc>>,
+    },
+    
+    /// 重连结果
+    ReconnectResult { 
+        success: bool, 
+        message: String,
+        /// 需要重新加入的房间列表
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rooms_to_rejoin: Option<Vec<Uuid>>,
+    },
+    
+    /// 请求离线期间的消息
+    GetMissedMessages { 
+        room_id: Uuid,
+        /// 上次接收的消息ID
+        last_message_id: Option<Uuid>,
+    },
+    
+    /// 离线消息列表
+    MissedMessages { 
+        room_id: Uuid,
+        messages: Vec<MissedMessage>,
+        /// 是否有更多消息
+        has_more: bool,
+    },
+    
+    /// 会话恢复完成
+    SessionRestored { 
+        restored_at: DateTime<Utc>,
+        /// 恢复的房间数
+        rooms_restored: usize,
+        /// 恢复的未读消息数
+        total_unread: usize,
+    },
+}
+
+/// 离线消息结构（用于断线重连后同步消息）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MissedMessage {
+    pub message_id: Uuid,
+    pub room_id: Uuid,
+    pub sender_id: Uuid,
+    pub sender_name: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_to: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
 }
 
 /// 用户信息（用于在线列表）
@@ -170,6 +224,33 @@ impl WebSocketMessage {
             content: content.to_string(),
             reply_to,
             created_at: Utc::now(),
+        }
+    }
+    
+    /// 创建重连成功响应
+    pub fn reconnect_success(rooms_to_rejoin: Vec<Uuid>) -> Self {
+        Self::ReconnectResult {
+            success: true,
+            message: "Reconnected successfully".to_string(),
+            rooms_to_rejoin: Some(rooms_to_rejoin),
+        }
+    }
+    
+    /// 创建重连失败响应
+    pub fn reconnect_failed(reason: &str) -> Self {
+        Self::ReconnectResult {
+            success: false,
+            message: reason.to_string(),
+            rooms_to_rejoin: None,
+        }
+    }
+    
+    /// 创建会话恢复完成消息
+    pub fn session_restored(rooms_restored: usize, total_unread: usize) -> Self {
+        Self::SessionRestored {
+            restored_at: Utc::now(),
+            rooms_restored,
+            total_unread,
         }
     }
 }

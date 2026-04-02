@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::config::JwtConfig;
 use crate::db::Database;
 use crate::services::auth_service::AuthService;
+use crate::services::message_service::MessageService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
 use crate::websocket::manager::WebSocketManager;
@@ -16,6 +17,7 @@ pub struct AppState {
     pub auth_service: AuthService,
     pub user_service: UserService,
     pub room_service: RoomService,
+    pub message_service: MessageService,
 }
 
 impl fmt::Debug for AppState {
@@ -26,6 +28,7 @@ impl fmt::Debug for AppState {
             .field("auth_service", &"<AuthService>")
             .field("user_service", &"<UserService>")
             .field("room_service", &"<RoomService>")
+            .field("message_service", &"<MessageService>")
             .finish()
     }
 }
@@ -40,6 +43,7 @@ impl AppState {
         let auth_service = AuthService::new(jwt_config);
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
+        let message_service = MessageService::new(db.clone());
 
         Arc::new(Self {
             db,
@@ -47,6 +51,7 @@ impl AppState {
             auth_service,
             user_service,
             room_service,
+            message_service,
         })
     }
 
@@ -74,6 +79,11 @@ impl AppState {
     pub fn room_service(&self) -> &RoomService {
         &self.room_service
     }
+
+    /// 获取消息服务
+    pub fn message_service(&self) -> &MessageService {
+        &self.message_service
+    }
 }
 
 // 为Arc<AppState>实现Clone
@@ -85,6 +95,7 @@ impl Clone for AppState {
             auth_service: AuthService::new(self.auth_service.jwt_config.clone()),
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),
+            message_service: MessageService::new(self.db.clone()),
         }
     }
 }

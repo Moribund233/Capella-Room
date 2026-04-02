@@ -30,18 +30,41 @@ use seredeli_room::{
 };
 use uuid::Uuid;
 
+/// 测试辅助函数：加载测试环境变量
+fn load_test_env() {
+    // 加载 .env.test 文件
+    if std::path::Path::new(".env.test").exists() {
+        dotenvy::from_filename(".env.test").ok();
+    } else if std::path::Path::new("../.env.test").exists() {
+        dotenvy::from_filename("../.env.test").ok();
+    }
+}
+
 /// 测试辅助函数：创建测试数据库连接
 async fn setup_test_db() -> Database {
-    // 使用测试数据库
-    let database_url = env::var("TEST_DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/seredeli_test".to_string());
+    // 确保环境变量已加载
+    load_test_env();
+
+    // 使用 .env.test 中的 DATABASE_URL
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set in .env.test or environment");
+
+    let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
 
     let db_config = DatabaseConfig {
         url: database_url,
-        max_connections: 5,
+        max_connections,
     };
 
-    Database::new(&db_config).await.expect("Failed to connect to test database")
+    let db = Database::new(&db_config).await.expect("Failed to connect to test database");
+    
+    // 运行数据库迁移
+    db.migrate().await.expect("Failed to run migrations");
+    
+    db
 }
 
 /// 测试辅助函数：创建测试用户
