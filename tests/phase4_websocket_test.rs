@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 // 引入被测模块
 use seredeli_room::{
-    config::{DatabaseConfig, JwtConfig},
+    config::{DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
@@ -94,25 +94,38 @@ async fn setup_test_db() -> Database {
         max_connections,
     };
 
-    Database::new(&db_config)
+    let db = Database::new(&db_config)
         .await
-        .expect("Failed to connect to test database")
+        .expect("Failed to connect to test database");
+    
+    // 运行数据库迁移
+    db.migrate().await.expect("Failed to run migrations");
+    
+    db
 }
 
 /// 测试辅助函数：创建测试服务器
 async fn setup_test_server() -> (TestServer, Database) {
     let db = setup_test_db().await;
 
-    // 运行数据库迁移
-    db.migrate().await.expect("Failed to run migrations");
+    // 设置 UPLOAD_DIR 环境变量（如果不存在）
+    if std::env::var("UPLOAD_DIR").is_err() {
+        let temp_dir = std::env::temp_dir().join(format!("seredeli_upload_test_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).expect("Failed to create temp upload directory");
+        std::env::set_var("UPLOAD_DIR", temp_dir.to_str().unwrap());
+    }
 
     let ws_manager = WebSocketManager::new();
     let jwt_config = JwtConfig {
         secret: "test_secret_key_for_testing_purposes_only".to_string(),
         expiration_hours: 24,
     };
+    let upload_config = UploadConfig {
+        max_file_size: 10 * 1024 * 1024,
+        base_url: "/uploads".to_string(),
+    };
 
-    let state = AppState::new(db.clone(), ws_manager, jwt_config);
+    let state = AppState::new(db.clone(), ws_manager, jwt_config, upload_config).expect("Failed to create app state");
     let app = create_router(state);
 
     let listener = TcpListener::bind("127.0.0.1:0")

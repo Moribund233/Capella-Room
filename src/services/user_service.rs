@@ -291,4 +291,25 @@ impl UserService {
 
         Ok(users)
     }
+
+    /// 更新用户头像
+    pub async fn update_user_avatar(&self, user_id: Uuid, avatar_url: Option<&str>) -> Result<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE users
+            SET avatar_url = $1, updated_at = NOW()
+            WHERE id = $2
+            "#
+        )
+        .bind(avatar_url)
+        .bind(user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
 }

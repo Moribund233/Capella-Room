@@ -1,9 +1,10 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::config::JwtConfig;
+use crate::config::{JwtConfig, UploadConfig};
 use crate::db::Database;
 use crate::services::auth_service::AuthService;
+use crate::services::file_service::FileService;
 use crate::services::message_service::MessageService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
@@ -18,6 +19,7 @@ pub struct AppState {
     pub user_service: UserService,
     pub room_service: RoomService,
     pub message_service: MessageService,
+    pub file_service: FileService,
 }
 
 impl fmt::Debug for AppState {
@@ -29,6 +31,7 @@ impl fmt::Debug for AppState {
             .field("user_service", &"<UserService>")
             .field("room_service", &"<RoomService>")
             .field("message_service", &"<MessageService>")
+            .field("file_service", &"<FileService>")
             .finish()
     }
 }
@@ -39,20 +42,23 @@ impl AppState {
         db: Database,
         ws_manager: Arc<WebSocketManager>,
         jwt_config: JwtConfig,
-    ) -> Arc<Self> {
+        upload_config: UploadConfig,
+    ) -> anyhow::Result<Arc<Self>> {
         let auth_service = AuthService::new(jwt_config);
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
+        let file_service = FileService::from_config(db.clone(), &upload_config)?;
 
-        Arc::new(Self {
+        Ok(Arc::new(Self {
             db,
             ws_manager,
             auth_service,
             user_service,
             room_service,
             message_service,
-        })
+            file_service,
+        }))
     }
 
     /// 获取数据库连接池
@@ -84,11 +90,22 @@ impl AppState {
     pub fn message_service(&self) -> &MessageService {
         &self.message_service
     }
+
+    /// 获取文件服务
+    pub fn file_service(&self) -> &FileService {
+        &self.file_service
+    }
 }
 
 // 为Arc<AppState>实现Clone
 impl Clone for AppState {
     fn clone(&self) -> Self {
+        // 获取文件服务的配置
+        let upload_config = crate::config::UploadConfig {
+            max_file_size: self.file_service.max_file_size(),
+            base_url: self.file_service.get_base_url(),
+        };
+        
         Self {
             db: self.db.clone(),
             ws_manager: Arc::clone(&self.ws_manager),
@@ -96,6 +113,8 @@ impl Clone for AppState {
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),
             message_service: MessageService::new(self.db.clone()),
+            file_service: FileService::from_config(self.db.clone(), &upload_config)
+                .expect("Failed to clone file service"),
         }
     }
 }

@@ -7,6 +7,26 @@ pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub jwt: JwtConfig,
+    pub upload: UploadConfig,
+}
+
+/// 文件上传配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct UploadConfig {
+    /// 最大文件大小（字节），默认 10MB
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size: usize,
+    /// 文件访问的基础URL路径，默认 "/uploads"
+    #[serde(default = "default_base_url")]
+    pub base_url: String,
+}
+
+fn default_max_file_size() -> usize {
+    10 * 1024 * 1024 // 10MB
+}
+
+fn default_base_url() -> String {
+    "/uploads".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -28,6 +48,12 @@ pub struct JwtConfig {
 }
 
 impl AppConfig {
+    /// 获取上传目录路径（从环境变量 UPLOAD_DIR 读取）
+    pub fn upload_dir() -> anyhow::Result<String> {
+        std::env::var("UPLOAD_DIR")
+            .map_err(|_| anyhow::anyhow!("UPLOAD_DIR environment variable is required"))
+    }
+
     /// 从环境变量加载配置
     /// 加载顺序（后面的覆盖前面的）：
     /// 1. 默认配置
@@ -52,6 +78,8 @@ impl AppConfig {
             .set_default("server.port", 3000)?
             .set_default("database.max_connections", 10)?
             .set_default("jwt.expiration_hours", 24)?
+            .set_default("upload.max_file_size", default_max_file_size() as i64)?
+            .set_default("upload.base_url", default_base_url())?
             // 2. 环境变量（APP_前缀，双下划线分隔）
             // 注意：环境变量名需要与结构体字段匹配
             // APP_SERVER__HOST -> server.host
@@ -100,6 +128,17 @@ impl AppConfig {
                     .and_then(|s| s.parse().ok())
                     .or_else(|| config.get::<i64>("jwt.expiration_hours").ok())
                     .unwrap_or(24),
+            },
+            upload: UploadConfig {
+                max_file_size: std::env::var("UPLOAD_MAX_FILE_SIZE")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .or_else(|| config.get::<i64>("upload.max_file_size").ok())
+                    .map(|v| v as usize)
+                    .unwrap_or_else(default_max_file_size),
+                base_url: std::env::var("UPLOAD_BASE_URL")
+                    .or_else(|_| config.get_string("upload.base_url"))
+                    .unwrap_or_else(|_| default_base_url()),
             },
         };
             

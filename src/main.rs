@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
     info!("WebSocket manager initialized");
 
     // 创建应用状态
-    let state = AppState::new(db, ws_manager, config.jwt.clone());
+    let state = AppState::new(db, ws_manager, config.jwt.clone(), config.upload.clone())?;
 
     // 构建应用路由
     let app = create_router(state);

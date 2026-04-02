@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod file;
 pub mod message;
 pub mod room;
 pub mod user;
@@ -8,3 +9,4 @@ pub mod user;
 // - user: 用户相关处理器（获取用户信息、更新资料、用户列表）
 // - room: 聊天室处理器（创建、加入、离开、获取列表）
 // - message: 消息处理器（获取历史消息、搜索消息、删除消息）
+// - file: 文件上传处理器（上传、获取、删除文件）

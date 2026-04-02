@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    handlers::{auth, message, room, user},
+    handlers::{auth, file, message, room, user},
     middleware::auth_middleware,
     state::AppState,
     websocket::handler::ws_handler,
@@ -41,6 +41,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // 消息路由
         .nest(&format!("/api/{}/messages", API_VERSION), message_routes())
         .nest("/api/messages", message_routes())
+        // 文件路由
+        .nest(&format!("/api/{}/files", API_VERSION), file_routes())
+        .nest(&format!("/api/{}/upload", API_VERSION), upload_routes())
         // 添加认证中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -99,6 +102,21 @@ fn message_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/search", get(message::search_messages))
         .route("/:message_id", delete(message::delete_message))
+}
+
+/// 文件路由
+fn file_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/", get(file::list_files))
+        .route("/:file_id", get(file::get_file).delete(file::delete_file))
+}
+
+/// 上传路由
+fn upload_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/", post(file::upload_file))
+        .route("/image", post(file::upload_image))
+        .route("/avatar", post(file::upload_avatar))
 }
 
 /// 健康检查

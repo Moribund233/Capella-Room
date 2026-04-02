@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 // 引入被测模块
 use seredeli_room::{
-    config::{AppConfig, DatabaseConfig, JwtConfig, ServerConfig},
+    config::{AppConfig, DatabaseConfig, JwtConfig, ServerConfig, UploadConfig},
     db::Database,
     error::AppError,
     websocket::manager::WebSocketManager,
@@ -115,6 +115,10 @@ mod config_tests {
                 secret: "test-secret".to_string(),
                 expiration_hours: 12,
             },
+            upload: UploadConfig {
+                max_file_size: 10 * 1024 * 1024,
+                base_url: "/uploads".to_string(),
+            },
         };
 
         let cloned = config.clone();
@@ -139,6 +143,10 @@ mod config_tests {
             jwt: JwtConfig {
                 secret: "test-secret".to_string(),
                 expiration_hours: 12,
+            },
+            upload: UploadConfig {
+                max_file_size: 10 * 1024 * 1024,
+                base_url: "/uploads".to_string(),
             },
         };
 
@@ -372,6 +380,10 @@ mod integration_tests {
                 secret: "test-secret-key".to_string(),
                 expiration_hours: 24,
             },
+            upload: UploadConfig {
+                max_file_size: 10 * 1024 * 1024,
+                base_url: "/uploads".to_string(),
+            },
         };
 
         assert_eq!(config.server.port, 3000);
@@ -420,6 +432,10 @@ mod acceptance_tests {
             jwt: JwtConfig {
                 secret: "secret".to_string(),
                 expiration_hours: 24,
+            },
+            upload: UploadConfig {
+                max_file_size: 10 * 1024 * 1024,
+                base_url: "/uploads".to_string(),
             },
         };
 

@@ -30,7 +30,8 @@ SeredeliRoom/
 ├── docs/
 │   └── development-roadmap.md  # 详细开发路线文档
 ├── migrations/             # 数据库迁移脚本
-│   └── 001_init.sql        # 初始数据库结构
+│   ├── 001_init.sql        # 初始数据库结构
+│   └── 002_add_file_resources.sql  # 文件资源表
 ├── src/
 │   ├── main.rs             # 应用入口
 │   ├── lib.rs              # 库模块导出
@@ -39,17 +40,20 @@ SeredeliRoom/
 │   ├── error/              # 错误处理
 │   ├── handlers/           # HTTP请求处理器
 │   │   ├── auth.rs         # 认证接口
+│   │   ├── file.rs         # 文件上传接口
 │   │   ├── message.rs      # 消息接口
 │   │   ├── room.rs         # 聊天室接口
 │   │   └── user.rs         # 用户接口
 │   ├── middleware/         # 中间件
 │   ├── models/             # 数据模型
+│   │   ├── file.rs         # 文件模型
 │   │   ├── user.rs         # 用户模型
 │   │   ├── room.rs         # 聊天室模型
 │   │   └── message.rs      # 消息模型
 │   ├── routes/             # 路由配置
 │   ├── services/           # 业务逻辑服务层
 │   │   ├── auth_service.rs
+│   │   ├── file_service.rs # 文件服务
 │   │   ├── message_service.rs
 │   │   ├── room_service.rs
 │   │   └── user_service.rs
@@ -59,8 +63,14 @@ SeredeliRoom/
 │       ├── handler.rs
 │       └── manager.rs
 └── tests/                  # 集成测试
-    ├── integration_test.rs
-    └── websocket_test.rs
+    ├── phase1_infrastructure_test.rs
+    ├── phase2_authentication_test.rs
+    ├── phase3_room_management_test.rs
+    ├── phase4_websocket_test.rs
+    ├── phase5_messaging_test.rs
+    ├── phase6_user_features_test.rs
+    ├── phase6_extra_features_test.rs
+    └── phase6_5_file_upload_test.rs
 ```
 
 ## 开发阶段
@@ -156,20 +166,37 @@ SeredeliRoom/
 
 **测试覆盖**：17 个阶段六功能测试全部通过（`tests/phase6_user_features_test.rs`）
 
-#### 阶段 6 扩展功能（额外开发）
+#### 阶段 6 扩展功能（额外开发）📎 规划中
+
+**已完成：**
 
 - [✅] **房间响应增强**：`RoomResponse` 添加 `updated_at` 字段
 - [✅] **最近房间列表**：新增 `GET /api/v1/rooms/recent` 接口
+
+**待开发：**
+
+- [ ] **6.5.1 速率限制中间件** - IP/用户级别的请求限制
+- [ ] **6.5.3 消息增强功能** - 消息回复、编辑历史、全文搜索
 
 **测试覆盖**：`tests/phase6_extra_features_test.rs`
 
 ---
 
-### 阶段 6.5：功能完整性开发 📎 规划中
+### 阶段 6.5：文件上传与资源管理 ✅ 已完成
 
-- [ ] **6.5.1 速率限制中间件** - IP/用户级别的请求限制
-- [ ] **6.5.2 文件上传与资源管理** - 文件上传、分类存储、权限控制
-- [ ] **6.5.3 消息增强功能** - 消息回复、编辑历史、全文搜索
+- [✅] **数据库设计** - `file_resources` 表，支持文件分类、用途、关联关系
+- [✅] **存储架构** - 按 `uploads/{category}/{year}/{month}/{uuid}.{ext}` 结构存储
+- [✅] **配置管理** - `UPLOAD_DIR` 环境变量配置
+- [✅] **API 接口** - 通用上传、图片上传、头像上传、文件查询、删除
+- [✅] **安全特性** - JWT 认证、文件类型验证、大小限制、权限控制
+
+**验收标准**：
+- ✅ 支持图片和文件消息发送
+- ✅ 文件分类存储结构清晰
+- ✅ 文件访问有适当的权限控制
+- ✅ 文件去重机制正常工作
+
+**测试覆盖**：13 个阶段 6.5 功能测试全部通过（`tests/phase6_5_file_upload_test.rs`）
 
 ### 阶段七：测试与优化 🧪 待开始
 
@@ -240,6 +267,11 @@ DATABASE_MAX_CONNECTIONS=10
 JWT_SECRET=your-super-secret-jwt-key
 JWT_EXPIRATION_HOURS=24
 
+# 文件上传配置（必需）
+UPLOAD_DIR=./uploads
+APP_UPLOAD__MAX_FILE_SIZE=10485760  # 10MB
+APP_UPLOAD__BASE_URL=/uploads
+
 # 日志级别
 RUST_LOG=info
 ```
@@ -295,6 +327,14 @@ curl http://localhost:3000/health
 - `GET /api/rooms/:room_id/messages` - 获取聊天室消息历史（支持游标分页）
 - `GET /api/messages/search` - 搜索消息（支持关键词、聊天室筛选）
 - `DELETE /api/messages/:message_id` - 删除消息（软删除）
+
+### 文件上传
+- `POST /api/v1/files/upload` - 通用文件上传
+- `POST /api/v1/files/upload/image` - 图片上传
+- `POST /api/v1/files/upload/avatar` - 头像上传（自动更新用户头像）
+- `GET /api/v1/files` - 获取当前用户文件列表
+- `GET /api/v1/files/:id` - 获取文件信息
+- `DELETE /api/v1/files/:id` - 删除文件
 
 ## 开发指南
 

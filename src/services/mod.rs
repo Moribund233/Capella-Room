@@ -1,4 +1,5 @@
 pub mod auth_service;
+pub mod file_service;
 pub mod message_service;
 pub mod room_service;
 pub mod user_service;
@@ -8,6 +9,7 @@ pub mod user_service;
 // - user_service: 用户相关业务逻辑（用户信息、状态管理）
 // - room_service: 聊天室相关业务逻辑（创建、加入、成员管理）
 // - message_service: 消息相关业务逻辑（发送、查询、搜索）
+// - file_service: 文件上传和资源管理业务逻辑
 //
 // 服务层负责：
 // - 处理复杂的业务逻辑
