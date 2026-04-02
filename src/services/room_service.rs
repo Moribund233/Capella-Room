@@ -612,6 +612,7 @@ impl RoomService {
 
 /// 用于查询的房间行（包含成员数）
 #[derive(Debug, Clone, sqlx::FromRow)]
+#[allow(dead_code)]
 struct RoomRow {
     pub id: Uuid,
     pub name: String,

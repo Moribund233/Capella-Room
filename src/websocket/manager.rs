@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::models::room::MemberRole;
@@ -83,13 +83,13 @@ impl WebSocketManager {
         // 添加到房间订阅列表
         self.room_subscribers
             .entry(room_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(user_id);
 
         // 添加到用户的房间列表
         self.user_rooms
             .entry(user_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(room_id);
     }
 

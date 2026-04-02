@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     error::{AppError, Result},
-    models::user::{User, UserResponse, UserStatus},
+    models::user::{User, UserStatus},
 };
 
 /// 用户服务

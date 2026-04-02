@@ -22,23 +22,37 @@ impl MessageService {
         room_id: Uuid,
         sender_id: Uuid,
         content: &str,
+        message_type: MessageType,
         reply_to: Option<Uuid>,
     ) -> Result<Message> {
         let message = sqlx::query_as::<_, Message>(
             r#"
             INSERT INTO messages (room_id, sender_id, content, message_type, reply_to)
-            VALUES ($1, $2, $3, 'text', $4)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
             "#,
         )
         .bind(room_id)
         .bind(sender_id)
         .bind(content)
+        .bind(message_type)
         .bind(reply_to)
         .fetch_one(self.db.pool())
         .await?;
 
         Ok(message)
+    }
+
+    /// 创建文本消息（便捷方法）
+    pub async fn create_text_message(
+        &self,
+        room_id: Uuid,
+        sender_id: Uuid,
+        content: &str,
+        reply_to: Option<Uuid>,
+    ) -> Result<Message> {
+        self.create_message(room_id, sender_id, content, MessageType::Text, reply_to)
+            .await
     }
 
     /// 获取聊天室消息历史
@@ -49,10 +63,12 @@ impl MessageService {
         before: Option<Uuid>,
     ) -> Result<Vec<MessageResponse>> {
         let messages = if let Some(before_id) = before {
+            // 使用 created_at 进行游标分页，而不是 UUID 比较
             sqlx::query_as::<_, Message>(
                 r#"
                 SELECT * FROM messages 
-                WHERE room_id = $1 AND id < $2 AND is_deleted = false
+                WHERE room_id = $1 AND is_deleted = false
+                AND created_at < (SELECT created_at FROM messages WHERE id = $2)
                 ORDER BY created_at DESC
                 LIMIT $3
                 "#,
@@ -134,19 +150,21 @@ impl MessageService {
 
     /// 删除消息（软删除）
     pub async fn delete_message(&self, message_id: Uuid, user_id: Uuid) -> Result<()> {
-        // 检查消息是否存在且属于该用户
+        // 检查消息是否存在
         let message: Option<Message> = sqlx::query_as(
             r#"
-            SELECT * FROM messages WHERE id = $1 AND sender_id = $2 AND is_deleted = false
+            SELECT * FROM messages WHERE id = $1 AND is_deleted = false
             "#,
         )
         .bind(message_id)
-        .bind(user_id)
         .fetch_optional(self.db.pool())
         .await?;
 
-        if message.is_none() {
-            return Err(AppError::NotFound);
+        let message = message.ok_or(AppError::NotFound)?;
+
+        // 检查权限：只有消息发送者才能删除
+        if message.sender_id != user_id {
+            return Err(AppError::Forbidden);
         }
 
         // 软删除
@@ -226,11 +244,12 @@ impl MessageService {
         limit: i64,
     ) -> Result<Vec<MessageResponse>> {
         let messages = if let Some(last_id) = last_message_id {
-            // 获取指定消息之后的新消息
+            // 获取指定消息之后的新消息（使用 created_at 比较）
             sqlx::query_as::<_, Message>(
                 r#"
                 SELECT * FROM messages 
-                WHERE room_id = $1 AND id > $2 AND is_deleted = false
+                WHERE room_id = $1 AND is_deleted = false
+                AND created_at > (SELECT created_at FROM messages WHERE id = $2)
                 ORDER BY created_at ASC
                 LIMIT $3
                 "#,
@@ -241,7 +260,7 @@ impl MessageService {
             .fetch_all(self.db.pool())
             .await?
         } else {
-            // 如果没有指定最后消息ID，获取最新的消息
+            // 如果没有指定最后消息 ID，获取最新的消息
             sqlx::query_as::<_, Message>(
                 r#"
                 SELECT * FROM messages 

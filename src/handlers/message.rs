@@ -1,44 +1,92 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     Json,
 };
+use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
-    error::Result,
-    models::message::{MessageResponse, SendMessageRequest},
+    error::{AppError, Result},
+    models::message::MessageResponse,
+    services::auth_service::Claims,
     state::AppState,
 };
 
+/// 获取聊天室消息历史查询参数
+#[derive(Debug, Deserialize)]
+pub struct GetMessagesQuery {
+    /// 每页数量，默认 50，最大 100
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    /// 游标分页：获取此 ID 之前的消息
+    pub before: Option<Uuid>,
+}
+
+fn default_limit() -> i64 {
+    50
+}
+
 /// 获取聊天室消息历史
-/// TODO: 实现获取消息历史逻辑（支持分页、游标分页）
 pub async fn get_room_messages(
     State(state): State<Arc<AppState>>,
     Path(room_id): Path<Uuid>,
-    // TODO: 添加分页参数
+    Query(query): Query<GetMessagesQuery>,
 ) -> Result<Json<Vec<MessageResponse>>> {
-    // TODO: 1. 验证用户是否在房间中
-    // TODO: 2. 查询消息历史
-    // TODO: 3. 返回消息列表
+    let limit = query.limit.min(100);
     
-    todo!("实现获取消息历史逻辑")
+    let messages = state
+        .message_service
+        .get_room_messages(room_id, limit, query.before)
+        .await?;
+    
+    Ok(Json(messages))
+}
+
+/// 搜索消息查询参数
+#[derive(Debug, Deserialize, Validate)]
+pub struct SearchMessagesQuery {
+    /// 搜索关键词
+    #[validate(length(min = 1, max = 100))]
+    pub q: String,
+    /// 限定在某个聊天室搜索
+    pub room_id: Option<Uuid>,
+    /// 结果数量限制，默认 50，最大 100
+    #[serde(default = "default_limit")]
+    pub limit: i64,
 }
 
 /// 搜索消息
-/// TODO: 实现搜索消息逻辑
 pub async fn search_messages(
     State(state): State<Arc<AppState>>,
-    // TODO: 添加搜索参数
+    Query(query): Query<SearchMessagesQuery>,
 ) -> Result<Json<Vec<MessageResponse>>> {
-    todo!("实现搜索消息逻辑")
+    query.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    
+    let limit = query.limit.min(100);
+    
+    let messages = state
+        .message_service
+        .search_messages(query.room_id, &query.q, limit)
+        .await?;
+    
+    Ok(Json(messages))
 }
 
 /// 删除消息
-/// TODO: 实现删除消息逻辑（软删除）
 pub async fn delete_message(
     State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
     Path(message_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    todo!("实现删除消息逻辑")
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
+    
+    state.message_service.delete_message(message_id, user_id).await?;
+    
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "消息已删除"
+    })))
 }

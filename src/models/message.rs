@@ -18,7 +18,7 @@ pub struct Message {
 }
 
 /// 消息类型
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "message_type", rename_all = "lowercase")]
 pub enum MessageType {

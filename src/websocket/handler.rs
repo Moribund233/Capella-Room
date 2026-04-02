@@ -567,7 +567,7 @@ async fn handle_chat_message(
     // 保存消息到数据库
     match state
         .message_service()
-        .create_message(room_id, user_id, &content, reply_to)
+        .create_text_message(room_id, user_id, &content, reply_to)
         .await
     {
         Ok(message) => {

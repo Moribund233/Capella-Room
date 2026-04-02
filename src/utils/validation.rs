@@ -170,9 +170,9 @@ pub fn validate_pagination(limit: i64, offset: i64) -> Result<(), ValidationErro
 
 /// 验证聊天室成员数量限制
 pub fn validate_max_members(max_members: i32) -> Result<(), ValidationError> {
-    if max_members < 2 || max_members > 1000 {
+    if !(2..=1000).contains(&max_members) {
         return Err(ValidationError::new(
-            "成员数量限制必须在2-1000之间"
+            "成员数量限制必须在 2-1000 之间"
         ));
     }
 

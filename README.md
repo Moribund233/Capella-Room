@@ -111,20 +111,37 @@ SeredeliRoom/
 
 **测试覆盖**：7 个阶段三功能测试全部通过（`tests/phase3_room_management_test.rs`）
 
-### 阶段四：WebSocket 实时通信 ⏳ 待开发
+### 阶段四：WebSocket 实时通信 ✅ 已完成
 
-- [ ] **4.1 WebSocket 管理器** - 管理连接和房间订阅
-- [ ] **4.2 WebSocket 处理器** - 实现消息收发循环
-- [ ] **4.3 消息协议** - 定义 WebSocket 消息格式
-- [ ] **4.4 房间广播** - 实现消息广播和单播
-- [ ] **4.5 心跳机制** - 实现心跳检测和超时处理
+- [✅] **4.1 WebSocket 管理器** - 管理连接和房间订阅，支持用户连接注册、断开处理
+- [✅] **4.2 WebSocket 处理器** - 实现消息收发循环，支持连接升级、认证、断开清理
+- [✅] **4.3 消息协议** - 定义 WebSocket 消息格式，支持认证、心跳、房间管理、消息通信等
+- [✅] **4.4 房间广播** - 实现房间消息广播、单播、在线用户列表同步
+- [✅] **4.5 心跳机制** - 服务端每 30 秒发送 Ping，客户端回复 Pong，90 秒超时检测
 
-### 阶段五：消息系统 ⏳ 待开发
+**验收标准**：
+- ✅ 客户端可以建立 WebSocket 连接
+- ✅ 用户可以加入/离开房间
+- ✅ 消息可以实时广播到房间所有成员
+- ✅ 心跳机制正常工作，超时连接被清理
 
-- [ ] **5.1 消息模型** - 支持多种消息类型
-- [ ] **5.2 消息存储** - 实现消息持久化
-- [ ] **5.3 消息查询** - 历史消息、搜索功能
-- [ ] **5.4 消息接口** - 获取历史、删除消息
+**测试覆盖**：20 个 WebSocket 测试全部通过（`tests/phase4_websocket_test.rs`）
+
+### 阶段五：消息系统 ✅ 已完成
+
+- [✅] **5.1 消息模型** - 完善 Message 模型，支持 Text/Image/File/System 类型，支持回复功能
+- [✅] **5.2 消息存储** - 实现消息持久化到数据库，WebSocket 消息自动存储，软删除机制
+- [✅] **5.3 消息查询** - 获取聊天室消息历史（游标分页）、搜索消息（模糊搜索）、离线消息获取
+- [✅] **5.4 消息接口** - 实现获取历史、搜索、删除消息的 HTTP API 接口
+
+**验收标准**：
+- ✅ 消息可以正确存储到数据库
+- ✅ 可以获取聊天室历史消息
+- ✅ 消息分页加载正常工作
+- ✅ 可以搜索消息内容
+- ✅ 消息可以软删除
+
+**测试覆盖**：14 个阶段五功能测试全部通过（`tests/phase5_messaging_test.rs`）
 
 ### 阶段六：用户功能完善 ⏳ 待开发
 
@@ -240,14 +257,18 @@ curl http://localhost:3000/health
 - `GET /api/rooms/` - 获取聊天室列表
 - `POST /api/rooms/` - 创建聊天室
 - `GET /api/rooms/:room_id` - 获取聊天室详情
+- `PUT /api/rooms/:room_id` - 更新聊天室信息
+- `DELETE /api/rooms/:room_id` - 删除聊天室
 - `POST /api/rooms/:room_id/join` - 加入聊天室
 - `POST /api/rooms/:room_id/leave` - 离开聊天室
 - `GET /api/rooms/:room_id/members` - 获取成员列表
-- `GET /api/rooms/:room_id/messages` - 获取消息历史
+- `POST /api/rooms/:room_id/kick` - 踢出成员
+- `PUT /api/rooms/:room_id/members/:user_id/role` - 设置成员角色
 
 ### 消息
-- `GET /api/messages/search` - 搜索消息
-- `DELETE /api/messages/:message_id` - 删除消息
+- `GET /api/rooms/:room_id/messages` - 获取聊天室消息历史（支持游标分页）
+- `GET /api/messages/search` - 搜索消息（支持关键词、聊天室筛选）
+- `DELETE /api/messages/:message_id` - 删除消息（软删除）
 
 ## 开发指南
 
