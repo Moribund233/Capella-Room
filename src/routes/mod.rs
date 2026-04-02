@@ -67,17 +67,25 @@ fn user_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/me", get(user::get_current_user))
         .route("/me", put(user::update_user))
+        .route("/me/rooms", get(room::get_my_rooms))
         .route("/", get(user::list_users))
 }
 
 /// 聊天室路由
 fn room_routes() -> Router<Arc<AppState>> {
     Router::new()
+        // 聊天室列表和创建
         .route("/", get(room::list_rooms).post(room::create_room))
-        .route("/:room_id", get(room::get_room))
+        // 聊天室详情、更新、删除
+        .route("/:room_id", get(room::get_room).put(room::update_room).delete(room::delete_room))
+        // 加入/离开聊天室
         .route("/:room_id/join", post(room::join_room))
         .route("/:room_id/leave", post(room::leave_room))
+        // 成员管理
         .route("/:room_id/members", get(room::get_room_members))
+        .route("/:room_id/members/:user_id", delete(room::kick_member))
+        .route("/:room_id/members/:user_id/role", put(room::set_member_role))
+        // 消息
         .route("/:room_id/messages", get(message::get_room_messages))
 }
 

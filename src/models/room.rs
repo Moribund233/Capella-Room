@@ -27,7 +27,7 @@ pub struct RoomMember {
 }
 
 /// 成员角色
-#[derive(Debug, Clone, Serialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "member_role", rename_all = "lowercase")]
 pub enum MemberRole {
