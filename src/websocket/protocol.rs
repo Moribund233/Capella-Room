@@ -97,6 +97,19 @@ pub enum WebSocketMessage {
     /// 房间信息更新
     RoomUpdated { room_id: Uuid, name: Option<String>, description: Option<String> },
     
+    // ========== 用户状态 ==========
+    /// 更新用户状态
+    UpdateStatus { status: UserStatus },
+    
+    /// 用户状态变更通知
+    UserStatusChanged { user_id: Uuid, username: String, status: UserStatus },
+    
+    /// 获取在线用户列表（全局）
+    GetOnlineUsers,
+    
+    /// 全局在线用户列表
+    GlobalOnlineUsers { users: Vec<UserInfo>, total: usize },
+    
     // ========== 断线重连 ==========
     /// 重连请求（携带上次断开时间）
     Reconnect { 

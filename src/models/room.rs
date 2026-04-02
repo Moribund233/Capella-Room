@@ -71,6 +71,7 @@ pub struct RoomResponse {
     pub max_members: i32,
     pub member_count: i64,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Room {
@@ -85,6 +86,7 @@ impl Room {
             max_members: self.max_members,
             member_count,
             created_at: self.created_at,
+            updated_at: self.updated_at,
         }
     }
 

@@ -169,6 +169,53 @@ impl UserService {
         Ok(users)
     }
 
+    /// 搜索用户（支持用户名和邮箱模糊搜索）
+    pub async fn search_users(&self, query: &str, limit: i64, offset: i64) -> Result<(Vec<User>, i64)> {
+        let search_pattern = format!("%{}%", query);
+
+        // 查询用户列表
+        let users = sqlx::query_as::<_, User>(
+            r#"
+            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            FROM users
+            WHERE username ILIKE $1 OR email ILIKE $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#
+        )
+        .bind(&search_pattern)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        // 查询总数
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM users
+            WHERE username ILIKE $1 OR email ILIKE $1
+            "#
+        )
+        .bind(&search_pattern)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok((users, total))
+    }
+
+    /// 统计用户总数
+    pub async fn count_users(&self) -> Result<i64> {
+        let count: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM users
+            "#
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(count)
+    }
+
     /// 检查邮箱是否已存在
     pub async fn email_exists(&self, email: &str) -> Result<bool> {
         let exists: bool = sqlx::query_scalar(
@@ -199,5 +246,49 @@ impl UserService {
         .await?;
 
         Ok(exists)
+    }
+
+    /// 获取在线用户列表
+    pub async fn get_online_users(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
+        let users = sqlx::query_as::<_, User>(
+            r#"
+            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            FROM users
+            WHERE status = 'online'
+            ORDER BY updated_at DESC
+            LIMIT $1 OFFSET $2
+            "#
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(users)
+    }
+
+    /// 获取指定状态的用户列表
+    pub async fn get_users_by_status(
+        &self,
+        status: UserStatus,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<User>> {
+        let users = sqlx::query_as::<_, User>(
+            r#"
+            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            FROM users
+            WHERE status = $1
+            ORDER BY updated_at DESC
+            LIMIT $2 OFFSET $3
+            "#
+        )
+        .bind(status)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(users)
     }
 }

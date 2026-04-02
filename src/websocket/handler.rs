@@ -400,6 +400,16 @@ async fn handle_message(
             handle_get_missed_messages(room_id, user_id, last_message_id, state, tx).await?;
         }
 
+        // 更新用户状态
+        WebSocketMessage::UpdateStatus { status } => {
+            handle_update_status(user_id, username, status, state, tx).await?;
+        }
+
+        // 获取全局在线用户列表
+        WebSocketMessage::GetOnlineUsers => {
+            handle_get_online_users(state, tx).await?;
+        }
+
         // 其他消息类型
         _ => {
             warn!("Unhandled message type from user {}: {:?}", user_id, msg);
@@ -780,6 +790,99 @@ async fn handle_get_missed_messages(
     }
 
     info!("Sent {} missed messages to user {} for room {}", msg_count, user_id, room_id);
+
+    Ok(())
+}
+
+/// 处理更新用户状态
+async fn handle_update_status(
+    user_id: Uuid,
+    username: &str,
+    status: crate::websocket::protocol::UserStatus,
+    state: &AppState,
+    tx: &mpsc::UnboundedSender<String>,
+) -> anyhow::Result<()> {
+    debug!("User {} updating status to {:?}", user_id, status);
+
+    // 转换协议中的UserStatus为模型中的UserStatus
+    let db_status = match status {
+        crate::websocket::protocol::UserStatus::Online => crate::models::user::UserStatus::Online,
+        crate::websocket::protocol::UserStatus::Away => crate::models::user::UserStatus::Away,
+        crate::websocket::protocol::UserStatus::Busy => crate::models::user::UserStatus::Away, // Busy映射为Away
+        crate::websocket::protocol::UserStatus::Offline => crate::models::user::UserStatus::Offline,
+    };
+
+    // 更新数据库中的用户状态
+    match state.user_service().update_user_status(user_id, db_status).await {
+        Ok(_) => {
+            // 广播状态变更给用户的所有房间
+            let user_rooms = state.ws_manager().get_user_rooms(user_id);
+            let status_changed_msg = WebSocketMessage::UserStatusChanged {
+                user_id,
+                username: username.to_string(),
+                status: status.clone(),
+            };
+
+            if let Ok(json) = status_changed_msg.to_json() {
+                for room_id in user_rooms {
+                    state.ws_manager().broadcast_to_room(room_id, json.clone(), Some(user_id)).await;
+                }
+            }
+
+            info!("User {} status updated to {:?}", user_id, status);
+        }
+        Err(e) => {
+            warn!("Failed to update user status: {}", e);
+            let error_msg = WebSocketMessage::error("STATUS_UPDATE_FAILED", "Failed to update status");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理获取全局在线用户列表
+async fn handle_get_online_users(
+    state: &AppState,
+    tx: &mpsc::UnboundedSender<String>,
+) -> anyhow::Result<()> {
+    debug!("Getting global online users");
+
+    // 获取在线用户（限制100个）
+    match state.user_service().get_online_users(100, 0).await {
+        Ok(users) => {
+            let user_infos: Vec<UserInfo> = users
+                .into_iter()
+                .map(|u| UserInfo {
+                    id: u.id,
+                    username: u.username,
+                    avatar_url: u.avatar_url,
+                    status: crate::websocket::protocol::UserStatus::Online,
+                })
+                .collect();
+
+            let total = user_infos.len();
+            let online_users_msg = WebSocketMessage::GlobalOnlineUsers {
+                users: user_infos,
+                total,
+            };
+
+            if let Ok(json) = online_users_msg.to_json() {
+                let _ = tx.send(json);
+            }
+
+            debug!("Sent {} online users", total);
+        }
+        Err(e) => {
+            warn!("Failed to get online users: {}", e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to fetch online users");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json);
+            }
+        }
+    }
 
     Ok(())
 }

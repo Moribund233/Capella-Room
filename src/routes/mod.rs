@@ -65,10 +65,13 @@ fn auth_routes() -> Router<Arc<AppState>> {
 /// 用户路由
 fn user_routes() -> Router<Arc<AppState>> {
     Router::new()
+        // 当前用户相关
         .route("/me", get(user::get_current_user))
         .route("/me", put(user::update_user))
         .route("/me/rooms", get(room::get_my_rooms))
+        // 用户列表和详情
         .route("/", get(user::list_users))
+        .route("/:user_id", get(user::get_user_by_id))
 }
 
 /// 聊天室路由
@@ -76,6 +79,8 @@ fn room_routes() -> Router<Arc<AppState>> {
     Router::new()
         // 聊天室列表和创建
         .route("/", get(room::list_rooms).post(room::create_room))
+        // 最近更新的聊天室列表
+        .route("/recent", get(room::list_recent_rooms))
         // 聊天室详情、更新、删除
         .route("/:room_id", get(room::get_room).put(room::update_room).delete(room::delete_room))
         // 加入/离开聊天室

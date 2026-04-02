@@ -71,7 +71,7 @@ pub async fn list_rooms(
     Query(query): Query<ListRoomsQuery>,
 ) -> Result<Json<Vec<RoomResponse>>> {
     let user_id = state
-        .auth_service
+        .auth_service()
         .extract_user_id(&claims)
         .ok();
 
@@ -81,6 +81,29 @@ pub async fn list_rooms(
     let rooms = state
         .room_service()
         .list_rooms(user_id, query.search.as_deref(), limit, offset)
+        .await?;
+
+    Ok(Json(rooms))
+}
+
+/// 获取最近更新的聊天室列表
+/// 按 updated_at 降序排序，返回最近活跃的房间
+pub async fn list_recent_rooms(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Query(query): Query<ListRoomsQuery>,
+) -> Result<Json<Vec<RoomResponse>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .ok();
+
+    let limit = query.limit.unwrap_or(20).min(100);
+    let offset = query.offset.unwrap_or(0);
+
+    let rooms = state
+        .room_service()
+        .list_recent_rooms(user_id, limit, offset)
         .await?;
 
     Ok(Json(rooms))

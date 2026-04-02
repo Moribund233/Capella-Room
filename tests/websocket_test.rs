@@ -43,8 +43,8 @@
 //! - 消息顺序保证测试
 //! - 大消息测试
 
-#[cfg(test)]
-mod tests {
-    // 所有主要 WebSocket 测试已在 phase4_websocket_test.rs 中实现
-    // 本文件保留用于未来扩展测试
-}
+// #[cfg(test)]
+// mod tests {
+//     // 所有主要 WebSocket 测试已在 phase4_websocket_test.rs 中实现
+//     // 本文件保留用于未来扩展测试
+// }

@@ -1,38 +1,148 @@
-use axum::{extract::State, Json};
+use axum::{
+    extract::{Query, State},
+    Extension, Json,
+};
+use serde::Deserialize;
 use std::sync::Arc;
+use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
-    error::Result,
-    models::user::UserResponse,
+    error::{AppError, Result},
+    models::user::{UpdateUserRequest, UserResponse},
+    services::auth_service::Claims,
     state::AppState,
 };
 
+/// 获取用户列表查询参数
+#[derive(Debug, Deserialize)]
+pub struct ListUsersQuery {
+    /// 搜索关键词（用户名或邮箱）
+    pub search: Option<String>,
+    /// 每页数量（默认20，最大100）
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    /// 偏移量（默认0）
+    #[serde(default = "default_offset")]
+    pub offset: i64,
+}
+
+fn default_limit() -> i64 {
+    20
+}
+
+fn default_offset() -> i64 {
+    0
+}
+
 /// 获取当前用户信息
-/// TODO: 实现获取用户信息逻辑
-#[allow(unused_variables)]
 pub async fn get_current_user(
     State(state): State<Arc<AppState>>,
-    // TODO: 从 JWT 获取用户 ID
+    Extension(claims): Extension<Claims>,
 ) -> Result<Json<UserResponse>> {
-    todo!("实现获取当前用户信息逻辑")
+    // 从Claims中提取用户ID
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)?;
+
+    // 查询用户信息
+    let user = state
+        .user_service()
+        .get_user_by_id(user_id)
+        .await?;
+
+    match user {
+        Some(user) => Ok(Json(user.to_response())),
+        None => Err(AppError::NotFound),
+    }
 }
 
 /// 更新用户信息
-/// TODO: 实现更新用户信息逻辑
-#[allow(unused_variables)]
 pub async fn update_user(
     State(state): State<Arc<AppState>>,
-    // TODO: 添加更新请求体
+    Extension(claims): Extension<Claims>,
+    Json(request): Json<UpdateUserRequest>,
 ) -> Result<Json<UserResponse>> {
-    todo!("实现更新用户信息逻辑")
+    // 验证请求
+    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // 从Claims中提取用户ID
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)?;
+
+    // 更新用户信息
+    let updated_user = state
+        .user_service()
+        .update_user(
+            user_id,
+            request.username.as_deref(),
+            request.avatar_url.as_deref(),
+        )
+        .await?;
+
+    Ok(Json(updated_user.to_response()))
 }
 
 /// 获取用户列表
-/// TODO: 实现获取用户列表逻辑（支持分页和搜索）
-#[allow(unused_variables)]
+/// 支持搜索和分页
 pub async fn list_users(
     State(state): State<Arc<AppState>>,
-    // TODO: 添加查询参数
-) -> Result<Json<Vec<UserResponse>>> {
-    todo!("实现获取用户列表逻辑")
+    Query(query): Query<ListUsersQuery>,
+) -> Result<Json<ListUsersResponse>> {
+    // 限制每页数量
+    let limit = query.limit.clamp(1, 100);
+    let offset = query.offset.max(0);
+
+    // 查询用户列表
+    let (users, total) = if let Some(search) = query.search {
+        // 搜索模式
+        state
+            .user_service()
+            .search_users(&search, limit, offset)
+            .await?
+    } else {
+        // 普通列表模式
+        let users = state.user_service().list_users(limit, offset).await?;
+        let total = state.user_service().count_users().await?;
+        (users, total)
+    };
+
+    // 转换为响应格式
+    let user_responses: Vec<UserResponse> = users
+        .into_iter()
+        .map(|u| u.to_response())
+        .collect();
+
+    Ok(Json(ListUsersResponse {
+        users: user_responses,
+        total,
+        limit,
+        offset,
+    }))
+}
+
+/// 用户列表响应
+#[derive(Debug, serde::Serialize)]
+pub struct ListUsersResponse {
+    pub users: Vec<UserResponse>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+/// 获取指定用户信息
+pub async fn get_user_by_id(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(user_id): axum::extract::Path<Uuid>,
+) -> Result<Json<UserResponse>> {
+    let user = state
+        .user_service()
+        .get_user_by_id(user_id)
+        .await?;
+
+    match user {
+        Some(user) => Ok(Json(user.to_response())),
+        None => Err(AppError::NotFound),
+    }
 }

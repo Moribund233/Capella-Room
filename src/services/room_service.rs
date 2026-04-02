@@ -191,6 +191,74 @@ impl RoomService {
         Ok(rows.into_iter().map(|r| r.into_response()).collect())
     }
 
+    /// 获取最近更新的聊天室列表
+    /// 按 updated_at 降序排序，返回最近活跃的房间
+    pub async fn list_recent_rooms(
+        &self,
+        user_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<RoomResponse>> {
+        let rows = if let Some(uid) = user_id {
+            // 登录用户：可以看到所有公开房间 + 自己加入的私有房间
+            sqlx::query_as::<_, RoomRow>(
+                r#"
+                SELECT 
+                    r.id,
+                    r.name,
+                    r.description,
+                    r.owner_id,
+                    r.is_private,
+                    r.max_members,
+                    r.created_at,
+                    r.updated_at,
+                    COUNT(rm.user_id) as member_count
+                FROM rooms r
+                LEFT JOIN room_members rm ON r.id = rm.room_id
+                WHERE r.is_private = false OR EXISTS (
+                    SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
+                )
+                GROUP BY r.id
+                ORDER BY r.updated_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(uid)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?
+        } else {
+            // 未登录用户：只能看到公开房间
+            sqlx::query_as::<_, RoomRow>(
+                r#"
+                SELECT 
+                    r.id,
+                    r.name,
+                    r.description,
+                    r.owner_id,
+                    r.is_private,
+                    r.max_members,
+                    r.created_at,
+                    r.updated_at,
+                    COUNT(rm.user_id) as member_count
+                FROM rooms r
+                LEFT JOIN room_members rm ON r.id = rm.room_id
+                WHERE r.is_private = false
+                GROUP BY r.id
+                ORDER BY r.updated_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+            )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?
+        };
+
+        Ok(rows.into_iter().map(|r| r.into_response()).collect())
+    }
+
     /// 通过ID获取聊天室
     pub async fn get_room_by_id(&self, room_id: Uuid) -> Result<Option<Room>> {
         let room = sqlx::query_as::<_, Room>(
@@ -636,6 +704,7 @@ impl RoomRow {
             max_members: self.max_members,
             member_count: self.member_count,
             created_at: self.created_at,
+            updated_at: self.updated_at,
         }
     }
 }
