@@ -69,30 +69,36 @@ impl AppConfig {
             )
             .build()?;
             
-        // 手动映射环境变量到配置结构
+        // 手动映射环境变量到配置结构（优先使用环境变量）
         let app_config = AppConfig {
             server: ServerConfig {
-                host: config.get_string("server.host")
-                    .or_else(|_| std::env::var("SERVER_HOST"))
+                host: std::env::var("SERVER_HOST")
+                    .or_else(|_| config.get_string("server.host"))
                     .unwrap_or_else(|_| "0.0.0.0".to_string()),
-                port: config.get::<u16>("server.port")
-                    .or_else(|_| std::env::var("SERVER_PORT").map(|s| s.parse().unwrap_or(3000)))
+                port: std::env::var("SERVER_PORT")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .or_else(|| config.get::<u16>("server.port").ok())
                     .unwrap_or(3000),
             },
             database: DatabaseConfig {
-                url: config.get_string("database.url")
-                    .or_else(|_| std::env::var("DATABASE_URL"))
+                url: std::env::var("DATABASE_URL")
+                    .or_else(|_| config.get_string("database.url"))
                     .map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?,
-                max_connections: config.get::<u32>("database.max_connections")
-                    .or_else(|_| std::env::var("DATABASE_MAX_CONNECTIONS").map(|s| s.parse().unwrap_or(10)))
+                max_connections: std::env::var("DATABASE_MAX_CONNECTIONS")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .or_else(|| config.get::<u32>("database.max_connections").ok())
                     .unwrap_or(10),
             },
             jwt: JwtConfig {
-                secret: config.get_string("jwt.secret")
-                    .or_else(|_| std::env::var("JWT_SECRET"))
+                secret: std::env::var("JWT_SECRET")
+                    .or_else(|_| config.get_string("jwt.secret"))
                     .map_err(|_| anyhow::anyhow!("JWT_SECRET is required"))?,
-                expiration_hours: config.get::<i64>("jwt.expiration_hours")
-                    .or_else(|_| std::env::var("JWT_EXPIRATION_HOURS").map(|s| s.parse().unwrap_or(24)))
+                expiration_hours: std::env::var("JWT_EXPIRATION_HOURS")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .or_else(|| config.get::<i64>("jwt.expiration_hours").ok())
                     .unwrap_or(24),
             },
         };
@@ -114,30 +120,47 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // 使用互斥锁确保测试串行执行
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
+
+    fn setup_env() {
+        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+        std::env::set_var("JWT_SECRET", "test-secret");
+    }
+
+    fn cleanup_env() {
+        std::env::remove_var("SERVER_PORT");
+        std::env::remove_var("DATABASE_URL");
+        std::env::remove_var("JWT_SECRET");
+    }
 
     #[test]
     fn test_default_config() {
-        // 设置必需的环境变量
-        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
-        std::env::set_var("JWT_SECRET", "test-secret");
-        
+        let _lock = TEST_MUTEX.lock().unwrap();
+        cleanup_env();
+        setup_env();
+
         let config = AppConfig::from_env().unwrap();
         assert_eq!(config.server.host, "0.0.0.0");
         assert_eq!(config.server.port, 3000);
         assert_eq!(config.database.max_connections, 10);
         assert_eq!(config.jwt.expiration_hours, 24);
+
+        cleanup_env();
     }
 
     #[test]
     fn test_env_override() {
-        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
-        std::env::set_var("JWT_SECRET", "test-secret");
+        let _lock = TEST_MUTEX.lock().unwrap();
+        cleanup_env();
+        setup_env();
         std::env::set_var("SERVER_PORT", "8080");
-        
+
         let config = AppConfig::from_env().unwrap();
         assert_eq!(config.server.port, 8080);
-        
-        // 清理
-        std::env::remove_var("SERVER_PORT");
+
+        cleanup_env();
     }
 }

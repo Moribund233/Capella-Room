@@ -28,6 +28,7 @@ pub struct RoomMember {
 
 /// 成员角色
 #[derive(Debug, Clone, Serialize, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "member_role", rename_all = "lowercase")]
 pub enum MemberRole {
     Owner,
@@ -38,22 +39,24 @@ pub enum MemberRole {
 /// 创建聊天室请求
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct CreateRoomRequest {
-    #[validate(length(min = 1, max = 50))]
+    #[validate(length(min = 1, max = 50, message = "聊天室名称长度必须在1-50个字符之间"))]
     pub name: String,
-    #[validate(length(max = 200))]
+    #[validate(length(max = 200, message = "聊天室描述不能超过200个字符"))]
     pub description: Option<String>,
     pub is_private: bool,
+    #[validate(range(min = 2, max = 1000, message = "成员数量限制必须在2-1000之间"))]
     pub max_members: Option<i32>,
 }
 
 /// 更新聊天室请求
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct UpdateRoomRequest {
-    #[validate(length(min = 1, max = 50))]
+    #[validate(length(min = 1, max = 50, message = "聊天室名称长度必须在1-50个字符之间"))]
     pub name: Option<String>,
-    #[validate(length(max = 200))]
+    #[validate(length(max = 200, message = "聊天室描述不能超过200个字符"))]
     pub description: Option<String>,
     pub is_private: Option<bool>,
+    #[validate(range(min = 2, max = 1000, message = "成员数量限制必须在2-1000之间"))]
     pub max_members: Option<i32>,
 }
 

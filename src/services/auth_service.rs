@@ -2,7 +2,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -13,44 +13,173 @@ use crate::{
 };
 
 /// JWT Claims
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: Uuid,  // 用户ID
-    pub exp: usize, // 过期时间
-    pub iat: usize, // 签发时间
+    pub sub: String, // 用户ID (字符串格式)
+    pub exp: usize,  // 过期时间
+    pub iat: usize,  // 签发时间
+    pub token_type: String, // token类型: access 或 refresh
+}
+
+/// Token对（访问令牌 + 刷新令牌）
+#[derive(Debug, Clone, Serialize)]
+pub struct TokenPair {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64, // 访问令牌过期时间（秒）
 }
 
 /// 认证服务
+#[derive(Clone)]
 pub struct AuthService {
-    jwt_config: JwtConfig,
+    pub jwt_config: JwtConfig,
 }
 
 impl AuthService {
     pub fn new(jwt_config: JwtConfig) -> Self {
         Self { jwt_config }
     }
-    
+
     /// 密码哈希
-    /// TODO: 实现密码哈希
+    /// 使用 Argon2id 算法进行密码哈希
     pub fn hash_password(&self, password: &str) -> Result<String> {
-        todo!("实现密码哈希")
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+
+        let password_hash = argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|e| AppError::Auth(format!("密码哈希失败: {}", e)))?;
+
+        Ok(password_hash.to_string())
     }
-    
+
     /// 验证密码
-    /// TODO: 实现密码验证
     pub fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
-        todo!("实现密码验证")
+        let parsed_hash = PasswordHash::new(hash)
+            .map_err(|e| AppError::Auth(format!("密码哈希解析失败: {}", e)))?;
+
+        let argon2 = Argon2::default();
+        let result = argon2.verify_password(password.as_bytes(), &parsed_hash);
+
+        match result {
+            Ok(_) => Ok(true),
+            Err(argon2::password_hash::Error::Password) => Ok(false),
+            Err(e) => Err(AppError::Auth(format!("密码验证失败: {}", e))),
+        }
     }
-    
-    /// 生成JWT Token
-    /// TODO: 实现Token生成
-    pub fn generate_token(&self, user_id: Uuid) -> Result<String> {
-        todo!("实现Token生成")
+
+    /// 生成Token对（访问令牌 + 刷新令牌）
+    pub fn generate_token_pair(&self, user_id: Uuid) -> Result<TokenPair> {
+        let access_token = self.generate_access_token(user_id)?;
+        let refresh_token = self.generate_refresh_token(user_id)?;
+
+        Ok(TokenPair {
+            access_token,
+            refresh_token,
+            expires_in: self.jwt_config.expiration_hours * 3600,
+        })
     }
-    
+
+    /// 生成访问令牌
+    fn generate_access_token(&self, user_id: Uuid) -> Result<String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
+
+        let iat = now.as_secs() as usize;
+        let exp = iat + (self.jwt_config.expiration_hours as usize * 3600);
+
+        let claims = Claims {
+            sub: user_id.to_string(),
+            exp,
+            iat,
+            token_type: "access".to_string(),
+        };
+
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(self.jwt_config.secret.as_bytes()),
+        )
+        .map_err(|e| AppError::Auth(format!("Token生成失败: {}", e)))?;
+
+        Ok(token)
+    }
+
+    /// 生成刷新令牌（有效期更长）
+    fn generate_refresh_token(&self, user_id: Uuid) -> Result<String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
+
+        let iat = now.as_secs() as usize;
+        // 刷新令牌有效期为访问令牌的7倍
+        let exp = iat + (self.jwt_config.expiration_hours as usize * 3600 * 7);
+
+        let claims = Claims {
+            sub: user_id.to_string(),
+            exp,
+            iat,
+            token_type: "refresh".to_string(),
+        };
+
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(self.jwt_config.secret.as_bytes()),
+        )
+        .map_err(|e| AppError::Auth(format!("刷新Token生成失败: {}", e)))?;
+
+        Ok(token)
+    }
+
     /// 验证JWT Token
-    /// TODO: 实现Token验证
     pub fn verify_token(&self, token: &str) -> Result<Claims> {
-        todo!("实现Token验证")
+        let validation = Validation::new(Algorithm::HS256);
+
+        let token_data = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.jwt_config.secret.as_bytes()),
+            &validation,
+        )
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                AppError::Auth("Token已过期".to_string())
+            }
+            jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                AppError::Auth("Token签名无效".to_string())
+            }
+            _ => AppError::Auth(format!("Token验证失败: {}", e)),
+        })?;
+
+        Ok(token_data.claims)
+    }
+
+    /// 验证访问令牌
+    pub fn verify_access_token(&self, token: &str) -> Result<Claims> {
+        let claims = self.verify_token(token)?;
+
+        if claims.token_type != "access" {
+            return Err(AppError::Auth("无效的访问令牌".to_string()));
+        }
+
+        Ok(claims)
+    }
+
+    /// 验证刷新令牌
+    pub fn verify_refresh_token(&self, token: &str) -> Result<Claims> {
+        let claims = self.verify_token(token)?;
+
+        if claims.token_type != "refresh" {
+            return Err(AppError::Auth("无效的刷新令牌".to_string()));
+        }
+
+        Ok(claims)
+    }
+
+    /// 从Claims中提取用户ID
+    pub fn extract_user_id(&self, claims: &Claims) -> Result<Uuid> {
+        Uuid::parse_str(&claims.sub)
+            .map_err(|_| AppError::Auth("无效的用户ID".to_string()))
     }
 }

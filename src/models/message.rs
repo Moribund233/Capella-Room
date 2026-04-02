@@ -19,6 +19,7 @@ pub struct Message {
 
 /// 消息类型
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "message_type", rename_all = "lowercase")]
 pub enum MessageType {
     Text,
@@ -39,7 +40,7 @@ pub struct CreateMessageRequest {
 /// 发送消息请求（HTTP API）
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct SendMessageRequest {
-    #[validate(length(min = 1, max = 2000))]
+    #[validate(length(min = 1, max = 2000, message = "消息内容长度必须在1-2000个字符之间"))]
     pub content: String,
     pub message_type: MessageType,
     pub reply_to: Option<Uuid>,
