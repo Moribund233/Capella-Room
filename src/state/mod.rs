@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::config::{JwtConfig, UploadConfig};
 use crate::db::Database;
+use crate::middleware::rate_limit::RateLimiter;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
 use crate::services::message_service::MessageService;
@@ -20,6 +21,7 @@ pub struct AppState {
     pub room_service: RoomService,
     pub message_service: MessageService,
     pub file_service: FileService,
+    pub rate_limiter: Option<Arc<RateLimiter>>,
 }
 
 impl fmt::Debug for AppState {
@@ -50,6 +52,17 @@ impl AppState {
         let message_service = MessageService::new(db.clone());
         let file_service = FileService::from_config(db.clone(), &upload_config)?;
 
+        // 从环境变量读取是否启用速率限制
+        let rate_limiter = if std::env::var("ENABLE_RATE_LIMIT")
+            .ok()
+            .and_then(|s| s.parse::<bool>().ok())
+            .unwrap_or(true)
+        {
+            Some(Arc::new(RateLimiter::default()))
+        } else {
+            None
+        };
+
         Ok(Arc::new(Self {
             db,
             ws_manager,
@@ -58,6 +71,7 @@ impl AppState {
             room_service,
             message_service,
             file_service,
+            rate_limiter,
         }))
     }
 
@@ -95,6 +109,11 @@ impl AppState {
     pub fn file_service(&self) -> &FileService {
         &self.file_service
     }
+
+    /// 获取速率限制器
+    pub fn rate_limiter(&self) -> Option<Arc<RateLimiter>> {
+        self.rate_limiter.clone()
+    }
 }
 
 // 为Arc<AppState>实现Clone
@@ -105,7 +124,7 @@ impl Clone for AppState {
             max_file_size: self.file_service.max_file_size(),
             base_url: self.file_service.get_base_url(),
         };
-        
+
         Self {
             db: self.db.clone(),
             ws_manager: Arc::clone(&self.ws_manager),
@@ -115,6 +134,7 @@ impl Clone for AppState {
             message_service: MessageService::new(self.db.clone()),
             file_service: FileService::from_config(self.db.clone(), &upload_config)
                 .expect("Failed to clone file service"),
+            rate_limiter: self.rate_limiter.clone(),
         }
     }
 }

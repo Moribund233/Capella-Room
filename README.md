@@ -31,7 +31,8 @@ SeredeliRoom/
 │   └── development-roadmap.md  # 详细开发路线文档
 ├── migrations/             # 数据库迁移脚本
 │   ├── 001_init.sql        # 初始数据库结构
-│   └── 002_add_file_resources.sql  # 文件资源表
+│   ├── 002_add_file_resources.sql  # 文件资源表
+│   └── 003_add_message_edits.sql   # 消息编辑历史和全文搜索
 ├── src/
 │   ├── main.rs             # 应用入口
 │   ├── lib.rs              # 库模块导出
@@ -45,6 +46,7 @@ SeredeliRoom/
 │   │   ├── room.rs         # 聊天室接口
 │   │   └── user.rs         # 用户接口
 │   ├── middleware/         # 中间件
+│   │   └── rate_limit.rs   # 速率限制中间件
 │   ├── models/             # 数据模型
 │   │   ├── file.rs         # 文件模型
 │   │   ├── user.rs         # 用户模型
@@ -166,19 +168,21 @@ SeredeliRoom/
 
 **测试覆盖**：17 个阶段六功能测试全部通过（`tests/phase6_user_features_test.rs`）
 
-#### 阶段 6 扩展功能（额外开发）📎 规划中
+#### 阶段 6 扩展功能（额外开发）✅ 已完成
 
 **已完成：**
 
 - [✅] **房间响应增强**：`RoomResponse` 添加 `updated_at` 字段
 - [✅] **最近房间列表**：新增 `GET /api/v1/rooms/recent` 接口
+- [✅] **速率限制中间件** - IP/用户级别的请求限制，支持不同接口不同限制策略
+- [✅] **消息编辑功能** - 支持编辑消息并记录编辑历史
+- [✅] **消息全文搜索** - PostgreSQL tsvector 全文搜索优化
 
 **待开发：**
 
-- [ ] **6.5.1 速率限制中间件** - IP/用户级别的请求限制
-- [ ] **6.5.3 消息增强功能** - 消息回复、编辑历史、全文搜索
+- [ ] **消息回复功能** - 支持回复特定消息并显示引用上下文
 
-**测试覆盖**：`tests/phase6_extra_features_test.rs`
+**测试覆盖**：16 个阶段 6 扩展功能测试全部通过（`tests/phase6_extra_features_test.rs`）
 
 ---
 
@@ -326,6 +330,9 @@ curl http://localhost:3000/health
 ### 消息
 - `GET /api/rooms/:room_id/messages` - 获取聊天室消息历史（支持游标分页）
 - `GET /api/messages/search` - 搜索消息（支持关键词、聊天室筛选）
+- `GET /api/messages/search/fulltext` - 全文搜索消息（PostgreSQL tsvector）
+- `PUT /api/messages/:message_id` - 编辑消息
+- `GET /api/messages/:message_id/history` - 获取消息编辑历史
 - `DELETE /api/messages/:message_id` - 删除消息（软删除）
 
 ### 文件上传

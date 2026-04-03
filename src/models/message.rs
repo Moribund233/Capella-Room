@@ -15,6 +15,8 @@ pub struct Message {
     pub reply_to: Option<Uuid>,
     pub is_deleted: bool,
     pub created_at: DateTime<Utc>,
+    pub edit_count: i32,
+    pub edited_at: Option<DateTime<Utc>>,
 }
 
 /// 消息类型
@@ -46,6 +48,35 @@ pub struct SendMessageRequest {
     pub reply_to: Option<Uuid>,
 }
 
+/// 编辑消息请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct EditMessageRequest {
+    #[validate(length(min = 1, max = 2000, message = "消息内容长度必须在1-2000个字符之间"))]
+    pub content: String,
+}
+
+/// 消息编辑记录
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct MessageEdit {
+    pub id: Uuid,
+    pub message_id: Uuid,
+    pub editor_id: Uuid,
+    pub old_content: String,
+    pub new_content: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 消息编辑记录响应
+#[derive(Debug, Clone, Serialize)]
+pub struct MessageEditResponse {
+    pub id: Uuid,
+    pub message_id: Uuid,
+    pub editor: SenderInfo,
+    pub old_content: String,
+    pub new_content: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// 消息响应
 #[derive(Debug, Clone, Serialize)]
 pub struct MessageResponse {
@@ -57,6 +88,8 @@ pub struct MessageResponse {
     pub reply_to: Option<Uuid>,
     pub is_deleted: bool,
     pub created_at: DateTime<Utc>,
+    pub edit_count: i32,
+    pub edited_at: Option<DateTime<Utc>>,
 }
 
 /// 发送者信息
@@ -79,6 +112,8 @@ impl Message {
             reply_to: self.reply_to,
             is_deleted: self.is_deleted,
             created_at: self.created_at,
+            edit_count: self.edit_count,
+            edited_at: self.edited_at,
         }
     }
 
@@ -152,6 +187,8 @@ mod tests {
             reply_to: None,
             is_deleted: false,
             created_at: Utc::now(),
+            edit_count: 0,
+            edited_at: None,
         };
         assert_eq!(msg.display_content(), "Test content");
 

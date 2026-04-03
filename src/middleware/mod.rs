@@ -14,6 +14,8 @@ use crate::{
     state::AppState,
 };
 
+pub mod rate_limit;
+
 /// 认证中间件
 /// 从Authorization头中提取JWT Token并验证
 pub async fn auth_middleware(

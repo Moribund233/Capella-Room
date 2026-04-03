@@ -165,11 +165,13 @@ mod tests {
     static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     fn setup_env() {
-        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+        std::env::set_var("APP_ENV", "test");
+        std::env::set_var("DATABASE_URL", "postgres://test:test123@localhost:5432/seredeli_room_test");
         std::env::set_var("JWT_SECRET", "test-secret");
     }
 
     fn cleanup_env() {
+        std::env::remove_var("APP_ENV");
         std::env::remove_var("SERVER_PORT");
         std::env::remove_var("DATABASE_URL");
         std::env::remove_var("JWT_SECRET");

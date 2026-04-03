@@ -55,7 +55,7 @@ mod tests {
 
     async fn create_test_db() -> anyhow::Result<Database> {
         let config = DatabaseConfig {
-            url: "postgres://developer:admin123@localhost:5432/seredeli_room".to_string(),
+            url: std::env::var("DATABASE_URL")?,
             max_connections: 5,
         };
         Database::new(&config).await

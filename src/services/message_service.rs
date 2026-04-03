@@ -205,7 +205,7 @@ impl MessageService {
     }
 
     /// 获取发送者信息
-    async fn get_sender_info(&self, user_id: Uuid) -> Result<SenderInfo> {
+    pub async fn get_sender_info(&self, user_id: Uuid) -> Result<SenderInfo> {
         let row: (String, Option<String>) = sqlx::query_as(
             r#"
             SELECT username, avatar_url FROM users WHERE id = $1
@@ -276,6 +276,181 @@ impl MessageService {
         };
 
         // 获取发送者信息并转换为响应
+        let mut responses = Vec::new();
+        for msg in messages {
+            let sender = self.get_sender_info(msg.sender_id).await?;
+            responses.push(msg.to_response(sender));
+        }
+
+        Ok(responses)
+    }
+
+    /// 编辑消息
+    /// 只有消息发送者才能编辑自己的消息
+    pub async fn edit_message(
+        &self,
+        message_id: Uuid,
+        user_id: Uuid,
+        new_content: &str,
+    ) -> Result<Message> {
+        // 检查消息是否存在
+        let message: Option<Message> = sqlx::query_as(
+            r#"
+            SELECT * FROM messages WHERE id = $1 AND is_deleted = false
+            "#,
+        )
+        .bind(message_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let message = message.ok_or(AppError::NotFound)?;
+
+        // 检查是否是系统消息（系统消息不能编辑）
+        if matches!(message.message_type, crate::models::message::MessageType::System) {
+            return Err(AppError::Forbidden);
+        }
+
+        // 检查权限：只有消息发送者才能编辑
+        if message.sender_id != user_id {
+            return Err(AppError::Forbidden);
+        }
+
+        // 开始事务
+        let mut tx = self.db.pool().begin().await?;
+
+        // 记录编辑历史
+        sqlx::query(
+            r#"
+            INSERT INTO message_edits (message_id, editor_id, old_content, new_content)
+            VALUES ($1, $2, $3, $4)
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .bind(&message.content)
+        .bind(new_content)
+        .execute(&mut *tx)
+        .await?;
+
+        // 更新消息内容
+        let updated_message = sqlx::query_as::<_, Message>(
+            r#"
+            UPDATE messages
+            SET 
+                content = $1,
+                edit_count = edit_count + 1,
+                edited_at = NOW()
+            WHERE id = $2
+            RETURNING *
+            "#,
+        )
+        .bind(new_content)
+        .bind(message_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(updated_message)
+    }
+
+    /// 获取消息的编辑历史
+    pub async fn get_message_edit_history(
+        &self,
+        message_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<crate::models::message::MessageEditResponse>> {
+        // 检查消息是否存在
+        let message_exists: (bool,) = sqlx::query_as(
+            r#"
+            SELECT EXISTS(SELECT 1 FROM messages WHERE id = $1)
+            "#,
+        )
+        .bind(message_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        if !message_exists.0 {
+            return Err(AppError::NotFound);
+        }
+
+        // 获取编辑历史
+        let edits = sqlx::query_as::<_, crate::models::message::MessageEdit>(
+            r#"
+            SELECT * FROM message_edits 
+            WHERE message_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(message_id)
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        // 转换为响应格式
+        let mut responses = Vec::new();
+        for edit in edits {
+            let editor = self.get_sender_info(edit.editor_id).await?;
+            responses.push(crate::models::message::MessageEditResponse {
+                id: edit.id,
+                message_id: edit.message_id,
+                editor,
+                old_content: edit.old_content,
+                new_content: edit.new_content,
+                created_at: edit.created_at,
+            });
+        }
+
+        Ok(responses)
+    }
+
+    /// 使用全文搜索搜索消息
+    pub async fn search_messages_fulltext(
+        &self,
+        room_id: Option<Uuid>,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<crate::models::message::MessageResponse>> {
+        // 构建搜索查询 - 使用 | (OR) 操作符连接多个词，并添加前缀匹配
+        let search_query = query
+            .split_whitespace()
+            .map(|word| format!("{}:*", word))
+            .collect::<Vec<_>>()
+            .join(" | ");
+
+        let messages = if let Some(rid) = room_id {
+            sqlx::query_as::<_, crate::models::message::Message>(
+                r#"
+                SELECT * FROM messages 
+                WHERE room_id = $1 
+                AND content_tsv @@ to_tsquery('simple', $2)
+                AND is_deleted = false
+                ORDER BY created_at DESC
+                LIMIT $3
+                "#,
+            )
+            .bind(rid)
+            .bind(&search_query)
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?
+        } else {
+            sqlx::query_as::<_, crate::models::message::Message>(
+                r#"
+                SELECT * FROM messages 
+                WHERE content_tsv @@ to_tsquery('simple', $1)
+                AND is_deleted = false
+                ORDER BY created_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(&search_query)
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?
+        };
+
         let mut responses = Vec::new();
         for msg in messages {
             let sender = self.get_sender_info(msg.sender_id).await?;
