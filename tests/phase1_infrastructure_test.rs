@@ -41,8 +41,8 @@ async fn setup_test_db() -> Database {
     load_test_env();
 
     // 使用 .env.test 中的 DATABASE_URL
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in .env.test or environment");
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env.test or environment");
 
     let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
         .ok()
@@ -54,11 +54,13 @@ async fn setup_test_db() -> Database {
         max_connections,
     };
 
-    let db = Database::new(&db_config).await.expect("Failed to connect to test database");
-    
+    let db = Database::new(&db_config)
+        .await
+        .expect("Failed to connect to test database");
+
     // 运行数据库迁移
     db.migrate().await.expect("Failed to run migrations");
-    
+
     db
 }
 
@@ -257,22 +259,10 @@ mod error_tests {
     /// 测试错误消息格式
     #[test]
     fn test_error_messages() {
-        assert_eq!(
-            format!("{}", AppError::NotFound),
-            "未找到资源"
-        );
-        assert_eq!(
-            format!("{}", AppError::Forbidden),
-            "权限不足"
-        );
-        assert_eq!(
-            format!("{}", AppError::Timeout),
-            "请求超时"
-        );
-        assert_eq!(
-            format!("{}", AppError::Internal),
-            "内部服务器错误"
-        );
+        assert_eq!(format!("{}", AppError::NotFound), "未找到资源");
+        assert_eq!(format!("{}", AppError::Forbidden), "权限不足");
+        assert_eq!(format!("{}", AppError::Timeout), "请求超时");
+        assert_eq!(format!("{}", AppError::Internal), "内部服务器错误");
     }
 }
 
@@ -457,9 +447,9 @@ mod acceptance_tests {
     async fn acceptance_database_connection() {
         // 使用统一的测试数据库连接函数
         let db = setup_test_db().await;
-        
+
         // 验证数据库连接成功
-        assert!(db.pool().is_closed() == false, "数据库连接池应该处于打开状态");
+        assert!(!db.pool().is_closed(), "数据库连接池应该处于打开状态");
     }
 
     /// 验收标准 1.3: 错误处理
@@ -473,18 +463,12 @@ mod acceptance_tests {
             (AppError::Forbidden, StatusCode::FORBIDDEN),
             (AppError::Timeout, StatusCode::REQUEST_TIMEOUT),
             (AppError::Internal, StatusCode::INTERNAL_SERVER_ERROR),
-            (
-                AppError::Auth("test".to_string()),
-                StatusCode::UNAUTHORIZED,
-            ),
+            (AppError::Auth("test".to_string()), StatusCode::UNAUTHORIZED),
             (
                 AppError::Validation("test".to_string()),
                 StatusCode::BAD_REQUEST,
             ),
-            (
-                AppError::Conflict("test".to_string()),
-                StatusCode::CONFLICT,
-            ),
+            (AppError::Conflict("test".to_string()), StatusCode::CONFLICT),
             (
                 AppError::Config("test".to_string()),
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -531,6 +515,6 @@ mod acceptance_tests {
         // AppConfig::from_env 在 config 模块中定义
 
         // 验证通过：所有必要组件都存在
-        assert!(true, "所有启动必要组件都已定义");
+        // 这个断言只是为了确保测试通过
     }
 }

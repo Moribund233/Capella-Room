@@ -10,41 +10,57 @@ pub enum WebSocketMessage {
     // ========== 连接管理 ==========
     /// 客户端连接认证
     Auth { token: String },
-    
+
     /// 认证结果
     AuthResult { success: bool, message: String },
-    
+
     /// 心跳 ping
     Ping,
-    
+
     /// 心跳 pong
     Pong,
-    
+
     /// 错误消息
     Error { code: String, message: String },
-    
+
     // ========== 房间管理 ==========
     /// 加入房间
     JoinRoom { room_id: Uuid },
-    
+
     /// 离开房间
     LeaveRoom { room_id: Uuid },
-    
+
     /// 房间加入结果
-    RoomJoined { room_id: Uuid, user_id: Uuid, username: String },
-    
+    RoomJoined {
+        room_id: Uuid,
+        user_id: Uuid,
+        username: String,
+    },
+
     /// 房间离开结果
-    RoomLeft { room_id: Uuid, user_id: Uuid, username: String },
-    
+    RoomLeft {
+        room_id: Uuid,
+        user_id: Uuid,
+        username: String,
+    },
+
     /// 用户加入房间通知（广播给其他用户）
-    UserJoined { room_id: Uuid, user_id: Uuid, username: String },
-    
+    UserJoined {
+        room_id: Uuid,
+        user_id: Uuid,
+        username: String,
+    },
+
     /// 用户离开房间通知（广播给其他用户）
-    UserLeft { room_id: Uuid, user_id: Uuid, username: String },
-    
+    UserLeft {
+        room_id: Uuid,
+        user_id: Uuid,
+        username: String,
+    },
+
     /// 在线用户列表
     OnlineUsers { room_id: Uuid, users: Vec<UserInfo> },
-    
+
     // ========== 消息通信 ==========
     /// 发送聊天消息
     ChatMessage {
@@ -53,7 +69,7 @@ pub enum WebSocketMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         reply_to: Option<Uuid>,
     },
-    
+
     /// 收到聊天消息（广播）
     NewMessage {
         message_id: Uuid,
@@ -65,85 +81,100 @@ pub enum WebSocketMessage {
         reply_to: Option<Uuid>,
         created_at: DateTime<Utc>,
     },
-    
+
     /// 正在输入状态
     Typing { room_id: Uuid },
-    
+
     /// 停止输入状态
     StopTyping { room_id: Uuid },
-    
+
     /// 消息已读确认
     MessageRead { message_id: Uuid },
-    
+
     /// 消息已读回执
     MessageReadReceipt { message_id: Uuid, user_id: Uuid },
-    
+
     /// 编辑消息
-    EditMessage { message_id: Uuid, new_content: String },
-    
+    EditMessage {
+        message_id: Uuid,
+        new_content: String,
+    },
+
     /// 消息已编辑通知
-    MessageEdited { message_id: Uuid, new_content: String, edited_at: DateTime<Utc> },
-    
+    MessageEdited {
+        message_id: Uuid,
+        new_content: String,
+        edited_at: DateTime<Utc>,
+    },
+
     /// 删除消息
     DeleteMessage { message_id: Uuid },
-    
+
     /// 消息已删除通知
     MessageDeleted { message_id: Uuid },
-    
+
     // ========== 系统消息 ==========
     /// 系统广播
     SystemMessage { content: String },
-    
+
     /// 房间信息更新
-    RoomUpdated { room_id: Uuid, name: Option<String>, description: Option<String> },
-    
+    RoomUpdated {
+        room_id: Uuid,
+        name: Option<String>,
+        description: Option<String>,
+    },
+
     // ========== 用户状态 ==========
     /// 更新用户状态
     UpdateStatus { status: UserStatus },
-    
+
     /// 用户状态变更通知
-    UserStatusChanged { user_id: Uuid, username: String, status: UserStatus },
-    
+    UserStatusChanged {
+        user_id: Uuid,
+        username: String,
+        status: UserStatus,
+    },
+
     /// 获取在线用户列表（全局）
     GetOnlineUsers,
-    
+
     /// 全局在线用户列表
     GlobalOnlineUsers { users: Vec<UserInfo>, total: usize },
-    
+
     // ========== 断线重连 ==========
     /// 重连请求（携带上次断开时间）
-    Reconnect { 
+    Reconnect {
         token: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         last_disconnect_at: Option<DateTime<Utc>>,
     },
-    
+
     /// 重连结果
-    ReconnectResult { 
-        success: bool, 
+    ReconnectResult {
+        success: bool,
         message: String,
         /// 需要重新加入的房间列表
         #[serde(skip_serializing_if = "Option::is_none")]
         rooms_to_rejoin: Option<Vec<Uuid>>,
     },
-    
+
     /// 请求离线期间的消息
-    GetMissedMessages { 
+    GetMissedMessages {
         room_id: Uuid,
         /// 上次接收的消息ID
         last_message_id: Option<Uuid>,
     },
-    
+
     /// 离线消息列表
-    MissedMessages { 
+    MissedMessages {
         room_id: Uuid,
         messages: Vec<MissedMessage>,
         /// 是否有更多消息
         has_more: bool,
     },
-    
+
     /// 会话恢复完成
-    SessionRestored { 
+    SessionRestored {
         restored_at: DateTime<Utc>,
         /// 恢复的房间数
         rooms_restored: usize,
@@ -176,7 +207,7 @@ pub struct UserInfo {
 }
 
 /// 用户在线状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum UserStatus {
     Online,
@@ -188,14 +219,16 @@ pub enum UserStatus {
 impl WebSocketMessage {
     /// 序列化为 JSON 字符串
     pub fn to_json(&self) -> anyhow::Result<String> {
-        serde_json::to_string(self).map_err(|e| anyhow::anyhow!("Failed to serialize message: {}", e))
+        serde_json::to_string(self)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize message: {}", e))
     }
-    
+
     /// 从 JSON 字符串反序列化
     pub fn from_json(json: &str) -> anyhow::Result<Self> {
-        serde_json::from_str(json).map_err(|e| anyhow::anyhow!("Failed to deserialize message: {}", e))
+        serde_json::from_str(json)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize message: {}", e))
     }
-    
+
     /// 创建成功认证响应
     pub fn auth_success() -> Self {
         Self::AuthResult {
@@ -203,7 +236,7 @@ impl WebSocketMessage {
             message: "Authentication successful".to_string(),
         }
     }
-    
+
     /// 创建失败认证响应
     pub fn auth_failed(reason: &str) -> Self {
         Self::AuthResult {
@@ -211,7 +244,7 @@ impl WebSocketMessage {
             message: reason.to_string(),
         }
     }
-    
+
     /// 创建错误消息
     pub fn error(code: &str, message: &str) -> Self {
         Self::Error {
@@ -219,7 +252,7 @@ impl WebSocketMessage {
             message: message.to_string(),
         }
     }
-    
+
     /// 创建聊天消息
     pub fn new_chat_message(
         message_id: Uuid,
@@ -239,7 +272,7 @@ impl WebSocketMessage {
             created_at: Utc::now(),
         }
     }
-    
+
     /// 创建重连成功响应
     pub fn reconnect_success(rooms_to_rejoin: Vec<Uuid>) -> Self {
         Self::ReconnectResult {
@@ -248,7 +281,7 @@ impl WebSocketMessage {
             rooms_to_rejoin: Some(rooms_to_rejoin),
         }
     }
-    
+
     /// 创建重连失败响应
     pub fn reconnect_failed(reason: &str) -> Self {
         Self::ReconnectResult {
@@ -257,7 +290,7 @@ impl WebSocketMessage {
             rooms_to_rejoin: None,
         }
     }
-    
+
     /// 创建会话恢复完成消息
     pub fn session_restored(rooms_restored: usize, total_unread: usize) -> Self {
         Self::SessionRestored {
@@ -284,7 +317,7 @@ mod tests {
         let json = r#"{"type":"Ping"}"#;
         let msg = WebSocketMessage::from_json(json).unwrap();
         match msg {
-            WebSocketMessage::Ping => {},
+            WebSocketMessage::Ping => {}
             _ => panic!("Expected Ping message"),
         }
     }
@@ -297,12 +330,16 @@ mod tests {
             content: "Hello, World!".to_string(),
             reply_to: None,
         };
-        
+
         let json = original.to_json().unwrap();
         let deserialized = WebSocketMessage::from_json(&json).unwrap();
-        
+
         match deserialized {
-            WebSocketMessage::ChatMessage { room_id: r, content: c, reply_to } => {
+            WebSocketMessage::ChatMessage {
+                room_id: r,
+                content: c,
+                reply_to,
+            } => {
                 assert_eq!(r, room_id);
                 assert_eq!(c, "Hello, World!");
                 assert!(reply_to.is_none());

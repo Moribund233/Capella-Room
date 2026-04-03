@@ -1,11 +1,11 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 use validator::ValidationError;
-use once_cell::sync::Lazy;
+
+use crate::utils::security::HtmlFilter;
 
 /// 用户名正则：只允许字母、数字、下划线，必须以字母开头
-static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap()
-});
+static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
 
 /// 验证用户名格式
 /// - 长度：3-20字符
@@ -13,14 +13,12 @@ static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
 /// - 只允许字母、数字、下划线
 pub fn validate_username(username: &str) -> Result<(), ValidationError> {
     if username.len() < 3 || username.len() > 20 {
-        return Err(ValidationError::new(
-            "用户名长度必须在3-20个字符之间"
-        ));
+        return Err(ValidationError::new("用户名长度必须在3-20个字符之间"));
     }
 
     if !USERNAME_REGEX.is_match(username) {
         return Err(ValidationError::new(
-            "用户名必须以字母开头，只能包含字母、数字和下划线"
+            "用户名必须以字母开头，只能包含字母、数字和下划线",
         ));
     }
 
@@ -33,15 +31,11 @@ pub fn validate_username(username: &str) -> Result<(), ValidationError> {
 /// - 可选：特殊字符
 pub fn validate_password_strength(password: &str) -> Result<(), ValidationError> {
     if password.len() < 8 {
-        return Err(ValidationError::new(
-            "密码长度至少为8个字符"
-        ));
+        return Err(ValidationError::new("密码长度至少为8个字符"));
     }
 
     if password.len() > 128 {
-        return Err(ValidationError::new(
-            "密码长度不能超过128个字符"
-        ));
+        return Err(ValidationError::new("密码长度不能超过128个字符"));
     }
 
     // 检查是否包含大写字母
@@ -53,7 +47,7 @@ pub fn validate_password_strength(password: &str) -> Result<(), ValidationError>
 
     if !has_upper || !has_lower || !has_digit {
         return Err(ValidationError::new(
-            "密码必须包含至少一个大写字母、一个小写字母和一个数字"
+            "密码必须包含至少一个大写字母、一个小写字母和一个数字",
         ));
     }
 
@@ -63,9 +57,7 @@ pub fn validate_password_strength(password: &str) -> Result<(), ValidationError>
 /// 验证邮箱格式（更严格的验证）
 pub fn validate_email_format(email: &str) -> Result<(), ValidationError> {
     if email.len() > 254 {
-        return Err(ValidationError::new(
-            "邮箱长度不能超过254个字符"
-        ));
+        return Err(ValidationError::new("邮箱长度不能超过254个字符"));
     }
 
     // 基本格式检查
@@ -93,15 +85,11 @@ pub fn validate_email_format(email: &str) -> Result<(), ValidationError> {
 /// - 不能全是空白字符
 pub fn validate_room_name(name: &str) -> Result<(), ValidationError> {
     if name.trim().is_empty() {
-        return Err(ValidationError::new(
-            "聊天室名称不能为空"
-        ));
+        return Err(ValidationError::new("聊天室名称不能为空"));
     }
 
     if name.len() > 50 {
-        return Err(ValidationError::new(
-            "聊天室名称不能超过50个字符"
-        ));
+        return Err(ValidationError::new("聊天室名称不能超过50个字符"));
     }
 
     Ok(())
@@ -111,9 +99,7 @@ pub fn validate_room_name(name: &str) -> Result<(), ValidationError> {
 /// - 最大长度：200字符
 pub fn validate_room_description(description: &str) -> Result<(), ValidationError> {
     if description.len() > 200 {
-        return Err(ValidationError::new(
-            "聊天室描述不能超过200个字符"
-        ));
+        return Err(ValidationError::new("聊天室描述不能超过200个字符"));
     }
 
     Ok(())
@@ -121,31 +107,44 @@ pub fn validate_room_description(description: &str) -> Result<(), ValidationErro
 
 /// 验证消息内容
 /// - 不能为空（去除空白后）
-/// - 最大长度：2000字符
+/// - 最大长度：2000 字符
+/// - 不能包含 XSS 攻击内容
 pub fn validate_message_content(content: &str) -> Result<(), ValidationError> {
     let trimmed = content.trim();
 
     if trimmed.is_empty() {
-        return Err(ValidationError::new(
-            "消息内容不能为空"
-        ));
+        return Err(ValidationError::new("消息内容不能为空"));
     }
 
     if content.len() > 2000 {
-        return Err(ValidationError::new(
-            "消息内容不能超过2000个字符"
-        ));
+        return Err(ValidationError::new("消息内容不能超过 2000 个字符"));
+    }
+
+    // 检查是否包含 XSS 攻击
+    if HtmlFilter::contains_xss(content) {
+        return Err(ValidationError::new("消息内容包含不安全内容"));
     }
 
     Ok(())
 }
 
+/// 验证并过滤消息内容（安全版本）
+/// - 过滤 HTML/XSS 内容
+/// - 验证长度
+pub fn sanitize_message_content(content: &str) -> Result<String, ValidationError> {
+    // 先过滤 HTML/XSS
+    let sanitized = HtmlFilter::sanitize(content);
+
+    // 验证过滤后的内容
+    validate_message_content(&sanitized)?;
+
+    Ok(sanitized)
+}
+
 /// 验证UUID格式
 pub fn validate_uuid(uuid_str: &str) -> Result<(), ValidationError> {
     if uuid::Uuid::parse_str(uuid_str).is_err() {
-        return Err(ValidationError::new(
-            "UUID格式不正确"
-        ));
+        return Err(ValidationError::new("UUID格式不正确"));
     }
 
     Ok(())
@@ -154,15 +153,11 @@ pub fn validate_uuid(uuid_str: &str) -> Result<(), ValidationError> {
 /// 验证分页参数
 pub fn validate_pagination(limit: i64, offset: i64) -> Result<(), ValidationError> {
     if limit <= 0 || limit > 100 {
-        return Err(ValidationError::new(
-            "每页数量必须在1-100之间"
-        ));
+        return Err(ValidationError::new("每页数量必须在1-100之间"));
     }
 
     if offset < 0 {
-        return Err(ValidationError::new(
-            "偏移量不能为负数"
-        ));
+        return Err(ValidationError::new("偏移量不能为负数"));
     }
 
     Ok(())
@@ -171,9 +166,7 @@ pub fn validate_pagination(limit: i64, offset: i64) -> Result<(), ValidationErro
 /// 验证聊天室成员数量限制
 pub fn validate_max_members(max_members: i32) -> Result<(), ValidationError> {
     if !(2..=1000).contains(&max_members) {
-        return Err(ValidationError::new(
-            "成员数量限制必须在 2-1000 之间"
-        ));
+        return Err(ValidationError::new("成员数量限制必须在 2-1000 之间"));
     }
 
     Ok(())

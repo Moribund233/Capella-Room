@@ -6,12 +6,15 @@ use uuid::Uuid;
 
 use crate::models::room::MemberRole;
 
+/// WebSocket 消息通道缓冲区大小（与 handler.rs 保持一致）
+pub const WS_MESSAGE_BUFFER_SIZE: usize = 100;
+
 /// 用户连接信息
 #[derive(Debug, Clone)]
 pub struct UserConnection {
     pub user_id: Uuid,
     pub username: String,
-    pub sender: mpsc::UnboundedSender<String>,
+    pub sender: mpsc::Sender<String>,
 }
 
 /// 房间成员信息
@@ -45,7 +48,7 @@ impl WebSocketManager {
     }
 
     /// 注册新连接
-    pub fn connect(&self, user_id: Uuid, username: String, sender: mpsc::UnboundedSender<String>) {
+    pub fn connect(&self, user_id: Uuid, username: String, sender: mpsc::Sender<String>) {
         debug!("User {} ({}) connected to WebSocket", username, user_id);
         let connection = UserConnection {
             user_id,
@@ -54,26 +57,48 @@ impl WebSocketManager {
         };
         self.connections.insert(user_id, connection);
         self.user_rooms.insert(user_id, Vec::new());
+
+        // 更新连接指标
+        self.update_connection_metrics();
     }
 
     /// 断开连接
     pub fn disconnect(&self, user_id: Uuid) {
         debug!("User {} disconnected from WebSocket", user_id);
-        
+
         // 获取用户加入的所有房间
-        let rooms: Vec<Uuid> = self.user_rooms
+        let rooms: Vec<Uuid> = self
+            .user_rooms
             .get(&user_id)
             .map(|r| r.clone())
             .unwrap_or_default();
-        
+
         // 从所有房间中移除该用户
         for room_id in rooms {
             self.leave_room(room_id, user_id);
         }
-        
+
         // 移除连接
         self.connections.remove(&user_id);
         self.user_rooms.remove(&user_id);
+
+        // 更新连接指标
+        self.update_connection_metrics();
+    }
+
+    /// 更新连接指标
+    fn update_connection_metrics(&self) {
+        let total_connections = self.connections.len();
+        debug!("Total active WebSocket connections: {}", total_connections);
+        // 这里可以集成具体的指标收集器，如 Prometheus、OpenTelemetry 等
+        // metrics::gauge!("websocket.connections", total_connections as f64);
+    }
+
+    /// 获取通道缓冲区使用率（用于监控背压）
+    pub fn get_channel_buffer_usage(&self, _user_id: Uuid) -> Option<f64> {
+        // 注意：tokio mpsc::Sender 没有直接的 capacity() 方法
+        // 实际应用中可以添加专门的指标收集
+        None
     }
 
     /// 加入房间
@@ -87,10 +112,7 @@ impl WebSocketManager {
             .push(user_id);
 
         // 添加到用户的房间列表
-        self.user_rooms
-            .entry(user_id)
-            .or_default()
-            .push(room_id);
+        self.user_rooms.entry(user_id).or_default().push(room_id);
     }
 
     /// 离开房间
@@ -109,7 +131,12 @@ impl WebSocketManager {
     }
 
     /// 广播消息到房间（排除指定用户）
-    pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_user: Option<Uuid>) {
+    pub async fn broadcast_to_room(
+        &self,
+        room_id: Uuid,
+        message: String,
+        exclude_user: Option<Uuid>,
+    ) {
         if let Some(subscribers) = self.room_subscribers.get(&room_id) {
             for user_id in subscribers.iter() {
                 // 跳过被排除的用户
@@ -118,7 +145,7 @@ impl WebSocketManager {
                         continue;
                     }
                 }
-                
+
                 if let Err(e) = self.send_to_user(*user_id, message.clone()).await {
                     warn!("Failed to send message to user {}: {}", user_id, e);
                 }
@@ -132,13 +159,30 @@ impl WebSocketManager {
     }
 
     /// 发送消息给指定用户
+    /// 使用带超时的发送实现背压机制
+    /// 如果通道已满（缓冲区 100 条消息），等待最多 1 秒
+    /// 如果超时，返回错误并记录警告
     pub async fn send_to_user(&self, user_id: Uuid, message: String) -> anyhow::Result<()> {
         if let Some(connection) = self.connections.get(&user_id) {
-            connection
-                .sender
-                .send(message)
-                .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))?;
-            Ok(())
+            // 使用 tokio::time::timeout 实现发送超时
+            // 防止因客户端处理慢导致服务端阻塞
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                connection.sender.send(message),
+            )
+            .await
+            {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(e)) => {
+                    // 通道关闭，用户已断开
+                    Err(anyhow::anyhow!("User {} connection closed: {}", user_id, e))
+                }
+                Err(_) => {
+                    // 发送超时，触发背压
+                    warn!("Backpressure: Failed to send message to user {} within timeout (channel full)", user_id);
+                    Err(anyhow::anyhow!("Message send timeout (backpressure)"))
+                }
+            }
         } else {
             Err(anyhow::anyhow!("User {} is not connected", user_id))
         }
@@ -160,9 +204,9 @@ impl WebSocketManager {
                 subscribers
                     .iter()
                     .filter_map(|user_id| {
-                        self.connections.get(user_id).map(|conn| {
-                            (conn.user_id, conn.username.clone())
-                        })
+                        self.connections
+                            .get(user_id)
+                            .map(|conn| (conn.user_id, conn.username.clone()))
                     })
                     .collect()
             })
@@ -230,7 +274,7 @@ mod tests {
     fn test_connect_disconnect() {
         let manager = WebSocketManager::new();
         let user_id = Uuid::new_v4();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel::<String>(100);
 
         manager.connect(user_id, "test_user".to_string(), tx);
         assert_eq!(manager.get_total_connections(), 1);
@@ -246,7 +290,7 @@ mod tests {
         let manager = WebSocketManager::new();
         let user_id = Uuid::new_v4();
         let room_id = Uuid::new_v4();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel::<String>(100);
 
         manager.connect(user_id, "test_user".to_string(), tx);
         manager.join_room(room_id, user_id);

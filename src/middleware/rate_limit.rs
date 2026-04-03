@@ -126,7 +126,7 @@ impl RateLimiter {
     }
 
     /// 使用默认配置创建
-    pub fn default() -> Self {
+    pub fn with_default_config() -> Self {
         Self::new(RateLimitConfig::default())
     }
 
@@ -148,7 +148,10 @@ impl RateLimiter {
         // 检查是否超过限制
         let count = record.count_requests(window);
         if count >= limit as usize {
-            debug!("IP {} exceeded rate limit: {}/{} in {}s", ip, count, limit, window_secs);
+            debug!(
+                "IP {} exceeded rate limit: {}/{} in {}s",
+                ip, count, limit, window_secs
+            );
             return false;
         }
 
@@ -175,7 +178,10 @@ impl RateLimiter {
         // 检查是否超过限制
         let count = record.count_requests(window);
         if count >= limit as usize {
-            debug!("User {} exceeded rate limit: {}/{} in {}s", user_id, count, limit, window_secs);
+            debug!(
+                "User {} exceeded rate limit: {}/{} in {}s",
+                user_id, count, limit, window_secs
+            );
             return false;
         }
 
@@ -189,11 +195,17 @@ impl RateLimiter {
         if path.contains("/auth/") || path.contains("/login") || path.contains("/register") {
             (self.config.auth_requests, self.config.auth_window_secs)
         } else if path.contains("/messages") {
-            (self.config.message_requests, self.config.message_window_secs)
+            (
+                self.config.message_requests,
+                self.config.message_window_secs,
+            )
         } else if path.contains("/rooms") {
             (self.config.room_requests, self.config.room_window_secs)
         } else {
-            (self.config.default_requests, self.config.default_window_secs)
+            (
+                self.config.default_requests,
+                self.config.default_window_secs,
+            )
         }
     }
 }
@@ -279,8 +291,14 @@ pub async fn rate_limit_middleware(
     let (limit, window_secs) = rate_limiter.get_ip_limit(&path);
 
     // 检查IP限制
-    if !rate_limiter.check_ip_limit(&client_ip, limit, window_secs).await {
-        warn!("Rate limit exceeded for IP: {} on path: {}", client_ip, path);
+    if !rate_limiter
+        .check_ip_limit(&client_ip, limit, window_secs)
+        .await
+    {
+        warn!(
+            "Rate limit exceeded for IP: {} on path: {}",
+            client_ip, path
+        );
         let retry_after = window_secs;
         return (
             StatusCode::TOO_MANY_REQUESTS,
@@ -293,8 +311,14 @@ pub async fn rate_limit_middleware(
     if let Some(user_id) = extract_user_id(&request) {
         // 用户级别限制更严格（默认限制的一半）
         let user_limit = (limit / 2).max(1);
-        if !rate_limiter.check_user_limit(&user_id, user_limit, window_secs).await {
-            warn!("Rate limit exceeded for user: {} on path: {}", user_id, path);
+        if !rate_limiter
+            .check_user_limit(&user_id, user_limit, window_secs)
+            .await
+        {
+            warn!(
+                "Rate limit exceeded for user: {} on path: {}",
+                user_id, path
+            );
             let retry_after = window_secs;
             return (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -331,7 +355,10 @@ pub async fn strict_rate_limit_middleware(
     let window_secs = rate_limiter.config.auth_window_secs;
 
     // 检查IP限制
-    if !rate_limiter.check_ip_limit(&client_ip, limit, window_secs).await {
+    if !rate_limiter
+        .check_ip_limit(&client_ip, limit, window_secs)
+        .await
+    {
         warn!(
             "Strict rate limit exceeded for IP: {} on auth endpoint",
             client_ip
@@ -353,7 +380,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rate_limiter_ip_limit() {
-        let limiter = RateLimiter::default();
+        let limiter = RateLimiter::with_default_config();
 
         // 在限制范围内应该通过
         for i in 0..5 {
@@ -362,21 +389,21 @@ mod tests {
         }
 
         // 清理之前的记录，重新测试限制
-        let limiter = RateLimiter::default();
+        let limiter2 = RateLimiter::with_default_config();
 
         // 超过限制应该被拒绝
         for _ in 0..10 {
-            limiter.check_ip_limit("192.168.1.1", 10, 60).await;
+            limiter2.check_ip_limit("192.168.1.1", 10, 60).await;
         }
 
-        // 第11个请求应该被拒绝
-        let allowed = limiter.check_ip_limit("192.168.1.1", 10, 60).await;
+        // 第 11 个请求应该被拒绝
+        let allowed = limiter2.check_ip_limit("192.168.1.1", 10, 60).await;
         assert!(!allowed, "Request should be denied after limit");
     }
 
     #[tokio::test]
     async fn test_rate_limiter_user_limit() {
-        let limiter = RateLimiter::default();
+        let limiter = RateLimiter::with_default_config();
 
         // 用户级别限制
         for i in 0..5 {
@@ -391,7 +418,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_ip_limit() {
-        let limiter = RateLimiter::default();
+        let limiter = RateLimiter::with_default_config();
 
         // 认证接口
         let (limit, window) = limiter.get_ip_limit("/api/v1/auth/login");

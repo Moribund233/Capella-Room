@@ -47,20 +47,15 @@ impl FileCategory {
 }
 
 /// 文件用途类型
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "file_usage_type", rename_all = "lowercase")]
 pub enum FileUsageType {
     Avatar,
     Message,
     RoomCover,
+    #[default]
     General,
-}
-
-impl Default for FileUsageType {
-    fn default() -> Self {
-        Self::General
-    }
 }
 
 /// 文件资源数据库模型

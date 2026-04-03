@@ -14,7 +14,6 @@
 //! ✅ 权限控制正确生效
 
 use std::env;
-use std::sync::Arc;
 
 // 引入被测模块
 use seredeli_room::{

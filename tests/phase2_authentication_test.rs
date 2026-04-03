@@ -624,7 +624,7 @@ mod acceptance_tests {
 
         // 创建测试用户
         let password_hash = auth_service.hash_password(password).unwrap();
-        let user = user_service
+        user_service
             .create_user(&username, &email, &password_hash)
             .await
             .expect("创建用户失败");

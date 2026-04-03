@@ -204,7 +204,7 @@ impl FileService {
         uploader_id: Uuid,
         params: FileQueryParams,
     ) -> Result<FileListResponse> {
-        let limit = params.limit.unwrap_or(20).max(1).min(100);
+        let limit = params.limit.unwrap_or(20).clamp(1, 100);
         let offset = params.offset.unwrap_or(0).max(0);
 
         let files = match (&params.category, &params.usage_type) {

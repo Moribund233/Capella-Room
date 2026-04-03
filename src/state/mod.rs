@@ -9,13 +9,15 @@ use crate::services::file_service::FileService;
 use crate::services::message_service::MessageService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
+use crate::utils::logging::MetricsCollector;
 use crate::websocket::manager::WebSocketManager;
 
 /// 应用状态
-/// 在Axum处理函数中通过State提取器访问
+/// 在 Axum 处理函数中通过 State 提取器访问
 pub struct AppState {
     pub db: Database,
     pub ws_manager: Arc<WebSocketManager>,
+    pub metrics_collector: Arc<MetricsCollector>,
     pub auth_service: AuthService,
     pub user_service: UserService,
     pub room_service: RoomService,
@@ -29,6 +31,7 @@ impl fmt::Debug for AppState {
         f.debug_struct("AppState")
             .field("db", &self.db)
             .field("ws_manager", &self.ws_manager)
+            .field("metrics_collector", &"<MetricsCollector>")
             .field("auth_service", &"<AuthService>")
             .field("user_service", &"<UserService>")
             .field("room_service", &"<RoomService>")
@@ -45,6 +48,7 @@ impl AppState {
         ws_manager: Arc<WebSocketManager>,
         jwt_config: JwtConfig,
         upload_config: UploadConfig,
+        metrics_collector: Arc<MetricsCollector>,
     ) -> anyhow::Result<Arc<Self>> {
         let auth_service = AuthService::new(jwt_config);
         let user_service = UserService::new(db.clone());
@@ -58,7 +62,7 @@ impl AppState {
             .and_then(|s| s.parse::<bool>().ok())
             .unwrap_or(true)
         {
-            Some(Arc::new(RateLimiter::default()))
+            Some(Arc::new(RateLimiter::with_default_config()))
         } else {
             None
         };
@@ -66,6 +70,7 @@ impl AppState {
         Ok(Arc::new(Self {
             db,
             ws_manager,
+            metrics_collector,
             auth_service,
             user_service,
             room_service,
@@ -80,9 +85,14 @@ impl AppState {
         &self.db
     }
 
-    /// 获取WebSocket管理器
+    /// 获取 WebSocket 管理器
     pub fn ws_manager(&self) -> &WebSocketManager {
         &self.ws_manager
+    }
+
+    /// 获取指标收集器
+    pub fn metrics_collector(&self) -> &MetricsCollector {
+        &self.metrics_collector
     }
 
     /// 获取认证服务
@@ -116,7 +126,7 @@ impl AppState {
     }
 }
 
-// 为Arc<AppState>实现Clone
+// 为 Arc<AppState>实现 Clone
 impl Clone for AppState {
     fn clone(&self) -> Self {
         // 获取文件服务的配置
@@ -128,6 +138,7 @@ impl Clone for AppState {
         Self {
             db: self.db.clone(),
             ws_manager: Arc::clone(&self.ws_manager),
+            metrics_collector: Arc::clone(&self.metrics_collector),
             auth_service: AuthService::new(self.auth_service.jwt_config.clone()),
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),

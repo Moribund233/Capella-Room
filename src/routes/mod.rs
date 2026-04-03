@@ -1,8 +1,9 @@
 use axum::{
     middleware,
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
     Router,
 };
+use chrono::Utc;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
@@ -25,7 +26,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health_check))
         // API 版本信息
         .route("/api/version", get(api_version))
-        // WebSocket端点
+        // WebSocket 端点
         .route("/ws", get(ws_handler));
 
     // 认证路由（使用严格的速率限制）
@@ -98,14 +99,22 @@ fn room_routes() -> Router<Arc<AppState>> {
         // 最近更新的聊天室列表
         .route("/recent", get(room::list_recent_rooms))
         // 聊天室详情、更新、删除
-        .route("/:room_id", get(room::get_room).put(room::update_room).delete(room::delete_room))
+        .route(
+            "/:room_id",
+            get(room::get_room)
+                .put(room::update_room)
+                .delete(room::delete_room),
+        )
         // 加入/离开聊天室
         .route("/:room_id/join", post(room::join_room))
-        .route("/:room_id/leave", post(room::leave_room))
+        .route("/:room_id/leave", delete(room::leave_room))
         // 成员管理
         .route("/:room_id/members", get(room::get_room_members))
         .route("/:room_id/members/:user_id", delete(room::kick_member))
-        .route("/:room_id/members/:user_id/role", put(room::set_member_role))
+        .route(
+            "/:room_id/members/:user_id/role",
+            put(room::set_member_role),
+        )
         // 消息
         .route("/:room_id/messages", get(message::get_room_messages))
 }
@@ -114,8 +123,14 @@ fn room_routes() -> Router<Arc<AppState>> {
 fn message_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/search", get(message::search_messages))
-        .route("/:message_id", put(message::edit_message).delete(message::delete_message))
-        .route("/:message_id/history", get(message::get_message_edit_history))
+        .route(
+            "/:message_id",
+            put(message::edit_message).delete(message::delete_message),
+        )
+        .route(
+            "/:message_id/history",
+            get(message::get_message_edit_history),
+        )
 }
 
 /// 文件路由
@@ -134,18 +149,27 @@ fn upload_routes() -> Router<Arc<AppState>> {
 }
 
 /// 健康检查
-async fn health_check() -> &'static str {
-    "OK"
+async fn health_check() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "success": true,
+        "data": {
+            "status": "healthy",
+            "timestamp": Utc::now().to_rfc3339()
+        }
+    }))
 }
 
 /// API 版本信息
 async fn api_version() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
-        "version": API_VERSION,
-        "name": "Seredeli Room API",
-        "description": "Real-time chat room API",
-        "deprecated_routes": ["/api/*"],
-        "recommended_routes": ["/api/v1/*"]
+        "success": true,
+        "data": {
+            "version": API_VERSION,
+            "name": "Seredeli Room API",
+            "description": "Real-time chat room API",
+            "deprecated_routes": ["/api/*"],
+            "recommended_routes": ["/api/v1/*"]
+        }
     }))
 }
 

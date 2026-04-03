@@ -1,11 +1,11 @@
 use axum::{extract::State, Json};
-use serde::Deserialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use validator::Validate;
 
 use crate::{
     error::{AppError, Result},
+    models::response::ApiResponse,
     models::user::{LoginRequest, RegisterRequest, UserResponse},
     state::AppState,
 };
@@ -20,9 +20,11 @@ pub struct RefreshTokenRequest {
 pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(request): Json<RegisterRequest>,
-) -> Result<Json<UserResponse>> {
+) -> Result<Json<ApiResponse<UserResponse>>> {
     // 验证请求
-    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
     // 检查邮箱是否已存在
     let email_exists = state.user_service().email_exists(&request.email).await?;
@@ -49,16 +51,28 @@ pub async fn register(
         .await?;
 
     // 返回用户信息
-    Ok(Json(user.to_response()))
+    Ok(Json(ApiResponse::success(user.to_response())))
+}
+
+/// 登录响应数据
+#[derive(Debug, Serialize)]
+pub struct LoginData {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+    pub token_type: String,
+    pub user: UserResponse,
 }
 
 /// 用户登录
 pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(request): Json<LoginRequest>,
-) -> Result<Json<serde_json::Value>> {
+) -> Result<Json<ApiResponse<LoginData>>> {
     // 验证请求
-    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
     // 查找用户
     let user = state
@@ -80,33 +94,39 @@ pub async fn login(
         return Err(AppError::Auth("邮箱或密码错误".to_string()));
     }
 
-    // 生成JWT Token对
+    // 生成 JWT Token 对
     let token_pair = state.auth_service().generate_token_pair(user.id)?;
 
-    // 返回Token和用户信息
-    Ok(Json(json!({
-        "success": true,
-        "data": {
-            "access_token": token_pair.access_token,
-            "refresh_token": token_pair.refresh_token,
-            "expires_in": token_pair.expires_in,
-            "token_type": "Bearer",
-            "user": user.to_response(),
-        }
+    // 返回 Token 和用户信息
+    Ok(Json(ApiResponse::success(LoginData {
+        access_token: token_pair.access_token,
+        refresh_token: token_pair.refresh_token,
+        expires_in: token_pair.expires_in,
+        token_type: "Bearer".to_string(),
+        user: user.to_response(),
     })))
 }
 
-/// 刷新Token
+/// 刷新 Token 响应数据
+#[derive(Debug, Serialize)]
+pub struct RefreshTokenData {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+    pub token_type: String,
+}
+
+/// 刷新 Token
 pub async fn refresh_token(
     State(state): State<Arc<AppState>>,
     Json(request): Json<RefreshTokenRequest>,
-) -> Result<Json<serde_json::Value>> {
+) -> Result<Json<ApiResponse<RefreshTokenData>>> {
     // 验证刷新令牌
     let claims = state
         .auth_service()
         .verify_refresh_token(&request.refresh_token)?;
 
-    // 提取用户ID
+    // 提取用户 ID
     let user_id = state.auth_service().extract_user_id(&claims)?;
 
     // 验证用户是否存在
@@ -115,16 +135,13 @@ pub async fn refresh_token(
         return Err(AppError::Auth("用户不存在".to_string()));
     }
 
-    // 生成新的Token对
+    // 生成新的 Token 对
     let token_pair = state.auth_service().generate_token_pair(user_id)?;
 
-    Ok(Json(json!({
-        "success": true,
-        "data": {
-            "access_token": token_pair.access_token,
-            "refresh_token": token_pair.refresh_token,
-            "expires_in": token_pair.expires_in,
-            "token_type": "Bearer",
-        }
+    Ok(Json(ApiResponse::success(RefreshTokenData {
+        access_token: token_pair.access_token,
+        refresh_token: token_pair.refresh_token,
+        expires_in: token_pair.expires_in,
+        token_type: "Bearer".to_string(),
     })))
 }

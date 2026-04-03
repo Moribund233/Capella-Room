@@ -15,10 +15,8 @@
 
 use std::env;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::Duration;
 
-use axum::Router;
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio::time::{sleep, timeout};
@@ -32,8 +30,10 @@ use seredeli_room::{
     routes::create_router,
     services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
     state::AppState,
+    utils::logging::MetricsCollector,
     websocket::{manager::WebSocketManager, protocol::WebSocketMessage},
 };
+use std::sync::Arc;
 
 /// 测试服务器句柄
 struct TestServer {
@@ -59,7 +59,11 @@ fn load_test_env() {
 
 /// 测试辅助函数：读取下一条非Ping消息
 async fn read_next_message(
-    read: &mut futures::stream::SplitStream<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>>,
+    read: &mut futures::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    >,
 ) -> Option<Result<Message, tokio_tungstenite::tungstenite::Error>> {
     while let Some(result) = read.next().await {
         if let Ok(Message::Text(text)) = &result {
@@ -81,8 +85,8 @@ async fn setup_test_db() -> Database {
     // 确保环境变量已加载
     load_test_env();
 
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in .env.test or environment");
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env.test or environment");
 
     let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
         .ok()
@@ -97,10 +101,10 @@ async fn setup_test_db() -> Database {
     let db = Database::new(&db_config)
         .await
         .expect("Failed to connect to test database");
-    
+
     // 运行数据库迁移
     db.migrate().await.expect("Failed to run migrations");
-    
+
     db
 }
 
@@ -110,7 +114,8 @@ async fn setup_test_server() -> (TestServer, Database) {
 
     // 设置 UPLOAD_DIR 环境变量（如果不存在）
     if std::env::var("UPLOAD_DIR").is_err() {
-        let temp_dir = std::env::temp_dir().join(format!("seredeli_upload_test_{}", Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("seredeli_upload_test_{}", Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).expect("Failed to create temp upload directory");
         std::env::set_var("UPLOAD_DIR", temp_dir.to_str().unwrap());
     }
@@ -125,7 +130,16 @@ async fn setup_test_server() -> (TestServer, Database) {
         base_url: "/uploads".to_string(),
     };
 
-    let state = AppState::new(db.clone(), ws_manager, jwt_config, upload_config).expect("Failed to create app state");
+    let metrics_collector = Arc::new(MetricsCollector::new());
+
+    let state = AppState::new(
+        db.clone(),
+        ws_manager,
+        jwt_config,
+        upload_config,
+        metrics_collector,
+    )
+    .expect("Failed to create app state");
     let app = create_router(state);
 
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -146,14 +160,17 @@ async fn setup_test_server() -> (TestServer, Database) {
     // 等待服务器启动
     sleep(Duration::from_millis(100)).await;
 
-    (TestServer { addr, _shutdown: shutdown_tx }, db)
+    (
+        TestServer {
+            addr,
+            _shutdown: shutdown_tx,
+        },
+        db,
+    )
 }
 
 /// 测试辅助函数：创建测试用户并返回token
-async fn create_test_user_with_token(
-    db: &Database,
-    username: &str,
-) -> (Uuid, String, String) {
+async fn create_test_user_with_token(db: &Database, username: &str) -> (Uuid, String, String) {
     let user_service = UserService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
         secret: "test_secret_key_for_testing_purposes_only".to_string(),
@@ -180,11 +197,7 @@ async fn create_test_user_with_token(
 }
 
 /// 测试辅助函数：创建测试房间
-async fn create_test_room(
-    db: &Database,
-    owner_id: Uuid,
-    name: &str,
-) -> Uuid {
+async fn create_test_room(db: &Database, owner_id: Uuid, name: &str) -> Uuid {
     let room_service = RoomService::new(db.clone());
 
     let room = room_service
@@ -208,7 +221,7 @@ mod websocket_connection_tests {
         let url = server.url();
         let (ws_stream, _) = connect_async(&url).await.expect("Failed to connect");
 
-        let (mut _write, mut read) = ws_stream.split();
+        let (_write, read) = ws_stream.split();
 
         // 连接应该成功建立
         // 由于没有发送认证消息，服务器应该等待认证
@@ -449,7 +462,9 @@ mod websocket_room_tests {
         let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
 
         // 尝试加入不存在的房间
-        let join_msg = WebSocketMessage::JoinRoom { room_id: fake_room_id };
+        let join_msg = WebSocketMessage::JoinRoom {
+            room_id: fake_room_id,
+        };
         write
             .send(Message::Text(join_msg.to_json().unwrap()))
             .await
@@ -644,7 +659,7 @@ mod websocket_manager_tests {
     fn test_manager_connection_management() {
         let manager = WebSocketManager::new();
         let user_id = Uuid::new_v4();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel(100);
 
         // 连接
         manager.connect(user_id, "test_user".to_string(), tx);
@@ -663,7 +678,7 @@ mod websocket_manager_tests {
         let manager = WebSocketManager::new();
         let user_id = Uuid::new_v4();
         let room_id = Uuid::new_v4();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel(100);
 
         manager.connect(user_id, "test_user".to_string(), tx);
 
@@ -686,18 +701,20 @@ mod websocket_manager_tests {
 
         // 创建两个用户
         let user1_id = Uuid::new_v4();
-        let (tx1, mut rx1) = mpsc::unbounded_channel();
+        let (tx1, mut rx1) = mpsc::channel(100);
         manager.connect(user1_id, "user1".to_string(), tx1);
         manager.join_room(room_id, user1_id);
 
         let user2_id = Uuid::new_v4();
-        let (tx2, mut rx2) = mpsc::unbounded_channel();
+        let (tx2, mut rx2) = mpsc::channel(100);
         manager.connect(user2_id, "user2".to_string(), tx2);
         manager.join_room(room_id, user2_id);
 
         // 广播消息
         let message = r#"{"type": "Test", "content": "Hello"}"#.to_string();
-        manager.broadcast_to_room_all(room_id, message.clone()).await;
+        manager
+            .broadcast_to_room_all(room_id, message.clone())
+            .await;
 
         // 验证两个用户都收到消息
         let msg1 = rx1.recv().await.expect("User1 should receive message");
@@ -714,12 +731,12 @@ mod websocket_manager_tests {
         let room_id = Uuid::new_v4();
 
         let user1_id = Uuid::new_v4();
-        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx1, _rx1) = mpsc::channel(100);
         manager.connect(user1_id, "user1".to_string(), tx1);
         manager.join_room(room_id, user1_id);
 
         let user2_id = Uuid::new_v4();
-        let (tx2, _rx2) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::channel(100);
         manager.connect(user2_id, "user2".to_string(), tx2);
         manager.join_room(room_id, user2_id);
 
@@ -732,7 +749,6 @@ mod websocket_manager_tests {
 #[cfg(test)]
 mod websocket_protocol_tests {
     use super::*;
-    use serde_json;
 
     /// 测试消息序列化和反序列化
     #[test]
@@ -787,7 +803,11 @@ mod websocket_protocol_tests {
         );
         let msg = WebSocketMessage::from_json(&json).unwrap();
         match msg {
-            WebSocketMessage::ChatMessage { room_id: rid, content, reply_to } => {
+            WebSocketMessage::ChatMessage {
+                room_id: rid,
+                content,
+                reply_to,
+            } => {
                 assert_eq!(rid, room_id);
                 assert_eq!(content, "Hello");
                 assert_eq!(reply_to, None);
@@ -816,7 +836,11 @@ mod websocket_protocol_tests {
         let decoded = WebSocketMessage::from_json(&json).unwrap();
 
         match decoded {
-            WebSocketMessage::NewMessage { content, sender_name, .. } => {
+            WebSocketMessage::NewMessage {
+                content,
+                sender_name,
+                ..
+            } => {
                 assert_eq!(content, "Test message content");
                 assert_eq!(sender_name, "TestUser");
             }

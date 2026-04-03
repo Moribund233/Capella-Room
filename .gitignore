@@ -40,3 +40,6 @@ doc/
 
 # SQLx offline mode
 .sqlx/
+
+# template
+temp/

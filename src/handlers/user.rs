@@ -9,6 +9,7 @@ use validator::Validate;
 
 use crate::{
     error::{AppError, Result},
+    models::response::ApiResponse,
     models::user::{UpdateUserRequest, UserResponse},
     services::auth_service::Claims,
     state::AppState,
@@ -39,20 +40,15 @@ fn default_offset() -> i64 {
 pub async fn get_current_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-) -> Result<Json<UserResponse>> {
-    // 从Claims中提取用户ID
-    let user_id = state
-        .auth_service()
-        .extract_user_id(&claims)?;
+) -> Result<Json<ApiResponse<UserResponse>>> {
+    // 从 Claims 中提取用户 ID
+    let user_id = state.auth_service().extract_user_id(&claims)?;
 
     // 查询用户信息
-    let user = state
-        .user_service()
-        .get_user_by_id(user_id)
-        .await?;
+    let user = state.user_service().get_user_by_id(user_id).await?;
 
     match user {
-        Some(user) => Ok(Json(user.to_response())),
+        Some(user) => Ok(Json(ApiResponse::success(user.to_response()))),
         None => Err(AppError::NotFound),
     }
 }
@@ -62,14 +58,14 @@ pub async fn update_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Json(request): Json<UpdateUserRequest>,
-) -> Result<Json<UserResponse>> {
+) -> Result<Json<ApiResponse<UserResponse>>> {
     // 验证请求
-    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    // 从Claims中提取用户ID
-    let user_id = state
-        .auth_service()
-        .extract_user_id(&claims)?;
+    // 从 Claims 中提取用户 ID
+    let user_id = state.auth_service().extract_user_id(&claims)?;
 
     // 更新用户信息
     let updated_user = state
@@ -81,7 +77,7 @@ pub async fn update_user(
         )
         .await?;
 
-    Ok(Json(updated_user.to_response()))
+    Ok(Json(ApiResponse::success(updated_user.to_response())))
 }
 
 /// 获取用户列表
@@ -89,7 +85,7 @@ pub async fn update_user(
 pub async fn list_users(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListUsersQuery>,
-) -> Result<Json<ListUsersResponse>> {
+) -> Result<Json<ApiResponse<ListUsersResponse>>> {
     // 限制每页数量
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
@@ -109,17 +105,14 @@ pub async fn list_users(
     };
 
     // 转换为响应格式
-    let user_responses: Vec<UserResponse> = users
-        .into_iter()
-        .map(|u| u.to_response())
-        .collect();
+    let user_responses: Vec<UserResponse> = users.into_iter().map(|u| u.to_response()).collect();
 
-    Ok(Json(ListUsersResponse {
+    Ok(Json(ApiResponse::success(ListUsersResponse {
         users: user_responses,
         total,
         limit,
         offset,
-    }))
+    })))
 }
 
 /// 用户列表响应
@@ -135,14 +128,11 @@ pub struct ListUsersResponse {
 pub async fn get_user_by_id(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(user_id): axum::extract::Path<Uuid>,
-) -> Result<Json<UserResponse>> {
-    let user = state
-        .user_service()
-        .get_user_by_id(user_id)
-        .await?;
+) -> Result<Json<ApiResponse<UserResponse>>> {
+    let user = state.user_service().get_user_by_id(user_id).await?;
 
     match user {
-        Some(user) => Ok(Json(user.to_response())),
+        Some(user) => Ok(Json(ApiResponse::success(user.to_response()))),
         None => Err(AppError::NotFound),
     }
 }
