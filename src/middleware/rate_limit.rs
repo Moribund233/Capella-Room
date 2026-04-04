@@ -220,7 +220,6 @@ fn extract_user_id(request: &Request) -> Option<String> {
 
 pub async fn rate_limit_middleware(
     State(state): State<Arc<AppState>>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request: Request,
     next: Next,
 ) -> Response {
@@ -232,7 +231,15 @@ pub async fn rate_limit_middleware(
     };
 
     let path = request.uri().path().to_string();
-    let client_ip = extract_client_ip(&ConnectInfo(addr), &request);
+    let addr = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|c| c.0);
+    let client_ip = if let Some(addr) = addr {
+        extract_client_ip(&ConnectInfo(addr), &request)
+    } else {
+        "127.0.0.1".to_string()
+    };
 
     let (limit, window_secs) = rate_limiter.get_ip_limit(&path);
 
@@ -276,7 +283,6 @@ pub async fn rate_limit_middleware(
 
 pub async fn strict_rate_limit_middleware(
     State(state): State<Arc<AppState>>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request: Request,
     next: Next,
 ) -> Response {
@@ -287,7 +293,15 @@ pub async fn strict_rate_limit_middleware(
         }
     };
 
-    let client_ip = extract_client_ip(&ConnectInfo(addr), &request);
+    let addr = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|c| c.0);
+    let client_ip = if let Some(addr) = addr {
+        extract_client_ip(&ConnectInfo(addr), &request)
+    } else {
+        "127.0.0.1".to_string()
+    };
 
     let limit = rate_limiter.config.auth_requests;
     let window_secs = rate_limiter.config.auth_window_secs;

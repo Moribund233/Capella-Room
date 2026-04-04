@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::config::AppConfig;
+use crate::config::{AppConfig, ConfigManager};
 use crate::db::Database;
 use crate::middleware::rate_limit::RateLimiter;
 use crate::services::auth_service::AuthService;
@@ -23,6 +23,7 @@ pub struct AppState {
     pub file_service: FileService,
     pub rate_limiter: Option<Arc<RateLimiter>>,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
+    pub config_manager: Arc<ConfigManager>,
 }
 
 impl fmt::Debug for AppState {
@@ -46,6 +47,7 @@ impl AppState {
         ws_manager: Arc<WebSocketManager>,
         config: AppConfig,
         metrics_collector: Arc<MetricsCollector>,
+        config_manager: Arc<ConfigManager>,
     ) -> anyhow::Result<Arc<Self>> {
         let jwt_config = crate::config::JwtConfig {
             secret: config.jwt.secret.clone(),
@@ -93,6 +95,7 @@ impl AppState {
             file_service,
             rate_limiter,
             config: shared_config,
+            config_manager,
         }))
     }
 
@@ -136,6 +139,10 @@ impl AppState {
         self.config.clone()
     }
 
+    pub fn config_manager(&self) -> Arc<ConfigManager> {
+        self.config_manager.clone()
+    }
+
     pub async fn get_config(&self) -> AppConfig {
         self.config.read().await.clone()
     }
@@ -165,6 +172,7 @@ impl Clone for AppState {
                 .expect("Failed to clone file service"),
             rate_limiter: self.rate_limiter.clone(),
             config: self.config.clone(),
+            config_manager: self.config_manager.clone(),
         }
     }
 }

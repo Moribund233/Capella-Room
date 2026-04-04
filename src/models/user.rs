@@ -4,7 +4,38 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::utils::validation::{validate_username, validate_password_strength, validate_email_format};
+use crate::utils::validation::{
+    validate_email_format, validate_password_strength, validate_username,
+};
+
+/// 用户角色
+#[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "user_role", rename_all = "snake_case")]
+pub enum UserRole {
+    #[default]
+    User,
+    Admin,
+    SuperAdmin,
+}
+
+impl UserRole {
+    pub fn is_admin(&self) -> bool {
+        matches!(self, UserRole::Admin | UserRole::SuperAdmin)
+    }
+
+    pub fn is_super_admin(&self) -> bool {
+        matches!(self, UserRole::SuperAdmin)
+    }
+
+    pub fn can_manage_user(&self, target_role: &UserRole) -> bool {
+        match self {
+            UserRole::SuperAdmin => true,
+            UserRole::Admin => !target_role.is_admin(),
+            UserRole::User => false,
+        }
+    }
+}
 
 /// 用户数据库模型
 #[derive(Debug, Clone, FromRow, Serialize)]
@@ -16,6 +47,7 @@ pub struct User {
     pub password_hash: String,
     pub avatar_url: Option<String>,
     pub status: UserStatus,
+    pub role: UserRole,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -75,6 +107,7 @@ pub struct UserResponse {
     pub email: String,
     pub avatar_url: Option<String>,
     pub status: UserStatus,
+    pub role: UserRole,
 }
 
 impl User {
@@ -86,6 +119,7 @@ impl User {
             email: self.email.clone(),
             avatar_url: self.avatar_url.clone(),
             status: self.status.clone(),
+            role: self.role.clone(),
         }
     }
 }

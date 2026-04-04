@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     error::{AppError, Result},
-    models::user::{User, UserStatus},
+    models::user::{User, UserRole, UserStatus},
 };
 
 /// 用户服务
@@ -18,12 +18,91 @@ impl UserService {
     }
 
     /// 创建用户
-    pub async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> Result<User> {
+    pub async fn create_user(
+        &self,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (username, email, password_hash, status)
-            VALUES ($1, $2, $3, 'offline')
-            RETURNING id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            INSERT INTO users (username, email, password_hash, status, role)
+            VALUES ($1, $2, $3, 'offline', 'user')
+            RETURNING id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
+            "#
+        )
+        .bind(username)
+        .bind(email)
+        .bind(password_hash)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(|e| match &e {
+            sqlx::Error::Database(db_err) => {
+                let constraint = db_err.constraint();
+                if constraint.is_some() && constraint.unwrap().contains("email") {
+                    AppError::Conflict("邮箱已被注册".to_string())
+                } else if constraint.is_some() && constraint.unwrap().contains("username") {
+                    AppError::Conflict("用户名已被使用".to_string())
+                } else {
+                    AppError::Database(e)
+                }
+            }
+            _ => AppError::Database(e),
+        })?;
+
+        Ok(user)
+    }
+
+    /// 创建超级管理员
+    pub async fn create_super_admin(
+        &self,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<User> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (username, email, password_hash, status, role)
+            VALUES ($1, $2, $3, 'offline', 'super_admin')
+            ON CONFLICT (email) DO UPDATE SET role = 'super_admin'
+            RETURNING id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
+            "#
+        )
+        .bind(username)
+        .bind(email)
+        .bind(password_hash)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(|e| match &e {
+            sqlx::Error::Database(db_err) => {
+                let constraint = db_err.constraint();
+                if constraint.is_some() && constraint.unwrap().contains("email") {
+                    AppError::Conflict("邮箱已被注册".to_string())
+                } else if constraint.is_some() && constraint.unwrap().contains("username") {
+                    AppError::Conflict("用户名已被使用".to_string())
+                } else {
+                    AppError::Database(e)
+                }
+            }
+            _ => AppError::Database(e),
+        })?;
+
+        Ok(user)
+    }
+
+    /// 创建管理员
+    pub async fn create_admin(
+        &self,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<User> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (username, email, password_hash, status, role)
+            VALUES ($1, $2, $3, 'offline', 'admin')
+            ON CONFLICT (email) DO UPDATE SET role = 'admin'
+            RETURNING id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             "#
         )
         .bind(username)
@@ -52,7 +131,7 @@ impl UserService {
     pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             WHERE id = $1
             "#
@@ -68,7 +147,7 @@ impl UserService {
     pub async fn get_user_by_email(&self, email: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             WHERE email = $1
             "#
@@ -84,7 +163,7 @@ impl UserService {
     pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             WHERE username = $1
             "#
@@ -111,7 +190,7 @@ impl UserService {
                 avatar_url = COALESCE($2, avatar_url),
                 updated_at = NOW()
             WHERE id = $3
-            RETURNING id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             "#
         )
         .bind(username)
@@ -137,7 +216,7 @@ impl UserService {
             UPDATE users
             SET status = $1, updated_at = NOW()
             WHERE id = $2
-            "#
+            "#,
         )
         .bind(status)
         .bind(user_id)
@@ -151,11 +230,33 @@ impl UserService {
         Ok(())
     }
 
+    /// 更新用户角色
+    pub async fn update_user_role(&self, user_id: Uuid, role: UserRole) -> Result<User> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            UPDATE users
+            SET role = $1, updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
+            "#
+        )
+        .bind(role)
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => AppError::NotFound,
+            _ => AppError::Database(e),
+        })?;
+
+        Ok(user)
+    }
+
     /// 获取用户列表
     pub async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
@@ -170,13 +271,18 @@ impl UserService {
     }
 
     /// 搜索用户（支持用户名和邮箱模糊搜索）
-    pub async fn search_users(&self, query: &str, limit: i64, offset: i64) -> Result<(Vec<User>, i64)> {
+    pub async fn search_users(
+        &self,
+        query: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<User>, i64)> {
         let search_pattern = format!("%{}%", query);
 
         // 查询用户列表
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             WHERE username ILIKE $1 OR email ILIKE $1
             ORDER BY created_at DESC
@@ -194,7 +300,7 @@ impl UserService {
             r#"
             SELECT COUNT(*) FROM users
             WHERE username ILIKE $1 OR email ILIKE $1
-            "#
+            "#,
         )
         .bind(&search_pattern)
         .fetch_one(self.db.pool())
@@ -208,7 +314,7 @@ impl UserService {
         let count: i64 = sqlx::query_scalar(
             r#"
             SELECT COUNT(*) FROM users
-            "#
+            "#,
         )
         .fetch_one(self.db.pool())
         .await?;
@@ -223,7 +329,7 @@ impl UserService {
             SELECT EXISTS(
                 SELECT 1 FROM users WHERE email = $1
             )
-            "#
+            "#,
         )
         .bind(email)
         .fetch_one(self.db.pool())
@@ -239,7 +345,7 @@ impl UserService {
             SELECT EXISTS(
                 SELECT 1 FROM users WHERE username = $1
             )
-            "#
+            "#,
         )
         .bind(username)
         .fetch_one(self.db.pool())
@@ -252,7 +358,7 @@ impl UserService {
     pub async fn get_online_users(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             WHERE status = 'online'
             ORDER BY updated_at DESC
@@ -276,7 +382,7 @@ impl UserService {
     ) -> Result<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
             FROM users
             WHERE status = $1
             ORDER BY updated_at DESC
@@ -299,7 +405,7 @@ impl UserService {
             UPDATE users
             SET avatar_url = $1, updated_at = NOW()
             WHERE id = $2
-            "#
+            "#,
         )
         .bind(avatar_url)
         .bind(user_id)
@@ -311,5 +417,66 @@ impl UserService {
         }
 
         Ok(())
+    }
+
+    /// 删除用户（软删除）
+    pub async fn delete_user(&self, user_id: Uuid) -> Result<()> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM users WHERE id = $1
+            "#,
+        )
+        .bind(user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 禁用/启用用户
+    pub async fn set_user_disabled(&self, user_id: Uuid, disabled: bool) -> Result<User> {
+        let status = if disabled {
+            UserStatus::Offline
+        } else {
+            UserStatus::Online
+        };
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            UPDATE users
+            SET status = $1, updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, username, email, password_hash, avatar_url, status, role, created_at, updated_at
+            "#
+        )
+        .bind(status)
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => AppError::NotFound,
+            _ => AppError::Database(e),
+        })?;
+
+        Ok(user)
+    }
+
+    /// 检查是否有超级管理员
+    pub async fn has_super_admin(&self) -> Result<bool> {
+        let exists: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM users WHERE role = 'super_admin'
+            )
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(exists)
     }
 }

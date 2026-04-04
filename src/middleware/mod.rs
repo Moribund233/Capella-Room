@@ -14,6 +14,7 @@ use crate::{
     state::AppState,
 };
 
+pub mod admin;
 pub mod rate_limit;
 
 /// 认证中间件

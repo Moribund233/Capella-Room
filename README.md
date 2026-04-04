@@ -24,6 +24,7 @@ Seredeli Room 是一个高性能、可扩展的实时聊天系统，支持多房
 ```
 SeredeliRoom/
 ├── Cargo.toml              # Rust项目配置和依赖
+├── config.toml             # 应用配置文件（三层配置体系）
 ├── .env.example            # 环境变量示例
 ├── .env.development        # 开发环境配置
 ├── README.md               # 项目文档
@@ -40,12 +41,14 @@ SeredeliRoom/
 │   ├── db/                 # 数据库连接池
 │   ├── error/              # 错误处理
 │   ├── handlers/           # HTTP请求处理器
+│   │   ├── admin.rs        # 管理员接口
 │   │   ├── auth.rs         # 认证接口
 │   │   ├── file.rs         # 文件上传接口
 │   │   ├── message.rs      # 消息接口
 │   │   ├── room.rs         # 聊天室接口
 │   │   └── user.rs         # 用户接口
 │   ├── middleware/         # 中间件
+│   │   ├── admin.rs        # 管理员认证中间件
 │   │   └── rate_limit.rs   # 速率限制中间件
 │   ├── models/             # 数据模型
 │   │   ├── file.rs         # 文件模型
@@ -72,7 +75,8 @@ SeredeliRoom/
     ├── phase5_messaging_test.rs
     ├── phase6_user_features_test.rs
     ├── phase6_extra_features_test.rs
-    └── phase6_5_file_upload_test.rs
+    ├── phase6_5_file_upload_test.rs
+    └── phase8_admin_system_test.rs
 ```
 
 ## 开发阶段
@@ -216,11 +220,11 @@ SeredeliRoom/
 
 | 测试类别 | 测试数量 | 状态 |
 |---------|---------|------|
-| 单元测试 | 45 | ✅ 通过 |
-| 阶段 1-6.5 功能测试 | 160 | ✅ 通过 |
+| 单元测试 | 53 | ✅ 通过 |
+| 阶段 1-8 功能测试 | 173 | ✅ 通过 |
 | 端到端集成测试 | 9 | ✅ 通过 |
 | WebSocket 场景测试 | 17 | ✅ 通过 |
-| **总计** | **231** | **✅ 全部通过** |
+| **总计** | **252** | **✅ 全部通过** |
 
 **主要优化点**：
 - AppState 参数完善，集成 MetricsCollector
@@ -231,12 +235,21 @@ SeredeliRoom/
 - API 版本信息标准化，统一响应格式
 - HTTP 方法语义化（`POST /leave` → `DELETE /leave`）
 
-### 阶段八：部署与运维 ⏳ 待开发
+### 阶段八：部署与运维 🔄 部分完成
 
-- [ ] **8.1 容器化** - Dockerfile、docker-compose
-- [ ] **8.2 配置管理** - 生产环境配置
-- [ ] **8.3 监控** - 日志收集、性能监控
-- [ ] **8.4 文档** - API 文档、部署文档
+- [✅] **8.1 三层配置管理体系** - 环境变量 + config.toml + 数据库配置，支持热更新
+- [✅] **8.2 管理员系统** - SuperAdmin/Admin/User 三级角色，权限控制
+- [✅] **8.3 运维管理 API** - 用户管理、配置管理、房间管理、消息审核、系统统计、日志查看
+- [ ] **8.4 容器化** - Dockerfile、docker-compose（暂缓）
+- [ ] **8.5 文档** - API 文档、部署文档（暂缓）
+
+**验收标准**：
+- ✅ 三层配置管理体系正常工作，支持配置热更新
+- ✅ 管理员系统完整，支持 SuperAdmin 和 Admin 角色
+- ✅ 所有运维管理 API 可用并通过测试
+- ✅ 日志系统支持分级和动态调整
+
+**测试覆盖**：13 个阶段八功能测试全部通过（`tests/phase8_admin_system_test.rs`）
 
 ## 快速开始
 
@@ -361,6 +374,25 @@ curl http://localhost:3000/health
 - `GET /api/v1/files` - 获取当前用户文件列表
 - `GET /api/v1/files/:id` - 获取文件信息
 - `DELETE /api/v1/files/:id` - 删除文件
+
+### 管理员（需要 Admin 或 SuperAdmin 角色）
+- `GET /api/v1/admin/users` - 获取用户列表（支持分页、搜索）
+- `PUT /api/v1/admin/users/:id/status` - 禁用/启用用户
+- `DELETE /api/v1/admin/users/:id` - 删除用户
+- `PUT /api/v1/admin/users/:id/role` - 修改用户角色（仅 SuperAdmin 可管理 Admin）
+- `GET /api/v1/admin/configs` - 获取所有配置项
+- `GET /api/v1/admin/configs/:key` - 获取指定配置
+- `PUT /api/v1/admin/configs/:key` - 修改配置项（仅 SuperAdmin）
+- `POST /api/v1/admin/configs/reset` - 重置配置到默认值
+- `GET /api/v1/admin/rooms` - 获取所有房间列表
+- `DELETE /api/v1/admin/rooms/:id` - 强制删除房间
+- `GET /api/v1/admin/rooms/:id/messages` - 查看房间消息记录
+- `GET /api/v1/admin/messages` - 查看所有消息（支持关键词搜索）
+- `DELETE /api/v1/admin/messages/:id` - 删除违规消息
+- `GET /api/v1/admin/stats` - 系统统计（用户数、房间数、消息数、在线用户数）
+- `GET /api/v1/admin/stats/activity` - 活跃度统计（日活、周活、月活）
+- `GET /api/v1/admin/logs` - 查看应用运行日志（支持级别过滤、时间范围）
+- `GET /api/v1/admin/logs/download` - 下载日志文件
 
 ## 开发指南
 

@@ -218,6 +218,16 @@ impl WebSocketManager {
         self.connections.len()
     }
 
+    /// 获取在线用户数（与总连接数相同，因为一个用户一个连接）
+    pub fn get_online_user_count(&self) -> usize {
+        self.connections.len()
+    }
+
+    /// 获取活跃连接数（与总连接数相同）
+    pub fn get_connection_count(&self) -> usize {
+        self.connections.len()
+    }
+
     /// 检查用户是否在线
     pub fn is_user_online(&self, user_id: Uuid) -> bool {
         self.connections.contains_key(&user_id)

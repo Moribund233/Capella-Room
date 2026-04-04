@@ -56,17 +56,23 @@ async fn main() -> Result<()> {
 
     let config = config_manager.get_config().await;
 
-    let state = AppState::new(db, ws_manager, config, Arc::clone(&metrics_collector))?;
+    let shared_config_manager = Arc::new(config_manager);
+
+    let state = AppState::new(
+        db.clone(),
+        ws_manager,
+        config.clone(),
+        Arc::clone(&metrics_collector),
+        Arc::clone(&shared_config_manager),
+    )?;
+
+    initialize_super_admin(&state, &config.admin.initial).await?;
 
     let app = create_router(state);
 
-    let addr: SocketAddr = format!(
-        "{}:{}",
-        config_manager.get_config().await.server.host,
-        config_manager.get_config().await.server.port
-    )
-    .parse()
-    .expect("Failed to parse server address");
+    let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port)
+        .parse()
+        .expect("Failed to parse server address");
 
     info!("Server starting on http://{}", addr);
 
@@ -91,6 +97,55 @@ async fn main() -> Result<()> {
     .await?;
 
     info!("Server shutdown complete");
+    Ok(())
+}
+
+async fn initialize_super_admin(
+    state: &AppState,
+    admin_config: &seredeli_room::config::InitialAdminConfig,
+) -> Result<()> {
+    if !admin_config.enabled {
+        info!("Initial super admin creation is disabled");
+        return Ok(());
+    }
+
+    let has_super_admin = state.user_service().has_super_admin().await?;
+    if has_super_admin {
+        info!("Super admin already exists, skipping initialization");
+        return Ok(());
+    }
+
+    let password = std::env::var("ADMIN_INITIAL_PASSWORD").or_else(|_| {
+        if !admin_config.password.is_empty() {
+            Ok(admin_config.password.clone())
+        } else {
+            Err(anyhow::anyhow!(
+                "ADMIN_INITIAL_PASSWORD not set and no default password in config"
+            ))
+        }
+    })?;
+
+    if password.len() < 8 {
+        return Err(anyhow::anyhow!(
+            "Initial admin password must be at least 8 characters"
+        ));
+    }
+
+    info!("Creating initial super admin: {}", admin_config.username);
+
+    let password_hash = state.auth_service().hash_password(&password)?;
+
+    let user = state
+        .user_service()
+        .create_super_admin(&admin_config.username, &admin_config.email, &password_hash)
+        .await?;
+
+    info!(
+        "Super admin created successfully: {} ({})",
+        user.username, user.email
+    );
+    warn!("⚠️  Please change the initial admin password immediately after first login!");
+
     Ok(())
 }
 

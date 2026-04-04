@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 // 引入被测模块
 use seredeli_room::{
-    config::ConfigLoader,
+    config::{ConfigLoader, ConfigManager},
     db::Database,
     routes::create_router,
     state::AppState,
@@ -51,8 +51,11 @@ impl TestServer {
 
 /// 启动测试服务器
 async fn start_test_server() -> TestServer {
-    // 加载开发环境配置
-    dotenvy::from_filename(".env.development").ok();
+    // 加载测试环境配置
+    dotenvy::from_filename(".env.test").ok();
+
+    // 设置配置文件路径
+    std::env::set_var("CONFIG_FILE", "config.toml");
 
     let config = ConfigLoader::load().expect("Failed to load config");
 
@@ -70,9 +73,18 @@ async fn start_test_server() -> TestServer {
     // 初始化指标收集器
     let metrics_collector = Arc::new(MetricsCollector::new());
 
+    // 创建配置管理器
+    let config_manager = ConfigManager::new(db.clone(), config.clone());
+
     // 创建应用状态
-    let state = AppState::new(db, ws_manager, config, metrics_collector)
-        .expect("Failed to create app state");
+    let state = AppState::new(
+        db,
+        ws_manager,
+        config,
+        metrics_collector,
+        Arc::new(config_manager),
+    )
+    .expect("Failed to create app state");
 
     // 构建应用路由
     let app = create_router(state);

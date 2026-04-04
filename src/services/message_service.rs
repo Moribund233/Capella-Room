@@ -459,4 +459,190 @@ impl MessageService {
 
         Ok(responses)
     }
+
+    /// 管理员：获取所有消息列表（支持搜索和分页）
+    pub async fn list_all_messages(
+        &self,
+        search: Option<&str>,
+        room_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<MessageResponse>, i64)> {
+        let messages = if let Some(rid) = room_id {
+            if let Some(query) = search {
+                sqlx::query_as::<_, Message>(
+                    r#"
+                    SELECT * FROM messages 
+                    WHERE room_id = $1 AND content ILIKE $2
+                    ORDER BY created_at DESC
+                    LIMIT $3 OFFSET $4
+                    "#,
+                )
+                .bind(rid)
+                .bind(format!("%{}%", query))
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.db.pool())
+                .await?
+            } else {
+                sqlx::query_as::<_, Message>(
+                    r#"
+                    SELECT * FROM messages 
+                    WHERE room_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                )
+                .bind(rid)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.db.pool())
+                .await?
+            }
+        } else if let Some(query) = search {
+            sqlx::query_as::<_, Message>(
+                r#"
+                SELECT * FROM messages 
+                WHERE content ILIKE $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(format!("%{}%", query))
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?
+        } else {
+            sqlx::query_as::<_, Message>(
+                r#"
+                SELECT * FROM messages 
+                ORDER BY created_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+            )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?
+        };
+
+        let total = self.count_all_messages().await?;
+
+        let mut responses = Vec::new();
+        for msg in messages {
+            let sender = self.get_sender_info(msg.sender_id).await?;
+            responses.push(msg.to_response(sender));
+        }
+
+        Ok((responses, total))
+    }
+
+    /// 管理员：统计所有消息数
+    pub async fn count_all_messages(&self) -> Result<i64> {
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM messages WHERE is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(count.0)
+    }
+
+    /// 管理员：删除消息（不检查权限）
+    pub async fn admin_delete_message(&self, message_id: Uuid) -> Result<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE messages SET is_deleted = true WHERE id = $1
+            "#,
+        )
+        .bind(message_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 获取活跃度统计
+    pub async fn get_activity_stats(&self) -> Result<ActivityStats> {
+        let daily_active_users: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(DISTINCT sender_id) FROM messages 
+            WHERE created_at > NOW() - INTERVAL '1 day' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let weekly_active_users: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(DISTINCT sender_id) FROM messages 
+            WHERE created_at > NOW() - INTERVAL '7 days' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let monthly_active_users: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(DISTINCT sender_id) FROM messages 
+            WHERE created_at > NOW() - INTERVAL '30 days' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let daily_messages: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM messages 
+            WHERE created_at > NOW() - INTERVAL '1 day' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let weekly_messages: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM messages 
+            WHERE created_at > NOW() - INTERVAL '7 days' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let monthly_messages: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM messages 
+            WHERE created_at > NOW() - INTERVAL '30 days' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(ActivityStats {
+            daily_active_users: daily_active_users.0,
+            weekly_active_users: weekly_active_users.0,
+            monthly_active_users: monthly_active_users.0,
+            daily_messages: daily_messages.0,
+            weekly_messages: weekly_messages.0,
+            monthly_messages: monthly_messages.0,
+        })
+    }
+}
+
+/// 活跃度统计数据
+#[derive(Debug, Clone)]
+pub struct ActivityStats {
+    pub daily_active_users: i64,
+    pub weekly_active_users: i64,
+    pub monthly_active_users: i64,
+    pub daily_messages: i64,
+    pub weekly_messages: i64,
+    pub monthly_messages: i64,
 }

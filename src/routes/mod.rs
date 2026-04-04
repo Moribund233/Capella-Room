@@ -8,7 +8,8 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    handlers::{auth, file, message, room, user},
+    handlers::{admin, auth, file, message, room, user},
+    middleware::admin::admin_auth_middleware,
     middleware::auth_middleware,
     middleware::rate_limit::{rate_limit_middleware, strict_rate_limit_middleware},
     state::AppState,
@@ -24,6 +25,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     let public_routes = Router::new()
         // 健康检查
         .route("/health", get(health_check))
+        .route("/health/detail", get(health_check_detailed))
+        .route("/health/ready", get(readiness_check))
+        .route("/health/live", get(liveness_check))
         // API 版本信息
         .route("/api/version", get(api_version))
         // WebSocket 端点
@@ -63,10 +67,31 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             auth_middleware,
         ));
 
+    // 创建管理员路由（需要管理员权限）
+    let admin_routes = Router::new()
+        .nest(&format!("/api/{}/admin", API_VERSION), admin_router())
+        .nest("/api/admin", admin_router())
+        // 添加速率限制中间件
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            rate_limit_middleware,
+        ))
+        // 添加管理员认证中间件
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            admin_auth_middleware,
+        ))
+        // 添加基础认证中间件
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            auth_middleware,
+        ));
+
     // 合并所有路由
     public_routes
         .merge(auth_routes_router)
         .merge(protected_routes)
+        .merge(admin_routes)
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -148,6 +173,44 @@ fn upload_routes() -> Router<Arc<AppState>> {
         .route("/avatar", post(file::upload_avatar))
 }
 
+/// 管理员路由
+fn admin_router() -> Router<Arc<AppState>> {
+    Router::new()
+        // 用户管理
+        .route("/users", get(admin::list_users))
+        .route(
+            "/users/:user_id",
+            get(admin::get_user).delete(admin::delete_user),
+        )
+        .route("/users/:user_id/role", put(admin::update_user_role))
+        .route("/users/:user_id/status", put(admin::set_user_status))
+        // 房间管理
+        .route("/rooms", get(admin::list_rooms))
+        .route(
+            "/rooms/:room_id",
+            get(admin::get_room).delete(admin::delete_room),
+        )
+        .route("/rooms/:room_id/messages", get(admin::get_room_messages))
+        // 消息审核
+        .route("/messages", get(admin::list_messages))
+        .route("/messages/:message_id", delete(admin::delete_message))
+        // 系统统计
+        .route("/stats", get(admin::get_stats))
+        .route("/stats/activity", get(admin::get_activity_stats))
+        // 日志查看
+        .route("/logs", get(admin::list_logs))
+        .route("/logs/download", get(admin::download_logs))
+        // 系统配置管理
+        .route(
+            "/configs",
+            get(admin::list_configs).post(admin::reset_configs),
+        )
+        .route(
+            "/configs/:key",
+            get(admin::get_config).put(admin::update_config),
+        )
+}
+
 /// 健康检查
 async fn health_check() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
@@ -157,6 +220,80 @@ async fn health_check() -> axum::Json<serde_json::Value> {
             "timestamp": Utc::now().to_rfc3339()
         }
     }))
+}
+
+/// 详细健康检查（包含数据库和WebSocket状态）
+async fn health_check_detailed(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> axum::Json<serde_json::Value> {
+    let db_healthy = check_database_health(&state).await;
+    let ws_connections = state.ws_manager().get_connection_count();
+    let online_users = state.ws_manager().get_online_user_count();
+
+    let status = if db_healthy { "healthy" } else { "degraded" };
+
+    axum::Json(serde_json::json!({
+        "success": true,
+        "data": {
+            "status": status,
+            "timestamp": Utc::now().to_rfc3339(),
+            "components": {
+                "database": {
+                    "status": if db_healthy { "healthy" } else { "unhealthy" }
+                },
+                "websocket": {
+                    "status": "healthy",
+                    "connections": ws_connections,
+                    "online_users": online_users
+                }
+            }
+        }
+    }))
+}
+
+/// 就绪检查（Readiness Probe）
+async fn readiness_check(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> axum::Json<serde_json::Value> {
+    let db_ready = check_database_health(&state).await;
+
+    if db_ready {
+        axum::Json(serde_json::json!({
+            "success": true,
+            "data": {
+                "status": "ready",
+                "timestamp": Utc::now().to_rfc3339()
+            }
+        }))
+    } else {
+        axum::Json(serde_json::json!({
+            "success": false,
+            "data": {
+                "status": "not_ready",
+                "timestamp": Utc::now().to_rfc3339(),
+                "reason": "database unavailable"
+            }
+        }))
+    }
+}
+
+/// 存活检查（Liveness Probe）
+async fn liveness_check() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "success": true,
+        "data": {
+            "status": "alive",
+            "timestamp": Utc::now().to_rfc3339()
+        }
+    }))
+}
+
+/// 检查数据库健康状态
+async fn check_database_health(state: &AppState) -> bool {
+    let result: Result<(i64,), _> = sqlx::query_as("SELECT 1")
+        .fetch_one(state.db().pool())
+        .await;
+    result.is_ok()
 }
 
 /// API 版本信息

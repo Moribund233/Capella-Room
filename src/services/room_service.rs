@@ -676,6 +676,99 @@ impl RoomService {
         let role = self.get_member_role(room_id, user_id).await?;
         Ok(matches!(role, Some(MemberRole::Owner)))
     }
+
+    /// 管理员：获取所有房间列表（包括私有房间）
+    pub async fn list_all_rooms(
+        &self,
+        search: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<RoomResponse>> {
+        let rows = if let Some(query) = search {
+            sqlx::query_as::<_, RoomRow>(
+                r#"
+                SELECT 
+                    r.id,
+                    r.name,
+                    r.description,
+                    r.owner_id,
+                    r.is_private,
+                    r.max_members,
+                    r.created_at,
+                    r.updated_at,
+                    COUNT(rm.user_id) as member_count
+                FROM rooms r
+                LEFT JOIN room_members rm ON r.id = rm.room_id
+                WHERE r.name ILIKE $1
+                GROUP BY r.id
+                ORDER BY r.created_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(format!("%{}%", query))
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?
+        } else {
+            sqlx::query_as::<_, RoomRow>(
+                r#"
+                SELECT 
+                    r.id,
+                    r.name,
+                    r.description,
+                    r.owner_id,
+                    r.is_private,
+                    r.max_members,
+                    r.created_at,
+                    r.updated_at,
+                    COUNT(rm.user_id) as member_count
+                FROM rooms r
+                LEFT JOIN room_members rm ON r.id = rm.room_id
+                GROUP BY r.id
+                ORDER BY r.created_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+            )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?
+        };
+
+        Ok(rows.into_iter().map(|r| r.into_response()).collect())
+    }
+
+    /// 管理员：统计所有房间数
+    pub async fn count_all_rooms(&self) -> Result<i64> {
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM rooms
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(count.0)
+    }
+
+    /// 管理员：强制删除房间（不检查权限）
+    pub async fn force_delete_room(&self, room_id: Uuid) -> Result<()> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM rooms WHERE id = $1
+            "#,
+        )
+        .bind(room_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
 }
 
 /// 用于查询的房间行（包含成员数）

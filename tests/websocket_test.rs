@@ -20,7 +20,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
 
 use seredeli_room::{
-    config::{DatabaseConfig, JwtConfig, UploadConfig},
+    config::{ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
@@ -142,11 +142,14 @@ async fn setup_test_server() -> (TestServer, Database) {
         admin: Default::default(),
     };
 
+    let config_manager = ConfigManager::new(db.clone(), config.clone());
+
     let state = AppState::new(
         db.clone(),
         ws_manager,
         config,
         Arc::clone(&metrics_collector),
+        Arc::new(config_manager),
     )
     .expect("Failed to create app state");
     let app = create_router(state);
