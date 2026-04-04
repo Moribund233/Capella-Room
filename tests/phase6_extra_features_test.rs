@@ -40,7 +40,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -61,7 +61,7 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
     let password = "TestPassword123!";
 
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test-secret-key-for-jwt-signing-in-tests-only".to_string(),
+        secret: Some("test-secret-key-for-jwt-signing-in-tests-only".to_string()),
         expiration_hours: 24,
     });
 

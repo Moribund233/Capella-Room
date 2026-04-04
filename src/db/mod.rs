@@ -3,15 +3,16 @@ use tracing::info;
 
 use crate::config::DatabaseConfig;
 
-/// 数据库连接池
 #[derive(Debug, Clone)]
 pub struct Database {
-    pub pool: PgPool,
+    pool: PgPool,
 }
 
 impl Database {
-    /// 创建数据库连接池
     pub async fn new(config: &DatabaseConfig) -> anyhow::Result<Self> {
+        let url = config.url.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Database URL is required"))?;
+        
         info!("Connecting to database...");
 
         let pool = PgPoolOptions::new()
@@ -19,10 +20,9 @@ impl Database {
             .min_connections(1)
             .acquire_timeout(std::time::Duration::from_secs(30))
             .idle_timeout(std::time::Duration::from_secs(600))
-            .connect(&config.url)
+            .connect(url)
             .await?;
 
-        // 测试连接
         sqlx::query("SELECT 1").fetch_one(&pool).await?;
 
         info!("Database connected successfully");
@@ -30,7 +30,6 @@ impl Database {
         Ok(Self { pool })
     }
 
-    /// 运行数据库迁移
     pub async fn migrate(&self) -> anyhow::Result<()> {
         info!("Running database migrations...");
 
@@ -40,7 +39,6 @@ impl Database {
         Ok(())
     }
 
-    /// 获取连接池
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -50,20 +48,19 @@ impl Database {
 mod tests {
     use super::*;
 
-    // 注意：这些测试需要数据库连接
-    // 在实际项目中应该使用测试数据库
-
-    async fn create_test_db() -> anyhow::Result<Database> {
-        let config = DatabaseConfig {
-            url: std::env::var("DATABASE_URL")?,
-            max_connections: 5,
-        };
-        Database::new(&config).await
-    }
-
     #[tokio::test]
     async fn test_database_connection() {
-        let result = create_test_db().await;
+        let url = std::env::var("DATABASE_URL");
+        if url.is_err() {
+            eprintln!("Skipping test_database_connection: DATABASE_URL not set");
+            return;
+        }
+        
+        let config = DatabaseConfig {
+            url: Some(url.unwrap()),
+            max_connections: 5,
+        };
+        let result = Database::new(&config).await;
         assert!(result.is_ok());
     }
 }

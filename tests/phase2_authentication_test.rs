@@ -51,7 +51,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let db_config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -164,7 +164,7 @@ mod password_security_tests {
     #[test]
     fn test_password_hashing() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -183,7 +183,7 @@ mod password_security_tests {
     #[test]
     fn test_password_verification() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -201,7 +201,7 @@ mod password_security_tests {
     #[test]
     fn test_different_passwords_different_hashes() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -219,7 +219,7 @@ mod password_security_tests {
     #[test]
     fn test_same_password_different_hashes() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -245,7 +245,7 @@ mod jwt_token_tests {
     #[test]
     fn test_token_generation() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -267,7 +267,7 @@ mod jwt_token_tests {
     #[test]
     fn test_access_token_verification() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -288,7 +288,7 @@ mod jwt_token_tests {
     #[test]
     fn test_refresh_token_verification() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -309,7 +309,7 @@ mod jwt_token_tests {
     #[test]
     fn test_invalid_token_verification() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -327,7 +327,7 @@ mod jwt_token_tests {
     #[test]
     fn test_token_type_mismatch() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -348,7 +348,7 @@ mod jwt_token_tests {
     #[test]
     fn test_extract_user_id() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -376,7 +376,7 @@ mod auth_service_integration_tests {
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -424,7 +424,7 @@ mod auth_service_integration_tests {
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -476,7 +476,7 @@ mod auth_service_integration_tests {
     #[tokio::test]
     async fn test_token_refresh_flow() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -564,7 +564,7 @@ mod acceptance_tests {
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -612,7 +612,7 @@ mod acceptance_tests {
         let user_service = UserService::new(db);
 
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -655,7 +655,7 @@ mod acceptance_tests {
     #[test]
     fn acceptance_jwt_token_generation_and_verification() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -694,7 +694,7 @@ mod acceptance_tests {
     #[test]
     fn acceptance_protected_endpoints_require_token() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -722,7 +722,7 @@ mod acceptance_tests {
     #[test]
     fn acceptance_token_refresh() {
         let jwt_config = JwtConfig {
-            secret: "test-secret-key-for-jwt-tokens".to_string(),
+            secret: Some("test-secret-key-for-jwt-tokens".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);

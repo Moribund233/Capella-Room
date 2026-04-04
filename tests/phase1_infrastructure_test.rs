@@ -50,7 +50,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let db_config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -88,14 +88,14 @@ mod config_tests {
 
         // 测试 DatabaseConfig 默认值
         let db_config = DatabaseConfig {
-            url: "postgres://localhost/test".to_string(),
+            url: Some("postgres://localhost/test".to_string()),
             max_connections: 10,
         };
         assert_eq!(db_config.max_connections, 10);
 
         // 测试 JwtConfig 默认值
         let jwt_config = JwtConfig {
-            secret: "test-secret".to_string(),
+            secret: Some("test-secret".to_string()),
             expiration_hours: 24,
         };
         assert_eq!(jwt_config.expiration_hours, 24);
@@ -105,22 +105,30 @@ mod config_tests {
     #[test]
     fn test_config_clone() {
         let config = AppConfig {
+            app: Default::default(),
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
             },
             database: DatabaseConfig {
-                url: "postgres://localhost/test".to_string(),
+                url: Some("postgres://localhost/test".to_string()),
                 max_connections: 5,
             },
             jwt: JwtConfig {
-                secret: "test-secret".to_string(),
+                secret: Some("test-secret".to_string()),
                 expiration_hours: 12,
             },
             upload: UploadConfig {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
+            rate_limit: Default::default(),
+            websocket: Default::default(),
+            reconnect: Default::default(),
+            logging: Default::default(),
+            cors: Default::default(),
+            system: Default::default(),
+            admin: Default::default(),
         };
 
         let cloned = config.clone();
@@ -134,22 +142,30 @@ mod config_tests {
     #[test]
     fn test_config_debug() {
         let config = AppConfig {
+            app: Default::default(),
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
             },
             database: DatabaseConfig {
-                url: "postgres://localhost/test".to_string(),
+                url: Some("postgres://localhost/test".to_string()),
                 max_connections: 5,
             },
             jwt: JwtConfig {
-                secret: "test-secret".to_string(),
+                secret: Some("test-secret".to_string()),
                 expiration_hours: 12,
             },
             upload: UploadConfig {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
+            rate_limit: Default::default(),
+            websocket: Default::default(),
+            reconnect: Default::default(),
+            logging: Default::default(),
+            cors: Default::default(),
+            system: Default::default(),
+            admin: Default::default(),
         };
 
         let debug_str = format!("{:?}", config);
@@ -358,22 +374,30 @@ mod integration_tests {
 
         // 配置结构体验证
         let config = AppConfig {
+            app: Default::default(),
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
             },
             database: DatabaseConfig {
-                url: "postgres://localhost:5432/seredeli_room".to_string(),
+                url: Some("postgres://localhost:5432/seredeli_room".to_string()),
                 max_connections: 10,
             },
             jwt: JwtConfig {
-                secret: "test-secret-key".to_string(),
+                secret: Some("test-secret-key".to_string()),
                 expiration_hours: 24,
             },
             upload: UploadConfig {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
+            rate_limit: Default::default(),
+            websocket: Default::default(),
+            reconnect: Default::default(),
+            logging: Default::default(),
+            cors: Default::default(),
+            system: Default::default(),
+            admin: Default::default(),
         };
 
         assert_eq!(config.server.port, 3000);
@@ -411,30 +435,38 @@ mod acceptance_tests {
     fn acceptance_config_management() {
         // 验证配置结构体定义完整
         let config = AppConfig {
+            app: Default::default(),
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
             },
             database: DatabaseConfig {
-                url: "postgres://user:pass@localhost:5432/db".to_string(),
+                url: Some("postgres://user:pass@localhost:5432/db".to_string()),
                 max_connections: 10,
             },
             jwt: JwtConfig {
-                secret: "secret".to_string(),
+                secret: Some("secret".to_string()),
                 expiration_hours: 24,
             },
             upload: UploadConfig {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
+            rate_limit: Default::default(),
+            websocket: Default::default(),
+            reconnect: Default::default(),
+            logging: Default::default(),
+            cors: Default::default(),
+            system: Default::default(),
+            admin: Default::default(),
         };
 
         // 验证所有配置字段可访问
         assert!(!config.server.host.is_empty());
         assert!(config.server.port > 0);
-        assert!(!config.database.url.is_empty());
+        assert!(config.database.url.is_some());
         assert!(config.database.max_connections > 0);
-        assert!(!config.jwt.secret.is_empty());
+        assert!(config.jwt.secret.is_some());
         assert!(config.jwt.expiration_hours > 0);
     }
 

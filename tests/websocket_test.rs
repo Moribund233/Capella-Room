@@ -88,7 +88,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let db_config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -117,20 +117,35 @@ async fn setup_test_server() -> (TestServer, Database) {
 
     let ws_manager = WebSocketManager::new();
     let metrics_collector = Arc::new(MetricsCollector::new());
-    let jwt_config = JwtConfig {
-        secret: "test_secret_key_for_testing_purposes_only".to_string(),
-        expiration_hours: 24,
-    };
-    let upload_config = UploadConfig {
-        max_file_size: 10 * 1024 * 1024,
-        base_url: "/uploads".to_string(),
+
+    let config = seredeli_room::config::AppConfig {
+        app: Default::default(),
+        server: Default::default(),
+        database: seredeli_room::config::DatabaseConfig {
+            url: None,
+            max_connections: 10,
+        },
+        jwt: JwtConfig {
+            secret: Some("test_secret_key_for_testing_purposes_only".to_string()),
+            expiration_hours: 24,
+        },
+        upload: UploadConfig {
+            max_file_size: 10 * 1024 * 1024,
+            base_url: "/uploads".to_string(),
+        },
+        rate_limit: Default::default(),
+        websocket: Default::default(),
+        reconnect: Default::default(),
+        logging: Default::default(),
+        cors: Default::default(),
+        system: Default::default(),
+        admin: Default::default(),
     };
 
     let state = AppState::new(
         db.clone(),
         ws_manager,
-        jwt_config,
-        upload_config,
+        config,
         Arc::clone(&metrics_collector),
     )
     .expect("Failed to create app state");
@@ -171,7 +186,7 @@ async fn create_test_user_with_token(_db: &Database, username: &str) -> (Uuid, S
     // 为了简化，我们在测试中直接使用数据库创建用户并生成 token
     let user_service = UserService::new(_db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret_key_for_testing_purposes_only".to_string(),
+        secret: Some("test_secret_key_for_testing_purposes_only".to_string()),
         expiration_hours: 24,
     });
 

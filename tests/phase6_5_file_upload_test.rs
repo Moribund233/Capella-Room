@@ -15,12 +15,8 @@ use std::path::PathBuf;
 use seredeli_room::{
     config::{DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
-    services::{
-        auth_service::AuthService,
-        file_service::FileService,
-        user_service::UserService,
-    },
-    models::file::{FileCategory, FileUsageType, FileQueryParams, is_allowed_mime_type},
+    models::file::{is_allowed_mime_type, FileCategory, FileQueryParams, FileUsageType},
+    services::{auth_service::AuthService, file_service::FileService, user_service::UserService},
 };
 use uuid::Uuid;
 
@@ -37,8 +33,8 @@ fn load_test_env() {
 async fn setup_test_db() -> Database {
     load_test_env();
 
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in .env.test or environment");
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env.test or environment");
 
     let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
         .ok()
@@ -46,15 +42,17 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
-    let db = Database::new(&config).await.expect("Failed to create database");
-    
+    let db = Database::new(&config)
+        .await
+        .expect("Failed to create database");
+
     // 运行数据库迁移
     db.migrate().await.expect("Failed to run migrations");
-    
+
     db
 }
 
@@ -72,12 +70,15 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
     let password = "TestPassword123!";
 
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test-secret-key-for-jwt-signing-in-tests-only".to_string(),
+        secret: Some("test-secret-key-for-jwt-signing-in-tests-only".to_string()),
         expiration_hours: 24,
     });
 
     let password_hash = auth_service.hash_password(password).unwrap();
-    let user = user_service.create_user(username, &email, &password_hash).await.unwrap();
+    let user = user_service
+        .create_user(username, &email, &password_hash)
+        .await
+        .unwrap();
 
     (user.id, password.to_string())
 }
@@ -128,7 +129,7 @@ async fn test_upload_image_file() {
 
     assert!(result.is_ok(), "图片上传应该成功: {:?}", result.err());
     let response = result.unwrap();
-    
+
     assert_eq!(response.original_name, "test_image.png");
     assert_eq!(response.mime_type, "image/png");
     assert_eq!(response.file_size, image_data.len() as i64);
@@ -164,7 +165,7 @@ async fn test_upload_document_file() {
 
     assert!(result.is_ok(), "文档上传应该成功: {:?}", result.err());
     let response = result.unwrap();
-    
+
     assert_eq!(response.original_name, "test_document.pdf");
     assert_eq!(response.mime_type, "application/pdf");
     assert!(response.file_url.starts_with("/uploads/documents/"));
@@ -202,11 +203,15 @@ async fn test_upload_avatar_file() {
 
     assert!(result.is_ok(), "头像上传应该成功: {:?}", result.err());
     let response = result.unwrap();
-    
+
     assert_eq!(response.original_name, "avatar.jpg");
     assert_eq!(response.mime_type, "image/jpeg");
     // 头像文件存储在 images/ 目录下（根据 MIME 类型 image/jpeg）
-    assert!(response.file_url.starts_with("/uploads/images/"), "URL 应该是 /uploads/images/ 开头，实际是: {}", response.file_url);
+    assert!(
+        response.file_url.starts_with("/uploads/images/"),
+        "URL 应该是 /uploads/images/ 开头，实际是: {}",
+        response.file_url
+    );
 
     // 清理测试目录
     let _ = std::fs::remove_dir_all(&upload_dir);
@@ -241,8 +246,13 @@ async fn test_upload_invalid_file_type() {
     assert!(result.is_err(), "不允许的文件类型应该被拒绝");
     let error_msg = result.unwrap_err().to_string();
     // 错误消息可能包含 "不支持的文件类型" 或 "不允许"
-    assert!(error_msg.contains("不支持") || error_msg.contains("不允许") || error_msg.contains("not allowed"), 
-            "错误消息应该表明文件类型不被允许: {}", error_msg);
+    assert!(
+        error_msg.contains("不支持")
+            || error_msg.contains("不允许")
+            || error_msg.contains("not allowed"),
+        "错误消息应该表明文件类型不被允许: {}",
+        error_msg
+    );
 
     // 清理测试目录
     let _ = std::fs::remove_dir_all(&upload_dir);
@@ -253,7 +263,7 @@ async fn test_upload_oversized_file() {
     let db = setup_test_db().await;
     let upload_dir = setup_test_upload_dir();
     let user_service = UserService::new(db.clone());
-    
+
     // 创建一个最大文件大小为 1KB 的配置
     let file_service = FileService::new(
         db.clone(),
@@ -281,8 +291,11 @@ async fn test_upload_oversized_file() {
 
     assert!(result.is_err(), "超大文件应该被拒绝");
     let error_msg = result.unwrap_err().to_string();
-    assert!(error_msg.contains("大小") || error_msg.contains("size") || error_msg.contains("超过"),
-            "错误消息应该表明文件大小超过限制: {}", error_msg);
+    assert!(
+        error_msg.contains("大小") || error_msg.contains("size") || error_msg.contains("超过"),
+        "错误消息应该表明文件大小超过限制: {}",
+        error_msg
+    );
 
     // 清理测试目录
     let _ = std::fs::remove_dir_all(&upload_dir);
@@ -315,11 +328,13 @@ async fn test_get_file_by_id() {
         .unwrap();
 
     // 查询文件信息
-    let file_info = file_service
-        .get_file_by_id(upload_response.id)
-        .await;
+    let file_info = file_service.get_file_by_id(upload_response.id).await;
 
-    assert!(file_info.is_ok(), "应该能获取文件信息: {:?}", file_info.err());
+    assert!(
+        file_info.is_ok(),
+        "应该能获取文件信息: {:?}",
+        file_info.err()
+    );
     let file = file_info.unwrap();
     assert_eq!(file.id, upload_response.id);
     assert_eq!(file.original_name, "test.png");
@@ -379,9 +394,7 @@ async fn test_list_user_files() {
         category: None,
     };
 
-    let result = file_service
-        .get_files_by_uploader(user_id, params)
-        .await;
+    let result = file_service.get_files_by_uploader(user_id, params).await;
 
     assert!(result.is_ok(), "应该能获取文件列表: {:?}", result.err());
     let list_response = result.unwrap();
@@ -419,9 +432,7 @@ async fn test_delete_own_file() {
         .unwrap();
 
     // 删除文件
-    let result = file_service
-        .delete_file(upload_response.id, user_id)
-        .await;
+    let result = file_service.delete_file(upload_response.id, user_id).await;
 
     assert!(result.is_ok(), "应该能删除自己的文件: {:?}", result.err());
 
@@ -459,9 +470,7 @@ async fn test_delete_other_user_file() {
         .unwrap();
 
     // 用户2尝试删除用户1的文件
-    let result = file_service
-        .delete_file(upload_response.id, user2_id)
-        .await;
+    let result = file_service.delete_file(upload_response.id, user2_id).await;
 
     assert!(result.is_err(), "不应该能删除其他用户的文件");
 
@@ -521,13 +530,31 @@ async fn test_file_deduplication() {
 #[test]
 fn test_file_category_detection() {
     // 测试 MIME 类型分类检测
-    assert_eq!(FileCategory::from_mime_type("image/png"), FileCategory::Image);
-    assert_eq!(FileCategory::from_mime_type("image/jpeg"), FileCategory::Image);
-    assert_eq!(FileCategory::from_mime_type("application/pdf"), FileCategory::Document);
-    assert_eq!(FileCategory::from_mime_type("video/mp4"), FileCategory::Video);
-    assert_eq!(FileCategory::from_mime_type("audio/mpeg"), FileCategory::Audio);
+    assert_eq!(
+        FileCategory::from_mime_type("image/png"),
+        FileCategory::Image
+    );
+    assert_eq!(
+        FileCategory::from_mime_type("image/jpeg"),
+        FileCategory::Image
+    );
+    assert_eq!(
+        FileCategory::from_mime_type("application/pdf"),
+        FileCategory::Document
+    );
+    assert_eq!(
+        FileCategory::from_mime_type("video/mp4"),
+        FileCategory::Video
+    );
+    assert_eq!(
+        FileCategory::from_mime_type("audio/mpeg"),
+        FileCategory::Audio
+    );
     // application/unknown 不是已知的文档类型，所以归类为 Document（根据扩展名）
-    assert_eq!(FileCategory::from_mime_type("application/unknown"), FileCategory::Document);
+    assert_eq!(
+        FileCategory::from_mime_type("application/unknown"),
+        FileCategory::Document
+    );
 }
 
 #[test]

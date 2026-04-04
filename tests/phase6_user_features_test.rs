@@ -17,10 +17,7 @@ use seredeli_room::{
     db::Database,
     error::AppError,
     models::user::{UpdateUserRequest, UserStatus},
-    services::{
-        auth_service::AuthService,
-        user_service::UserService,
-    },
+    services::{auth_service::AuthService, user_service::UserService},
 };
 use uuid::Uuid;
 use validator::Validate;
@@ -28,7 +25,7 @@ use validator::Validate;
 /// 创建测试用的 JWT 配置
 fn test_jwt_config() -> JwtConfig {
     JwtConfig {
-        secret: "test-secret-key-for-jwt-signing-in-tests-only".to_string(),
+        secret: Some("test-secret-key-for-jwt-signing-in-tests-only".to_string()),
         expiration_hours: 24,
     }
 }
@@ -46,8 +43,8 @@ fn load_test_env() {
 async fn setup_test_db() -> Database {
     load_test_env();
 
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in .env.test or environment");
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env.test or environment");
 
     let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
         .ok()
@@ -55,7 +52,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let db_config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -131,7 +128,12 @@ async fn test_6_1_update_user_username() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("testupdate{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testupdate{}", unique_id),
+    )
+    .await;
 
     // 更新用户名
     let new_username = format!("updateduser{}", unique_id);
@@ -151,7 +153,12 @@ async fn test_6_1_update_user_avatar() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("testavatar{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testavatar{}", unique_id),
+    )
+    .await;
 
     // 更新头像URL
     let avatar_url = "https://example.com/avatar.png";
@@ -195,8 +202,18 @@ async fn test_6_1_update_user_duplicate_username() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user1_id, _) = create_test_user(&user_service, &auth_service, &format!("testdup1{}", unique_id)).await;
-    let (_, _) = create_test_user(&user_service, &auth_service, &format!("testdup2{}", unique_id)).await;
+    let (user1_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testdup1{}", unique_id),
+    )
+    .await;
+    let (_, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testdup2{}", unique_id),
+    )
+    .await;
 
     // 尝试将user1的用户名改为user2的用户名
     let result = user_service
@@ -222,7 +239,12 @@ async fn test_6_2_update_user_status() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("teststatus{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("teststatus{}", unique_id),
+    )
+    .await;
 
     // 更新状态为在线
     user_service
@@ -276,7 +298,12 @@ async fn test_6_2_get_online_users() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("testonline{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testonline{}", unique_id),
+    )
+    .await;
 
     // 将用户状态设置为在线
     user_service
@@ -301,7 +328,12 @@ async fn test_6_2_get_users_by_status() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("testbystatus{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testbystatus{}", unique_id),
+    )
+    .await;
 
     // 设置用户为离线状态
     user_service
@@ -332,7 +364,12 @@ async fn test_6_3_list_users_pagination() {
     // 创建多个测试用户
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
     for i in 0..5 {
-        let _ = create_test_user(&user_service, &auth_service, &format!("testlist{}{}", unique_id, i)).await;
+        let _ = create_test_user(
+            &user_service,
+            &auth_service,
+            &format!("testlist{}{}", unique_id, i),
+        )
+        .await;
     }
 
     // 测试分页
@@ -352,17 +389,25 @@ async fn test_6_3_count_users() {
 
     // 获取当前用户总数
     let count = user_service.count_users().await.unwrap();
-    
+
     // 验证返回的是有效的计数（非负）
     assert!(count >= 0, "User count should be non-negative");
-    
+
     // 创建新用户
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let _ = create_test_user(&user_service, &auth_service, &format!("testcount{}", unique_id)).await;
+    let _ = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testcount{}", unique_id),
+    )
+    .await;
 
     // 验证总数增加（至少为1，因为创建了一个用户）
     let new_count = user_service.count_users().await.unwrap();
-    assert!(new_count >= count, "User count should not decrease after creating a user");
+    assert!(
+        new_count >= count,
+        "User count should not decrease after creating a user"
+    );
 }
 
 #[tokio::test]
@@ -382,7 +427,10 @@ async fn test_6_3_search_users() {
     assert!(results.iter().any(|u| u.id == user_id));
 
     // 通过部分用户名搜索
-    let (results, total) = user_service.search_users("searchableuser", 10, 0).await.unwrap();
+    let (results, total) = user_service
+        .search_users("searchableuser", 10, 0)
+        .await
+        .unwrap();
     assert!(total >= 1);
     assert!(results.iter().any(|u| u.id == user_id));
 }
@@ -399,7 +447,10 @@ async fn test_6_3_search_users_by_email() {
     let (user_id, _) = create_test_user(&user_service, &auth_service, &username).await;
 
     // 通过邮箱域名搜索
-    let (results, total) = user_service.search_users("seredeli.com", 10, 0).await.unwrap();
+    let (results, total) = user_service
+        .search_users("seredeli.com", 10, 0)
+        .await
+        .unwrap();
     assert!(total >= 1);
     assert!(results.iter().any(|u| u.id == user_id));
 }
@@ -423,11 +474,17 @@ async fn test_6_3_search_users_pagination() {
     }
 
     // 搜索并分页
-    let (results1, total) = user_service.search_users(&format!("pagsearch{}", unique_id), 2, 0).await.unwrap();
+    let (results1, total) = user_service
+        .search_users(&format!("pagsearch{}", unique_id), 2, 0)
+        .await
+        .unwrap();
     assert_eq!(results1.len(), 2);
     assert!(total >= 5);
 
-    let (results2, _) = user_service.search_users(&format!("pagsearch{}", unique_id), 2, 2).await.unwrap();
+    let (results2, _) = user_service
+        .search_users(&format!("pagsearch{}", unique_id), 2, 2)
+        .await
+        .unwrap();
     assert_eq!(results2.len(), 2);
 }
 
@@ -441,7 +498,12 @@ async fn test_user_to_response() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("testresponse{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("testresponse{}", unique_id),
+    )
+    .await;
 
     let user = user_service.get_user_by_id(user_id).await.unwrap().unwrap();
     let response = user.to_response();
@@ -462,7 +524,12 @@ async fn test_user_profile_workflow() {
     let user_service = UserService::new(db);
 
     let unique_id = Uuid::new_v4().to_string()[..8].to_string();
-    let (user_id, _) = create_test_user(&user_service, &auth_service, &format!("workflow{}", unique_id)).await;
+    let (user_id, _) = create_test_user(
+        &user_service,
+        &auth_service,
+        &format!("workflow{}", unique_id),
+    )
+    .await;
 
     // 1. 获取用户信息
     let user = user_service.get_user_by_id(user_id).await.unwrap().unwrap();
@@ -498,7 +565,10 @@ async fn test_user_profile_workflow() {
     assert!(found, "User should be in online users list");
 
     // 6. 搜索用户
-    let (search_results, _) = user_service.search_users(&new_username, 10, 0).await.unwrap();
+    let (search_results, _) = user_service
+        .search_users(&new_username, 10, 0)
+        .await
+        .unwrap();
     let found = search_results.iter().any(|u| u.id == user_id);
     assert!(found, "User should be found in search results");
 }

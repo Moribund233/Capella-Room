@@ -12,24 +12,21 @@ use crate::{
     error::{AppError, Result},
 };
 
-/// JWT Claims
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String, // 用户ID (字符串格式)
-    pub exp: usize,  // 过期时间
-    pub iat: usize,  // 签发时间
-    pub token_type: String, // token类型: access 或 refresh
+    pub sub: String,
+    pub exp: usize,
+    pub iat: usize,
+    pub token_type: String,
 }
 
-/// Token对（访问令牌 + 刷新令牌）
 #[derive(Debug, Clone, Serialize)]
 pub struct TokenPair {
     pub access_token: String,
     pub refresh_token: String,
-    pub expires_in: i64, // 访问令牌过期时间（秒）
+    pub expires_in: i64,
 }
 
-/// 认证服务
 #[derive(Clone)]
 pub struct AuthService {
     pub jwt_config: JwtConfig,
@@ -40,8 +37,11 @@ impl AuthService {
         Self { jwt_config }
     }
 
-    /// 密码哈希
-    /// 使用 Argon2id 算法进行密码哈希
+    fn get_secret(&self) -> Result<&str> {
+        self.jwt_config.secret.as_deref()
+            .ok_or_else(|| AppError::Auth("JWT secret is not configured".to_string()))
+    }
+
     pub fn hash_password(&self, password: &str) -> Result<String> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
@@ -53,7 +53,6 @@ impl AuthService {
         Ok(password_hash.to_string())
     }
 
-    /// 验证密码
     pub fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
         let parsed_hash = PasswordHash::new(hash)
             .map_err(|e| AppError::Auth(format!("密码哈希解析失败: {}", e)))?;
@@ -68,7 +67,6 @@ impl AuthService {
         }
     }
 
-    /// 生成Token对（访问令牌 + 刷新令牌）
     pub fn generate_token_pair(&self, user_id: Uuid) -> Result<TokenPair> {
         let access_token = self.generate_access_token(user_id)?;
         let refresh_token = self.generate_refresh_token(user_id)?;
@@ -80,7 +78,6 @@ impl AuthService {
         })
     }
 
-    /// 生成访问令牌
     fn generate_access_token(&self, user_id: Uuid) -> Result<String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -96,24 +93,23 @@ impl AuthService {
             token_type: "access".to_string(),
         };
 
+        let secret = self.get_secret()?;
         let token = encode(
             &Header::new(Algorithm::HS256),
             &claims,
-            &EncodingKey::from_secret(self.jwt_config.secret.as_bytes()),
+            &EncodingKey::from_secret(secret.as_bytes()),
         )
         .map_err(|e| AppError::Auth(format!("Token生成失败: {}", e)))?;
 
         Ok(token)
     }
 
-    /// 生成刷新令牌（有效期更长）
     fn generate_refresh_token(&self, user_id: Uuid) -> Result<String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
 
         let iat = now.as_secs() as usize;
-        // 刷新令牌有效期为访问令牌的7倍
         let exp = iat + (self.jwt_config.expiration_hours as usize * 3600 * 7);
 
         let claims = Claims {
@@ -123,23 +119,24 @@ impl AuthService {
             token_type: "refresh".to_string(),
         };
 
+        let secret = self.get_secret()?;
         let token = encode(
             &Header::new(Algorithm::HS256),
             &claims,
-            &EncodingKey::from_secret(self.jwt_config.secret.as_bytes()),
+            &EncodingKey::from_secret(secret.as_bytes()),
         )
         .map_err(|e| AppError::Auth(format!("刷新Token生成失败: {}", e)))?;
 
         Ok(token)
     }
 
-    /// 验证JWT Token
     pub fn verify_token(&self, token: &str) -> Result<Claims> {
         let validation = Validation::new(Algorithm::HS256);
+        let secret = self.get_secret()?;
 
         let token_data = decode::<Claims>(
             token,
-            &DecodingKey::from_secret(self.jwt_config.secret.as_bytes()),
+            &DecodingKey::from_secret(secret.as_bytes()),
             &validation,
         )
         .map_err(|e| match e.kind() {
@@ -155,7 +152,6 @@ impl AuthService {
         Ok(token_data.claims)
     }
 
-    /// 验证访问令牌
     pub fn verify_access_token(&self, token: &str) -> Result<Claims> {
         let claims = self.verify_token(token)?;
 
@@ -166,7 +162,6 @@ impl AuthService {
         Ok(claims)
     }
 
-    /// 验证刷新令牌
     pub fn verify_refresh_token(&self, token: &str) -> Result<Claims> {
         let claims = self.verify_token(token)?;
 
@@ -177,7 +172,6 @@ impl AuthService {
         Ok(claims)
     }
 
-    /// 从Claims中提取用户ID
     pub fn extract_user_id(&self, claims: &Claims) -> Result<Uuid> {
         Uuid::parse_str(&claims.sub)
             .map_err(|_| AppError::Auth("无效的用户ID".to_string()))

@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 // 引入被测模块
 use seredeli_room::{
-    config::AppConfig,
+    config::ConfigLoader,
     db::Database,
     routes::create_router,
     state::AppState,
@@ -54,7 +54,7 @@ async fn start_test_server() -> TestServer {
     // 加载开发环境配置
     dotenvy::from_filename(".env.development").ok();
 
-    let config = AppConfig::from_env().expect("Failed to load config");
+    let config = ConfigLoader::load().expect("Failed to load config");
 
     // 初始化数据库
     let db = Database::new(&config.database)
@@ -71,14 +71,8 @@ async fn start_test_server() -> TestServer {
     let metrics_collector = Arc::new(MetricsCollector::new());
 
     // 创建应用状态
-    let state = AppState::new(
-        db,
-        ws_manager,
-        config.jwt.clone(),
-        config.upload.clone(),
-        metrics_collector,
-    )
-    .expect("Failed to create app state");
+    let state = AppState::new(db, ws_manager, config, metrics_collector)
+        .expect("Failed to create app state");
 
     // 构建应用路由
     let app = create_router(state);

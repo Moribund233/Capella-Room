@@ -52,7 +52,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let db_config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -167,7 +167,7 @@ async fn test_5_2_create_message() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -198,7 +198,7 @@ async fn test_5_2_create_message_with_reply() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -228,7 +228,7 @@ async fn test_5_2_soft_delete_message() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -263,7 +263,7 @@ async fn test_5_2_delete_message_permission() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -296,7 +296,7 @@ async fn test_5_3_get_room_messages() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -333,7 +333,7 @@ async fn test_5_3_cursor_pagination() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -377,7 +377,7 @@ async fn test_5_3_search_messages() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -432,7 +432,7 @@ async fn test_5_3_search_excludes_deleted() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -470,7 +470,7 @@ async fn test_5_4_get_message_by_id() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -508,7 +508,7 @@ async fn test_5_4_get_latest_messages() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -541,7 +541,7 @@ async fn test_5_4_get_missed_messages() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 
@@ -583,7 +583,7 @@ async fn test_5_full_message_lifecycle() {
     let room_service = RoomService::new(db.clone());
     let message_service = MessageService::new(db.clone());
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret".to_string(),
+        secret: Some("test_secret".to_string()),
         expiration_hours: 24,
     });
 

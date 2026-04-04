@@ -54,7 +54,7 @@ async fn setup_test_db() -> Database {
         .unwrap_or(5);
 
     let db_config = DatabaseConfig {
-        url: database_url,
+        url: Some(database_url),
         max_connections,
     };
 
@@ -75,7 +75,7 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
     if let Ok(Some(user)) = user_service.get_user_by_email(&email).await {
         // 直接生成token
         let jwt_config = JwtConfig {
-            secret: "test_secret_key_for_testing_purposes_only".to_string(),
+            secret: Some("test_secret_key_for_testing_purposes_only".to_string()),
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
@@ -84,7 +84,7 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
     }
 
     let auth_service = AuthService::new(JwtConfig {
-        secret: "test_secret_key_for_testing_purposes_only".to_string(),
+        secret: Some("test_secret_key_for_testing_purposes_only".to_string()),
         expiration_hours: 24,
     });
 

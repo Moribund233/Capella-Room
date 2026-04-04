@@ -7,12 +7,11 @@ use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::{
-    config::AppConfig,
     db::Database,
     error::{AppError, Result},
     models::file::{
-        FileCategory, FileListResponse, FileQueryParams, FileResource,
-        FileResponse, FileUploadResponse, FileUsageType, is_allowed_mime_type,
+        is_allowed_mime_type, FileCategory, FileListResponse, FileQueryParams, FileResource,
+        FileResponse, FileUploadResponse, FileUsageType,
     },
 };
 
@@ -37,7 +36,7 @@ impl FileService {
 
     /// 从配置创建文件服务
     pub fn from_config(db: Database, config: &crate::config::UploadConfig) -> anyhow::Result<Self> {
-        let upload_dir = AppConfig::upload_dir()?;
+        let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
         Ok(Self::new(
             db,
             upload_dir,
@@ -105,20 +104,20 @@ impl FileService {
         if existing_file.is_none() {
             // 创建目录
             let parent_dir = full_path.parent().ok_or(AppError::Internal)?;
-            fs::create_dir_all(parent_dir).await.map_err(|e| {
-                AppError::Validation(format!("创建目录失败: {}", e))
-            })?;
+            fs::create_dir_all(parent_dir)
+                .await
+                .map_err(|e| AppError::Validation(format!("创建目录失败: {}", e)))?;
 
             // 保存文件
-            let mut file = fs::File::create(&full_path).await.map_err(|e| {
-                AppError::Validation(format!("创建文件失败: {}", e))
-            })?;
-            file.write_all(&file_data).await.map_err(|e| {
-                AppError::Validation(format!("写入文件失败: {}", e))
-            })?;
-            file.flush().await.map_err(|e| {
-                AppError::Validation(format!("刷新文件失败: {}", e))
-            })?;
+            let mut file = fs::File::create(&full_path)
+                .await
+                .map_err(|e| AppError::Validation(format!("创建文件失败: {}", e)))?;
+            file.write_all(&file_data)
+                .await
+                .map_err(|e| AppError::Validation(format!("写入文件失败: {}", e)))?;
+            file.flush()
+                .await
+                .map_err(|e| AppError::Validation(format!("刷新文件失败: {}", e)))?;
         }
 
         // 构建访问 URL
@@ -372,11 +371,7 @@ impl FileService {
     }
 
     /// 关联文件到消息
-    pub async fn link_file_to_message(
-        &self,
-        file_id: Uuid,
-        message_id: Uuid,
-    ) -> Result<()> {
+    pub async fn link_file_to_message(&self, file_id: Uuid, message_id: Uuid) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE file_resources 
