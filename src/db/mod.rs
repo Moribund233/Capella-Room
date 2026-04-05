@@ -10,16 +10,18 @@ pub struct Database {
 
 impl Database {
     pub async fn new(config: &DatabaseConfig) -> anyhow::Result<Self> {
-        let url = config.url.as_ref()
+        let url = config
+            .url
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Database URL is required"))?;
-        
+
         info!("Connecting to database...");
 
         let pool = PgPoolOptions::new()
             .max_connections(config.max_connections)
             .min_connections(1)
-            .acquire_timeout(std::time::Duration::from_secs(30))
-            .idle_timeout(std::time::Duration::from_secs(600))
+            .acquire_timeout(std::time::Duration::from_secs(config.acquire_timeout_secs))
+            .idle_timeout(std::time::Duration::from_secs(config.idle_timeout_secs))
             .connect(url)
             .await?;
 
@@ -55,10 +57,12 @@ mod tests {
             eprintln!("Skipping test_database_connection: DATABASE_URL not set");
             return;
         }
-        
+
         let config = DatabaseConfig {
             url: Some(url.unwrap()),
             max_connections: 5,
+            acquire_timeout_secs: 30,
+            idle_timeout_secs: 600,
         };
         let result = Database::new(&config).await;
         assert!(result.is_ok());

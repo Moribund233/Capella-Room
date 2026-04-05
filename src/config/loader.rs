@@ -117,6 +117,20 @@ impl ConfigLoader {
             }
         }
 
+        if let Ok(timeout) = std::env::var("DATABASE_ACQUIRE_TIMEOUT_SECS") {
+            if let Ok(t) = timeout.parse() {
+                debug!("Overriding database.acquire_timeout_secs from environment");
+                config.database.acquire_timeout_secs = t;
+            }
+        }
+
+        if let Ok(timeout) = std::env::var("DATABASE_IDLE_TIMEOUT_SECS") {
+            if let Ok(t) = timeout.parse() {
+                debug!("Overriding database.idle_timeout_secs from environment");
+                config.database.idle_timeout_secs = t;
+            }
+        }
+
         if let Ok(secret) = std::env::var("JWT_SECRET") {
             debug!("Overriding jwt.secret from environment");
             config.jwt.secret = Some(secret);

@@ -1,12 +1,13 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::config::{AppConfig, ConfigManager};
+use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
 use crate::middleware::rate_limit::RateLimiter;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
 use crate::services::message_service::MessageService;
+use crate::services::notification_service::NotificationService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
 use crate::utils::logging::MetricsCollector;
@@ -21,7 +22,8 @@ pub struct AppState {
     pub room_service: RoomService,
     pub message_service: MessageService,
     pub file_service: FileService,
-    pub rate_limiter: Option<Arc<RateLimiter>>,
+    pub notification_service: NotificationService,
+    pub rate_limiter: Option<Arc<tokio::sync::RwLock<RateLimiter>>>,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
 }
@@ -37,6 +39,7 @@ impl fmt::Debug for AppState {
             .field("room_service", &"<RoomService>")
             .field("message_service", &"<MessageService>")
             .field("file_service", &"<FileService>")
+            .field("notification_service", &"<NotificationService>")
             .finish()
     }
 }
@@ -58,6 +61,7 @@ impl AppState {
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
+        let notification_service = NotificationService::new(db.clone(), ws_manager.clone());
 
         let upload_config = crate::config::UploadConfig {
             max_file_size: config.upload.max_file_size,
@@ -76,27 +80,36 @@ impl AppState {
                 message_window_secs: config.rate_limit.message_window_secs,
                 room_requests: config.rate_limit.room_requests,
                 room_window_secs: config.rate_limit.room_window_secs,
+                cleanup_interval_secs: config.rate_limit.cleanup_interval_secs,
             };
-            Some(Arc::new(RateLimiter::new(rate_limit_config)))
+            Some(Arc::new(tokio::sync::RwLock::new(RateLimiter::new(
+                rate_limit_config,
+            ))))
         } else {
             None
         };
 
         let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
-        Ok(Arc::new(Self {
+        let state = Arc::new(Self {
             db,
-            ws_manager,
+            ws_manager: ws_manager.clone(),
             metrics_collector,
             auth_service,
             user_service,
             room_service,
             message_service,
             file_service,
-            rate_limiter,
+            notification_service,
+            rate_limiter: rate_limiter.clone(),
             config: shared_config,
-            config_manager,
-        }))
+            config_manager: config_manager.clone(),
+        });
+
+        // 启动配置监听器
+        start_config_listeners(config_manager, ws_manager, rate_limiter);
+
+        Ok(state)
     }
 
     pub fn db(&self) -> &Database {
@@ -131,7 +144,11 @@ impl AppState {
         &self.file_service
     }
 
-    pub fn rate_limiter(&self) -> Option<Arc<RateLimiter>> {
+    pub fn notification_service(&self) -> &NotificationService {
+        &self.notification_service
+    }
+
+    pub fn rate_limiter(&self) -> Option<Arc<tokio::sync::RwLock<RateLimiter>>> {
         self.rate_limiter.clone()
     }
 
@@ -170,6 +187,10 @@ impl Clone for AppState {
             message_service: MessageService::new(self.db.clone()),
             file_service: FileService::from_config(self.db.clone(), &upload_config)
                 .expect("Failed to clone file service"),
+            notification_service: NotificationService::new(
+                self.db.clone(),
+                Arc::clone(&self.ws_manager),
+            ),
             rate_limiter: self.rate_limiter.clone(),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),

@@ -1,13 +1,13 @@
 use dashmap::DashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::models::room::MemberRole;
 
-/// WebSocket 消息通道缓冲区大小（与 handler.rs 保持一致）
-pub const WS_MESSAGE_BUFFER_SIZE: usize = 100;
+/// WebSocket 消息通道默认缓冲区大小
+pub const DEFAULT_WS_MESSAGE_BUFFER_SIZE: usize = 100;
 
 /// 用户连接信息
 #[derive(Debug, Clone)]
@@ -35,6 +35,12 @@ pub struct WebSocketManager {
     room_subscribers: DashMap<Uuid, Vec<Uuid>>,
     /// 用户当前加入的房间
     user_rooms: DashMap<Uuid, Vec<Uuid>>,
+    /// 消息缓冲区大小（可动态更新）
+    message_buffer_size: RwLock<usize>,
+    /// 心跳间隔（秒，可动态更新）
+    heartbeat_interval_secs: RwLock<u64>,
+    /// 心跳超时（秒，可动态更新）
+    heartbeat_timeout_secs: RwLock<u64>,
 }
 
 impl WebSocketManager {
@@ -44,7 +50,62 @@ impl WebSocketManager {
             connections: DashMap::new(),
             room_subscribers: DashMap::new(),
             user_rooms: DashMap::new(),
+            message_buffer_size: RwLock::new(DEFAULT_WS_MESSAGE_BUFFER_SIZE),
+            heartbeat_interval_secs: RwLock::new(30),
+            heartbeat_timeout_secs: RwLock::new(90),
         })
+    }
+
+    /// 从配置创建WebSocket管理器
+    pub fn from_config(
+        buffer_size: usize,
+        heartbeat_interval: u64,
+        heartbeat_timeout: u64,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            connections: DashMap::new(),
+            room_subscribers: DashMap::new(),
+            user_rooms: DashMap::new(),
+            message_buffer_size: RwLock::new(buffer_size),
+            heartbeat_interval_secs: RwLock::new(heartbeat_interval),
+            heartbeat_timeout_secs: RwLock::new(heartbeat_timeout),
+        })
+    }
+
+    /// 获取当前消息缓冲区大小
+    pub async fn get_message_buffer_size(&self) -> usize {
+        *self.message_buffer_size.read().await
+    }
+
+    /// 设置消息缓冲区大小（对新连接生效）
+    pub async fn set_message_buffer_size(&self, size: usize) {
+        let mut buffer_size = self.message_buffer_size.write().await;
+        *buffer_size = size;
+        debug!("WebSocket message buffer size updated to {}", size);
+    }
+
+    /// 获取当前心跳间隔（秒）
+    pub async fn get_heartbeat_interval(&self) -> u64 {
+        *self.heartbeat_interval_secs.read().await
+    }
+
+    /// 设置心跳间隔（秒，对新连接生效）
+    pub async fn set_heartbeat_interval(&self, secs: u64) {
+        let mut interval = self.heartbeat_interval_secs.write().await;
+        *interval = secs;
+        debug!("WebSocket heartbeat interval updated to {}s", secs);
+    }
+
+    /// 获取当前心跳超时（秒）
+    pub async fn get_heartbeat_timeout(&self) -> u64 {
+        *self.heartbeat_timeout_secs.read().await
+    }
+
+    /// 设置心跳超时（秒，对新连接生效）
+    pub async fn set_heartbeat_timeout(&self, secs: u64) {
+        let mut timeout = self.heartbeat_timeout_secs.write().await;
+        *timeout = secs;
+        debug!("WebSocket heartbeat timeout updated to {}s", secs);
     }
 
     /// 注册新连接
@@ -266,6 +327,9 @@ impl Default for WebSocketManager {
             connections: DashMap::new(),
             room_subscribers: DashMap::new(),
             user_rooms: DashMap::new(),
+            message_buffer_size: RwLock::new(DEFAULT_WS_MESSAGE_BUFFER_SIZE),
+            heartbeat_interval_secs: RwLock::new(30),
+            heartbeat_timeout_secs: RwLock::new(90),
         }
     }
 }

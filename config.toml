@@ -163,6 +163,3 @@ enabled = true
 username = "admin"
 # 初始超级管理员邮箱
 email = "admin@example.com"
-# 初始密码（安全提示：首次登录后请立即修改！）
-# 如需设置初始密码，请通过环境变量 ADMIN_INITIAL_PASSWORD 设置
-# password = "admin123456"

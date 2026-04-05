@@ -1,6 +1,7 @@
 pub mod auth_service;
 pub mod file_service;
 pub mod message_service;
+pub mod notification_service;
 pub mod room_service;
 pub mod user_service;
 
@@ -10,6 +11,7 @@ pub mod user_service;
 // - room_service: 聊天室相关业务逻辑（创建、加入、成员管理）
 // - message_service: 消息相关业务逻辑（发送、查询、搜索）
 // - file_service: 文件上传和资源管理业务逻辑
+// - notification_service: 消息通知系统（私信、@提及、房间邀请、系统通知、文件上传通知）
 //
 // 服务层负责：
 // - 处理复杂的业务逻辑

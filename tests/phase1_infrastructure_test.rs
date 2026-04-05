@@ -52,6 +52,8 @@ async fn setup_test_db() -> Database {
     let db_config = DatabaseConfig {
         url: Some(database_url),
         max_connections,
+        acquire_timeout_secs: 30,
+        idle_timeout_secs: 600,
     };
 
     let db = Database::new(&db_config)
@@ -90,6 +92,8 @@ mod config_tests {
         let db_config = DatabaseConfig {
             url: Some("postgres://localhost/test".to_string()),
             max_connections: 10,
+            acquire_timeout_secs: 30,
+            idle_timeout_secs: 600,
         };
         assert_eq!(db_config.max_connections, 10);
 
@@ -113,6 +117,8 @@ mod config_tests {
             database: DatabaseConfig {
                 url: Some("postgres://localhost/test".to_string()),
                 max_connections: 5,
+                acquire_timeout_secs: 30,
+                idle_timeout_secs: 600,
             },
             jwt: JwtConfig {
                 secret: Some("test-secret".to_string()),
@@ -150,6 +156,8 @@ mod config_tests {
             database: DatabaseConfig {
                 url: Some("postgres://localhost/test".to_string()),
                 max_connections: 5,
+                acquire_timeout_secs: 30,
+                idle_timeout_secs: 600,
             },
             jwt: JwtConfig {
                 secret: Some("test-secret".to_string()),
@@ -382,6 +390,8 @@ mod integration_tests {
             database: DatabaseConfig {
                 url: Some("postgres://localhost:5432/seredeli_room".to_string()),
                 max_connections: 10,
+                acquire_timeout_secs: 30,
+                idle_timeout_secs: 600,
             },
             jwt: JwtConfig {
                 secret: Some("test-secret-key".to_string()),
@@ -443,6 +453,8 @@ mod acceptance_tests {
             database: DatabaseConfig {
                 url: Some("postgres://user:pass@localhost:5432/db".to_string()),
                 max_connections: 10,
+                acquire_timeout_secs: 30,
+                idle_timeout_secs: 600,
             },
             jwt: JwtConfig {
                 secret: Some("secret".to_string()),

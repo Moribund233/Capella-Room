@@ -19,10 +19,6 @@ use crate::{
     websocket::protocol::{MissedMessage, UserInfo, UserStatus, WebSocketMessage},
 };
 
-/// WebSocket 消息通道缓冲区大小
-/// 每个连接最多缓冲 100 条待发送消息，超过后会触发背压机制
-const WS_MESSAGE_BUFFER_SIZE: usize = 100;
-
 /// WebSocket升级处理器
 /// 处理WebSocket连接升级请求
 pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
@@ -41,7 +37,14 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     // 创建有界消息通道用于从其他任务发送消息到 WebSocket
     // 使用有界通道（而非 unbounded_channel）实现背压机制
     // 当缓冲区满时，发送方会被阻塞，防止内存溢出
-    let (tx, mut rx) = mpsc::channel::<String>(WS_MESSAGE_BUFFER_SIZE);
+    // 从配置读取缓冲区大小
+    let buffer_size = state
+        .config_manager
+        .get_config()
+        .await
+        .websocket
+        .message_buffer_size;
+    let (tx, mut rx) = mpsc::channel::<String>(buffer_size);
 
     // 等待认证或重连消息
     let (user_id, username, rooms_to_rejoin, is_reconnect) =
@@ -156,12 +159,17 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let last_pong = Arc::new(std::sync::Mutex::new(Instant::now()));
     let last_pong_clone = Arc::clone(&last_pong);
 
+    // 从配置读取 WebSocket 心跳配置
+    let ws_config = state.config_manager.get_config().await.websocket.clone();
+    let heartbeat_interval_secs = ws_config.heartbeat_interval_secs;
+    let heartbeat_timeout_secs = ws_config.heartbeat_timeout_secs;
+
     // 启动消息发送任务
     let mut send_task = tokio::spawn(async move {
-        // 发送心跳间隔
-        let mut heartbeat_interval = interval(Duration::from_secs(30));
-        // 心跳超时时间（90秒 = 3次心跳未响应）
-        let heartbeat_timeout = Duration::from_secs(90);
+        // 发送心跳间隔（从配置读取）
+        let mut heartbeat_interval = interval(Duration::from_secs(heartbeat_interval_secs));
+        // 心跳超时时间（从配置读取）
+        let heartbeat_timeout = Duration::from_secs(heartbeat_timeout_secs);
 
         loop {
             tokio::select! {
@@ -287,8 +295,14 @@ async fn wait_for_auth(
     receiver: &mut futures::stream::SplitStream<WebSocket>,
     state: &AppState,
 ) -> anyhow::Result<AuthResult> {
-    // 设置认证超时（30 秒，给予客户端更充足的时间）
-    let auth_timeout = Duration::from_secs(30);
+    // 从配置读取认证超时时间
+    let auth_timeout_secs = state
+        .config_manager
+        .get_config()
+        .await
+        .websocket
+        .auth_timeout_secs;
+    let auth_timeout = Duration::from_secs(auth_timeout_secs);
 
     let result = timeout(auth_timeout, async {
         // 等待第一个消息（认证或重连）
@@ -505,6 +519,26 @@ async fn handle_message(
             handle_get_online_users(state, tx).await?;
         }
 
+        // ========== 通知系统 ==========
+        // 获取离线通知
+        WebSocketMessage::GetOfflineNotifications {
+            last_notification_id,
+            limit,
+        } => {
+            handle_get_offline_notifications(user_id, last_notification_id, limit, state, tx)
+                .await?;
+        }
+
+        // 标记通知已读
+        WebSocketMessage::MarkNotificationRead { notification_id } => {
+            handle_mark_notification_read(user_id, notification_id, state, tx).await?;
+        }
+
+        // 标记所有通知已读
+        WebSocketMessage::MarkAllNotificationsRead => {
+            handle_mark_all_notifications_read(user_id, state, tx).await?;
+        }
+
         // 其他消息类型
         _ => {
             warn!("Unhandled message type from user {}: {:?}", user_id, msg);
@@ -689,7 +723,7 @@ async fn handle_chat_message(
                 room_id,
                 sender_id: user_id,
                 sender_name: username.to_string(),
-                content: message.content,
+                content: message.content.clone(),
                 reply_to: message.reply_to,
                 created_at: message.created_at,
             };
@@ -700,6 +734,18 @@ async fn handle_chat_message(
                     .broadcast_to_room_all(room_id, json)
                     .await;
             }
+
+            // 4. 检测并处理@提及通知
+            handle_mentions(
+                &content,
+                message.id,
+                room_id,
+                user_id,
+                username,
+                &message.created_at,
+                state,
+            )
+            .await;
 
             StructuredLogger::message_sent(
                 message.id,
@@ -720,6 +766,73 @@ async fn handle_chat_message(
     }
 
     Ok(())
+}
+
+/// 处理@提及通知
+async fn handle_mentions(
+    content: &str,
+    message_id: Uuid,
+    room_id: Uuid,
+    sender_id: Uuid,
+    sender_name: &str,
+    created_at: &chrono::DateTime<chrono::Utc>,
+    state: &AppState,
+) {
+    use crate::services::notification_service::MentionInfo;
+    use crate::utils::mention;
+
+    // 检查消息中是否包含@提及
+    let mentions = mention::extract_mentions(content);
+    if mentions.is_empty() {
+        return;
+    }
+
+    debug!("Found {} mentions in message", mentions.len());
+
+    // 过滤掉发送者自己
+    let mentions = mention::filter_self_mentions(mentions, sender_name);
+    if mentions.is_empty() {
+        return;
+    }
+
+    // 解析用户名为用户ID
+    let mentioned_user_ids = match mention::resolve_usernames_to_ids(mentions, state.db()).await {
+        Ok(ids) => ids,
+        Err(e) => {
+            warn!("Failed to resolve usernames to IDs: {}", e);
+            return;
+        }
+    };
+
+    if mentioned_user_ids.is_empty() {
+        return;
+    }
+
+    // 生成内容预览（限制长度）
+    let content_preview = if content.len() > 100 {
+        format!("{}...", &content[..100])
+    } else {
+        content.to_string()
+    };
+
+    // 创建提及信息
+    let mention_info = MentionInfo {
+        message_id,
+        room_id,
+        mentioned_by: sender_id,
+        mentioned_by_name: sender_name.to_string(),
+        content_preview,
+        created_at: *created_at,
+    };
+
+    // 发送提及通知
+    if let Err(e) = state
+        .notification_service()
+        .send_mentions(mentioned_user_ids, mention_info)
+        .await
+    {
+        warn!("Failed to send mention notifications: {}", e);
+    }
 }
 
 /// 处理正在输入
@@ -1000,6 +1113,125 @@ async fn handle_get_online_users(
         Err(e) => {
             warn!("Failed to get online users: {}", e);
             let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to fetch online users");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理获取离线通知
+async fn handle_get_offline_notifications(
+    user_id: Uuid,
+    _last_notification_id: Option<Uuid>,
+    limit: Option<i64>,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("Getting offline notifications for user {}", user_id);
+
+    let limit = limit.unwrap_or(50);
+
+    // 获取未读通知
+    match state
+        .notification_service()
+        .get_unread_notifications(user_id, limit)
+        .await
+    {
+        Ok(notifications) => {
+            let has_more = notifications.len() as i64 >= limit;
+
+            let offline_notifications = WebSocketMessage::OfflineNotifications {
+                notifications,
+                has_more,
+            };
+
+            if let Ok(json) = offline_notifications.to_json() {
+                let _ = tx.send(json).await;
+            }
+
+            debug!("Sent offline notifications to user {}", user_id);
+        }
+        Err(e) => {
+            warn!("Failed to get offline notifications: {}", e);
+            let error_msg =
+                WebSocketMessage::error("FETCH_FAILED", "Failed to fetch notifications");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理标记通知已读
+async fn handle_mark_notification_read(
+    user_id: Uuid,
+    notification_id: Uuid,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!(
+        "Marking notification {} as read for user {}",
+        notification_id, user_id
+    );
+
+    match state
+        .notification_service()
+        .mark_as_read(user_id, notification_id)
+        .await
+    {
+        Ok(_) => {
+            let confirm = WebSocketMessage::NotificationReadConfirm { notification_id };
+
+            if let Ok(json) = confirm.to_json() {
+                let _ = tx.send(json).await;
+            }
+
+            debug!("Notification {} marked as read", notification_id);
+        }
+        Err(e) => {
+            warn!("Failed to mark notification as read: {}", e);
+            let error_msg =
+                WebSocketMessage::error("UPDATE_FAILED", "Failed to mark notification as read");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理标记所有通知已读
+async fn handle_mark_all_notifications_read(
+    user_id: Uuid,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("Marking all notifications as read for user {}", user_id);
+
+    match state.notification_service().mark_all_as_read(user_id).await {
+        Ok(_) => {
+            let confirm = WebSocketMessage::NotificationReadConfirm {
+                notification_id: Uuid::nil(), // 使用nil UUID表示所有通知
+            };
+
+            if let Ok(json) = confirm.to_json() {
+                let _ = tx.send(json).await;
+            }
+
+            debug!("All notifications marked as read for user {}", user_id);
+        }
+        Err(e) => {
+            warn!("Failed to mark all notifications as read: {}", e);
+            let error_msg = WebSocketMessage::error(
+                "UPDATE_FAILED",
+                "Failed to mark all notifications as read",
+            );
             if let Ok(json) = error_msg.to_json() {
                 let _ = tx.send(json).await;
             }

@@ -33,6 +33,8 @@ pub struct RateLimitConfig {
     pub message_window_secs: u64,
     pub room_requests: u32,
     pub room_window_secs: u64,
+    /// 清理间隔（秒），默认30秒
+    pub cleanup_interval_secs: u64,
 }
 
 impl Default for RateLimitConfig {
@@ -47,6 +49,7 @@ impl Default for RateLimitConfig {
             message_window_secs: 60,
             room_requests: 20,
             room_window_secs: 60,
+            cleanup_interval_secs: 30,
         }
     }
 }
@@ -69,9 +72,9 @@ impl RequestRecord {
         self.timestamps.push(Instant::now());
     }
 
-    fn cleanup(&mut self, window: Duration) {
+    fn cleanup(&mut self, window: Duration, cleanup_interval: Duration) {
         let now = Instant::now();
-        if now.duration_since(self.last_cleanup) < Duration::from_secs(30) {
+        if now.duration_since(self.last_cleanup) < cleanup_interval {
             return;
         }
 
@@ -108,6 +111,7 @@ impl RateLimiter {
 
     pub async fn check_ip_limit(&self, ip: &str, limit: u32, window_secs: u64) -> bool {
         let window = Duration::from_secs(window_secs);
+        let cleanup_interval = Duration::from_secs(self.config.cleanup_interval_secs);
 
         let record = self
             .ip_records
@@ -116,7 +120,7 @@ impl RateLimiter {
 
         let mut record = record.write().await;
 
-        record.cleanup(window);
+        record.cleanup(window, cleanup_interval);
 
         let count = record.count_requests(window);
         if count >= limit as usize {
@@ -133,6 +137,7 @@ impl RateLimiter {
 
     pub async fn check_user_limit(&self, user_id: &str, limit: u32, window_secs: u64) -> bool {
         let window = Duration::from_secs(window_secs);
+        let cleanup_interval = Duration::from_secs(self.config.cleanup_interval_secs);
 
         let record = self
             .user_records
@@ -141,7 +146,7 @@ impl RateLimiter {
 
         let mut record = record.write().await;
 
-        record.cleanup(window);
+        record.cleanup(window, cleanup_interval);
 
         let count = record.count_requests(window);
         if count >= limit as usize {
@@ -154,6 +159,17 @@ impl RateLimiter {
 
         record.add_request();
         true
+    }
+
+    /// 更新配置（用于热重载）
+    pub fn update_config(&mut self, config: RateLimitConfig) {
+        self.config = config;
+        debug!("Rate limiter configuration updated");
+    }
+
+    /// 获取当前配置
+    pub fn get_config(&self) -> &RateLimitConfig {
+        &self.config
     }
 
     pub fn get_ip_limit(&self, path: &str) -> (u32, u64) {
@@ -241,12 +257,18 @@ pub async fn rate_limit_middleware(
         "127.0.0.1".to_string()
     };
 
-    let (limit, window_secs) = rate_limiter.get_ip_limit(&path);
+    // 获取读锁来访问 rate_limiter
+    let (limit, window_secs) = {
+        let limiter = rate_limiter.read().await;
+        limiter.get_ip_limit(&path)
+    };
 
-    if !rate_limiter
-        .check_ip_limit(&client_ip, limit, window_secs)
-        .await
-    {
+    let ip_allowed = {
+        let limiter = rate_limiter.read().await;
+        limiter.check_ip_limit(&client_ip, limit, window_secs).await
+    };
+
+    if !ip_allowed {
         warn!(
             "Rate limit exceeded for IP: {} on path: {}",
             client_ip, path
@@ -261,10 +283,14 @@ pub async fn rate_limit_middleware(
 
     if let Some(user_id) = extract_user_id(&request) {
         let user_limit = (limit / 2).max(1);
-        if !rate_limiter
-            .check_user_limit(&user_id, user_limit, window_secs)
-            .await
-        {
+        let user_allowed = {
+            let limiter = rate_limiter.read().await;
+            limiter
+                .check_user_limit(&user_id, user_limit, window_secs)
+                .await
+        };
+
+        if !user_allowed {
             warn!(
                 "Rate limit exceeded for user: {} on path: {}",
                 user_id, path
@@ -303,13 +329,20 @@ pub async fn strict_rate_limit_middleware(
         "127.0.0.1".to_string()
     };
 
-    let limit = rate_limiter.config.auth_requests;
-    let window_secs = rate_limiter.config.auth_window_secs;
+    let (limit, window_secs) = {
+        let limiter = rate_limiter.read().await;
+        (
+            limiter.config.auth_requests,
+            limiter.config.auth_window_secs,
+        )
+    };
 
-    if !rate_limiter
-        .check_ip_limit(&client_ip, limit, window_secs)
-        .await
-    {
+    let ip_allowed = {
+        let limiter = rate_limiter.read().await;
+        limiter.check_ip_limit(&client_ip, limit, window_secs).await
+    };
+
+    if !ip_allowed {
         warn!(
             "Strict rate limit exceeded for IP: {} on auth endpoint",
             client_ip

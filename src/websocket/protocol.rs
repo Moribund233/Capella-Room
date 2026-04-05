@@ -181,6 +181,118 @@ pub enum WebSocketMessage {
         /// 恢复的未读消息数
         total_unread: usize,
     },
+
+    // ========== 消息通知系统 ==========
+    /// 私信通知
+    PrivateMessage {
+        message_id: Uuid,
+        sender_id: Uuid,
+        sender_name: String,
+        content: String,
+        created_at: DateTime<Utc>,
+    },
+
+    /// @提及通知
+    Mentioned {
+        message_id: Uuid,
+        room_id: Uuid,
+        mentioned_by: Uuid,
+        mentioned_by_name: String,
+        content_preview: String,
+        created_at: DateTime<Utc>,
+    },
+
+    /// 房间邀请通知
+    RoomInvitation {
+        invitation_id: Uuid,
+        room_id: Uuid,
+        room_name: String,
+        invited_by: Uuid,
+        invited_by_name: String,
+        created_at: DateTime<Utc>,
+    },
+
+    /// 系统通知
+    SystemNotification {
+        notification_type: NotificationType,
+        title: String,
+        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<serde_json::Value>,
+        created_at: DateTime<Utc>,
+    },
+
+    /// 文件上传完成通知
+    FileUploadComplete {
+        file_id: Uuid,
+        file_name: String,
+        file_url: String,
+        file_size: u64,
+        uploaded_at: DateTime<Utc>,
+    },
+
+    // ========== 通知管理 ==========
+    /// 获取离线通知
+    GetOfflineNotifications {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        last_notification_id: Option<Uuid>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        limit: Option<i64>,
+    },
+
+    /// 标记通知已读
+    MarkNotificationRead { notification_id: Uuid },
+
+    /// 标记所有通知已读
+    MarkAllNotificationsRead,
+
+    /// 离线通知列表
+    OfflineNotifications {
+        notifications: Vec<Notification>,
+        has_more: bool,
+    },
+
+    /// 通知已读确认
+    NotificationReadConfirm { notification_id: Uuid },
+}
+
+/// 通知类型枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationType {
+    /// 新功能、新版本
+    New,
+    /// 重要公告
+    Important,
+    /// 警告、维护通知
+    Warning,
+}
+
+/// 通知结构（用于离线通知同步）
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Notification {
+    pub id: Uuid,
+    pub notification_type: NotificationDbType,
+    pub title: Option<String>,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+    pub is_read: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 数据库通知类型枚举（对应数据库中的 notification_type）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "notification_type", rename_all = "snake_case")]
+pub enum NotificationDbType {
+    PrivateMessage,
+    Mentioned,
+    RoomInvitation,
+    SystemNotification,
+    FileUploadComplete,
 }
 
 /// 离线消息结构（用于断线重连后同步消息）

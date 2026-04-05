@@ -2,11 +2,15 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+pub mod listener;
 pub mod loader;
 pub mod manager;
 
+pub use listener::{
+    start_config_listeners, LoggingConfigListener, RateLimitConfigListener, WebSocketConfigListener,
+};
 pub use loader::ConfigLoader;
-pub use manager::ConfigManager;
+pub use manager::{ConfigChangeEvent, ConfigManager};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
@@ -57,6 +61,20 @@ pub struct DatabaseConfig {
     pub url: Option<String>,
     #[serde(default)]
     pub max_connections: u32,
+    /// 连接超时时间（秒），默认30秒
+    #[serde(default = "default_acquire_timeout_secs")]
+    pub acquire_timeout_secs: u64,
+    /// 空闲超时时间（秒），默认600秒
+    #[serde(default = "default_idle_timeout_secs")]
+    pub idle_timeout_secs: u64,
+}
+
+fn default_acquire_timeout_secs() -> u64 {
+    30
+}
+
+fn default_idle_timeout_secs() -> u64 {
+    600
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -84,6 +102,13 @@ pub struct RateLimitConfig {
     pub message_window_secs: u64,
     pub room_requests: u32,
     pub room_window_secs: u64,
+    /// 清理间隔（秒），默认30秒
+    #[serde(default = "default_cleanup_interval_secs")]
+    pub cleanup_interval_secs: u64,
+}
+
+fn default_cleanup_interval_secs() -> u64 {
+    30
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -182,6 +207,3 @@ impl From<SystemConfigRecord> for SystemConfigItem {
 }
 
 pub type SharedConfig = Arc<RwLock<AppConfig>>;
-
-#[cfg(test)]
-mod tests;

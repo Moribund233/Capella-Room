@@ -51,6 +51,8 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
     let db = Database::new(&DatabaseConfig {
         url: Some(database_url.clone()),
         max_connections: 5,
+        acquire_timeout_secs: 30,
+        idle_timeout_secs: 600,
     })
     .await
     .expect("Failed to connect to test database");
@@ -67,6 +69,8 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         database: DatabaseConfig {
             url: Some(database_url),
             max_connections: 5,
+            acquire_timeout_secs: 30,
+            idle_timeout_secs: 600,
         },
         jwt: JwtConfig {
             secret: Some("test_secret_key_for_testing_purposes_only".to_string()),

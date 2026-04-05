@@ -42,8 +42,16 @@ async fn main() -> Result<()> {
 
     db.migrate().await?;
 
-    let ws_manager = WebSocketManager::new();
-    info!("WebSocket manager initialized");
+    let ws_manager = WebSocketManager::from_config(
+        config.websocket.message_buffer_size,
+        config.websocket.heartbeat_interval_secs,
+        config.websocket.heartbeat_timeout_secs,
+    );
+    info!("WebSocket manager initialized with config: buffer_size={}, heartbeat_interval={}s, heartbeat_timeout={}s",
+        config.websocket.message_buffer_size,
+        config.websocket.heartbeat_interval_secs,
+        config.websocket.heartbeat_timeout_secs
+    );
 
     let metrics_collector = Arc::new(MetricsCollector::new());
     info!("Metrics collector initialized");

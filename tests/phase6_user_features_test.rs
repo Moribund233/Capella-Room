@@ -54,6 +54,8 @@ async fn setup_test_db() -> Database {
     let db_config = DatabaseConfig {
         url: Some(database_url),
         max_connections,
+        acquire_timeout_secs: 30,
+        idle_timeout_secs: 600,
     };
 
     let db = Database::new(&db_config)

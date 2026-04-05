@@ -1,23 +1,54 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, info, warn};
 
 use super::{AppConfig, SharedConfig, SystemConfigItem, SystemConfigRecord};
 use crate::db::Database;
 
+/// 配置变更事件
+#[derive(Debug, Clone)]
+pub enum ConfigChangeEvent {
+    /// 单个配置项变更
+    ConfigUpdated {
+        key: String,
+        old_value: String,
+        new_value: String,
+    },
+    /// 整个配置类别变更
+    CategoryUpdated { category: String },
+    /// 配置重载
+    ConfigReloaded,
+}
+
 pub struct ConfigManager {
     db: Database,
     config: SharedConfig,
+    /// 配置变更事件广播发送器
+    config_change_tx: broadcast::Sender<ConfigChangeEvent>,
 }
 
 impl ConfigManager {
     pub fn new(db: Database, config: AppConfig) -> Self {
+        // 创建配置变更事件广播通道
+        let (tx, _rx) = broadcast::channel::<ConfigChangeEvent>(100);
+
         Self {
             db,
             config: Arc::new(RwLock::new(config)),
+            config_change_tx: tx,
         }
+    }
+
+    /// 订阅配置变更事件
+    pub fn subscribe_config_changes(&self) -> broadcast::Receiver<ConfigChangeEvent> {
+        self.config_change_tx.subscribe()
+    }
+
+    /// 广播配置变更事件
+    fn notify_config_change(&self, event: ConfigChangeEvent) {
+        let _ = self.config_change_tx.send(event);
     }
 
     pub fn shared_config(&self) -> SharedConfig {
@@ -35,6 +66,9 @@ impl ConfigManager {
 
         let mut config = self.config.write().await;
         super::loader::ConfigLoader::apply_database_overrides(&mut config, &db_configs);
+
+        // 广播配置重载事件
+        self.notify_config_change(ConfigChangeEvent::ConfigReloaded);
 
         info!("Configuration reloaded from database");
         Ok(())
@@ -105,9 +139,22 @@ impl ConfigManager {
 
         let item: SystemConfigItem = record.into();
 
+        // 获取旧值用于事件通知
+        let old_value = existing
+            .as_ref()
+            .map(|i| i.value.clone())
+            .unwrap_or_default();
+
         if item.is_hot_reloadable {
             self.apply_hot_reload(&item).await?;
         }
+
+        // 广播配置变更事件
+        self.notify_config_change(ConfigChangeEvent::ConfigUpdated {
+            key: key.to_string(),
+            old_value,
+            new_value: value.to_string(),
+        });
 
         info!("Configuration '{}' updated", key);
         Ok(item)
@@ -161,6 +208,12 @@ impl ConfigManager {
                 if let Ok(req) = item.value.parse() {
                     config.rate_limit.room_requests = req;
                     debug!("Hot reloaded rate_limit.room_requests = {}", req);
+                }
+            }
+            "rate_limit.cleanup_interval_secs" => {
+                if let Ok(secs) = item.value.parse() {
+                    config.rate_limit.cleanup_interval_secs = secs;
+                    debug!("Hot reloaded rate_limit.cleanup_interval_secs = {}", secs);
                 }
             }
             "websocket.heartbeat_interval_secs" => {
@@ -416,6 +469,15 @@ impl ConfigManager {
                 "60",
                 "int",
                 "房间接口时间窗口（秒）",
+                "rate_limit",
+                true,
+                true,
+            ),
+            (
+                "rate_limit.cleanup_interval_secs",
+                "30",
+                "int",
+                "速率限制清理间隔（秒）",
                 "rate_limit",
                 true,
                 true,
