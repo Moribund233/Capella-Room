@@ -2,6 +2,16 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// 被引用消息的信息（用于 WebSocket 传输）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplyToInfo {
+    pub id: Uuid,
+    pub sender_id: Uuid,
+    pub sender_name: String,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// WebSocket 消息类型
 /// 使用 tag 字段进行反序列化分发
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,6 +89,8 @@ pub enum WebSocketMessage {
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         reply_to: Option<Uuid>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reply_to_message: Option<ReplyToInfo>,
         created_at: DateTime<Utc>,
     },
 
@@ -305,6 +317,8 @@ pub struct MissedMessage {
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply_to: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_to_message: Option<ReplyToInfo>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -373,6 +387,7 @@ impl WebSocketMessage {
         sender_name: &str,
         content: &str,
         reply_to: Option<Uuid>,
+        reply_to_message: Option<ReplyToInfo>,
     ) -> Self {
         Self::NewMessage {
             message_id,
@@ -381,6 +396,7 @@ impl WebSocketMessage {
             sender_name: sender_name.to_string(),
             content: content.to_string(),
             reply_to,
+            reply_to_message,
             created_at: Utc::now(),
         }
     }

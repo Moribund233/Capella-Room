@@ -16,7 +16,7 @@ use uuid::Uuid;
 use crate::{
     state::AppState,
     utils::logging::{PerformanceTimer, StructuredLogger},
-    websocket::protocol::{MissedMessage, UserInfo, UserStatus, WebSocketMessage},
+    websocket::protocol::{MissedMessage, ReplyToInfo, UserInfo, UserStatus, WebSocketMessage},
 };
 
 /// WebSocket升级处理器
@@ -710,13 +710,47 @@ async fn handle_chat_message(
         return Ok(());
     }
 
-    // 3. 保存消息到数据库
+    // 3. 如果指定了 reply_to，验证被回复的消息
+    if let Some(reply_to_id) = reply_to {
+        if let Err(e) = state
+            .message_service()
+            .validate_reply_message(reply_to_id, room_id)
+            .await
+        {
+            let error_msg = WebSocketMessage::error("INVALID_REPLY", &e.to_string());
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+    }
+
+    // 4. 保存消息到数据库
     match state
         .message_service()
         .create_text_message(room_id, user_id, &content, reply_to)
         .await
     {
         Ok(message) => {
+            // 获取被引用消息的信息（如果有）
+            let reply_to_message = if let Some(reply_to_id) = message.reply_to {
+                state
+                    .message_service()
+                    .get_reply_to_info(reply_to_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|info| ReplyToInfo {
+                        id: info.id,
+                        sender_id: info.sender.id,
+                        sender_name: info.sender.username.clone(),
+                        content: info.content,
+                        created_at: info.created_at,
+                    })
+            } else {
+                None
+            };
+
             // 广播消息给房间所有成员
             let new_message = WebSocketMessage::NewMessage {
                 message_id: message.id,
@@ -725,6 +759,7 @@ async fn handle_chat_message(
                 sender_name: username.to_string(),
                 content: message.content.clone(),
                 reply_to: message.reply_to,
+                reply_to_message,
                 created_at: message.created_at,
             };
 
@@ -988,14 +1023,25 @@ async fn handle_get_missed_messages(
     // 转换为 MissedMessage
     let ws_messages: Vec<MissedMessage> = messages
         .into_iter()
-        .map(|msg| MissedMessage {
-            message_id: msg.id,
-            room_id: msg.room_id,
-            sender_id: msg.sender.id,
-            sender_name: msg.sender.username.clone(),
-            content: msg.content,
-            reply_to: msg.reply_to,
-            created_at: msg.created_at,
+        .map(|msg| {
+            let reply_to_message = msg.reply_to_message.map(|info| ReplyToInfo {
+                id: info.id,
+                sender_id: info.sender.id,
+                sender_name: info.sender.username.clone(),
+                content: info.content,
+                created_at: info.created_at,
+            });
+
+            MissedMessage {
+                message_id: msg.id,
+                room_id: msg.room_id,
+                sender_id: msg.sender.id,
+                sender_name: msg.sender.username.clone(),
+                content: msg.content,
+                reply_to: msg.reply_to,
+                reply_to_message,
+                created_at: msg.created_at,
+            }
         })
         .collect();
 

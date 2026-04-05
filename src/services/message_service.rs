@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{
     db::Database,
     error::{AppError, Result},
-    models::message::{Message, MessageResponse, MessageType, SenderInfo},
+    models::message::{Message, MessageResponse, MessageType, ReplyToInfo, SenderInfo},
 };
 
 /// 消息服务
@@ -55,6 +56,137 @@ impl MessageService {
             .await
     }
 
+    /// 验证被回复的消息是否有效
+    /// 检查：消息是否存在、是否在同一会话、是否已被删除
+    pub async fn validate_reply_message(&self, reply_to_id: Uuid, room_id: Uuid) -> Result<()> {
+        let message: Option<Message> = sqlx::query_as(
+            r#"
+            SELECT * FROM messages WHERE id = $1
+            "#,
+        )
+        .bind(reply_to_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let message = message.ok_or_else(|| AppError::NotFound)?;
+
+        // 检查消息是否在同一会话
+        if message.room_id != room_id {
+            return Err(AppError::Validation("只能回复同一会话中的消息".to_string()));
+        }
+
+        // 检查消息是否已被删除
+        if message.is_deleted {
+            return Err(AppError::Validation("无法回复已删除的消息".to_string()));
+        }
+
+        Ok(())
+    }
+
+    /// 获取被引用消息的简要信息
+    pub async fn get_reply_to_info(&self, message_id: Uuid) -> Result<Option<ReplyToInfo>> {
+        // 先查询消息
+        let message: Option<Message> = sqlx::query_as(
+            r#"
+            SELECT * FROM messages WHERE id = $1
+            "#,
+        )
+        .bind(message_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let message = match message {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        // 再查询发送者信息
+        let sender = self.get_sender_info(message.sender_id).await?;
+
+        let content = if message.is_deleted {
+            "[此消息已被删除]".to_string()
+        } else {
+            message.content
+        };
+
+        Ok(Some(ReplyToInfo {
+            id: message.id,
+            sender,
+            content,
+            created_at: message.created_at,
+        }))
+    }
+
+    /// 批量获取被引用消息的信息
+    pub async fn get_reply_to_infos(
+        &self,
+        message_ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, ReplyToInfo>> {
+        if message_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // 查询所有消息
+        let messages: Vec<Message> = sqlx::query_as(
+            r#"
+            SELECT * FROM messages WHERE id = ANY($1)
+            "#,
+        )
+        .bind(message_ids)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        // 收集所有发送者 ID
+        let sender_ids: Vec<Uuid> = messages.iter().map(|m| m.sender_id).collect();
+
+        // 批量查询发送者信息
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
+        let mut map = HashMap::new();
+        for message in messages {
+            let content = if message.is_deleted {
+                "[此消息已被删除]".to_string()
+            } else {
+                message.content.clone()
+            };
+
+            if let Some(sender) = sender_infos.get(&message.sender_id).cloned() {
+                let info = ReplyToInfo {
+                    id: message.id,
+                    sender,
+                    content,
+                    created_at: message.created_at,
+                };
+                map.insert(message.id, info);
+            }
+        }
+
+        Ok(map)
+    }
+
+    /// 批量获取发送者信息
+    async fn get_sender_infos(&self, user_ids: &[Uuid]) -> Result<HashMap<Uuid, SenderInfo>> {
+        if user_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let rows: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
+            r#"
+            SELECT id, username, avatar_url FROM users WHERE id = ANY($1)
+            "#,
+        )
+        .bind(user_ids)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        let mut map = HashMap::new();
+        for (id, username, avatar_url) in rows {
+            map.insert(id, SenderInfo::new(id, username, avatar_url));
+        }
+
+        Ok(map)
+    }
+
     /// 获取聊天室消息历史
     pub async fn get_room_messages(
         &self,
@@ -66,7 +198,7 @@ impl MessageService {
             // 使用 created_at 进行游标分页，而不是 UUID 比较
             sqlx::query_as::<_, Message>(
                 r#"
-                SELECT * FROM messages 
+                SELECT * FROM messages
                 WHERE room_id = $1 AND is_deleted = false
                 AND created_at < (SELECT created_at FROM messages WHERE id = $2)
                 ORDER BY created_at DESC
@@ -81,7 +213,7 @@ impl MessageService {
         } else {
             sqlx::query_as::<_, Message>(
                 r#"
-                SELECT * FROM messages 
+                SELECT * FROM messages
                 WHERE room_id = $1 AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT $2
@@ -93,11 +225,18 @@ impl MessageService {
             .await?
         };
 
+        // 收集所有需要查询的 reply_to ID
+        let reply_to_ids: Vec<Uuid> = messages.iter().filter_map(|msg| msg.reply_to).collect();
+
+        // 批量获取被引用消息的信息
+        let reply_to_infos = self.get_reply_to_infos(&reply_to_ids).await?;
+
         // 获取发送者信息并转换为响应
         let mut responses = Vec::new();
         for msg in messages {
             let sender = self.get_sender_info(msg.sender_id).await?;
-            responses.push(msg.to_response(sender));
+            let reply_to_message = msg.reply_to.and_then(|id| reply_to_infos.get(&id).cloned());
+            responses.push(msg.to_response_with_reply(sender, reply_to_message));
         }
 
         Ok(responses)
@@ -113,7 +252,7 @@ impl MessageService {
         let messages = if let Some(rid) = room_id {
             sqlx::query_as::<_, Message>(
                 r#"
-                SELECT * FROM messages 
+                SELECT * FROM messages
                 WHERE room_id = $1 AND content ILIKE $2 AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT $3
@@ -127,7 +266,7 @@ impl MessageService {
         } else {
             sqlx::query_as::<_, Message>(
                 r#"
-                SELECT * FROM messages 
+                SELECT * FROM messages
                 WHERE content ILIKE $1 AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT $2
@@ -139,10 +278,17 @@ impl MessageService {
             .await?
         };
 
+        // 收集所有需要查询的 reply_to ID
+        let reply_to_ids: Vec<Uuid> = messages.iter().filter_map(|msg| msg.reply_to).collect();
+
+        // 批量获取被引用消息的信息
+        let reply_to_infos = self.get_reply_to_infos(&reply_to_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
             let sender = self.get_sender_info(msg.sender_id).await?;
-            responses.push(msg.to_response(sender));
+            let reply_to_message = msg.reply_to.and_then(|id| reply_to_infos.get(&id).cloned());
+            responses.push(msg.to_response_with_reply(sender, reply_to_message));
         }
 
         Ok(responses)
@@ -181,7 +327,11 @@ impl MessageService {
     }
 
     /// 获取最新消息
-    pub async fn get_latest_messages(&self, room_id: Uuid, limit: i64) -> Result<Vec<MessageResponse>> {
+    pub async fn get_latest_messages(
+        &self,
+        room_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<MessageResponse>> {
         let messages = sqlx::query_as::<_, Message>(
             r#"
             SELECT * FROM messages 
@@ -306,7 +456,10 @@ impl MessageService {
         let message = message.ok_or(AppError::NotFound)?;
 
         // 检查是否是系统消息（系统消息不能编辑）
-        if matches!(message.message_type, crate::models::message::MessageType::System) {
+        if matches!(
+            message.message_type,
+            crate::models::message::MessageType::System
+        ) {
             return Err(AppError::Forbidden);
         }
 

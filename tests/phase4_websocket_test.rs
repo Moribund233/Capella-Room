@@ -851,6 +851,7 @@ mod websocket_protocol_tests {
             sender_name: "TestUser".to_string(),
             content: "Test message content".to_string(),
             reply_to: None,
+            reply_to_message: None,
             created_at: chrono::Utc::now(),
         };
 

@@ -77,6 +77,15 @@ pub struct MessageEditResponse {
     pub created_at: DateTime<Utc>,
 }
 
+/// 被引用消息的信息
+#[derive(Debug, Clone, Serialize)]
+pub struct ReplyToInfo {
+    pub id: Uuid,
+    pub sender: SenderInfo,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// 消息响应
 #[derive(Debug, Clone, Serialize)]
 pub struct MessageResponse {
@@ -86,6 +95,8 @@ pub struct MessageResponse {
     pub content: String,
     pub message_type: MessageType,
     pub reply_to: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_to_message: Option<ReplyToInfo>,
     pub is_deleted: bool,
     pub created_at: DateTime<Utc>,
     pub edit_count: i32,
@@ -110,6 +121,28 @@ impl Message {
             content: self.content.clone(),
             message_type: self.message_type.clone(),
             reply_to: self.reply_to,
+            reply_to_message: None,
+            is_deleted: self.is_deleted,
+            created_at: self.created_at,
+            edit_count: self.edit_count,
+            edited_at: self.edited_at,
+        }
+    }
+
+    /// 转换为响应DTO，包含引用消息信息
+    pub fn to_response_with_reply(
+        &self,
+        sender: SenderInfo,
+        reply_to_message: Option<ReplyToInfo>,
+    ) -> MessageResponse {
+        MessageResponse {
+            id: self.id,
+            room_id: self.room_id,
+            sender,
+            content: self.content.clone(),
+            message_type: self.message_type.clone(),
+            reply_to: self.reply_to,
+            reply_to_message,
             is_deleted: self.is_deleted,
             created_at: self.created_at,
             edit_count: self.edit_count,
