@@ -81,7 +81,7 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
-        let tokens = auth_service.generate_token_pair(user.id).unwrap();
+        let tokens = auth_service.generate_token_pair(user.id, user.role.clone()).unwrap();
         return (user.id, password.to_string(), tokens);
     }
 
@@ -93,7 +93,7 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
     let password_hash = auth_service.hash_password(password).unwrap();
 
     let user = user_service.create_user(username, &email, &password_hash).await.unwrap();
-    let tokens = auth_service.generate_token_pair(user.id).unwrap();
+    let tokens = auth_service.generate_token_pair(user.id, user.role.clone()).unwrap();
 
     (user.id, password.to_string(), tokens)
 }

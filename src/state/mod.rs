@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
+use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
 use crate::services::message_service::MessageService;
@@ -21,7 +22,8 @@ pub struct AppState {
     pub room_service: RoomService,
     pub message_service: MessageService,
     pub file_service: FileService,
-    pub notification_service: NotificationService,
+    pub notification_service: Arc<NotificationService>,
+    pub audit_service: Arc<AuditService>,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
 }
@@ -38,12 +40,13 @@ impl fmt::Debug for AppState {
             .field("message_service", &"<MessageService>")
             .field("file_service", &"<FileService>")
             .field("notification_service", &"<NotificationService>")
+            .field("audit_service", &"<AuditService>")
             .finish_non_exhaustive()
     }
 }
 
 impl AppState {
-    pub fn new(
+    pub async fn new(
         db: Database,
         ws_manager: Arc<WebSocketManager>,
         config: AppConfig,
@@ -59,7 +62,16 @@ impl AppState {
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
-        let notification_service = NotificationService::new(db.clone(), ws_manager.clone());
+        let notification_service =
+            Arc::new(NotificationService::new(db.clone(), ws_manager.clone()));
+        let audit_service = Arc::new(
+            AuditService::new(
+                db.clone(),
+                notification_service.clone(),
+                config_manager.clone(),
+            )
+            .await,
+        );
 
         let upload_config = crate::config::UploadConfig {
             max_file_size: config.upload.max_file_size,
@@ -79,6 +91,7 @@ impl AppState {
             message_service,
             file_service,
             notification_service,
+            audit_service,
             config: shared_config,
             config_manager: config_manager.clone(),
         });
@@ -125,6 +138,10 @@ impl AppState {
         &self.notification_service
     }
 
+    pub fn audit_service(&self) -> &AuditService {
+        &self.audit_service
+    }
+
     pub fn config(&self) -> Arc<tokio::sync::RwLock<AppConfig>> {
         self.config.clone()
     }
@@ -160,10 +177,8 @@ impl Clone for AppState {
             message_service: MessageService::new(self.db.clone()),
             file_service: FileService::from_config(self.db.clone(), &upload_config)
                 .expect("Failed to clone file service"),
-            notification_service: NotificationService::new(
-                self.db.clone(),
-                Arc::clone(&self.ws_manager),
-            ),
+            notification_service: Arc::clone(&self.notification_service),
+            audit_service: Arc::clone(&self.audit_service),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
         }

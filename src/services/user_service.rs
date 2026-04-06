@@ -479,4 +479,25 @@ impl UserService {
 
         Ok(exists)
     }
+
+    /// 更新用户密码
+    pub async fn update_password(&self, user_id: Uuid, new_password_hash: &str) -> Result<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE users
+            SET password_hash = $1, updated_at = NOW()
+            WHERE id = $2
+            "#,
+        )
+        .bind(new_password_hash)
+        .bind(user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
 }

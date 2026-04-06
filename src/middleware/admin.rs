@@ -114,12 +114,16 @@ pub async fn admin_auth_middleware(
 
     let mut request = request;
     request.extensions_mut().insert(CurrentUserRole(user.role));
+    request.extensions_mut().insert(CurrentUserId(user_id));
 
     next.run(request).await
 }
 
 #[derive(Clone, Debug)]
 pub struct CurrentUserRole(pub UserRole);
+
+#[derive(Clone, Debug)]
+pub struct CurrentUserId(pub Uuid);
 
 /// 超级管理员认证中间件
 /// 验证用户是否具有超级管理员权限

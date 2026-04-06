@@ -1,17 +1,18 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{ConnectInfo, Path, Query, State},
     http::StatusCode,
     Extension, Json,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
     config::SystemConfigItem,
     error::{AppError, Result},
-    middleware::admin::CurrentUserRole,
+    middleware::admin::{CurrentUserId, CurrentUserRole},
     models::{
         message::MessageResponse,
         response::ApiResponse,
@@ -90,8 +91,10 @@ pub async fn get_user(
 
 pub async fn update_user_role(
     State(state): State<Arc<AppState>>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Path(user_id): Path<Uuid>,
     Extension(CurrentUserRole(current_role)): Extension<CurrentUserRole>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
     Json(request): Json<UpdateUserRoleRequest>,
 ) -> Result<Json<ApiResponse<UserResponse>>> {
     let new_role = match request.role.as_str() {
@@ -124,13 +127,26 @@ pub async fn update_user_role(
         .update_user_role(user_id, new_role)
         .await?;
 
+    // 记录管理员操作审计日志
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "user_role_change", "user", user_id, ip)
+            .await;
+    });
+
     Ok(Json(ApiResponse::success(user.to_response())))
 }
 
 pub async fn set_user_status(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(user_id): Path<Uuid>,
     Extension(CurrentUserRole(current_role)): Extension<CurrentUserRole>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
     Json(request): Json<SetUserStatusRequest>,
 ) -> Result<Json<ApiResponse<UserResponse>>> {
     let target_user = state
@@ -152,13 +168,24 @@ pub async fn set_user_status(
         .set_user_disabled(user_id, request.disabled)
         .await?;
 
+    // 记录管理员操作审计日志
+    let ip = addr.ip();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "user_disable", "user", user_id, ip)
+            .await;
+    });
+
     Ok(Json(ApiResponse::success(user.to_response())))
 }
 
 pub async fn delete_user(
     State(state): State<Arc<AppState>>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Path(user_id): Path<Uuid>,
     Extension(CurrentUserRole(current_role)): Extension<CurrentUserRole>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
 ) -> Result<StatusCode> {
     let target_user = state
         .user_service()
@@ -175,6 +202,17 @@ pub async fn delete_user(
     }
 
     state.user_service().delete_user(user_id).await?;
+
+    // 记录管理员操作审计日志
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "user_delete", "user", user_id, ip)
+            .await;
+    });
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -220,8 +258,10 @@ pub async fn get_config(
 
 pub async fn update_config(
     State(state): State<Arc<AppState>>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Path(key): Path<String>,
     Extension(CurrentUserRole(current_role)): Extension<CurrentUserRole>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
     Json(request): Json<UpdateConfigRequest>,
 ) -> Result<Json<ApiResponse<SystemConfigItem>>> {
     if !current_role.is_super_admin() {
@@ -232,6 +272,17 @@ pub async fn update_config(
         .config_manager()
         .set_config(&key, &request.value)
         .await?;
+
+    // 记录管理员操作审计日志
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "config_update", "config", Uuid::nil(), ip)
+            .await;
+    });
 
     Ok(Json(ApiResponse::success(config)))
 }
@@ -304,7 +355,9 @@ pub async fn get_room(
 
 pub async fn delete_room(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(room_id): Path<Uuid>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
 ) -> Result<StatusCode> {
     let room = state
         .room_service()
@@ -313,6 +366,15 @@ pub async fn delete_room(
         .ok_or(AppError::NotFound)?;
 
     state.room_service().force_delete_room(room.id).await?;
+
+    // 记录管理员操作审计日志
+    let ip = addr.ip();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "room_delete", "room", room_id, ip)
+            .await;
+    });
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -380,7 +442,9 @@ pub async fn list_messages(
 
 pub async fn delete_message(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(message_id): Path<Uuid>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
 ) -> Result<StatusCode> {
     let message = state
         .message_service()
@@ -392,6 +456,15 @@ pub async fn delete_message(
         .message_service()
         .admin_delete_message(message.id)
         .await?;
+
+    // 记录管理员操作审计日志
+    let ip = addr.ip();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "message_delete", "message", message_id, ip)
+            .await;
+    });
 
     Ok(StatusCode::NO_CONTENT)
 }

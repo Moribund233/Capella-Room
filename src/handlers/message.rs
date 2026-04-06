@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{ConnectInfo, Extension, Path, Query, State},
     Json,
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
@@ -35,12 +36,12 @@ pub async fn get_room_messages(
     Query(query): Query<GetMessagesQuery>,
 ) -> Result<Json<Vec<MessageResponse>>> {
     let limit = query.limit.min(100);
-    
+
     let messages = state
         .message_service
         .get_room_messages(room_id, limit, query.before)
         .await?;
-    
+
     Ok(Json(messages))
 }
 
@@ -62,28 +63,44 @@ pub async fn search_messages(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SearchMessagesQuery>,
 ) -> Result<Json<Vec<MessageResponse>>> {
-    query.validate().map_err(|e| AppError::Validation(e.to_string()))?;
-    
+    query
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
     let limit = query.limit.min(100);
-    
+
     let messages = state
         .message_service
         .search_messages(query.room_id, &query.q, limit)
         .await?;
-    
+
     Ok(Json(messages))
 }
 
 /// 删除消息
 pub async fn delete_message(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(claims): Extension<Claims>,
     Path(message_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
+    let user_id =
+        Uuid::parse_str(&claims.sub).map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
 
-    state.message_service.delete_message(message_id, user_id).await?;
+    state
+        .message_service
+        .delete_message(message_id, user_id)
+        .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_message_action(user_id, role, message_id, "delete", ip)
+            .await;
+    });
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -94,19 +111,32 @@ pub async fn delete_message(
 /// 编辑消息
 pub async fn edit_message(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(claims): Extension<Claims>,
     Path(message_id): Path<Uuid>,
     Json(request): Json<EditMessageRequest>,
 ) -> Result<Json<MessageResponse>> {
-    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
+    let user_id =
+        Uuid::parse_str(&claims.sub).map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
 
     let message = state
         .message_service
         .edit_message(message_id, user_id, &request.content)
         .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_message_action(user_id, role, message_id, "edit", ip)
+            .await;
+    });
 
     let sender = state
         .message_service

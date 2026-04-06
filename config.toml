@@ -140,3 +140,26 @@ enabled = true
 username = "admin"
 # 初始超级管理员邮箱
 email = "admin@example.com"
+
+# -----------------------------------------------------------------------------
+# 审计配置
+# -----------------------------------------------------------------------------
+[audit]
+# 是否启用审计日志
+enabled = true
+# 审计日志保留天数（0 表示永久保留）
+log_retention_days = 90
+# 批量写入缓冲区大小（达到此数量后自动刷新到数据库）
+buffer_size = 100
+# 缓冲区刷新间隔（秒）
+flush_interval_seconds = 5
+# 排除审计的路径（不记录这些路径的请求）
+excluded_paths = ["/health", "/ws", "/static"]
+# 是否启用告警检测
+alert_enabled = true
+# 告警冷却时间（分钟，相同类型告警的最小间隔）
+alert_cooldown_minutes = 10
+# 是否启用自动归档
+auto_archive_enabled = true
+# 归档触发时间（每天的小时数，0-23）
+archive_hour = 3

@@ -72,7 +72,8 @@ async fn main() -> Result<()> {
         config.clone(),
         Arc::clone(&metrics_collector),
         Arc::clone(&shared_config_manager),
-    )?;
+    )
+    .await?;
 
     initialize_super_admin(&state, &config.admin.initial).await?;
 

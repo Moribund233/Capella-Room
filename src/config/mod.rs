@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -34,6 +34,8 @@ pub struct AppConfig {
     pub system: SystemConfig,
     #[serde(default)]
     pub admin: AdminConfig,
+    #[serde(default)]
+    pub audit: AuditConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -132,6 +134,52 @@ pub struct SystemConfig {
 pub struct AdminConfig {
     #[serde(default)]
     pub initial: InitialAdminConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AuditConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_log_retention_days")]
+    pub log_retention_days: i32,
+    #[serde(default = "default_buffer_size")]
+    pub buffer_size: usize,
+    #[serde(default = "default_flush_interval_seconds")]
+    pub flush_interval_seconds: u64,
+    #[serde(default)]
+    pub excluded_paths: Vec<String>,
+    #[serde(default = "default_true")]
+    pub alert_enabled: bool,
+    #[serde(default = "default_alert_cooldown_minutes")]
+    pub alert_cooldown_minutes: i32,
+    #[serde(default = "default_true")]
+    pub auto_archive_enabled: bool,
+    #[serde(default = "default_archive_hour")]
+    pub archive_hour: u8,
+}
+
+fn default_log_retention_days() -> i32 {
+    90
+}
+
+fn default_buffer_size() -> usize {
+    100
+}
+
+fn default_flush_interval_seconds() -> u64 {
+    5
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_alert_cooldown_minutes() -> i32 {
+    10
+}
+
+fn default_archive_hour() -> u8 {
+    3
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

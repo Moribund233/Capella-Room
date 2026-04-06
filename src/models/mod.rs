@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod file;
 pub mod message;
 pub mod response;
@@ -10,3 +11,4 @@ pub mod user;
 // - room: 聊天室模型（Room、RoomMember、MemberRole 等）
 // - message: 消息模型（Message、MessageType、SendMessageRequest 等）
 // - file: 文件资源模型（FileResource、FileCategory、FileUploadRequest 等）
+// - audit: 审计日志模型（AuditLog、AuditAlert、AlertRule 等）

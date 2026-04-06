@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{ConnectInfo, Extension, Path, Query, State},
     Json,
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
@@ -33,6 +34,7 @@ pub struct SetRoleRequest {
 /// 创建聊天室
 pub async fn create_room(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(claims): Extension<Claims>,
     Json(request): Json<CreateRoomRequest>,
 ) -> Result<Json<ApiResponse<RoomResponse>>> {
@@ -57,6 +59,17 @@ pub async fn create_room(
             max_members,
         )
         .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let room_id = room.id;
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_room_action(user_id, role, room_id, "create", ip)
+            .await;
+    });
 
     let room_detail = state
         .room_service()
@@ -169,6 +182,7 @@ pub async fn update_room(
 /// 删除聊天室
 pub async fn delete_room(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(room_id): Path<Uuid>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>> {
@@ -186,12 +200,23 @@ pub async fn delete_room(
 
     state.room_service().delete_room(room_id).await?;
 
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_room_action(user_id, role, room_id, "delete", ip)
+            .await;
+    });
+
     Ok(Json(ApiResponse::success_with_message("聊天室已删除")))
 }
 
 /// 加入聊天室
 pub async fn join_room(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(room_id): Path<Uuid>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>> {
@@ -202,12 +227,23 @@ pub async fn join_room(
 
     state.room_service().join_room(room_id, user_id).await?;
 
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_room_action(user_id, role, room_id, "member_add", ip)
+            .await;
+    });
+
     Ok(Json(ApiResponse::success_with_message("成功加入聊天室")))
 }
 
 /// 离开聊天室
 pub async fn leave_room(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(room_id): Path<Uuid>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>> {
@@ -217,6 +253,16 @@ pub async fn leave_room(
         .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
 
     state.room_service().leave_room(room_id, user_id).await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_room_action(user_id, role, room_id, "member_remove", ip)
+            .await;
+    });
 
     Ok(Json(ApiResponse::success_with_message("已离开聊天室")))
 }
@@ -244,6 +290,7 @@ pub async fn get_room_members(
 /// 踢出成员
 pub async fn kick_member(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path((room_id, target_user_id)): Path<(Uuid, Uuid)>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>> {
@@ -257,12 +304,23 @@ pub async fn kick_member(
         .kick_member(room_id, target_user_id, operator_id)
         .await?;
 
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_room_action(operator_id, role, room_id, "member_remove", ip)
+            .await;
+    });
+
     Ok(Json(ApiResponse::success_with_message("成员已被踢出")))
 }
 
 /// 设置成员角色
 pub async fn set_member_role(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path((room_id, target_user_id)): Path<(Uuid, Uuid)>,
     Extension(claims): Extension<Claims>,
     Json(request): Json<SetRoleRequest>,
@@ -276,6 +334,16 @@ pub async fn set_member_role(
         .room_service()
         .set_member_role(room_id, target_user_id, request.role, operator_id)
         .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_room_action(operator_id, role, room_id, "member_role_change", ip)
+            .await;
+    });
 
     Ok(Json(ApiResponse::success_with_message("成员角色已更新")))
 }

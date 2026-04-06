@@ -1,5 +1,6 @@
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -19,8 +20,14 @@ pub struct RefreshTokenRequest {
 /// 用户注册
 pub async fn register(
     State(state): State<Arc<AppState>>,
+    connect_info: Option<axum::extract::ConnectInfo<SocketAddr>>,
     Json(request): Json<RegisterRequest>,
 ) -> Result<Json<ApiResponse<UserResponse>>> {
+    // 获取客户端IP（可选）
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+
     // 验证请求
     request
         .validate()
@@ -29,6 +36,11 @@ pub async fn register(
     // 检查邮箱是否已存在
     let email_exists = state.user_service().email_exists(&request.email).await?;
     if email_exists {
+        // 记录注册失败审计日志
+        let audit_service = Arc::clone(&state.audit_service);
+        tokio::spawn(async move {
+            let _ = audit_service.log_user_register(uuid::Uuid::nil(), ip).await;
+        });
         return Err(AppError::Conflict("邮箱已被注册".to_string()));
     }
 
@@ -38,6 +50,11 @@ pub async fn register(
         .username_exists(&request.username)
         .await?;
     if username_exists {
+        // 记录注册失败审计日志
+        let audit_service = Arc::clone(&state.audit_service);
+        tokio::spawn(async move {
+            let _ = audit_service.log_user_register(uuid::Uuid::nil(), ip).await;
+        });
         return Err(AppError::Conflict("用户名已被使用".to_string()));
     }
 
@@ -49,6 +66,13 @@ pub async fn register(
         .user_service()
         .create_user(&request.username, &request.email, &password_hash)
         .await?;
+
+    // 记录注册成功审计日志
+    let user_id = user.id;
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service.log_user_register(user_id, ip).await;
+    });
 
     // 返回用户信息
     Ok(Json(ApiResponse::success(user.to_response())))
@@ -67,8 +91,14 @@ pub struct LoginData {
 /// 用户登录
 pub async fn login(
     State(state): State<Arc<AppState>>,
+    connect_info: Option<axum::extract::ConnectInfo<SocketAddr>>,
     Json(request): Json<LoginRequest>,
 ) -> Result<Json<ApiResponse<LoginData>>> {
+    // 获取客户端IP（可选）
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+
     // 验证请求
     request
         .validate()
@@ -82,7 +112,17 @@ pub async fn login(
 
     let user = match user {
         Some(u) => u,
-        None => return Err(AppError::Auth("邮箱或密码错误".to_string())),
+        None => {
+            // 记录登录失败审计日志
+            let email = request.email.clone();
+            let audit_service = Arc::clone(&state.audit_service);
+            tokio::spawn(async move {
+                let _ = audit_service
+                    .log_login_failure(&email, ip, "用户不存在")
+                    .await;
+            });
+            return Err(AppError::Auth("邮箱或密码错误".to_string()));
+        }
     };
 
     // 验证密码
@@ -91,11 +131,31 @@ pub async fn login(
         .verify_password(&request.password, &user.password_hash)?;
 
     if !password_valid {
+        // 记录登录失败审计日志
+        let email = request.email.clone();
+        let audit_service = Arc::clone(&state.audit_service);
+        tokio::spawn(async move {
+            let _ = audit_service
+                .log_login_failure(&email, ip, "密码错误")
+                .await;
+        });
         return Err(AppError::Auth("邮箱或密码错误".to_string()));
     }
 
     // 生成 JWT Token 对
-    let token_pair = state.auth_service().generate_token_pair(user.id)?;
+    let token_pair = state
+        .auth_service()
+        .generate_token_pair(user.id, user.role.clone())?;
+
+    // 记录登录成功审计日志
+    let user_id = user.id;
+    let role = user.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_user_login(user_id, role, ip, None, true)
+            .await;
+    });
 
     // 返回 Token 和用户信息
     Ok(Json(ApiResponse::success(LoginData {
@@ -130,13 +190,16 @@ pub async fn refresh_token(
     let user_id = state.auth_service().extract_user_id(&claims)?;
 
     // 验证用户是否存在
-    let user = state.user_service().get_user_by_id(user_id).await?;
-    if user.is_none() {
-        return Err(AppError::Auth("用户不存在".to_string()));
-    }
+    let user = state
+        .user_service()
+        .get_user_by_id(user_id)
+        .await?
+        .ok_or_else(|| AppError::Auth("用户不存在".to_string()))?;
 
     // 生成新的 Token 对
-    let token_pair = state.auth_service().generate_token_pair(user_id)?;
+    let token_pair = state
+        .auth_service()
+        .generate_token_pair(user_id, user.role)?;
 
     Ok(Json(ApiResponse::success(RefreshTokenData {
         access_token: token_pair.access_token,

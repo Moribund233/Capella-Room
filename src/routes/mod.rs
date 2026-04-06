@@ -8,8 +8,9 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    handlers::{admin, auth, file, message, room, user},
+    handlers::{admin, audit, auth, file, message, room, user},
     middleware::admin::admin_auth_middleware,
+    middleware::audit::audit_middleware,
     middleware::auth_middleware,
     state::AppState,
     websocket::handler::ws_handler,
@@ -51,6 +52,11 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // 文件路由
         .nest(&format!("/api/{}/files", API_VERSION), file_routes())
         .nest(&format!("/api/{}/upload", API_VERSION), upload_routes())
+        // 添加审计中间件
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            audit_middleware,
+        ))
         // 添加认证中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -65,6 +71,11 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             admin_auth_middleware,
+        ))
+        // 添加审计中间件
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            audit_middleware,
         ))
         // 添加基础认证中间件
         .layer(middleware::from_fn_with_state(
@@ -86,6 +97,7 @@ fn auth_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/register", post(auth::register))
         .route("/login", post(auth::login))
+        .route("/logout", post(user::logout))
         .route("/refresh", post(auth::refresh_token))
 }
 
@@ -95,6 +107,7 @@ fn user_routes() -> Router<Arc<AppState>> {
         // 当前用户相关
         .route("/me", get(user::get_current_user))
         .route("/me", put(user::update_user))
+        .route("/me/password", put(user::change_password))
         .route("/me/rooms", get(room::get_my_rooms))
         // 用户列表和详情
         .route("/", get(user::list_users))
@@ -194,6 +207,26 @@ fn admin_router() -> Router<Arc<AppState>> {
             "/configs/:key",
             get(admin::get_config).put(admin::update_config),
         )
+        // 审计系统路由
+        .nest("/audit", audit_routes())
+}
+
+/// 审计系统路由
+fn audit_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        // 审计日志
+        .route("/logs", get(audit::list_audit_logs))
+        .route("/logs/:id", get(audit::get_audit_log_detail))
+        .route("/stats", get(audit::get_audit_stats))
+        .route("/export", get(audit::export_audit_logs))
+        // 告警管理
+        .route("/alerts", get(audit::list_alerts))
+        .route("/alerts/:id/status", put(audit::update_alert_status))
+        // 告警规则
+        .route("/rules", get(audit::list_alert_rules))
+        .route("/rules/:id", put(audit::update_alert_rule))
+        // 日志清理
+        .route("/cleanup", post(audit::cleanup_audit_logs))
 }
 
 /// 健康检查

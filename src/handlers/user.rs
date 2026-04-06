@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Query, State},
+    extract::{ConnectInfo, Query, State},
     Extension, Json,
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
@@ -10,7 +11,7 @@ use validator::Validate;
 use crate::{
     error::{AppError, Result},
     models::response::ApiResponse,
-    models::user::{UpdateUserRequest, UserResponse},
+    models::user::{ChangePasswordRequest, UpdateUserRequest, UserResponse},
     services::auth_service::Claims,
     state::AppState,
 };
@@ -135,4 +136,85 @@ pub async fn get_user_by_id(
         Some(user) => Ok(Json(ApiResponse::success(user.to_response()))),
         None => Err(AppError::NotFound),
     }
+}
+
+/// 修改密码
+pub async fn change_password(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
+    Json(request): Json<ChangePasswordRequest>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
+
+    let user = state
+        .user_service()
+        .get_user_by_id(user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    let old_password_valid = state
+        .auth_service()
+        .verify_password(&request.old_password, &user.password_hash)?;
+
+    if !old_password_valid {
+        return Err(AppError::Auth("原密码错误".to_string()));
+    }
+
+    if request.old_password == request.new_password {
+        return Err(AppError::Validation("新密码不能与原密码相同".to_string()));
+    }
+
+    let new_password_hash = state.auth_service().hash_password(&request.new_password)?;
+
+    state
+        .user_service()
+        .update_password(user_id, &new_password_hash)
+        .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service.log_password_change(user_id, role, ip).await;
+    });
+
+    Ok(Json(ApiResponse::success_with_message("密码修改成功")))
+}
+
+/// 用户登出
+pub async fn logout(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
+
+    let ip = addr.ip();
+    let role = claims.role.clone();
+
+    // 更新用户状态为离线
+    let _ = state
+        .user_service()
+        .update_user_status(user_id, crate::models::user::UserStatus::Offline)
+        .await;
+
+    // 记录审计日志
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service.log_user_logout(user_id, role, ip).await;
+    });
+
+    Ok(Json(ApiResponse::success_with_message("登出成功")))
 }

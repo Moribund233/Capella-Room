@@ -8,13 +8,10 @@ use axum::{
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::{
-    error::AppError,
-    services::auth_service::Claims,
-    state::AppState,
-};
+use crate::{error::AppError, services::auth_service::Claims, state::AppState};
 
 pub mod admin;
+pub mod audit;
 
 /// 认证中间件
 /// 从Authorization头中提取JWT Token并验证
@@ -102,10 +99,7 @@ pub async fn optional_auth_middleware(
 
 /// 日志中间件
 /// 记录请求和响应信息
-pub async fn logging_middleware(
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn logging_middleware(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let uri = request.uri().clone();
 
@@ -121,10 +115,7 @@ pub async fn logging_middleware(
 
 /// 速率限制中间件（可选功能）
 /// 当前为透传实现，如需启用可集成 tower-governor 等限流库
-pub async fn rate_limit_middleware(
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn rate_limit_middleware(request: Request, next: Next) -> Response {
     // 可选：实现基于IP的速率限制
     // 推荐方案：使用 tower-governor 或自定义限流逻辑
     next.run(request).await

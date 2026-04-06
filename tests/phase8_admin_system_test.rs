@@ -80,12 +80,18 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
         },
-        websocket: Default::default(),
+        websocket: seredeli_room::config::WebSocketConfig {
+            heartbeat_interval_secs: 30,
+            heartbeat_timeout_secs: 60,
+            auth_timeout_secs: 10,
+            message_buffer_size: 100,
+        },
         reconnect: Default::default(),
         logging: Default::default(),
         cors: Default::default(),
         system: Default::default(),
         admin: Default::default(),
+        audit: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone());
 
@@ -96,6 +102,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         metrics_collector,
         Arc::new(config_manager),
     )
+    .await
     .expect("Failed to create app state");
 
     let app = create_router(Arc::clone(&state));
@@ -113,7 +120,10 @@ async fn create_test_user(state: &AppState, username: &str, email: &str) -> (Uui
         .await
         .unwrap();
 
-    let token = state.auth_service().generate_token_pair(user.id).unwrap();
+    let token = state
+        .auth_service()
+        .generate_token_pair(user.id, user.role.clone())
+        .unwrap();
 
     (user.id, token.access_token)
 }
@@ -128,7 +138,10 @@ async fn create_test_admin(state: &AppState, username: &str, email: &str) -> (Uu
         .await
         .unwrap();
 
-    let token = state.auth_service().generate_token_pair(user.id).unwrap();
+    let token = state
+        .auth_service()
+        .generate_token_pair(user.id, user.role.clone())
+        .unwrap();
 
     (user.id, token.access_token)
 }
@@ -143,7 +156,10 @@ async fn create_test_super_admin(state: &AppState, username: &str, email: &str) 
         .await
         .unwrap();
 
-    let token = state.auth_service().generate_token_pair(user.id).unwrap();
+    let token = state
+        .auth_service()
+        .generate_token_pair(user.id, user.role.clone())
+        .unwrap();
 
     (user.id, token.access_token)
 }

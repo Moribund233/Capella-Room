@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 // 引入被测模块
 use seredeli_room::{
-    config::{AppConfig, DatabaseConfig, JwtConfig, ServerConfig, UploadConfig},
+    config::{AppConfig, DatabaseConfig, JwtConfig, ServerConfig, UploadConfig, WebSocketConfig},
     db::Database,
     error::AppError,
     websocket::manager::WebSocketManager,
@@ -128,12 +128,18 @@ mod config_tests {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
-            websocket: Default::default(),
+            websocket: WebSocketConfig {
+                heartbeat_interval_secs: 30,
+                heartbeat_timeout_secs: 60,
+                auth_timeout_secs: 10,
+                message_buffer_size: 100,
+            },
             reconnect: Default::default(),
             logging: Default::default(),
             cors: Default::default(),
             system: Default::default(),
             admin: Default::default(),
+            audit: Default::default(),
         };
 
         let cloned = config.clone();
@@ -166,12 +172,18 @@ mod config_tests {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
-            websocket: Default::default(),
+            websocket: WebSocketConfig {
+                heartbeat_interval_secs: 30,
+                heartbeat_timeout_secs: 60,
+                auth_timeout_secs: 10,
+                message_buffer_size: 100,
+            },
             reconnect: Default::default(),
             logging: Default::default(),
             cors: Default::default(),
             system: Default::default(),
             admin: Default::default(),
+            audit: Default::default(),
         };
 
         let debug_str = format!("{:?}", config);
@@ -399,12 +411,18 @@ mod integration_tests {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
-            websocket: Default::default(),
+            websocket: WebSocketConfig {
+                heartbeat_interval_secs: 30,
+                heartbeat_timeout_secs: 60,
+                auth_timeout_secs: 10,
+                message_buffer_size: 100,
+            },
             reconnect: Default::default(),
             logging: Default::default(),
             cors: Default::default(),
             system: Default::default(),
             admin: Default::default(),
+            audit: Default::default(),
         };
 
         assert_eq!(config.server.port, 3000);
@@ -461,12 +479,18 @@ mod acceptance_tests {
                 max_file_size: 10 * 1024 * 1024,
                 base_url: "/uploads".to_string(),
             },
-            websocket: Default::default(),
+            websocket: WebSocketConfig {
+                heartbeat_interval_secs: 30,
+                heartbeat_timeout_secs: 60,
+                auth_timeout_secs: 10,
+                message_buffer_size: 100,
+            },
             reconnect: Default::default(),
             logging: Default::default(),
             cors: Default::default(),
             system: Default::default(),
             admin: Default::default(),
+            audit: Default::default(),
         };
 
         // 验证所有配置字段可访问

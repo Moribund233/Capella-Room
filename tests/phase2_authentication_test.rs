@@ -21,7 +21,7 @@ use seredeli_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,
-    models::user::{LoginRequest, RegisterRequest},
+    models::user::{LoginRequest, RegisterRequest, UserRole},
     services::{auth_service::AuthService, user_service::UserService},
     utils::validation::{validate_email_format, validate_password_strength, validate_username},
 };
@@ -42,8 +42,8 @@ async fn setup_test_db() -> Database {
     load_test_env();
 
     // 使用 .env.test 中的 DATABASE_URL
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in .env.test or environment");
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env.test or environment");
 
     let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
         .ok()
@@ -57,11 +57,13 @@ async fn setup_test_db() -> Database {
         idle_timeout_secs: 600,
     };
 
-    let db = Database::new(&db_config).await.expect("Failed to connect to test database");
-    
+    let db = Database::new(&db_config)
+        .await
+        .expect("Failed to connect to test database");
+
     // 运行数据库迁移
     db.migrate().await.expect("Failed to run migrations");
-    
+
     db
 }
 
@@ -196,7 +198,9 @@ mod password_security_tests {
         // 正确密码验证通过
         assert!(auth_service.verify_password(password, &hash).unwrap());
         // 错误密码验证失败
-        assert!(!auth_service.verify_password("WrongPassword", &hash).unwrap());
+        assert!(!auth_service
+            .verify_password("WrongPassword", &hash)
+            .unwrap());
     }
 
     /// 测试不同密码产生不同哈希
@@ -253,7 +257,7 @@ mod jwt_token_tests {
         let auth_service = AuthService::new(jwt_config);
 
         let user_id = uuid::Uuid::new_v4();
-        let token_pair = auth_service.generate_token_pair(user_id);
+        let token_pair = auth_service.generate_token_pair(user_id, UserRole::User);
 
         assert!(token_pair.is_ok());
         let token_pair = token_pair.unwrap();
@@ -275,7 +279,9 @@ mod jwt_token_tests {
         let auth_service = AuthService::new(jwt_config);
 
         let user_id = uuid::Uuid::new_v4();
-        let token_pair = auth_service.generate_token_pair(user_id).unwrap();
+        let token_pair = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
 
         // 验证有效 Token
         let claims = auth_service.verify_access_token(&token_pair.access_token);
@@ -296,7 +302,9 @@ mod jwt_token_tests {
         let auth_service = AuthService::new(jwt_config);
 
         let user_id = uuid::Uuid::new_v4();
-        let token_pair = auth_service.generate_token_pair(user_id).unwrap();
+        let token_pair = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
 
         // 验证有效 Refresh Token
         let claims = auth_service.verify_refresh_token(&token_pair.refresh_token);
@@ -335,7 +343,9 @@ mod jwt_token_tests {
         let auth_service = AuthService::new(jwt_config);
 
         let user_id = uuid::Uuid::new_v4();
-        let token_pair = auth_service.generate_token_pair(user_id).unwrap();
+        let token_pair = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
 
         // 尝试用 Refresh Token 作为 Access Token 验证
         let result = auth_service.verify_access_token(&token_pair.refresh_token);
@@ -356,8 +366,12 @@ mod jwt_token_tests {
         let auth_service = AuthService::new(jwt_config);
 
         let user_id = uuid::Uuid::new_v4();
-        let token_pair = auth_service.generate_token_pair(user_id).unwrap();
-        let claims = auth_service.verify_access_token(&token_pair.access_token).unwrap();
+        let token_pair = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
+        let claims = auth_service
+            .verify_access_token(&token_pair.access_token)
+            .unwrap();
 
         let extracted_id = auth_service.extract_user_id(&claims);
         assert!(extracted_id.is_ok());
@@ -461,7 +475,7 @@ mod auth_service_integration_tests {
 
         // 4. 生成 Token
         let token_pair = auth_service
-            .generate_token_pair(found_user.id)
+            .generate_token_pair(found_user.id, found_user.role.clone())
             .expect("Token 生成失败");
 
         assert!(!token_pair.access_token.is_empty());
@@ -487,7 +501,7 @@ mod auth_service_integration_tests {
 
         // 1. 生成初始 Token
         let initial_token_pair = auth_service
-            .generate_token_pair(user_id)
+            .generate_token_pair(user_id, UserRole::User)
             .expect("初始 Token 生成失败");
 
         // 2. 验证 Refresh Token
@@ -502,7 +516,7 @@ mod auth_service_integration_tests {
 
         // 3. 生成新的 Token 对
         let new_token_pair = auth_service
-            .generate_token_pair(user_id)
+            .generate_token_pair(user_id, UserRole::User)
             .expect("新 Token 生成失败");
 
         // 4. 验证新 Token 有效
@@ -596,7 +610,9 @@ mod acceptance_tests {
         assert!(user.id != uuid::Uuid::nil());
 
         // 5. 验证密码可验证
-        assert!(auth_service.verify_password(password, &user.password_hash).unwrap());
+        assert!(auth_service
+            .verify_password(password, &user.password_hash)
+            .unwrap());
 
         // 6. 验证用户名和邮箱已被占用
         assert!(user_service.username_exists(&username).await.unwrap());
@@ -637,10 +653,14 @@ mod acceptance_tests {
             .await
             .unwrap()
             .expect("用户应该存在");
-        assert!(auth_service.verify_password(password, &found_user.password_hash).unwrap());
+        assert!(auth_service
+            .verify_password(password, &found_user.password_hash)
+            .unwrap());
 
         // 2. 错误密码登录失败
-        assert!(!auth_service.verify_password("WrongPassword", &found_user.password_hash).unwrap());
+        assert!(!auth_service
+            .verify_password("WrongPassword", &found_user.password_hash)
+            .unwrap());
 
         // 3. 不存在的邮箱登录失败
         let non_existent = user_service
@@ -665,18 +685,24 @@ mod acceptance_tests {
         let user_id = uuid::Uuid::new_v4();
 
         // 1. 生成 Token
-        let token_pair = auth_service.generate_token_pair(user_id).unwrap();
+        let token_pair = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
         assert!(!token_pair.access_token.is_empty());
         assert!(!token_pair.refresh_token.is_empty());
         assert_eq!(token_pair.expires_in, 86400); // 24小时 = 86400秒
 
         // 2. 验证 Access Token
-        let access_claims = auth_service.verify_access_token(&token_pair.access_token).unwrap();
+        let access_claims = auth_service
+            .verify_access_token(&token_pair.access_token)
+            .unwrap();
         assert_eq!(access_claims.sub, user_id.to_string());
         assert_eq!(access_claims.token_type, "access");
 
         // 3. 验证 Refresh Token
-        let refresh_claims = auth_service.verify_refresh_token(&token_pair.refresh_token).unwrap();
+        let refresh_claims = auth_service
+            .verify_refresh_token(&token_pair.refresh_token)
+            .unwrap();
         assert_eq!(refresh_claims.sub, user_id.to_string());
         assert_eq!(refresh_claims.token_type, "refresh");
 
@@ -685,8 +711,12 @@ mod acceptance_tests {
         assert!(auth_service.verify_refresh_token("invalid.token").is_err());
 
         // 5. Token 类型不匹配被拒绝
-        assert!(auth_service.verify_access_token(&token_pair.refresh_token).is_err());
-        assert!(auth_service.verify_refresh_token(&token_pair.access_token).is_err());
+        assert!(auth_service
+            .verify_access_token(&token_pair.refresh_token)
+            .is_err());
+        assert!(auth_service
+            .verify_refresh_token(&token_pair.access_token)
+            .is_err());
     }
 
     /// 验收标准 2.4: 受保护的接口需要有效 Token
@@ -704,10 +734,14 @@ mod acceptance_tests {
         let user_id = uuid::Uuid::new_v4();
 
         // 1. 生成有效 Token
-        let token_pair = auth_service.generate_token_pair(user_id).unwrap();
+        let token_pair = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
 
         // 2. 验证 Token 有效
-        let claims = auth_service.verify_access_token(&token_pair.access_token).unwrap();
+        let claims = auth_service
+            .verify_access_token(&token_pair.access_token)
+            .unwrap();
         let extracted_user_id = auth_service.extract_user_id(&claims).unwrap();
         assert_eq!(extracted_user_id, user_id);
 
@@ -732,7 +766,9 @@ mod acceptance_tests {
         let user_id = uuid::Uuid::new_v4();
 
         // 1. 生成初始 Token
-        let initial_tokens = auth_service.generate_token_pair(user_id).unwrap();
+        let initial_tokens = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
 
         // 2. 验证 Refresh Token
         let claims = auth_service
@@ -742,11 +778,17 @@ mod acceptance_tests {
         assert_eq!(extracted_user_id, user_id);
 
         // 3. 使用 Refresh Token 获取新 Token（模拟刷新）
-        let new_tokens = auth_service.generate_token_pair(user_id).unwrap();
+        let new_tokens = auth_service
+            .generate_token_pair(user_id, UserRole::User)
+            .unwrap();
 
         // 4. 验证新 Token 有效
-        assert!(auth_service.verify_access_token(&new_tokens.access_token).is_ok());
-        assert!(auth_service.verify_refresh_token(&new_tokens.refresh_token).is_ok());
+        assert!(auth_service
+            .verify_access_token(&new_tokens.access_token)
+            .is_ok());
+        assert!(auth_service
+            .verify_refresh_token(&new_tokens.refresh_token)
+            .is_ok());
 
         // 5. 验证新 Token 不为空（由于时间戳相同，Token 可能相同，主要验证新 Token 有效）
         assert!(!new_tokens.access_token.is_empty());

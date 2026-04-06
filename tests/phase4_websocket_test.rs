@@ -141,12 +141,18 @@ async fn setup_test_server() -> (TestServer, Database) {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
         },
-        websocket: Default::default(),
+        websocket: seredeli_room::config::WebSocketConfig {
+            heartbeat_interval_secs: 30,
+            heartbeat_timeout_secs: 60,
+            auth_timeout_secs: 10,
+            message_buffer_size: 100,
+        },
         reconnect: Default::default(),
         logging: Default::default(),
         cors: Default::default(),
         system: Default::default(),
         admin: Default::default(),
+        audit: Default::default(),
     };
 
     let metrics_collector = Arc::new(MetricsCollector::new());
@@ -160,6 +166,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         metrics_collector,
         Arc::new(config_manager),
     )
+    .await
     .expect("Failed to create app state");
     let app = create_router(state);
 
@@ -203,7 +210,9 @@ async fn create_test_user_with_token(db: &Database, username: &str) -> (Uuid, St
 
     // 检查用户是否已存在
     if let Ok(Some(user)) = user_service.get_user_by_email(&email).await {
-        let tokens = auth_service.generate_token_pair(user.id).unwrap();
+        let tokens = auth_service
+            .generate_token_pair(user.id, user.role.clone())
+            .unwrap();
         return (user.id, password.to_string(), tokens.access_token);
     }
 
@@ -212,7 +221,9 @@ async fn create_test_user_with_token(db: &Database, username: &str) -> (Uuid, St
         .create_user(username, &email, &password_hash)
         .await
         .unwrap();
-    let tokens = auth_service.generate_token_pair(user.id).unwrap();
+    let tokens = auth_service
+        .generate_token_pair(user.id, user.role.clone())
+        .unwrap();
 
     (user.id, password.to_string(), tokens.access_token)
 }

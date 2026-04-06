@@ -18,6 +18,7 @@ pub struct Claims {
     pub exp: usize,
     pub iat: usize,
     pub token_type: String,
+    pub role: crate::models::user::UserRole,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,7 +39,9 @@ impl AuthService {
     }
 
     fn get_secret(&self) -> Result<&str> {
-        self.jwt_config.secret.as_deref()
+        self.jwt_config
+            .secret
+            .as_deref()
             .ok_or_else(|| AppError::Auth("JWT secret is not configured".to_string()))
     }
 
@@ -67,9 +70,13 @@ impl AuthService {
         }
     }
 
-    pub fn generate_token_pair(&self, user_id: Uuid) -> Result<TokenPair> {
-        let access_token = self.generate_access_token(user_id)?;
-        let refresh_token = self.generate_refresh_token(user_id)?;
+    pub fn generate_token_pair(
+        &self,
+        user_id: Uuid,
+        role: crate::models::user::UserRole,
+    ) -> Result<TokenPair> {
+        let access_token = self.generate_access_token(user_id, role.clone())?;
+        let refresh_token = self.generate_refresh_token(user_id, role)?;
 
         Ok(TokenPair {
             access_token,
@@ -78,7 +85,11 @@ impl AuthService {
         })
     }
 
-    fn generate_access_token(&self, user_id: Uuid) -> Result<String> {
+    fn generate_access_token(
+        &self,
+        user_id: Uuid,
+        role: crate::models::user::UserRole,
+    ) -> Result<String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
@@ -91,6 +102,7 @@ impl AuthService {
             exp,
             iat,
             token_type: "access".to_string(),
+            role,
         };
 
         let secret = self.get_secret()?;
@@ -104,7 +116,11 @@ impl AuthService {
         Ok(token)
     }
 
-    fn generate_refresh_token(&self, user_id: Uuid) -> Result<String> {
+    fn generate_refresh_token(
+        &self,
+        user_id: Uuid,
+        role: crate::models::user::UserRole,
+    ) -> Result<String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
@@ -117,6 +133,7 @@ impl AuthService {
             exp,
             iat,
             token_type: "refresh".to_string(),
+            role,
         };
 
         let secret = self.get_secret()?;
@@ -173,7 +190,6 @@ impl AuthService {
     }
 
     pub fn extract_user_id(&self, claims: &Claims) -> Result<Uuid> {
-        Uuid::parse_str(&claims.sub)
-            .map_err(|_| AppError::Auth("无效的用户ID".to_string()))
+        Uuid::parse_str(&claims.sub).map_err(|_| AppError::Auth("无效的用户ID".to_string()))
     }
 }

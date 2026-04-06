@@ -99,6 +99,14 @@ pub struct UpdateUserRequest {
     pub avatar_url: Option<String>,
 }
 
+/// 修改密码请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct ChangePasswordRequest {
+    pub old_password: String,
+    #[validate(custom(function = "validate_password_strength", message = "密码强度不足"))]
+    pub new_password: String,
+}
+
 /// 用户信息响应
 #[derive(Debug, Clone, Serialize)]
 pub struct UserResponse {

@@ -84,6 +84,7 @@ async fn start_test_server() -> TestServer {
         metrics_collector,
         Arc::new(config_manager),
     )
+    .await
     .expect("Failed to create app state");
 
     // 构建应用路由

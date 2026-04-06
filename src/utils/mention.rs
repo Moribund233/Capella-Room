@@ -20,6 +20,7 @@ static MENTION_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"@(\w{3,20})\b").
 ///
 /// # 示例
 /// ```
+/// use seredeli_room::utils::mention::extract_mentions;
 /// let content = "Hello @alice and @bob!";
 /// let mentions = extract_mentions(content);
 /// assert_eq!(mentions, vec!["alice", "bob"]);
