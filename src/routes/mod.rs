@@ -11,7 +11,6 @@ use crate::{
     handlers::{admin, auth, file, message, room, user},
     middleware::admin::admin_auth_middleware,
     middleware::auth_middleware,
-    middleware::rate_limit::{rate_limit_middleware, strict_rate_limit_middleware},
     state::AppState,
     websocket::handler::ws_handler,
 };
@@ -33,16 +32,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // WebSocket 端点
         .route("/ws", get(ws_handler));
 
-    // 认证路由（使用严格的速率限制）
+    // 认证路由（公开访问）
     let auth_routes_router = Router::new()
         .nest(&format!("/api/{}/auth", API_VERSION), auth_routes())
-        .nest("/api/auth", auth_routes())
-        .layer(middleware::from_fn_with_state(
-            Arc::clone(&state),
-            strict_rate_limit_middleware,
-        ));
+        .nest("/api/auth", auth_routes());
 
-    // 创建受保护路由（需要认证 + 速率限制）
+    // 创建受保护路由（需要认证）
     let protected_routes = Router::new()
         // 用户路由
         .nest(&format!("/api/{}/users", API_VERSION), user_routes())
@@ -56,11 +51,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // 文件路由
         .nest(&format!("/api/{}/files", API_VERSION), file_routes())
         .nest(&format!("/api/{}/upload", API_VERSION), upload_routes())
-        // 添加速率限制中间件（在认证之前）
-        .layer(middleware::from_fn_with_state(
-            Arc::clone(&state),
-            rate_limit_middleware,
-        ))
         // 添加认证中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -71,11 +61,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     let admin_routes = Router::new()
         .nest(&format!("/api/{}/admin", API_VERSION), admin_router())
         .nest("/api/admin", admin_router())
-        // 添加速率限制中间件
-        .layer(middleware::from_fn_with_state(
-            Arc::clone(&state),
-            rate_limit_middleware,
-        ))
         // 添加管理员认证中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),

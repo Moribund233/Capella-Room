@@ -180,42 +180,6 @@ impl ConfigManager {
                 config.upload.base_url = item.value.clone();
                 debug!("Hot reloaded upload.base_url = {}", item.value);
             }
-            "rate_limit.enabled" => {
-                if let Ok(enabled) = item.value.parse() {
-                    config.rate_limit.enabled = enabled;
-                    debug!("Hot reloaded rate_limit.enabled = {}", enabled);
-                }
-            }
-            "rate_limit.default_requests" => {
-                if let Ok(req) = item.value.parse() {
-                    config.rate_limit.default_requests = req;
-                    debug!("Hot reloaded rate_limit.default_requests = {}", req);
-                }
-            }
-            "rate_limit.auth_requests" => {
-                if let Ok(req) = item.value.parse() {
-                    config.rate_limit.auth_requests = req;
-                    debug!("Hot reloaded rate_limit.auth_requests = {}", req);
-                }
-            }
-            "rate_limit.message_requests" => {
-                if let Ok(req) = item.value.parse() {
-                    config.rate_limit.message_requests = req;
-                    debug!("Hot reloaded rate_limit.message_requests = {}", req);
-                }
-            }
-            "rate_limit.room_requests" => {
-                if let Ok(req) = item.value.parse() {
-                    config.rate_limit.room_requests = req;
-                    debug!("Hot reloaded rate_limit.room_requests = {}", req);
-                }
-            }
-            "rate_limit.cleanup_interval_secs" => {
-                if let Ok(secs) = item.value.parse() {
-                    config.rate_limit.cleanup_interval_secs = secs;
-                    debug!("Hot reloaded rate_limit.cleanup_interval_secs = {}", secs);
-                }
-            }
             "websocket.heartbeat_interval_secs" => {
                 if let Ok(secs) = item.value.parse() {
                     config.websocket.heartbeat_interval_secs = secs;

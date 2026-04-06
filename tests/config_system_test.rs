@@ -8,7 +8,6 @@ use tempfile::NamedTempFile;
 use tokio::sync::broadcast;
 
 use seredeli_room::config::{ConfigChangeEvent, ConfigLoader};
-use seredeli_room::middleware::rate_limit::{RateLimitConfig, RateLimiter};
 use seredeli_room::websocket::manager::WebSocketManager;
 
 /// 创建临时配置文件
@@ -42,18 +41,6 @@ expiration_hours = 24
 [upload]
 max_file_size = 10485760
 base_url = "/uploads"
-
-[rate_limit]
-enabled = true
-default_requests = 100
-default_window_secs = 60
-auth_requests = 5
-auth_window_secs = 60
-message_requests = 30
-message_window_secs = 60
-room_requests = 20
-room_window_secs = 60
-cleanup_interval_secs = 30
 
 [websocket]
 heartbeat_interval_secs = 30
@@ -122,18 +109,6 @@ expiration_hours = 12
 max_file_size = 20971520
 base_url = "/files"
 
-[rate_limit]
-enabled = true
-default_requests = 200
-default_window_secs = 120
-auth_requests = 10
-auth_window_secs = 60
-message_requests = 50
-message_window_secs = 60
-room_requests = 30
-room_window_secs = 60
-cleanup_interval_secs = 60
-
 [websocket]
 heartbeat_interval_secs = 45
 heartbeat_timeout_secs = 120
@@ -183,10 +158,6 @@ email = "admin@test.com"
     assert_eq!(config.jwt.expiration_hours, 12);
     assert_eq!(config.upload.max_file_size, 20971520);
     assert_eq!(config.upload.base_url, "/files");
-    assert!(config.rate_limit.enabled);
-    assert_eq!(config.rate_limit.default_requests, 200);
-    assert_eq!(config.rate_limit.cleanup_interval_secs, 60);
-    assert_eq!(config.rate_limit.default_window_secs, 120);
     assert_eq!(config.websocket.heartbeat_interval_secs, 45);
     assert_eq!(config.websocket.heartbeat_timeout_secs, 120);
     assert_eq!(config.logging.level, "debug");
@@ -248,61 +219,6 @@ async fn test_websocket_config_update() {
     assert_eq!(ws_manager.get_message_buffer_size().await, 200);
     assert_eq!(ws_manager.get_heartbeat_interval().await, 45);
     assert_eq!(ws_manager.get_heartbeat_timeout().await, 120);
-}
-
-#[tokio::test]
-async fn test_rate_limit_config_update() {
-    // 创建速率限制器
-    let initial_config = RateLimitConfig {
-        enabled: true,
-        default_requests: 100,
-        default_window_secs: 60,
-        auth_requests: 5,
-        auth_window_secs: 60,
-        message_requests: 30,
-        message_window_secs: 60,
-        room_requests: 20,
-        room_window_secs: 60,
-        cleanup_interval_secs: 30,
-    };
-
-    let rate_limiter = Arc::new(tokio::sync::RwLock::new(RateLimiter::new(initial_config)));
-
-    // 验证初始配置
-    {
-        let limiter = rate_limiter.read().await;
-        let config = limiter.get_config();
-        assert_eq!(config.default_requests, 100);
-        assert_eq!(config.cleanup_interval_secs, 30);
-    }
-
-    // 更新配置
-    let new_config = RateLimitConfig {
-        enabled: true,
-        default_requests: 200,
-        default_window_secs: 120,
-        auth_requests: 10,
-        auth_window_secs: 60,
-        message_requests: 50,
-        message_window_secs: 60,
-        room_requests: 30,
-        room_window_secs: 60,
-        cleanup_interval_secs: 60,
-    };
-
-    {
-        let mut limiter = rate_limiter.write().await;
-        limiter.update_config(new_config);
-    }
-
-    // 验证更新后的配置
-    {
-        let limiter = rate_limiter.read().await;
-        let config = limiter.get_config();
-        assert_eq!(config.default_requests, 200);
-        assert_eq!(config.cleanup_interval_secs, 60);
-        assert_eq!(config.default_window_secs, 120);
-    }
 }
 
 /// ==================== 配置变更事件测试 ====================
@@ -407,113 +323,4 @@ fn test_websocket_manager_default() {
 
     // 验证默认值
     assert_eq!(manager.get_total_connections(), 0);
-}
-
-#[test]
-fn test_rate_limiter_default() {
-    let limiter = RateLimiter::with_default_config();
-    let config = limiter.get_config();
-
-    // 验证默认值
-    assert!(config.enabled);
-    assert_eq!(config.default_requests, 100);
-    assert_eq!(config.default_window_secs, 60);
-    assert_eq!(config.cleanup_interval_secs, 30);
-}
-
-/// ==================== 速率限制功能测试 ====================
-
-#[tokio::test]
-async fn test_rate_limiter_ip_limit() {
-    let limiter = RateLimiter::with_default_config();
-
-    // 测试正常请求
-    for i in 0..5 {
-        let allowed = limiter.check_ip_limit("127.0.0.1", 10, 60).await;
-        assert!(allowed, "Request {} should be allowed", i);
-    }
-
-    // 创建新的 limiter 测试限制
-    let limiter2 = RateLimiter::with_default_config();
-    for _ in 0..10 {
-        limiter2.check_ip_limit("192.168.1.1", 10, 60).await;
-    }
-
-    // 第 11 个请求应该被拒绝
-    let allowed = limiter2.check_ip_limit("192.168.1.1", 10, 60).await;
-    assert!(!allowed, "Request 11 should be denied");
-}
-
-#[tokio::test]
-async fn test_rate_limiter_user_limit() {
-    let limiter = RateLimiter::with_default_config();
-
-    let user_id = "user_123";
-
-    // 测试正常请求
-    for i in 0..5 {
-        let allowed = limiter.check_user_limit(user_id, 10, 60).await;
-        assert!(allowed, "Request {} should be allowed", i);
-    }
-
-    // 创建新的 limiter 测试限制
-    let limiter2 = RateLimiter::with_default_config();
-    for _ in 0..10 {
-        limiter2.check_user_limit(user_id, 10, 60).await;
-    }
-
-    // 第 11 个请求应该被拒绝
-    let allowed = limiter2.check_user_limit(user_id, 10, 60).await;
-    assert!(!allowed, "Request 11 should be denied");
-}
-
-#[tokio::test]
-async fn test_rate_limit_config_update_effect() {
-    let initial_config = RateLimitConfig {
-        enabled: true,
-        default_requests: 5,
-        default_window_secs: 60,
-        auth_requests: 5,
-        auth_window_secs: 60,
-        message_requests: 30,
-        message_window_secs: 60,
-        room_requests: 20,
-        room_window_secs: 60,
-        cleanup_interval_secs: 30,
-    };
-
-    let rate_limiter = Arc::new(tokio::sync::RwLock::new(RateLimiter::new(initial_config)));
-
-    // 使用旧配置达到限制
-    let ip = "10.0.0.1";
-    for _ in 0..5 {
-        let limiter = rate_limiter.read().await;
-        limiter.check_ip_limit(ip, 5, 60).await;
-    }
-
-    // 更新配置，增加限制
-    let new_config = RateLimitConfig {
-        enabled: true,
-        default_requests: 10,
-        default_window_secs: 60,
-        auth_requests: 5,
-        auth_window_secs: 60,
-        message_requests: 30,
-        message_window_secs: 60,
-        room_requests: 20,
-        room_window_secs: 60,
-        cleanup_interval_secs: 30,
-    };
-
-    {
-        let mut limiter = rate_limiter.write().await;
-        limiter.update_config(new_config);
-    }
-
-    // 验证新配置已生效
-    {
-        let limiter = rate_limiter.read().await;
-        let config = limiter.get_config();
-        assert_eq!(config.default_requests, 10);
-    }
 }

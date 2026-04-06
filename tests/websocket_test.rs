@@ -137,7 +137,6 @@ async fn setup_test_server() -> (TestServer, Database) {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
         },
-        rate_limit: Default::default(),
         websocket: Default::default(),
         reconnect: Default::default(),
         logging: Default::default(),

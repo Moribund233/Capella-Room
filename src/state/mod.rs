@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
-use crate::middleware::rate_limit::RateLimiter;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
 use crate::services::message_service::MessageService;
@@ -23,7 +22,6 @@ pub struct AppState {
     pub message_service: MessageService,
     pub file_service: FileService,
     pub notification_service: NotificationService,
-    pub rate_limiter: Option<Arc<tokio::sync::RwLock<RateLimiter>>>,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
 }
@@ -40,7 +38,7 @@ impl fmt::Debug for AppState {
             .field("message_service", &"<MessageService>")
             .field("file_service", &"<FileService>")
             .field("notification_service", &"<NotificationService>")
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -69,26 +67,6 @@ impl AppState {
         };
         let file_service = FileService::from_config(db.clone(), &upload_config)?;
 
-        let rate_limiter = if config.rate_limit.enabled {
-            let rate_limit_config = crate::middleware::rate_limit::RateLimitConfig {
-                enabled: config.rate_limit.enabled,
-                default_requests: config.rate_limit.default_requests,
-                default_window_secs: config.rate_limit.default_window_secs,
-                auth_requests: config.rate_limit.auth_requests,
-                auth_window_secs: config.rate_limit.auth_window_secs,
-                message_requests: config.rate_limit.message_requests,
-                message_window_secs: config.rate_limit.message_window_secs,
-                room_requests: config.rate_limit.room_requests,
-                room_window_secs: config.rate_limit.room_window_secs,
-                cleanup_interval_secs: config.rate_limit.cleanup_interval_secs,
-            };
-            Some(Arc::new(tokio::sync::RwLock::new(RateLimiter::new(
-                rate_limit_config,
-            ))))
-        } else {
-            None
-        };
-
         let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
         let state = Arc::new(Self {
@@ -101,13 +79,12 @@ impl AppState {
             message_service,
             file_service,
             notification_service,
-            rate_limiter: rate_limiter.clone(),
             config: shared_config,
             config_manager: config_manager.clone(),
         });
 
         // 启动配置监听器
-        start_config_listeners(config_manager, ws_manager, rate_limiter);
+        start_config_listeners(config_manager, ws_manager);
 
         Ok(state)
     }
@@ -146,10 +123,6 @@ impl AppState {
 
     pub fn notification_service(&self) -> &NotificationService {
         &self.notification_service
-    }
-
-    pub fn rate_limiter(&self) -> Option<Arc<tokio::sync::RwLock<RateLimiter>>> {
-        self.rate_limiter.clone()
     }
 
     pub fn config(&self) -> Arc<tokio::sync::RwLock<AppConfig>> {
@@ -191,7 +164,6 @@ impl Clone for AppState {
                 self.db.clone(),
                 Arc::clone(&self.ws_manager),
             ),
-            rate_limiter: self.rate_limiter.clone(),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
         }

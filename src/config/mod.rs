@@ -6,9 +6,7 @@ pub mod listener;
 pub mod loader;
 pub mod manager;
 
-pub use listener::{
-    start_config_listeners, LoggingConfigListener, RateLimitConfigListener, WebSocketConfigListener,
-};
+pub use listener::{start_config_listeners, LoggingConfigListener, WebSocketConfigListener};
 pub use loader::ConfigLoader;
 pub use manager::{ConfigChangeEvent, ConfigManager};
 
@@ -24,8 +22,6 @@ pub struct AppConfig {
     pub jwt: JwtConfig,
     #[serde(default)]
     pub upload: UploadConfig,
-    #[serde(default)]
-    pub rate_limit: RateLimitConfig,
     #[serde(default)]
     pub websocket: WebSocketConfig,
     #[serde(default)]
@@ -89,26 +85,6 @@ pub struct JwtConfig {
 pub struct UploadConfig {
     pub max_file_size: usize,
     pub base_url: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct RateLimitConfig {
-    pub enabled: bool,
-    pub default_requests: u32,
-    pub default_window_secs: u64,
-    pub auth_requests: u32,
-    pub auth_window_secs: u64,
-    pub message_requests: u32,
-    pub message_window_secs: u64,
-    pub room_requests: u32,
-    pub room_window_secs: u64,
-    /// 清理间隔（秒），默认30秒
-    #[serde(default = "default_cleanup_interval_secs")]
-    pub cleanup_interval_secs: u64,
-}
-
-fn default_cleanup_interval_secs() -> u64 {
-    30
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

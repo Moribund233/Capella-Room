@@ -39,17 +39,6 @@ INSERT INTO system_configs (key, value, value_type, description, category, is_ed
     ('upload.max_file_size', '10485760', 'int', '最大文件大小（字节）', 'upload', true, true),
     ('upload.base_url', '/uploads', 'string', '文件访问基础URL路径', 'upload', true, true),
     
-    -- 速率限制配置
-    ('rate_limit.enabled', 'true', 'bool', '是否启用速率限制', 'rate_limit', true, true),
-    ('rate_limit.default_requests', '100', 'int', '默认限制：时间窗口内的最大请求数', 'rate_limit', true, true),
-    ('rate_limit.default_window_secs', '60', 'int', '默认限制：时间窗口（秒）', 'rate_limit', true, true),
-    ('rate_limit.auth_requests', '5', 'int', '认证接口限制', 'rate_limit', true, true),
-    ('rate_limit.auth_window_secs', '60', 'int', '认证接口时间窗口（秒）', 'rate_limit', true, true),
-    ('rate_limit.message_requests', '30', 'int', '消息接口限制', 'rate_limit', true, true),
-    ('rate_limit.message_window_secs', '60', 'int', '消息接口时间窗口（秒）', 'rate_limit', true, true),
-    ('rate_limit.room_requests', '20', 'int', '房间接口限制', 'rate_limit', true, true),
-    ('rate_limit.room_window_secs', '60', 'int', '房间接口时间窗口（秒）', 'rate_limit', true, true),
-    
     -- WebSocket 配置
     ('websocket.heartbeat_interval_secs', '30', 'int', 'WebSocket 心跳间隔（秒）', 'websocket', true, true),
     ('websocket.heartbeat_timeout_secs', '90', 'int', 'WebSocket 心跳超时（秒）', 'websocket', true, true),

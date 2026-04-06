@@ -10,7 +10,6 @@ use std::env;
 use seredeli_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
-    middleware::rate_limit::RateLimiter,
     services::{
         auth_service::AuthService, message_service::MessageService, room_service::RoomService,
         user_service::UserService,
@@ -413,77 +412,6 @@ async fn test_recent_rooms_anonymous_user() {
 
     assert!(public_found, "匿名用户应该能看到公开房间");
     assert!(!private_found, "匿名用户不应该能看到私有房间");
-}
-
-// ==================== 速率限制中间件测试 ====================
-
-#[tokio::test]
-async fn test_rate_limiter_ip_limit() {
-    // 测试IP级别的速率限制
-    let limiter = RateLimiter::with_default_config();
-
-    // 在限制范围内应该通过
-    for i in 0..5 {
-        let allowed = limiter.check_ip_limit("127.0.0.1", 10, 60).await;
-        assert!(allowed, "请求 {} 应该被允许", i);
-    }
-}
-
-#[tokio::test]
-async fn test_rate_limiter_ip_limit_exceeded() {
-    // 测试IP超过限制后被拒绝
-    let limiter = RateLimiter::with_default_config();
-
-    // 发送超过限制的请求
-    for _ in 0..10 {
-        limiter.check_ip_limit("192.168.1.1", 10, 60).await;
-    }
-
-    // 第11个请求应该被拒绝
-    let allowed = limiter.check_ip_limit("192.168.1.1", 10, 60).await;
-    assert!(!allowed, "超过限制后请求应该被拒绝");
-}
-
-#[tokio::test]
-async fn test_rate_limiter_user_limit() {
-    // 测试用户级别的速率限制
-    let limiter = RateLimiter::with_default_config();
-
-    // 用户级别限制
-    for i in 0..5 {
-        let allowed = limiter.check_user_limit("user123", 10, 60).await;
-        assert!(allowed, "请求 {} 应该被允许", i);
-    }
-
-    // 不同用户互不影响
-    let allowed = limiter.check_user_limit("user456", 10, 60).await;
-    assert!(allowed, "不同用户不应该受影响");
-}
-
-#[tokio::test]
-async fn test_rate_limiter_different_paths() {
-    // 测试不同路径的限制策略
-    let limiter = RateLimiter::with_default_config();
-
-    // 认证接口限制
-    let (limit, window) = limiter.get_ip_limit("/api/v1/auth/login");
-    assert_eq!(limit, 5);
-    assert_eq!(window, 60);
-
-    // 消息接口限制
-    let (limit, window) = limiter.get_ip_limit("/api/v1/messages");
-    assert_eq!(limit, 30);
-    assert_eq!(window, 60);
-
-    // 房间接口限制
-    let (limit, window) = limiter.get_ip_limit("/api/v1/rooms");
-    assert_eq!(limit, 20);
-    assert_eq!(window, 60);
-
-    // 默认接口限制
-    let (limit, window) = limiter.get_ip_limit("/api/v1/users");
-    assert_eq!(limit, 100);
-    assert_eq!(window, 60);
 }
 
 // ==================== 消息编辑功能测试 ====================

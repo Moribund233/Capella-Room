@@ -155,13 +155,6 @@ impl ConfigLoader {
             config.upload.base_url = base_url;
         }
 
-        if let Ok(enabled) = std::env::var("RATE_LIMIT_ENABLED") {
-            if let Ok(e) = enabled.parse() {
-                debug!("Overriding rate_limit.enabled from environment");
-                config.rate_limit.enabled = e;
-            }
-        }
-
         if let Ok(level) = std::env::var("LOG_LEVEL") {
             debug!("Overriding logging.level from environment");
             config.logging.level = level;
@@ -191,12 +184,6 @@ impl ConfigLoader {
         if config.upload.max_file_size == 0 {
             return Err(anyhow::anyhow!(
                 "upload.max_file_size cannot be 0. Please set a valid value in config.toml"
-            ));
-        }
-
-        if config.rate_limit.auth_requests == 0 {
-            return Err(anyhow::anyhow!(
-                "rate_limit.auth_requests cannot be 0. Please set a valid value in config.toml"
             ));
         }
 
@@ -245,36 +232,6 @@ impl ConfigLoader {
 
         if let Some(value) = db_configs.get("upload.base_url") {
             config.upload.base_url = value.clone();
-        }
-
-        if let Some(value) = db_configs.get("rate_limit.enabled") {
-            if let Ok(enabled) = value.parse() {
-                config.rate_limit.enabled = enabled;
-            }
-        }
-
-        if let Some(value) = db_configs.get("rate_limit.default_requests") {
-            if let Ok(req) = value.parse() {
-                config.rate_limit.default_requests = req;
-            }
-        }
-
-        if let Some(value) = db_configs.get("rate_limit.auth_requests") {
-            if let Ok(req) = value.parse() {
-                config.rate_limit.auth_requests = req;
-            }
-        }
-
-        if let Some(value) = db_configs.get("rate_limit.message_requests") {
-            if let Ok(req) = value.parse() {
-                config.rate_limit.message_requests = req;
-            }
-        }
-
-        if let Some(value) = db_configs.get("rate_limit.room_requests") {
-            if let Ok(req) = value.parse() {
-                config.rate_limit.room_requests = req;
-            }
         }
 
         if let Some(value) = db_configs.get("websocket.heartbeat_interval_secs") {
