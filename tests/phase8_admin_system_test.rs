@@ -64,7 +64,6 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
     let metrics_collector = Arc::new(MetricsCollector::new());
 
     let config = AppConfig {
-        app: Default::default(),
         server: Default::default(),
         database: DatabaseConfig {
             url: Some(database_url),

@@ -1,0 +1,251 @@
+/**
+ * 响应式样式基础
+ * 定义断点和响应式工具类
+ */
+
+/* ============================================
+   断点定义
+   ============================================ */
+:root {
+  /* 断点值 */
+  --breakpoint-xs: 0;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* ============================================
+   响应式容器
+   ============================================ */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--spacing-4);
+  padding-right: var(--spacing-4);
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
+}
+
+/* ============================================
+   响应式显示/隐藏工具类
+   ============================================ */
+
+/* 只在 xs 显示 */
+@media (min-width: 640px) {
+  .xs-only {
+    display: none !important;
+  }
+}
+
+/* 只在 sm 及以上显示 */
+@media (max-width: 639px) {
+  .sm-up {
+    display: none !important;
+  }
+}
+
+/* 只在 md 及以上显示 */
+@media (max-width: 767px) {
+  .md-up {
+    display: none !important;
+  }
+}
+
+/* 只在 lg 及以上显示 */
+@media (max-width: 1023px) {
+  .lg-up {
+    display: none !important;
+  }
+}
+
+/* 只在 xl 及以上显示 */
+@media (max-width: 1279px) {
+  .xl-up {
+    display: none !important;
+  }
+}
+
+/* 只在 sm 以下显示 */
+@media (min-width: 640px) {
+  .sm-down {
+    display: none !important;
+  }
+}
+
+/* 只在 md 以下显示 */
+@media (min-width: 768px) {
+  .md-down {
+    display: none !important;
+  }
+}
+
+/* 只在 lg 以下显示 */
+@media (min-width: 1024px) {
+  .lg-down {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   响应式布局工具类
+   ============================================ */
+
+/* 响应式侧边栏 */
+@media (max-width: 1023px) {
+  .sidebar-responsive {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: var(--z-fixed);
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+  }
+
+  .sidebar-responsive.is-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgb(0 0 0 / 0.5);
+    z-index: calc(var(--z-fixed) - 1);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-normal), visibility var(--transition-normal);
+  }
+
+  .sidebar-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sidebar-responsive {
+    position: static;
+    transform: none;
+  }
+
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* 响应式网格 */
+.grid-responsive {
+  display: grid;
+  gap: var(--spacing-4);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .grid-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .grid-responsive {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* 响应式间距 */
+@media (max-width: 767px) {
+  .p-responsive {
+    padding: var(--spacing-4);
+  }
+
+  .gap-responsive {
+    gap: var(--spacing-3);
+  }
+}
+
+@media (min-width: 768px) {
+  .p-responsive {
+    padding: var(--spacing-6);
+  }
+
+  .gap-responsive {
+    gap: var(--spacing-4);
+  }
+}
+
+@media (min-width: 1024px) {
+  .p-responsive {
+    padding: var(--spacing-8);
+  }
+
+  .gap-responsive {
+    gap: var(--spacing-6);
+  }
+}
+
+/* ============================================
+   移动端优化
+   ============================================ */
+@media (max-width: 767px) {
+  /* 触摸友好的点击区域 */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 移动端字体微调 */
+  html {
+    font-size: 14px;
+  }
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}

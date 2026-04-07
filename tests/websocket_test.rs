@@ -121,7 +121,6 @@ async fn setup_test_server() -> (TestServer, Database) {
     let metrics_collector = Arc::new(MetricsCollector::new());
 
     let config = seredeli_room::config::AppConfig {
-        app: Default::default(),
         server: Default::default(),
         database: seredeli_room::config::DatabaseConfig {
             url: None,

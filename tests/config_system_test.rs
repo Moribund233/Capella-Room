@@ -81,9 +81,6 @@ maintenance_message = "Test message"
 #[test]
 fn test_load_full_config() {
     let config_content = r#"
-[app]
-env = "production"
-
 [server]
 host = "0.0.0.0"
 port = 3000
@@ -135,7 +132,6 @@ email = "admin@test.com"
 
     let config = ConfigLoader::load_from_file_only(path).expect("Failed to load config");
 
-    assert_eq!(config.app.env, "production");
     assert_eq!(config.server.host, "0.0.0.0");
     assert_eq!(config.server.port, 3000);
     assert_eq!(config.database.max_connections, 20);

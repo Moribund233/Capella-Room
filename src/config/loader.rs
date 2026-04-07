@@ -15,14 +15,39 @@ impl ConfigLoader {
     pub fn load_with_path(config_path: Option<&str>) -> Result<AppConfig> {
         info!("Loading configuration...");
 
-        let env_from_env = std::env::var("APP_ENV").ok();
+        // 第1步：优先从 .env 文件加载基础环境变量（包含 APP_ENV）
+        if Path::new(".env").exists() {
+            debug!("Loading base .env file");
+            dotenvy::from_filename(".env").ok();
+        }
+
+        // 第2步：确定运行环境（优先级：系统环境变量 > .env文件中的APP_ENV > 默认值）
+        let env = std::env::var("APP_ENV")
+            .ok()
+            .filter(|e| !e.is_empty())
+            .unwrap_or_else(|| "development".to_string());
+
+        info!("Application environment: {}", env);
+
+        // 第3步：加载对应环境的 .env.{env} 文件
+        let env_file = format!(".env.{}", env);
+        if Path::new(&env_file).exists() {
+            debug!("Loading environment file: {}", env_file);
+            dotenvy::from_filename(&env_file).ok();
+        }
+
+        // 第4步：确定配置文件路径
         let config_file = config_path
             .map(|s| s.to_string())
             .or_else(|| std::env::var("CONFIG_FILE").ok())
             .or_else(|| {
-                env_from_env
-                    .as_ref()
-                    .map(|env| format!("config.{}.toml", env))
+                // 根据环境选择对应的配置文件
+                let env_config = format!("config.{}.toml", env);
+                if Path::new(&env_config).exists() {
+                    Some(env_config)
+                } else {
+                    None
+                }
             })
             .unwrap_or_else(|| "config.toml".to_string());
 
@@ -39,30 +64,10 @@ impl ConfigLoader {
         info!("Loading config from file: {}", config_file);
         let mut config = Self::load_from_file(&config_file)?;
 
-        let env = env_from_env
-            .or_else(|| {
-                if !config.app.env.is_empty() {
-                    Some(config.app.env.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_else(|| "development".to_string());
-
-        info!("Application environment: {}", env);
-
-        let env_file = format!(".env.{}", env);
-        if Path::new(&env_file).exists() {
-            debug!("Loading environment file: {}", env_file);
-            dotenvy::from_filename(&env_file).ok();
-        } else if Path::new(".env").exists() {
-            debug!("Loading .env file");
-            dotenvy::dotenv().ok();
-        }
-
+        // 第5步：应用环境变量覆盖
         Self::apply_env_overrides(&mut config);
 
-        Self::validate_config(&config)?;
+        Self::validate_config(&mut config)?;
 
         info!("Configuration loaded successfully");
         Ok(config)
@@ -72,10 +77,10 @@ impl ConfigLoader {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read config file: {}", path))?;
 
-        let config: AppConfig = toml::from_str(&content)
+        let mut config: AppConfig = toml::from_str(&content)
             .with_context(|| format!("Failed to parse config file: {}", path))?;
 
-        Self::validate_config(&config)?;
+        Self::validate_config(&mut config)?;
 
         Ok(config)
     }
@@ -168,18 +173,25 @@ impl ConfigLoader {
         }
     }
 
-    fn validate_config(config: &AppConfig) -> Result<()> {
-        if config.database.url.is_none() {
+    fn validate_config(config: &mut AppConfig) -> Result<()> {
+        // 敏感配置必须从环境变量读取，不允许从config.toml读取
+        let db_url = std::env::var("DATABASE_URL").ok();
+        if db_url.is_none() {
             return Err(anyhow::anyhow!(
-                "DATABASE_URL is required. Please set it in environment variable or config.toml"
+                "DATABASE_URL is required. Please set it via environment variable. \
+                 For security reasons, this cannot be set in config.toml."
             ));
         }
+        config.database.url = db_url;
 
-        if config.jwt.secret.is_none() {
+        let jwt_secret = std::env::var("JWT_SECRET").ok();
+        if jwt_secret.is_none() {
             return Err(anyhow::anyhow!(
-                "JWT_SECRET is required. Please set it via environment variable for security."
+                "JWT_SECRET is required. Please set it via environment variable. \
+                 For security reasons, this cannot be set in config.toml."
             ));
         }
+        config.jwt.secret = jwt_secret;
 
         if config.upload.max_file_size == 0 {
             return Err(anyhow::anyhow!(

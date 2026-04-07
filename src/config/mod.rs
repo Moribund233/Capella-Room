@@ -13,8 +13,6 @@ pub use manager::{ConfigChangeEvent, ConfigManager};
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
-    pub app: AppConfigSection,
-    #[serde(default)]
     pub server: ServerConfig,
     #[serde(default)]
     pub database: DatabaseConfig,
@@ -36,13 +34,6 @@ pub struct AppConfig {
     pub audit: AuditConfig,
     #[serde(default)]
     pub redis: RedisConfig,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct AppConfigSection {
-    #[serde(default)]
-    pub env: String,
-    pub config_file: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

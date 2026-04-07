@@ -17,6 +17,14 @@ use seredeli_room::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Windows 控制台编码处理：设置为 UTF-8
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        // 设置控制台代码页为 UTF-8 (65001)
+        let _ = Command::new("cmd").args(["/C", "chcp", "65001"]).output();
+    }
+
     init_logging();
 
     info!("Starting Seredeli Room server...");
@@ -27,7 +35,8 @@ async fn main() -> Result<()> {
         "Server will run on {}:{}",
         config.server.host, config.server.port
     );
-    info!("Environment: {}", config.app.env);
+    let env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+    info!("Environment: {}", env);
 
     let db_url = config
         .database
@@ -175,13 +184,19 @@ fn init_logging() {
         tracing_subscriber::EnvFilter::new("info,seredeli_room=debug,tower_http=debug")
     });
 
-    tracing_subscriber::fmt()
+    let is_production = std::env::var("APP_ENV")
+        .map(|env| env == "production")
+        .unwrap_or(false);
+
+    let subscriber = tracing_subscriber::fmt()
         .with_env_filter(env_filter)
         .with_target(true)
-        .with_thread_ids(true)
-        .with_file(true)
-        .with_line_number(true)
-        .init();
+        .with_thread_ids(!is_production)
+        .with_file(!is_production)
+        .with_line_number(!is_production)
+        .with_ansi(false);
+
+    subscriber.init();
 }
 
 async fn create_shutdown_signal() {

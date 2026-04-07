@@ -109,7 +109,6 @@ mod config_tests {
     #[test]
     fn test_config_clone() {
         let config = AppConfig {
-            app: Default::default(),
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
@@ -153,7 +152,6 @@ mod config_tests {
     #[test]
     fn test_config_debug() {
         let config = AppConfig {
-            app: Default::default(),
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
@@ -392,7 +390,6 @@ mod integration_tests {
 
         // 配置结构体验证
         let config = AppConfig {
-            app: Default::default(),
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
@@ -460,7 +457,6 @@ mod acceptance_tests {
     fn acceptance_config_management() {
         // 验证配置结构体定义完整
         let config = AppConfig {
-            app: Default::default(),
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
