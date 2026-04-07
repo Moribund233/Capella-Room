@@ -88,7 +88,6 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         },
         reconnect: Default::default(),
         logging: Default::default(),
-        cors: Default::default(),
         system: Default::default(),
         admin: Default::default(),
         audit: Default::default(),

@@ -58,13 +58,6 @@ multiplier = 2
 level = "info"
 structured = true
 
-[cors]
-allowed_origins = ["*"]
-allowed_methods = ["GET", "POST"]
-allowed_headers = ["*"]
-allow_credentials = false
-max_age = 3600
-
 [system]
 name = "Test System"
 description = "Test Description"
@@ -125,13 +118,6 @@ multiplier = 3
 level = "debug"
 structured = false
 
-[cors]
-allowed_origins = ["https://example.com"]
-allowed_methods = ["GET", "POST"]
-allowed_headers = ["*"]
-allow_credentials = true
-max_age = 7200
-
 [system]
 name = "Test System"
 description = "Test Description"
@@ -162,8 +148,6 @@ email = "admin@test.com"
     assert_eq!(config.websocket.heartbeat_timeout_secs, 120);
     assert_eq!(config.logging.level, "debug");
     assert!(!config.logging.structured);
-    assert_eq!(config.cors.allowed_origins, vec!["https://example.com"]);
-    assert!(config.cors.allow_credentials);
     assert_eq!(config.system.name, "Test System");
     assert!(config.system.maintenance_mode);
     assert!(!config.admin.initial.enabled);

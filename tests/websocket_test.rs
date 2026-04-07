@@ -146,7 +146,6 @@ async fn setup_test_server() -> (TestServer, Database) {
         reconnect: Default::default(),
         logging: Default::default(),
         audit: Default::default(),
-        cors: Default::default(),
         system: Default::default(),
         admin: Default::default(),
         redis: Default::default(),

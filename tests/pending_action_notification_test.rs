@@ -78,7 +78,6 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         websocket: Default::default(),
         reconnect: Default::default(),
         logging: Default::default(),
-        cors: Default::default(),
         system: Default::default(),
         admin: Default::default(),
         audit: seredeli_room::config::AuditConfig {

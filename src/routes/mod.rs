@@ -5,7 +5,6 @@ use axum::{
 };
 use chrono::Utc;
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
 
 use crate::{
     handlers::{admin, audit, auth, file, message, room, user},
@@ -88,7 +87,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .merge(auth_routes_router)
         .merge(protected_routes)
         .merge(admin_routes)
-        .layer(CorsLayer::permissive())
         .with_state(state)
 }
 
