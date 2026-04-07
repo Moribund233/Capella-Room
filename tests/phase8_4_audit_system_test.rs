@@ -112,8 +112,9 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             auto_archive_enabled: false,
             archive_hour: 3,
         },
+        redis: Default::default(),
     };
-    let config_manager = ConfigManager::new(db.clone(), config.clone());
+    let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
     let state = AppState::new(
         db,

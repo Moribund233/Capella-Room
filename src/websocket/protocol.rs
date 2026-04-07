@@ -266,6 +266,47 @@ pub enum WebSocketMessage {
 
     /// 通知已读确认
     NotificationReadConfirm { notification_id: Uuid },
+
+    // ========== 待办通知系统 ==========
+    /// 待办通知
+    PendingAction {
+        notification_id: Uuid,
+        action_type: String,
+        title: String,
+        description: String,
+        deadline: Option<DateTime<Utc>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<serde_json::Value>,
+        created_at: DateTime<Utc>,
+    },
+
+    /// 响应待办通知
+    RespondPendingAction {
+        notification_id: Uuid,
+        action: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        comment: Option<String>,
+    },
+
+    /// 待办响应确认
+    PendingActionResponse {
+        notification_id: Uuid,
+        success: bool,
+        message: String,
+        new_status: String,
+    },
+
+    /// 获取待办列表
+    GetPendingActions {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        action_type: Option<String>,
+    },
+
+    /// 待办列表响应
+    PendingActionsList {
+        actions: Vec<PendingActionInfo>,
+        total: usize,
+    },
 }
 
 /// 通知类型枚举
@@ -278,6 +319,81 @@ pub enum NotificationType {
     Important,
     /// 警告、维护通知
     Warning,
+}
+
+/// 待办操作类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingActionType {
+    /// 确认执行
+    Approve,
+    /// 拒绝变更
+    Reject,
+    /// 稍后提醒
+    Snooze,
+}
+
+impl std::fmt::Display for PendingActionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PendingActionType::Approve => write!(f, "approve"),
+            PendingActionType::Reject => write!(f, "reject"),
+            PendingActionType::Snooze => write!(f, "snooze"),
+        }
+    }
+}
+
+impl std::str::FromStr for PendingActionType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "approve" => Ok(PendingActionType::Approve),
+            "reject" => Ok(PendingActionType::Reject),
+            "snooze" => Ok(PendingActionType::Snooze),
+            _ => Err(format!("Unknown pending action type: {}", s)),
+        }
+    }
+}
+
+/// 待办操作状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "action_status", rename_all = "snake_case")]
+pub enum PendingActionStatus {
+    /// 待处理
+    Pending,
+    /// 已确认
+    Approved,
+    /// 已拒绝
+    Rejected,
+    /// 已延迟
+    Snoozed,
+}
+
+/// 待办通知信息
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PendingActionInfo {
+    pub notification_id: Uuid,
+    pub action_type: String,
+    pub title: String,
+    pub description: String,
+    pub deadline: Option<DateTime<Utc>>,
+    pub action_status: PendingActionStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub related_config_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub related_config_value: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 待办响应请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingActionResponseRequest {
+    pub notification_id: Uuid,
+    pub action: PendingActionType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 /// 通知结构（用于离线通知同步）
@@ -305,6 +421,8 @@ pub enum NotificationDbType {
     RoomInvitation,
     SystemNotification,
     FileUploadComplete,
+    ConfigReloadRequired,
+    PendingAction,
 }
 
 /// 离线消息结构（用于断线重连后同步消息）

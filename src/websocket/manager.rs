@@ -5,6 +5,7 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::models::room::MemberRole;
+use crate::redis::pubsub::RedisPubSub;
 
 /// WebSocket 消息通道默认缓冲区大小
 pub const DEFAULT_WS_MESSAGE_BUFFER_SIZE: usize = 100;
@@ -27,6 +28,7 @@ pub struct RoomMemberInfo {
 
 /// WebSocket连接管理器
 /// 管理所有活跃的WebSocket连接和房间订阅
+/// 支持分布式部署，通过 Redis Pub/Sub 实现跨节点消息广播
 #[derive(Debug)]
 pub struct WebSocketManager {
     /// 用户ID到连接信息的映射
@@ -41,6 +43,10 @@ pub struct WebSocketManager {
     heartbeat_interval_secs: RwLock<u64>,
     /// 心跳超时（秒，可动态更新）
     heartbeat_timeout_secs: RwLock<u64>,
+    /// Redis Pub/Sub 客户端（可选，用于分布式部署）
+    redis_pubsub: RwLock<Option<RedisPubSub>>,
+    /// 当前节点 ID（用于分布式部署）
+    node_id: String,
 }
 
 impl WebSocketManager {
@@ -53,6 +59,8 @@ impl WebSocketManager {
             message_buffer_size: RwLock::new(DEFAULT_WS_MESSAGE_BUFFER_SIZE),
             heartbeat_interval_secs: RwLock::new(30),
             heartbeat_timeout_secs: RwLock::new(90),
+            redis_pubsub: RwLock::new(None),
+            node_id: format!("node-{}", Uuid::new_v4()),
         })
     }
 
@@ -69,7 +77,33 @@ impl WebSocketManager {
             message_buffer_size: RwLock::new(buffer_size),
             heartbeat_interval_secs: RwLock::new(heartbeat_interval),
             heartbeat_timeout_secs: RwLock::new(heartbeat_timeout),
+            redis_pubsub: RwLock::new(None),
+            node_id: format!("node-{}", Uuid::new_v4()),
         })
+    }
+
+    /// 获取当前节点 ID
+    pub fn node_id(&self) -> &str {
+        &self.node_id
+    }
+
+    /// 设置 Redis Pub/Sub 客户端
+    ///
+    /// # 参数
+    /// - `redis_pubsub`: Redis Pub/Sub 客户端
+    ///
+    /// # 说明
+    /// 启用 Redis 后，房间广播消息将通过 Redis 发布到其他节点
+    pub async fn set_redis_pubsub(&self, redis_pubsub: RedisPubSub) {
+        let mut pubsub = self.redis_pubsub.write().await;
+        *pubsub = Some(redis_pubsub);
+        debug!("Redis Pub/Sub client set for node {}", self.node_id);
+    }
+
+    /// 检查是否启用了 Redis
+    pub async fn is_redis_enabled(&self) -> bool {
+        let pubsub = self.redis_pubsub.read().await;
+        pubsub.is_some()
     }
 
     /// 获取当前消息缓冲区大小
@@ -192,7 +226,41 @@ impl WebSocketManager {
     }
 
     /// 广播消息到房间（排除指定用户）
+    ///
+    /// # 说明
+    /// 如果启用了 Redis，消息将同时发布到 Redis，以便其他节点接收
     pub async fn broadcast_to_room(
+        &self,
+        room_id: Uuid,
+        message: String,
+        exclude_user: Option<Uuid>,
+    ) {
+        // 1. 本地广播
+        self.broadcast_local(room_id, message.clone(), exclude_user)
+            .await;
+
+        // 2. 如果启用了 Redis，发布到 Redis
+        if let Some(ref mut redis_pubsub) = *self.redis_pubsub.write().await {
+            if let Err(e) = redis_pubsub
+                .publish_room_message(room_id, message, exclude_user)
+                .await
+            {
+                warn!("Failed to publish room message to Redis: {}", e);
+            }
+        }
+    }
+
+    /// 本地广播消息到房间（仅当前节点）
+    ///
+    /// # 参数
+    /// - `room_id`: 房间 ID
+    /// - `message`: 消息内容
+    /// - `exclude_user`: 排除的用户 ID
+    ///
+    /// # 说明
+    /// 该方法仅向当前节点的客户端发送消息，不通过 Redis 发布
+    /// 用于处理从 Redis 接收到的消息
+    pub async fn broadcast_local(
         &self,
         room_id: Uuid,
         message: String,
@@ -330,6 +398,8 @@ impl Default for WebSocketManager {
             message_buffer_size: RwLock::new(DEFAULT_WS_MESSAGE_BUFFER_SIZE),
             heartbeat_interval_secs: RwLock::new(30),
             heartbeat_timeout_secs: RwLock::new(90),
+            redis_pubsub: RwLock::new(None),
+            node_id: format!("node-{}", Uuid::new_v4()),
         }
     }
 }

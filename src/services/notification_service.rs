@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use tracing::{debug, error, warn};
+use serde_json::json;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -9,7 +10,10 @@ use crate::{
     error::{AppError, Result},
     websocket::{
         manager::WebSocketManager,
-        protocol::{NotificationDbType, WebSocketMessage},
+        protocol::{
+            NotificationDbType, PendingActionInfo, PendingActionStatus, PendingActionType,
+            WebSocketMessage,
+        },
     },
 };
 
@@ -557,6 +561,310 @@ impl NotificationService {
         .map_err(AppError::Database)?;
 
         Ok(result.rows_affected())
+    }
+
+    // ==================== 待办通知系统 ====================
+
+    /// 发送待办通知（需要管理员确认的配置变更）
+    ///
+    /// # 参数
+    /// - `admin_user_id`: 管理员用户ID
+    /// - `action_info`: 待办通知信息
+    ///
+    /// # 说明
+    /// - 如果管理员在线，通过WebSocket实时推送
+    /// - 如果管理员离线，存储到数据库待上线后同步
+    pub async fn send_pending_action(
+        &self,
+        admin_user_id: Uuid,
+        action_info: PendingActionInfo,
+    ) -> Result<()> {
+        debug!(
+            "Sending pending action notification to admin: {}",
+            admin_user_id
+        );
+
+        // 1. 先存储到数据库（标记为需要操作）
+        let notification_id = self
+            .store_pending_action(admin_user_id, &action_info)
+            .await?;
+
+        // 2. 如果管理员在线，WebSocket实时推送
+        let ws_message = WebSocketMessage::PendingAction {
+            notification_id,
+            action_type: action_info.action_type.clone(),
+            title: action_info.title.clone(),
+            description: action_info.description.clone(),
+            deadline: action_info.deadline,
+            data: serde_json::to_value(&action_info).ok(),
+            created_at: action_info.created_at,
+        };
+
+        if self.ws_manager.is_user_online(admin_user_id) {
+            if let Ok(json) = ws_message.to_json() {
+                if let Err(e) = self.ws_manager.send_to_user(admin_user_id, json).await {
+                    warn!(
+                        "Failed to send pending action to online admin {}: {}",
+                        admin_user_id, e
+                    );
+                } else {
+                    debug!(
+                        "Pending action notification sent to online admin: {}",
+                        admin_user_id
+                    );
+                }
+            }
+        } else {
+            debug!(
+                "Admin {} is offline, pending action stored for later sync",
+                admin_user_id
+            );
+        }
+
+        Ok(())
+    }
+
+    /// 存储待办通知到数据库
+    async fn store_pending_action(
+        &self,
+        user_id: Uuid,
+        action_info: &PendingActionInfo,
+    ) -> Result<Uuid> {
+        let record: (Uuid,) = sqlx::query_as(
+            r#"
+            INSERT INTO notifications (
+                user_id, notification_type, title, content, data,
+                requires_action, action_type, action_status, action_deadline
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(NotificationDbType::PendingAction)
+        .bind(&action_info.title)
+        .bind(&action_info.description)
+        .bind(json!({
+            "related_config_key": action_info.related_config_key,
+            "related_config_value": action_info.related_config_value,
+        }))
+        .bind(true) // requires_action
+        .bind(&action_info.action_type)
+        .bind(PendingActionStatus::Pending)
+        .bind(action_info.deadline)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(|e| {
+            error!("Failed to store pending action: {}", e);
+            AppError::Database(e)
+        })?;
+
+        Ok(record.0)
+    }
+
+    /// 处理待办响应
+    ///
+    /// # 参数
+    /// - `admin_user_id`: 管理员用户ID
+    /// - `notification_id`: 通知ID
+    /// - `action`: 操作类型（Approve/Reject/Snooze）
+    /// - `comment`: 可选备注
+    pub async fn handle_pending_action_response(
+        &self,
+        admin_user_id: Uuid,
+        notification_id: Uuid,
+        action: PendingActionType,
+        comment: Option<String>,
+    ) -> Result<PendingActionStatus> {
+        // 1. 验证通知是否存在且属于该管理员
+        let _notification: crate::websocket::protocol::Notification = sqlx::query_as(
+            r#"
+            SELECT id, notification_type, title, content, data, is_read, read_at, created_at
+            FROM notifications
+            WHERE id = $1 AND user_id = $2 AND requires_action = true
+            "#,
+        )
+        .bind(notification_id)
+        .bind(admin_user_id)
+        .fetch_optional(self.db.pool())
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::NotFound)?;
+
+        // 2. 根据操作类型更新状态
+        let new_status = match action {
+            PendingActionType::Approve => PendingActionStatus::Approved,
+            PendingActionType::Reject => PendingActionStatus::Rejected,
+            PendingActionType::Snooze => PendingActionStatus::Snoozed,
+        };
+
+        // 3. 更新通知状态
+        sqlx::query(
+            r#"
+            UPDATE notifications
+            SET action_status = $1,
+                action_by = $2,
+                action_at = NOW(),
+                action_result = $3,
+                is_read = true,
+                read_at = NOW()
+            WHERE id = $4
+            "#,
+        )
+        .bind(&new_status)
+        .bind(admin_user_id)
+        .bind(json!({
+            "action": action.to_string(),
+            "comment": comment,
+        }))
+        .bind(notification_id)
+        .execute(self.db.pool())
+        .await
+        .map_err(AppError::Database)?;
+
+        info!(
+            "Pending action {} handled by admin {}: {:?}",
+            notification_id, admin_user_id, action
+        );
+
+        // 4. 发送确认响应给管理员
+        let response_message = WebSocketMessage::PendingActionResponse {
+            notification_id,
+            success: true,
+            message: format!("Action {:?} processed successfully", action),
+            new_status: format!("{:?}", new_status).to_lowercase(),
+        };
+
+        if let Ok(json) = response_message.to_json() {
+            let _ = self.ws_manager.send_to_user(admin_user_id, json).await;
+        }
+
+        Ok(new_status)
+    }
+
+    /// 获取管理员的待办列表
+    ///
+    /// # 参数
+    /// - `admin_user_id`: 管理员用户ID
+    /// - `action_type`: 可选的操作类型过滤
+    pub async fn get_pending_actions(
+        &self,
+        admin_user_id: Uuid,
+        action_type: Option<String>,
+    ) -> Result<Vec<PendingActionInfo>> {
+        let actions: Vec<PendingActionInfo> = if let Some(ref action_type_filter) = action_type {
+            sqlx::query_as(
+                r#"
+                SELECT 
+                    id as notification_id,
+                    action_type,
+                    title,
+                    content as description,
+                    action_deadline as deadline,
+                    action_status,
+                    data->>'related_config_key' as related_config_key,
+                    data->>'related_config_value' as related_config_value,
+                    created_at
+                FROM notifications
+                WHERE user_id = $1 
+                    AND requires_action = true 
+                    AND action_status = 'pending'
+                    AND action_type = $2
+                ORDER BY action_deadline ASC NULLS LAST, created_at DESC
+                "#,
+            )
+            .bind(admin_user_id)
+            .bind(action_type_filter)
+            .fetch_all(self.db.pool())
+            .await
+            .map_err(AppError::Database)?
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT 
+                    id as notification_id,
+                    action_type,
+                    title,
+                    content as description,
+                    action_deadline as deadline,
+                    action_status,
+                    data->>'related_config_key' as related_config_key,
+                    data->>'related_config_value' as related_config_value,
+                    created_at
+                FROM notifications
+                WHERE user_id = $1 
+                    AND requires_action = true 
+                    AND action_status = 'pending'
+                ORDER BY action_deadline ASC NULLS LAST, created_at DESC
+                "#,
+            )
+            .bind(admin_user_id)
+            .fetch_all(self.db.pool())
+            .await
+            .map_err(AppError::Database)?
+        };
+
+        Ok(actions)
+    }
+
+    /// 获取待办数量
+    pub async fn get_pending_action_count(&self, admin_user_id: Uuid) -> Result<i64> {
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM notifications
+            WHERE user_id = $1 
+                AND requires_action = true 
+                AND action_status = 'pending'
+            "#,
+        )
+        .bind(admin_user_id)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(count.0)
+    }
+
+    /// 创建配置重载待办通知（便捷方法）
+    ///
+    /// # 参数
+    /// - `admin_user_id`: 管理员用户ID
+    /// - `config_key`: 配置项键名
+    /// - `config_value`: 新的配置值
+    /// - `requires_restart`: 是否需要重启生效
+    pub async fn send_config_reload_notification(
+        &self,
+        admin_user_id: Uuid,
+        config_key: &str,
+        config_value: &str,
+        requires_restart: bool,
+    ) -> Result<()> {
+        let title = format!("配置变更需要确认: {}", config_key);
+        let description = if requires_restart {
+            format!(
+                "配置项 '{}' 已修改为 '{}'，需要重启服务才能生效。请确认是否执行重启操作。",
+                config_key, config_value
+            )
+        } else {
+            format!(
+                "配置项 '{}' 已修改为 '{}'，将在下次清理任务时自动生效。",
+                config_key, config_value
+            )
+        };
+
+        let action_info = PendingActionInfo {
+            notification_id: Uuid::new_v4(), // 临时ID，实际由数据库生成
+            action_type: "config_reload".to_string(),
+            title,
+            description,
+            deadline: Some(Utc::now() + chrono::Duration::hours(24)), // 24小时截止
+            action_status: PendingActionStatus::Pending,
+            related_config_key: Some(config_key.to_string()),
+            related_config_value: Some(config_value.to_string()),
+            created_at: Utc::now(),
+        };
+
+        self.send_pending_action(admin_user_id, action_info).await
     }
 }
 

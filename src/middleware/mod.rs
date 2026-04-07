@@ -113,14 +113,6 @@ pub async fn logging_middleware(request: Request, next: Next) -> Response {
     response
 }
 
-/// 速率限制中间件（可选功能）
-/// 当前为透传实现，如需启用可集成 tower-governor 等限流库
-pub async fn rate_limit_middleware(request: Request, next: Next) -> Response {
-    // 可选：实现基于IP的速率限制
-    // 推荐方案：使用 tower-governor 或自定义限流逻辑
-    next.run(request).await
-}
-
 /// 从请求扩展中提取Claims
 pub fn extract_claims(request: &Request) -> Option<&Claims> {
     request.extensions().get::<Claims>()

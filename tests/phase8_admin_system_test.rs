@@ -92,8 +92,9 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         system: Default::default(),
         admin: Default::default(),
         audit: Default::default(),
+        redis: Default::default(),
     };
-    let config_manager = ConfigManager::new(db.clone(), config.clone());
+    let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
     let state = AppState::new(
         db,

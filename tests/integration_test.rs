@@ -73,8 +73,8 @@ async fn start_test_server() -> TestServer {
     // 初始化指标收集器
     let metrics_collector = Arc::new(MetricsCollector::new());
 
-    // 创建配置管理器
-    let config_manager = ConfigManager::new(db.clone(), config.clone());
+    // 创建配置管理器（测试环境不使用 Redis 同步）
+    let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
     // 创建应用状态
     let state = AppState::new(

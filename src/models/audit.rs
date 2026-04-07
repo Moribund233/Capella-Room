@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sqlx::FromRow;
+use std::fmt;
 use std::net::IpAddr;
 use uuid::Uuid;
 
@@ -40,6 +41,37 @@ pub enum AuditEventType {
     SystemLoginFailure,
     SystemUnauthorizedAccess,
     SystemRateLimitTriggered,
+}
+
+impl fmt::Display for AuditEventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            AuditEventType::UserLogin => "user_login",
+            AuditEventType::UserLogout => "user_logout",
+            AuditEventType::UserRegister => "user_register",
+            AuditEventType::UserPasswordChange => "user_password_change",
+            AuditEventType::UserProfileUpdate => "user_profile_update",
+            AuditEventType::RoomCreate => "room_create",
+            AuditEventType::RoomDelete => "room_delete",
+            AuditEventType::RoomMemberAdd => "room_member_add",
+            AuditEventType::RoomMemberRemove => "room_member_remove",
+            AuditEventType::RoomMemberRoleChange => "room_member_role_change",
+            AuditEventType::MessageSend => "message_send",
+            AuditEventType::MessageEdit => "message_edit",
+            AuditEventType::MessageDelete => "message_delete",
+            AuditEventType::MessageReport => "message_report",
+            AuditEventType::AdminUserDisable => "admin_user_disable",
+            AuditEventType::AdminUserRoleChange => "admin_user_role_change",
+            AuditEventType::AdminUserDelete => "admin_user_delete",
+            AuditEventType::AdminRoomDelete => "admin_room_delete",
+            AuditEventType::AdminMessageDelete => "admin_message_delete",
+            AuditEventType::AdminConfigUpdate => "admin_config_update",
+            AuditEventType::SystemLoginFailure => "system_login_failure",
+            AuditEventType::SystemUnauthorizedAccess => "system_unauthorized_access",
+            AuditEventType::SystemRateLimitTriggered => "system_rate_limit_triggered",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl AuditEventType {
@@ -95,6 +127,18 @@ pub enum AuditSeverity {
     Warning,
     Error,
     Critical,
+}
+
+impl fmt::Display for AuditSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            AuditSeverity::Info => "info",
+            AuditSeverity::Warning => "warning",
+            AuditSeverity::Error => "error",
+            AuditSeverity::Critical => "critical",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl AuditSeverity {

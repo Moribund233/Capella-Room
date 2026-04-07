@@ -8,6 +8,7 @@ use tracing::{info, warn};
 use seredeli_room::{
     config::{ConfigLoader, ConfigManager},
     db::Database,
+    redis::{ConfigSyncManager, RedisManager},
     routes::create_router,
     state::AppState,
     utils::logging::MetricsCollector,
@@ -56,7 +57,18 @@ async fn main() -> Result<()> {
     let metrics_collector = Arc::new(MetricsCollector::new());
     info!("Metrics collector initialized");
 
-    let config_manager = ConfigManager::new(db.clone(), config.clone());
+    // 初始化 Redis 连接（用于配置同步）
+    let redis_manager = RedisManager::new(config.redis.clone()).await.ok().flatten();
+    let config_sync_manager = if let Some(ref redis_mgr) = redis_manager {
+        ConfigSyncManager::new(redis_mgr.clone())
+            .await
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
+
+    let config_manager = ConfigManager::new(db.clone(), config.clone(), config_sync_manager);
 
     config_manager.initialize_default_configs().await?;
 

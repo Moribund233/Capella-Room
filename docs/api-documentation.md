@@ -1,7 +1,7 @@
 # Seredeli Room API 接口文档
 
-> 版本: v1.0.0  
-> 基础URL: `http://localhost:3000`  
+> 版本: v1.0.0\
+> 基础URL: `http://localhost:3000`\
 > API版本: `v1`
 
 ## 目录
@@ -15,10 +15,11 @@
 7. [管理员接口](#管理员接口)
 8. [审计系统接口](#审计系统接口)
 9. [WebSocket协议](#websocket协议)
-10. [数据模型](#数据模型)
-11. [错误码说明](#错误码说明)
+10. [待办通知系统](#待办通知系统)
+11. [数据模型](#数据模型)
+12. [错误码说明](#错误码说明)
 
----
+***
 
 ## 通用说明
 
@@ -59,12 +60,12 @@
 
 支持分页的接口接受以下查询参数：
 
-| 参数 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| `limit` | integer | 每页数量 | 20 |
-| `offset` | integer | 偏移量 | 0 |
+| 参数       | 类型      | 说明   | 默认值 |
+| -------- | ------- | ---- | --- |
+| `limit`  | integer | 每页数量 | 20  |
+| `offset` | integer | 偏移量  | 0   |
 
----
+***
 
 ## 认证接口
 
@@ -74,11 +75,11 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `username` | string | 是 | 用户名，3-20字符，只允许字母、数字、下划线 |
-| `email` | string | 是 | 邮箱地址 |
-| `password` | string | 是 | 密码，8-32字符，需包含大小写字母和数字 |
+| 字段         | 类型     | 必填 | 说明                      |
+| ---------- | ------ | -- | ----------------------- |
+| `username` | string | 是  | 用户名，3-20字符，只允许字母、数字、下划线 |
+| `email`    | string | 是  | 邮箱地址                    |
+| `password` | string | 是  | 密码，8-32字符，需包含大小写字母和数字   |
 
 #### 请求示例
 
@@ -112,7 +113,7 @@
 - `VALIDATION_ERROR` - 请求参数验证失败
 - `CONFLICT` - 用户名或邮箱已存在
 
----
+***
 
 ### 2. 用户登录
 
@@ -120,10 +121,10 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `email` | string | 是 | 邮箱地址 |
-| `password` | string | 是 | 密码 |
+| 字段         | 类型     | 必填 | 说明   |
+| ---------- | ------ | -- | ---- |
+| `email`    | string | 是  | 邮箱地址 |
+| `password` | string | 是  | 密码   |
 
 #### 请求示例
 
@@ -162,7 +163,7 @@
 - `AUTH_ERROR` - 邮箱或密码错误
 - `VALIDATION_ERROR` - 请求参数验证失败
 
----
+***
 
 ### 3. 刷新Token
 
@@ -170,9 +171,9 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `refresh_token` | string | 是 | 刷新令牌 |
+| 字段              | 类型     | 必填 | 说明   |
+| --------------- | ------ | -- | ---- |
+| `refresh_token` | string | 是  | 刷新令牌 |
 
 #### 响应示例
 
@@ -188,7 +189,7 @@
 }
 ```
 
----
+***
 
 ### 4. 用户登出
 
@@ -207,7 +208,7 @@
 }
 ```
 
----
+***
 
 ## 用户接口
 
@@ -234,7 +235,7 @@
 }
 ```
 
----
+***
 
 ### 2. 更新用户信息
 
@@ -244,10 +245,10 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `username` | string | 否 | 新用户名 |
-| `avatar_url` | string | 否 | 头像URL |
+| 字段           | 类型     | 必填 | 说明    |
+| ------------ | ------ | -- | ----- |
+| `username`   | string | 否  | 新用户名  |
+| `avatar_url` | string | 否  | 头像URL |
 
 #### 请求示例
 
@@ -258,7 +259,7 @@
 }
 ```
 
----
+***
 
 ### 3. 修改密码
 
@@ -268,10 +269,10 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `old_password` | string | 是 | 旧密码 |
-| `new_password` | string | 是 | 新密码，8-32字符 |
+| 字段             | 类型     | 必填 | 说明         |
+| -------------- | ------ | -- | ---------- |
+| `old_password` | string | 是  | 旧密码        |
+| `new_password` | string | 是  | 新密码，8-32字符 |
 
 #### 请求示例
 
@@ -282,7 +283,7 @@
 }
 ```
 
----
+***
 
 ### 4. 获取用户列表
 
@@ -292,11 +293,11 @@
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `search` | string | 搜索关键词（用户名或邮箱） |
-| `limit` | integer | 每页数量（1-100） |
-| `offset` | integer | 偏移量 |
+| 参数       | 类型      | 说明            |
+| -------- | ------- | ------------- |
+| `search` | string  | 搜索关键词（用户名或邮箱） |
+| `limit`  | integer | 每页数量（1-100）   |
+| `offset` | integer | 偏移量           |
 
 #### 响应示例
 
@@ -325,7 +326,7 @@
 }
 ```
 
----
+***
 
 ### 5. 获取指定用户信息
 
@@ -350,7 +351,7 @@
 }
 ```
 
----
+***
 
 ### 6. 获取当前用户的聊天室列表
 
@@ -379,7 +380,7 @@
 }
 ```
 
----
+***
 
 ## 聊天室接口
 
@@ -391,12 +392,12 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `name` | string | 是 | 房间名称，2-50字符 |
-| `description` | string | 否 | 房间描述，最多500字符 |
-| `is_private` | boolean | 否 | 是否私有房间 | false |
-| `max_members` | integer | 否 | 最大成员数（1-1000） | 100 |
+| 字段            | 类型      | 必填 | 说明            | <br /> |
+| ------------- | ------- | -- | ------------- | :----- |
+| `name`        | string  | 是  | 房间名称，2-50字符   | <br /> |
+| `description` | string  | 否  | 房间描述，最多500字符  | <br /> |
+| `is_private`  | boolean | 否  | 是否私有房间        | false  |
+| `max_members` | integer | 否  | 最大成员数（1-1000） | 100    |
 
 #### 请求示例
 
@@ -428,7 +429,7 @@
 }
 ```
 
----
+***
 
 ### 2. 获取聊天室列表
 
@@ -438,11 +439,11 @@
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `search` | string | 搜索关键词 |
-| `limit` | integer | 每页数量（1-100） |
-| `offset` | integer | 偏移量 |
+| 参数       | 类型      | 说明          |
+| -------- | ------- | ----------- |
+| `search` | string  | 搜索关键词       |
+| `limit`  | integer | 每页数量（1-100） |
+| `offset` | integer | 偏移量         |
 
 #### 响应示例
 
@@ -465,7 +466,7 @@
 }
 ```
 
----
+***
 
 ### 3. 获取最近活跃的聊天室
 
@@ -475,12 +476,12 @@
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `limit` | integer | 每页数量 |
-| `offset` | integer | 偏移量 |
+| 参数       | 类型      | 说明   |
+| -------- | ------- | ---- |
+| `limit`  | integer | 每页数量 |
+| `offset` | integer | 偏移量  |
 
----
+***
 
 ### 4. 获取聊天室详情
 
@@ -507,7 +508,7 @@
 }
 ```
 
----
+***
 
 ### 5. 更新聊天室信息
 
@@ -517,14 +518,14 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `name` | string | 否 | 新房间名称 |
-| `description` | string | 否 | 新房间描述 |
-| `is_private` | boolean | 否 | 是否设为私有 |
-| `max_members` | integer | 否 | 新的最大成员数 |
+| 字段            | 类型      | 必填 | 说明      |
+| ------------- | ------- | -- | ------- |
+| `name`        | string  | 否  | 新房间名称   |
+| `description` | string  | 否  | 新房间描述   |
+| `is_private`  | boolean | 否  | 是否设为私有  |
+| `max_members` | integer | 否  | 新的最大成员数 |
 
----
+***
 
 ### 6. 删除聊天室
 
@@ -532,7 +533,7 @@
 
 > 需要认证，仅房间所有者或管理员可操作
 
----
+***
 
 ### 7. 加入聊天室
 
@@ -551,7 +552,7 @@
 }
 ```
 
----
+***
 
 ### 8. 离开聊天室
 
@@ -559,7 +560,7 @@
 
 > 需要认证
 
----
+***
 
 ### 9. 获取聊天室成员列表
 
@@ -591,7 +592,7 @@
 }
 ```
 
----
+***
 
 ### 10. 踢出成员
 
@@ -599,7 +600,7 @@
 
 > 需要认证，仅房间所有者或管理员可操作
 
----
+***
 
 ### 11. 设置成员角色
 
@@ -609,9 +610,9 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `role` | string | 是 | 角色：`owner`、`admin`、`member` |
+| 字段     | 类型     | 必填 | 说明                          |
+| ------ | ------ | -- | --------------------------- |
+| `role` | string | 是  | 角色：`owner`、`admin`、`member` |
 
 #### 请求示例
 
@@ -621,7 +622,7 @@
 }
 ```
 
----
+***
 
 ### 12. 获取聊天室消息历史
 
@@ -631,10 +632,10 @@
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `limit` | integer | 每页数量（1-100，默认50） |
-| `before` | UUID | 游标：获取此ID之前的消息 |
+| 参数       | 类型      | 说明               |
+| -------- | ------- | ---------------- |
+| `limit`  | integer | 每页数量（1-100，默认50） |
+| `before` | UUID    | 游标：获取此ID之前的消息    |
 
 #### 响应示例
 
@@ -658,7 +659,7 @@
 }
 ```
 
----
+***
 
 ## 消息接口
 
@@ -670,11 +671,11 @@
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `q` | string | 搜索关键词（必填） |
-| `room_id` | UUID | 限定在某个房间搜索 |
-| `limit` | integer | 结果数量限制（1-100，默认50） |
+| 参数        | 类型      | 说明                 |
+| --------- | ------- | ------------------ |
+| `q`       | string  | 搜索关键词（必填）          |
+| `room_id` | UUID    | 限定在某个房间搜索          |
+| `limit`   | integer | 结果数量限制（1-100，默认50） |
 
 #### 响应示例
 
@@ -695,7 +696,7 @@
 }
 ```
 
----
+***
 
 ### 2. 编辑消息
 
@@ -705,9 +706,9 @@
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `content` | string | 是 | 新消息内容，1-2000字符 |
+| 字段        | 类型     | 必填 | 说明             |
+| --------- | ------ | -- | -------------- |
+| `content` | string | 是  | 新消息内容，1-2000字符 |
 
 #### 请求示例
 
@@ -717,7 +718,7 @@
 }
 ```
 
----
+***
 
 ### 3. 删除消息
 
@@ -725,7 +726,7 @@
 
 > 需要认证，仅消息发送者可删除
 
----
+***
 
 ### 4. 获取消息编辑历史
 
@@ -751,7 +752,7 @@
 }
 ```
 
----
+***
 
 ## 文件上传接口
 
@@ -767,11 +768,11 @@ Content-Type: `multipart/form-data`
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `file` | File | 是 | 文件数据 |
-| `usage_type` | string | 否 | 用途：`general`、`avatar`、`message`、`room_cover` |
-| `room_id` | UUID | 否 | 关联的房间ID |
+| 字段           | 类型     | 必填 | 说明                                           |
+| ------------ | ------ | -- | -------------------------------------------- |
+| `file`       | File   | 是  | 文件数据                                         |
+| `usage_type` | string | 否  | 用途：`general`、`avatar`、`message`、`room_cover` |
+| `room_id`    | UUID   | 否  | 关联的房间ID                                      |
 
 #### 响应示例
 
@@ -792,7 +793,7 @@ Content-Type: `multipart/form-data`
 }
 ```
 
----
+***
 
 ### 2. 上传图片
 
@@ -806,13 +807,13 @@ Content-Type: `multipart/form-data`
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `file` | File | 是 | 图片文件（jpg、png、gif、webp） |
-| `usage_type` | string | 否 | 用途 |
-| `room_id` | UUID | 否 | 关联的房间ID |
+| 字段           | 类型     | 必填 | 说明                     |
+| ------------ | ------ | -- | ---------------------- |
+| `file`       | File   | 是  | 图片文件（jpg、png、gif、webp） |
+| `usage_type` | string | 否  | 用途                     |
+| `room_id`    | UUID   | 否  | 关联的房间ID                |
 
----
+***
 
 ### 3. 上传头像
 
@@ -828,11 +829,11 @@ Content-Type: `multipart/form-data`
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `file` | File | 是 | 头像图片 |
+| 字段     | 类型   | 必填 | 说明   |
+| ------ | ---- | -- | ---- |
+| `file` | File | 是  | 头像图片 |
 
----
+***
 
 ### 4. 获取文件列表
 
@@ -860,7 +861,7 @@ Content-Type: `multipart/form-data`
 }
 ```
 
----
+***
 
 ### 5. 获取文件信息
 
@@ -868,7 +869,7 @@ Content-Type: `multipart/form-data`
 
 > 需要认证
 
----
+***
 
 ### 6. 删除文件
 
@@ -876,7 +877,7 @@ Content-Type: `multipart/form-data`
 
 > 需要认证，仅文件上传者可删除
 
----
+***
 
 ## 管理员接口
 
@@ -890,19 +891,19 @@ Content-Type: `multipart/form-data`
 
 ##### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `page` | integer | 页码（默认1） |
-| `page_size` | integer | 每页数量 |
-| `search` | string | 搜索关键词 |
+| 参数          | 类型      | 说明      |
+| ----------- | ------- | ------- |
+| `page`      | integer | 页码（默认1） |
+| `page_size` | integer | 每页数量    |
+| `search`    | string  | 搜索关键词   |
 
----
+***
 
 #### 2. 获取用户详情
 
 **GET** `/api/v1/admin/users/:user_id`
 
----
+***
 
 #### 3. 修改用户角色
 
@@ -910,11 +911,11 @@ Content-Type: `multipart/form-data`
 
 ##### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `role` | string | 是 | `user`、`admin`、`super_admin` |
+| 字段     | 类型     | 必填 | 说明                           |
+| ------ | ------ | -- | ---------------------------- |
+| `role` | string | 是  | `user`、`admin`、`super_admin` |
 
----
+***
 
 #### 4. 设置用户状态
 
@@ -922,17 +923,17 @@ Content-Type: `multipart/form-data`
 
 ##### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `disabled` | boolean | 是 | 是否禁用用户 |
+| 字段         | 类型      | 必填 | 说明     |
+| ---------- | ------- | -- | ------ |
+| `disabled` | boolean | 是  | 是否禁用用户 |
 
----
+***
 
 #### 5. 删除用户
 
 **DELETE** `/api/v1/admin/users/:user_id`
 
----
+***
 
 ### 房间管理
 
@@ -942,31 +943,31 @@ Content-Type: `multipart/form-data`
 
 ##### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `page` | integer | 页码 |
-| `page_size` | integer | 每页数量 |
-| `search` | string | 搜索关键词 |
+| 参数          | 类型      | 说明    |
+| ----------- | ------- | ----- |
+| `page`      | integer | 页码    |
+| `page_size` | integer | 每页数量  |
+| `search`    | string  | 搜索关键词 |
 
----
+***
 
 #### 7. 获取房间详情
 
 **GET** `/api/v1/admin/rooms/:room_id`
 
----
+***
 
 #### 8. 强制删除房间
 
 **DELETE** `/api/v1/admin/rooms/:room_id`
 
----
+***
 
 #### 9. 获取房间消息
 
 **GET** `/api/v1/admin/rooms/:room_id/messages`
 
----
+***
 
 ### 消息审核
 
@@ -976,19 +977,19 @@ Content-Type: `multipart/form-data`
 
 ##### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `page` | integer | 页码 |
-| `page_size` | integer | 每页数量 |
-| `search` | string | 搜索关键词 |
+| 参数          | 类型      | 说明    |
+| ----------- | ------- | ----- |
+| `page`      | integer | 页码    |
+| `page_size` | integer | 每页数量  |
+| `search`    | string  | 搜索关键词 |
 
----
+***
 
 #### 11. 删除消息
 
 **DELETE** `/api/v1/admin/messages/:message_id`
 
----
+***
 
 ### 系统统计
 
@@ -1012,13 +1013,13 @@ Content-Type: `multipart/form-data`
 }
 ```
 
----
+***
 
 #### 13. 获取活动统计
 
 **GET** `/api/v1/admin/stats/activity`
 
----
+***
 
 ### 系统配置
 
@@ -1026,13 +1027,13 @@ Content-Type: `multipart/form-data`
 
 **GET** `/api/v1/admin/configs`
 
----
+***
 
 #### 15. 获取配置详情
 
 **GET** `/api/v1/admin/configs/:key`
 
----
+***
 
 #### 16. 更新配置
 
@@ -1042,11 +1043,11 @@ Content-Type: `multipart/form-data`
 
 ##### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `value` | string | 是 | 配置值 |
+| 字段      | 类型     | 必填 | 说明  |
+| ------- | ------ | -- | --- |
+| `value` | string | 是  | 配置值 |
 
----
+***
 
 #### 17. 重置配置
 
@@ -1054,7 +1055,7 @@ Content-Type: `multipart/form-data`
 
 > 仅 SuperAdmin 可操作
 
----
+***
 
 ### 日志查看
 
@@ -1064,19 +1065,140 @@ Content-Type: `multipart/form-data`
 
 ##### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `level` | string | 日志级别：error、warn、info、debug |
-| `start_time` | datetime | 开始时间 |
-| `end_time` | datetime | 结束时间 |
+| 参数           | 类型       | 说明                         |
+| ------------ | -------- | -------------------------- |
+| `level`      | string   | 日志级别：error、warn、info、debug |
+| `start_time` | datetime | 开始时间                       |
+| `end_time`   | datetime | 结束时间                       |
 
----
+***
 
 #### 19. 下载日志
 
 **GET** `/api/v1/admin/logs/download`
 
----
+***
+
+### 待办通知管理
+
+#### 20. 获取待办通知列表
+
+**GET** `/api/v1/admin/pending-actions`
+
+> 需要管理员权限
+
+##### 查询参数
+
+| 参数            | 类型      | 说明                                             |
+| ------------- | ------- | ---------------------------------------------- |
+| `action_type` | string  | 操作类型过滤：`config_reload`、`alert_ack` 等           |
+| `status`      | string  | 状态过滤：`pending`、`approved`、`rejected`、`snoozed` |
+| `limit`       | integer | 每页数量（默认20，最大100）                               |
+| `offset`      | integer | 偏移量                                            |
+
+##### 响应示例
+
+```json
+{
+  "success": true,
+  "data": {
+    "actions": [
+      {
+        "notification_id": "550e8400-e29b-41d4-a716-446655440100",
+        "action_type": "config_reload",
+        "title": "配置变更需要确认: audit.buffer_size",
+        "description": "配置项已修改，需要重启生效",
+        "deadline": "2024-01-16T10:30:00Z",
+        "action_status": "pending",
+        "related_config_key": "audit.buffer_size",
+        "related_config_value": "200",
+        "created_at": "2024-01-15T10:30:00Z"
+      }
+    ],
+    "total": 5,
+    "pending_count": 3
+  },
+  "pagination": {
+    "total": 5,
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+***
+
+#### 21. 处理待办通知
+
+**POST** `/api/v1/admin/pending-actions/:notification_id`
+
+> 需要管理员权限
+
+##### 请求参数
+
+| 字段        | 类型     | 必填 | 说明                               |
+| --------- | ------ | -- | -------------------------------- |
+| `action`  | string | 是  | 操作类型：`approve`、`reject`、`snooze` |
+| `comment` | string | 否  | 备注说明                             |
+
+##### 请求示例
+
+```json
+{
+  "action": "approve",
+  "comment": "同意执行配置变更，将在维护窗口期重启服务"
+}
+```
+
+##### 响应示例
+
+```json
+{
+  "success": true,
+  "data": {
+    "notification_id": "550e8400-e29b-41d4-a716-446655440100",
+    "new_status": "approved",
+    "action_by": "550e8400-e29b-41d4-a716-446655440000",
+    "action_at": "2024-01-15T11:00:00Z",
+    "message": "配置变更已确认，将在下次重启时生效"
+  }
+}
+```
+
+##### 错误码
+
+- `NOT_FOUND` - 待办通知不存在或无权访问
+- `VALIDATION_ERROR` - 请求参数验证失败
+- `INVALID_STATE` - 待办通知状态不允许此操作（如已处理的待办）
+
+***
+
+#### 22. 获取待办通知统计
+
+**GET** `/api/v1/admin/pending-actions/stats`
+
+> 需要管理员权限
+
+##### 响应示例
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 10,
+    "pending": 3,
+    "approved": 5,
+    "rejected": 1,
+    "snoozed": 1,
+    "by_type": {
+      "config_reload": 7,
+      "alert_ack": 3
+    }
+  }
+}
+```
+
+***
 
 ## 审计系统接口
 
@@ -1088,17 +1210,17 @@ Content-Type: `multipart/form-data`
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `event_type` | string | 事件类型 |
-| `severity` | string | 严重级别：info、warning、error、critical |
-| `actor_id` | UUID | 操作者ID |
-| `target_id` | UUID | 目标ID |
-| `status` | string | 状态：success、failure |
-| `start_time` | datetime | 开始时间 |
-| `end_time` | datetime | 结束时间 |
-| `limit` | integer | 每页数量 |
-| `offset` | integer | 偏移量 |
+| 参数           | 类型       | 说明                               |
+| ------------ | -------- | -------------------------------- |
+| `event_type` | string   | 事件类型                             |
+| `severity`   | string   | 严重级别：info、warning、error、critical |
+| `actor_id`   | UUID     | 操作者ID                            |
+| `target_id`  | UUID     | 目标ID                             |
+| `status`     | string   | 状态：success、failure               |
+| `start_time` | datetime | 开始时间                             |
+| `end_time`   | datetime | 结束时间                             |
+| `limit`      | integer  | 每页数量                             |
+| `offset`     | integer  | 偏移量                              |
 
 #### 响应示例
 
@@ -1128,13 +1250,13 @@ Content-Type: `multipart/form-data`
 }
 ```
 
----
+***
 
 ### 2. 获取审计日志详情
 
 **GET** `/api/v1/admin/audit/logs/:id`
 
----
+***
 
 ### 3. 获取审计统计
 
@@ -1142,10 +1264,10 @@ Content-Type: `multipart/form-data`
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
+| 参数           | 类型       | 说明   |
+| ------------ | -------- | ---- |
 | `start_time` | datetime | 开始时间 |
-| `end_time` | datetime | 结束时间 |
+| `end_time`   | datetime | 结束时间 |
 
 #### 响应示例
 
@@ -1174,7 +1296,7 @@ Content-Type: `multipart/form-data`
 }
 ```
 
----
+***
 
 ### 4. 导出审计日志
 
@@ -1182,13 +1304,13 @@ Content-Type: `multipart/form-data`
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `format` | string | 格式：`json` 或 `csv` |
-| `start_time` | datetime | 开始时间 |
-| `end_time` | datetime | 结束时间 |
+| 参数           | 类型       | 说明                |
+| ------------ | -------- | ----------------- |
+| `format`     | string   | 格式：`json` 或 `csv` |
+| `start_time` | datetime | 开始时间              |
+| `end_time`   | datetime | 结束时间              |
 
----
+***
 
 ### 5. 获取告警列表
 
@@ -1196,12 +1318,12 @@ Content-Type: `multipart/form-data`
 
 #### 查询参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `status` | string | 状态：new、acknowledged、resolved、ignored |
-| `severity` | string | 严重级别 |
+| 参数         | 类型     | 说明                                   |
+| ---------- | ------ | ------------------------------------ |
+| `status`   | string | 状态：new、acknowledged、resolved、ignored |
+| `severity` | string | 严重级别                                 |
 
----
+***
 
 ### 6. 处理告警
 
@@ -1209,17 +1331,17 @@ Content-Type: `multipart/form-data`
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `status` | string | 是 | `acknowledged`、`resolved`、`ignored` |
+| 字段       | 类型     | 必填 | 说明                                  |
+| -------- | ------ | -- | ----------------------------------- |
+| `status` | string | 是  | `acknowledged`、`resolved`、`ignored` |
 
----
+***
 
 ### 7. 获取告警规则
 
 **GET** `/api/v1/admin/audit/rules`
 
----
+***
 
 ### 8. 更新告警规则
 
@@ -1227,13 +1349,13 @@ Content-Type: `multipart/form-data`
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `enabled` | boolean | 否 | 是否启用 |
-| `severity` | string | 否 | 严重级别 |
-| `cooldown_minutes` | integer | 否 | 冷却时间（分钟） |
+| 字段                 | 类型      | 必填 | 说明       |
+| ------------------ | ------- | -- | -------- |
+| `enabled`          | boolean | 否  | 是否启用     |
+| `severity`         | string  | 否  | 严重级别     |
+| `cooldown_minutes` | integer | 否  | 冷却时间（分钟） |
 
----
+***
 
 ### 9. 清理审计日志
 
@@ -1241,11 +1363,11 @@ Content-Type: `multipart/form-data`
 
 #### 请求参数
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `before` | datetime | 是 | 清理此日期之前的日志 |
+| 字段       | 类型       | 必填 | 说明         |
+| -------- | -------- | -- | ---------- |
+| `before` | datetime | 是  | 清理此日期之前的日志 |
 
----
+***
 
 ## WebSocket协议
 
@@ -1568,80 +1690,253 @@ ws://localhost:3000/ws
 }
 ```
 
----
+### 待办通知系统
+
+待办通知系统用于管理员处理需要确认的操作，如配置变更、告警确认等。
+
+#### 待办通知数据结构
+
+| 字段                     | 类型       | 说明                                                               |
+| ---------------------- | -------- | ---------------------------------------------------------------- |
+| `notification_id`      | UUID     | 通知唯一ID                                                           |
+| `action_type`          | string   | 操作类型：`config_reload`（配置重载）、`alert_ack`（告警确认）等                    |
+| `title`                | string   | 通知标题                                                             |
+| `description`          | string   | 详细描述                                                             |
+| `deadline`             | datetime | 操作截止时间（可选）                                                       |
+| `action_status`        | string   | 状态：`pending`（待处理）、`approved`（已确认）、`rejected`（已拒绝）、`snoozed`（已延迟） |
+| `related_config_key`   | string   | 关联的配置键（可选）                                                       |
+| `related_config_value` | string   | 关联的配置值（可选）                                                       |
+| `created_at`           | datetime | 创建时间                                                             |
+
+#### 接收待办通知
+
+当有待办通知时，管理员会收到：
+
+```json
+{
+  "type": "PendingAction",
+  "payload": {
+    "notification_id": "550e8400-e29b-41d4-a716-446655440100",
+    "action_type": "config_reload",
+    "title": "配置变更需要确认: audit.buffer_size",
+    "description": "配置项 'audit.buffer_size' 已修改为 '200'，需要重启服务才能生效。请确认是否执行重启操作。",
+    "deadline": "2024-01-16T10:30:00Z",
+    "data": {
+      "related_config_key": "audit.buffer_size",
+      "related_config_value": "200"
+    },
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### 响应待办通知
+
+管理员处理待办通知：
+
+```json
+{
+  "type": "RespondPendingAction",
+  "payload": {
+    "notification_id": "550e8400-e29b-41d4-a716-446655440100",
+    "action": "approve",
+    "comment": "同意执行配置变更"
+  }
+}
+```
+
+`action` 可选值：
+
+- `approve` - 确认执行
+- `reject` - 拒绝变更
+- `snooze` - 稍后提醒
+
+处理结果通知：
+
+```json
+{
+  "type": "PendingActionResponse",
+  "payload": {
+    "notification_id": "550e8400-e29b-41d4-a716-446655440100",
+    "success": true,
+    "message": "Action approve processed successfully",
+    "new_status": "approved"
+  }
+}
+```
+
+#### 获取待办列表
+
+主动查询待办通知：
+
+```json
+{
+  "type": "GetPendingActions",
+  "payload": {
+    "action_type": "config_reload"
+  }
+}
+```
+
+响应：
+
+```json
+{
+  "type": "PendingActionsList",
+  "payload": {
+    "actions": [
+      {
+        "notification_id": "550e8400-e29b-41d4-a716-446655440100",
+        "action_type": "config_reload",
+        "title": "配置变更需要确认: audit.buffer_size",
+        "description": "配置项已修改，需要重启生效",
+        "deadline": "2024-01-16T10:30:00Z",
+        "action_status": "pending",
+        "related_config_key": "audit.buffer_size",
+        "related_config_value": "200",
+        "created_at": "2024-01-15T10:30:00Z"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+***
+
+## 待办通知系统
+
+待办通知系统用于管理员处理需要确认的操作，如配置变更、告警确认等。系统支持 WebSocket 实时推送和 REST API 查询管理。
+
+### 核心概念
+
+- **待办通知 (Pending Action)**: 需要管理员确认或处理的通知
+- **操作类型 (Action Type)**: 待办的分类，如 `config_reload`（配置重载）、`alert_ack`（告警确认）
+- **操作状态 (Action Status)**: 待办的处理状态
+  - `pending` - 待处理
+  - `approved` - 已确认执行
+  - `rejected` - 已拒绝
+  - `snoozed` - 已延迟（稍后提醒）
+
+### 使用场景
+
+1. **配置变更确认**: 当修改了需要重启生效的配置时，系统自动创建待办通知推送给管理员
+2. **告警确认**: Critical 级别的告警需要管理员手动确认
+3. **系统维护**: 计划性维护任务需要管理员审批
+
+### 工作流程
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  配置变更   │────▶│ 创建待办    │────▶│ WebSocket   │
+│  /告警触发  │     │ 通知        │     │ 实时推送    │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                                               ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  执行操作   │◀────│ 管理员处理  │◀────│ 管理员收到  │
+│  (重启等)   │     │ (确认/拒绝) │     │ 待办通知    │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+### REST API
+
+详见 [管理员接口 - 待办通知管理](#待办通知管理) 章节。
+
+### WebSocket 协议
+
+详见 [WebSocket协议 - 待办通知系统](#待办通知系统-1) 章节。
+
+***
 
 ## 数据模型
 
 ### User（用户）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 用户ID |
-| `username` | string | 用户名 |
-| `email` | string | 邮箱 |
-| `avatar_url` | string | 头像URL |
-| `status` | string | 状态：online、offline、away |
-| `role` | string | 角色：user、admin、super_admin |
-| `created_at` | datetime | 创建时间 |
+| 字段           | 类型       | 说明                         |
+| ------------ | -------- | -------------------------- |
+| `id`         | UUID     | 用户ID                       |
+| `username`   | string   | 用户名                        |
+| `email`      | string   | 邮箱                         |
+| `avatar_url` | string   | 头像URL                      |
+| `status`     | string   | 状态：online、offline、away     |
+| `role`       | string   | 角色：user、admin、super\_admin |
+| `created_at` | datetime | 创建时间                       |
 
 ### Room（聊天室）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 房间ID |
-| `name` | string | 房间名称 |
-| `description` | string | 房间描述 |
-| `owner_id` | UUID | 所有者ID |
-| `is_private` | boolean | 是否私有 |
-| `max_members` | integer | 最大成员数 |
-| `member_count` | integer | 当前成员数 |
-| `created_at` | datetime | 创建时间 |
-| `updated_at` | datetime | 更新时间 |
+| 字段             | 类型       | 说明    |
+| -------------- | -------- | ----- |
+| `id`           | UUID     | 房间ID  |
+| `name`         | string   | 房间名称  |
+| `description`  | string   | 房间描述  |
+| `owner_id`     | UUID     | 所有者ID |
+| `is_private`   | boolean  | 是否私有  |
+| `max_members`  | integer  | 最大成员数 |
+| `member_count` | integer  | 当前成员数 |
+| `created_at`   | datetime | 创建时间  |
+| `updated_at`   | datetime | 更新时间  |
 
 ### Message（消息）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 消息ID |
-| `room_id` | UUID | 房间ID |
-| `sender_id` | UUID | 发送者ID |
-| `sender_name` | string | 发送者用户名 |
-| `content` | string | 消息内容 |
-| `message_type` | string | 类型：text、image、file |
-| `reply_to` | UUID | 回复的消息ID |
-| `created_at` | datetime | 创建时间 |
-| `updated_at` | datetime | 更新时间 |
-| `edit_count` | integer | 编辑次数 |
+| 字段             | 类型       | 说明                 |
+| -------------- | -------- | ------------------ |
+| `id`           | UUID     | 消息ID               |
+| `room_id`      | UUID     | 房间ID               |
+| `sender_id`    | UUID     | 发送者ID              |
+| `sender_name`  | string   | 发送者用户名             |
+| `content`      | string   | 消息内容               |
+| `message_type` | string   | 类型：text、image、file |
+| `reply_to`     | UUID     | 回复的消息ID            |
+| `created_at`   | datetime | 创建时间               |
+| `updated_at`   | datetime | 更新时间               |
+| `edit_count`   | integer  | 编辑次数               |
 
 ### File（文件）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 文件ID |
-| `original_name` | string | 原始文件名 |
-| `file_path` | string | 文件路径 |
-| `file_size` | integer | 文件大小（字节） |
-| `mime_type` | string | MIME类型 |
-| `category` | string | 分类：image、document、video、audio、other |
-| `usage_type` | string | 用途 |
-| `url` | string | 访问URL |
-| `created_at` | datetime | 创建时间 |
+| 字段              | 类型       | 说明                                  |
+| --------------- | -------- | ----------------------------------- |
+| `id`            | UUID     | 文件ID                                |
+| `original_name` | string   | 原始文件名                               |
+| `file_path`     | string   | 文件路径                                |
+| `file_size`     | integer  | 文件大小（字节）                            |
+| `mime_type`     | string   | MIME类型                              |
+| `category`      | string   | 分类：image、document、video、audio、other |
+| `usage_type`    | string   | 用途                                  |
+| `url`           | string   | 访问URL                               |
+| `created_at`    | datetime | 创建时间                                |
 
----
+### PendingAction（待办通知）
+
+| 字段                     | 类型       | 说明                                           |
+| ---------------------- | -------- | -------------------------------------------- |
+| `notification_id`      | UUID     | 通知唯一ID                                       |
+| `action_type`          | string   | 操作类型：`config_reload`、`alert_ack` 等           |
+| `title`                | string   | 通知标题                                         |
+| `description`          | string   | 详细描述                                         |
+| `deadline`             | datetime | 操作截止时间（可选）                                   |
+| `action_status`        | string   | 状态：`pending`、`approved`、`rejected`、`snoozed` |
+| `related_config_key`   | string   | 关联的配置键（可选）                                   |
+| `related_config_value` | string   | 关联的配置值（可选）                                   |
+| `action_by`            | UUID     | 处理人ID（可选）                                    |
+| `action_at`            | datetime | 处理时间（可选）                                     |
+| `created_at`           | datetime | 创建时间                                         |
+
+***
 
 ## 错误码说明
 
-| 错误码 | HTTP状态 | 说明 |
-|--------|----------|------|
-| `VALIDATION_ERROR` | 400 | 请求参数验证失败 |
-| `AUTH_ERROR` | 401 | 认证失败（未登录或Token无效） |
-| `FORBIDDEN` | 403 | 权限不足 |
-| `NOT_FOUND` | 404 | 资源不存在 |
-| `CONFLICT` | 409 | 资源冲突（如用户名已存在） |
-| `RATE_LIMIT` | 429 | 请求过于频繁 |
-| `INTERNAL_ERROR` | 500 | 服务器内部错误 |
+| 错误码                | HTTP状态 | 说明                |
+| ------------------ | ------ | ----------------- |
+| `VALIDATION_ERROR` | 400    | 请求参数验证失败          |
+| `AUTH_ERROR`       | 401    | 认证失败（未登录或Token无效） |
+| `FORBIDDEN`        | 403    | 权限不足              |
+| `NOT_FOUND`        | 404    | 资源不存在             |
+| `CONFLICT`         | 409    | 资源冲突（如用户名已存在）     |
+| `RATE_LIMIT`       | 429    | 请求过于频繁            |
+| `INTERNAL_ERROR`   | 500    | 服务器内部错误           |
 
----
+***
 
 ## 前端开发建议
 
@@ -1781,7 +2076,7 @@ export const useAuthStore = defineStore('auth', {
 });
 ```
 
----
+***
 
-*文档版本: 1.0.0*  
+*文档版本: 1.0.0*\
 *最后更新: 2024-01*

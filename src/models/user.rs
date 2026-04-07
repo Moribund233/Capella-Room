@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use std::fmt;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -17,6 +18,17 @@ pub enum UserRole {
     User,
     Admin,
     SuperAdmin,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            UserRole::User => "user",
+            UserRole::Admin => "admin",
+            UserRole::SuperAdmin => "super_admin",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl UserRole {

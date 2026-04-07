@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
+use crate::redis::{pubsub::RedisPubSub, RedisManager, StreamManager};
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
@@ -26,6 +27,7 @@ pub struct AppState {
     pub audit_service: Arc<AuditService>,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
+    pub redis_manager: Option<Arc<RedisManager>>,
 }
 
 impl fmt::Debug for AppState {
@@ -41,6 +43,7 @@ impl fmt::Debug for AppState {
             .field("file_service", &"<FileService>")
             .field("notification_service", &"<NotificationService>")
             .field("audit_service", &"<AuditService>")
+            .field("redis_manager", &self.redis_manager)
             .finish_non_exhaustive()
     }
 }
@@ -64,11 +67,23 @@ impl AppState {
         let message_service = MessageService::new(db.clone());
         let notification_service =
             Arc::new(NotificationService::new(db.clone(), ws_manager.clone()));
+
+        // 初始化 Redis 连接
+        let redis_manager = RedisManager::new(config.redis.clone()).await?;
+
+        // 初始化 Stream 管理器（如果 Redis 可用）
+        let stream_manager = if let Some(ref redis_mgr) = redis_manager {
+            StreamManager::new(redis_mgr.clone(), 10000).await? // 最大 10000 条消息
+        } else {
+            None
+        };
+
         let audit_service = Arc::new(
             AuditService::new(
                 db.clone(),
                 notification_service.clone(),
                 config_manager.clone(),
+                stream_manager.clone(),
             )
             .await,
         );
@@ -78,6 +93,13 @@ impl AppState {
             base_url: config.upload.base_url.clone(),
         };
         let file_service = FileService::from_config(db.clone(), &upload_config)?;
+
+        // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
+        if let Some(ref redis_mgr) = redis_manager {
+            if let Some(redis_pubsub) = RedisPubSub::new(redis_mgr.clone()).await? {
+                ws_manager.set_redis_pubsub(redis_pubsub).await;
+            }
+        }
 
         let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
@@ -94,6 +116,7 @@ impl AppState {
             audit_service,
             config: shared_config,
             config_manager: config_manager.clone(),
+            redis_manager,
         });
 
         // 启动配置监听器
@@ -181,6 +204,7 @@ impl Clone for AppState {
             audit_service: Arc::clone(&self.audit_service),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
+            redis_manager: self.redis_manager.clone(),
         }
     }
 }

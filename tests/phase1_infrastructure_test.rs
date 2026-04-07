@@ -140,6 +140,7 @@ mod config_tests {
             system: Default::default(),
             admin: Default::default(),
             audit: Default::default(),
+            redis: Default::default(),
         };
 
         let cloned = config.clone();
@@ -184,6 +185,7 @@ mod config_tests {
             system: Default::default(),
             admin: Default::default(),
             audit: Default::default(),
+            redis: Default::default(),
         };
 
         let debug_str = format!("{:?}", config);
@@ -423,6 +425,7 @@ mod integration_tests {
             system: Default::default(),
             admin: Default::default(),
             audit: Default::default(),
+            redis: Default::default(),
         };
 
         assert_eq!(config.server.port, 3000);
@@ -491,6 +494,7 @@ mod acceptance_tests {
             system: Default::default(),
             admin: Default::default(),
             audit: Default::default(),
+            redis: Default::default(),
         };
 
         // 验证所有配置字段可访问

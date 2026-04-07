@@ -149,9 +149,10 @@ async fn setup_test_server() -> (TestServer, Database) {
         cors: Default::default(),
         system: Default::default(),
         admin: Default::default(),
+        redis: Default::default(),
     };
 
-    let config_manager = ConfigManager::new(db.clone(), config.clone());
+    let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
     let state = AppState::new(
         db.clone(),

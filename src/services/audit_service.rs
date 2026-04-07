@@ -18,12 +18,14 @@ use crate::models::audit::{
     DailyCount, EventTypeCount, SeverityCount, UpdateAlertRuleRequest,
 };
 use crate::models::user::UserRole;
+use crate::redis::{AuditLogStreamMessage, StreamManager};
 use crate::services::alert_engine::AlertEngine;
 use crate::services::alert_handler::AlertHandler;
 use crate::services::notification_service::NotificationService;
 
 /// 审计服务
 /// 负责审计日志的记录、查询、导出和告警管理
+/// 支持 Redis Stream 异步写入和本地 Buffer 降级
 pub struct AuditService {
     db: Database,
     notification_service: Arc<NotificationService>,
@@ -33,6 +35,12 @@ pub struct AuditService {
     flush_interval: Duration,
     alert_engine: Arc<AlertEngine>,
     alert_handler: Arc<AlertHandler>,
+    /// Redis Stream 管理器（可选）
+    stream_manager: Option<Arc<StreamManager>>,
+    /// 是否使用 Redis Stream
+    use_stream: bool,
+    /// 节点 ID
+    node_id: String,
 }
 
 impl std::fmt::Debug for AuditService {
@@ -47,10 +55,17 @@ impl std::fmt::Debug for AuditService {
 
 impl AuditService {
     /// 创建新的审计服务
+    ///
+    /// # 参数
+    /// - `db`: 数据库连接
+    /// - `notification_service`: 通知服务
+    /// - `config_manager`: 配置管理器
+    /// - `stream_manager`: Redis Stream 管理器（可选）
     pub async fn new(
         db: Database,
         notification_service: Arc<NotificationService>,
         config_manager: Arc<ConfigManager>,
+        stream_manager: Option<Arc<StreamManager>>,
     ) -> Self {
         let log_buffer = Arc::new(RwLock::new(Vec::new()));
         let alert_engine = Arc::new(AlertEngine::new(db.clone()));
@@ -62,6 +77,22 @@ impl AuditService {
         let buffer_size = audit_config.buffer_size;
         let flush_interval = Duration::from_secs(audit_config.flush_interval_seconds);
 
+        // 确定是否使用 Redis Stream
+        let use_stream = stream_manager.is_some();
+        let node_id = stream_manager
+            .as_ref()
+            .map(|_s| {
+                // 尝试从 StreamManager 获取 node_id
+                "node-audit".to_string()
+            })
+            .unwrap_or_else(|| format!("node-{}", Uuid::new_v4()));
+
+        if use_stream {
+            info!("AuditService initialized with Redis Stream support");
+        } else {
+            info!("AuditService initialized with direct database writes");
+        }
+
         let service = Self {
             db,
             notification_service,
@@ -71,6 +102,9 @@ impl AuditService {
             flush_interval,
             alert_engine,
             alert_handler,
+            stream_manager,
+            use_stream,
+            node_id,
         };
 
         service.start_background_tasks();
@@ -202,14 +236,36 @@ impl AuditService {
             flush_interval: self.flush_interval,
             alert_engine: self.alert_engine.clone(),
             alert_handler: self.alert_handler.clone(),
+            stream_manager: self.stream_manager.clone(),
+            use_stream: self.use_stream,
+            node_id: self.node_id.clone(),
         }
     }
 
     // ==================== 审计日志记录 ====================
 
     /// 记录审计日志（异步批量写入）
+    /// 优先使用 Redis Stream，不可用时降级到本地 Buffer
     /// 同时触发告警规则引擎分析
     pub async fn log_event(&self, log: CreateAuditLogRequest) -> Result<()> {
+        // 如果启用了 Redis Stream，先尝试写入 Stream
+        if self.use_stream {
+            match self.send_to_stream(&log).await {
+                Ok(_) => {
+                    debug!("Audit log sent to Redis Stream");
+                    return Ok(());
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to send audit log to Redis Stream: {}, falling back to buffer",
+                        e
+                    );
+                    // 降级到本地 Buffer
+                }
+            }
+        }
+
+        // 使用本地 Buffer（降级方案或直接写入模式）
         let mut buffer = self.log_buffer.write().await;
         buffer.push(log);
 
@@ -219,6 +275,48 @@ impl AuditService {
         }
 
         Ok(())
+    }
+
+    /// 将审计日志发送到 Redis Stream
+    ///
+    /// # 参数
+    /// - `log`: 审计日志请求
+    ///
+    /// # 返回
+    /// - 发送成功返回 Ok(())
+    /// - 发送失败返回 Err
+    async fn send_to_stream(&self, log: &CreateAuditLogRequest) -> anyhow::Result<()> {
+        if let Some(ref manager) = self.stream_manager {
+            let mut producer = manager
+                .get_producer()
+                .await
+                .ok_or_else(|| anyhow::anyhow!("Stream producer not available"))?;
+
+            let stream_msg = AuditLogStreamMessage {
+                id: Uuid::new_v4(),
+                event_type: log.event_type.to_string(),
+                severity: log.severity().to_string(),
+                actor_id: log.actor_id,
+                actor_role: log.actor_role.as_ref().map(|r| r.to_string()),
+                target_type: log.target_type.clone(),
+                target_id: log.target_id,
+                action: log.action.clone(),
+                description: log.description.clone(),
+                metadata: log
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| serde_json::to_value(m).ok()),
+                status: log.status.clone().unwrap_or_else(|| "success".to_string()),
+                error_message: log.error_message.clone(),
+                node_id: self.node_id.clone(),
+                timestamp: Utc::now(),
+            };
+
+            producer.send(&stream_msg).await?;
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Stream manager not available"))
+        }
     }
 
     /// 记录审计日志并触发告警分析（用于需要实时告警的场景）

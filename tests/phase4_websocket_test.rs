@@ -153,11 +153,12 @@ async fn setup_test_server() -> (TestServer, Database) {
         system: Default::default(),
         admin: Default::default(),
         audit: Default::default(),
+        redis: Default::default(),
     };
 
     let metrics_collector = Arc::new(MetricsCollector::new());
 
-    let config_manager = ConfigManager::new(db.clone(), config.clone());
+    let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
     let state = AppState::new(
         db.clone(),

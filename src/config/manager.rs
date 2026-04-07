@@ -6,6 +6,7 @@ use tracing::{debug, info, warn};
 
 use super::{AppConfig, SharedConfig, SystemConfigItem, SystemConfigRecord};
 use crate::db::Database;
+use crate::redis::{ConfigSyncBridge, ConfigSyncManager};
 
 /// 配置变更事件
 #[derive(Debug, Clone)]
@@ -27,17 +28,70 @@ pub struct ConfigManager {
     config: SharedConfig,
     /// 配置变更事件广播发送器
     config_change_tx: broadcast::Sender<ConfigChangeEvent>,
+    /// 配置同步管理器（可选，用于多节点同步）
+    sync_manager: Option<Arc<ConfigSyncManager>>,
+    /// 当前节点 ID
+    node_id: String,
 }
 
 impl ConfigManager {
-    pub fn new(db: Database, config: AppConfig) -> Self {
+    /// 创建新的配置管理器
+    ///
+    /// # 参数
+    /// - `db`: 数据库连接
+    /// - `config`: 应用配置
+    /// - `sync_manager`: 配置同步管理器（可选）
+    pub fn new(
+        db: Database,
+        config: AppConfig,
+        sync_manager: Option<Arc<ConfigSyncManager>>,
+    ) -> Self {
         // 创建配置变更事件广播通道
         let (tx, _rx) = broadcast::channel::<ConfigChangeEvent>(100);
+
+        let node_id = sync_manager
+            .as_ref()
+            .map(|s| s.node_id().to_string())
+            .unwrap_or_else(|| format!("node-{}", uuid::Uuid::new_v4()));
+
+        if sync_manager.is_some() {
+            info!(
+                "ConfigManager initialized with Redis sync support, node_id: {}",
+                node_id
+            );
+        } else {
+            info!(
+                "ConfigManager initialized without Redis sync, node_id: {}",
+                node_id
+            );
+        }
 
         Self {
             db,
             config: Arc::new(RwLock::new(config)),
             config_change_tx: tx,
+            sync_manager,
+            node_id,
+        }
+    }
+
+    /// 启动配置同步
+    ///
+    /// # 说明
+    /// 启动 Redis 订阅和桥接，实现跨节点配置同步
+    pub async fn start_sync(self: Arc<Self>) {
+        if let Some(ref sync_manager) = self.sync_manager {
+            // 启动订阅器（接收其他节点的配置变更）
+            let manager_clone = self.clone();
+            sync_manager.clone().start_subscriber(manager_clone).await;
+
+            // 启动桥接器（将本地变更广播到其他节点）
+            let bridge = Arc::new(ConfigSyncBridge::new(sync_manager.clone()));
+            bridge.start(self.clone()).await;
+
+            info!("Config sync started for node: {}", self.node_id);
+        } else {
+            debug!("Config sync not enabled, skipping sync start");
         }
     }
 
@@ -353,96 +407,6 @@ impl ConfigManager {
                 "string",
                 "文件访问基础URL路径",
                 "upload",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.enabled",
-                "true",
-                "bool",
-                "是否启用速率限制",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.default_requests",
-                "100",
-                "int",
-                "默认限制：时间窗口内的最大请求数",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.default_window_secs",
-                "60",
-                "int",
-                "默认限制：时间窗口（秒）",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.auth_requests",
-                "5",
-                "int",
-                "认证接口限制",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.auth_window_secs",
-                "60",
-                "int",
-                "认证接口时间窗口（秒）",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.message_requests",
-                "30",
-                "int",
-                "消息接口限制",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.message_window_secs",
-                "60",
-                "int",
-                "消息接口时间窗口（秒）",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.room_requests",
-                "20",
-                "int",
-                "房间接口限制",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.room_window_secs",
-                "60",
-                "int",
-                "房间接口时间窗口（秒）",
-                "rate_limit",
-                true,
-                true,
-            ),
-            (
-                "rate_limit.cleanup_interval_secs",
-                "30",
-                "int",
-                "速率限制清理间隔（秒）",
-                "rate_limit",
                 true,
                 true,
             ),
