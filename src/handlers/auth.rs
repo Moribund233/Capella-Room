@@ -142,6 +142,12 @@ pub async fn login(
         return Err(AppError::Auth("邮箱或密码错误".to_string()));
     }
 
+    // 更新用户状态为在线
+    let _ = state
+        .user_service()
+        .update_user_status(user.id, crate::models::user::UserStatus::Online)
+        .await;
+
     // 生成 JWT Token 对
     let token_pair = state
         .auth_service()
@@ -157,13 +163,20 @@ pub async fn login(
             .await;
     });
 
+    // 获取更新后的用户信息（包含最新状态）
+    let updated_user = state
+        .user_service()
+        .get_user_by_id(user.id)
+        .await?
+        .unwrap_or(user);
+
     // 返回 Token 和用户信息
     Ok(Json(ApiResponse::success(LoginData {
         access_token: token_pair.access_token,
         refresh_token: token_pair.refresh_token,
         expires_in: token_pair.expires_in,
         token_type: "Bearer".to_string(),
-        user: user.to_response(),
+        user: updated_user.to_response(),
     })))
 }
 

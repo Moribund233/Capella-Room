@@ -28,3 +28,22 @@ export {
   type RefreshTokenRequest,
   type RefreshTokenResponse,
 } from './auth'
+
+// Dashboard
+export {
+  getSystemStats,
+  getActivityStats,
+  getHealthStatus,
+  type SystemStats,
+  type ActivityStats,
+  type HealthStatus,
+} from './dashboard'
+
+// User
+export {
+  getCurrentUser,
+  updateUser,
+  changePassword,
+  type UpdateUsernameRequest,
+  type ChangePasswordRequest,
+} from './user'

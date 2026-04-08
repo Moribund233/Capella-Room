@@ -98,6 +98,7 @@ async fn test_audit_log_batch_write_performance() {
             event_type: AuditEventType::UserLogin,
             severity: AuditSeverity::Info,
             actor_id: Some(uuid::Uuid::new_v4()),
+            actor_name: None,
             actor_role: None,
             target_type: None,
             target_id: None,
@@ -137,6 +138,7 @@ fn test_audit_log_query_performance() {
                 AuditSeverity::Info
             },
             actor_id: Some(uuid::Uuid::new_v4()),
+            actor_name: None,
             actor_role: None,
             target_type: None,
             target_id: None,

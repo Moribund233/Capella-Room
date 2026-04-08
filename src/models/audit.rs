@@ -41,6 +41,13 @@ pub enum AuditEventType {
     SystemLoginFailure,
     SystemUnauthorizedAccess,
     SystemRateLimitTriggered,
+    // 审计系统事件
+    AuditQuery,
+    AuditExport,
+    AuditStatsQuery,
+    AlertQuery,
+    AlertRuleUpdate,
+    AuditCleanup,
 }
 
 impl fmt::Display for AuditEventType {
@@ -69,6 +76,12 @@ impl fmt::Display for AuditEventType {
             AuditEventType::SystemLoginFailure => "system_login_failure",
             AuditEventType::SystemUnauthorizedAccess => "system_unauthorized_access",
             AuditEventType::SystemRateLimitTriggered => "system_rate_limit_triggered",
+            AuditEventType::AuditQuery => "audit_query",
+            AuditEventType::AuditExport => "audit_export",
+            AuditEventType::AuditStatsQuery => "audit_stats_query",
+            AuditEventType::AlertQuery => "alert_query",
+            AuditEventType::AlertRuleUpdate => "alert_rule_update",
+            AuditEventType::AuditCleanup => "audit_cleanup",
         };
         write!(f, "{}", s)
     }
@@ -101,6 +114,12 @@ impl AuditEventType {
             AuditEventType::SystemLoginFailure
             | AuditEventType::SystemUnauthorizedAccess
             | AuditEventType::SystemRateLimitTriggered => "system",
+            AuditEventType::AuditQuery
+            | AuditEventType::AuditExport
+            | AuditEventType::AuditStatsQuery
+            | AuditEventType::AlertQuery
+            | AuditEventType::AlertRuleUpdate
+            | AuditEventType::AuditCleanup => "audit",
         }
     }
 
@@ -171,6 +190,7 @@ pub struct AuditLog {
     pub event_type: AuditEventType,
     pub severity: AuditSeverity,
     pub actor_id: Option<Uuid>,
+    pub actor_name: Option<String>,
     pub actor_role: Option<UserRole>,
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,
@@ -474,6 +494,9 @@ pub struct CreateAlertRequest {
 #[derive(Debug, Clone, Serialize)]
 pub struct AuditStats {
     pub total_logs: i64,
+    pub today_logs: i64,
+    pub week_logs: i64,
+    pub month_logs: i64,
     pub logs_by_severity: Vec<SeverityCount>,
     pub logs_by_event_type: Vec<EventTypeCount>,
     pub logs_by_day: Vec<DailyCount>,

@@ -49,6 +49,16 @@ const router = createRouter({
           },
         },
         {
+          path: 'audit',
+          name: 'Audit',
+          component: () => import('@/views/audit/index.vue'),
+          meta: {
+            title: '审计系统',
+            icon: 'DocumentChecked',
+            requiresAuth: true,
+          },
+        },
+        {
           path: 'documents',
           name: 'Documents',
           component: () => import('@/views/documents/index.vue'),

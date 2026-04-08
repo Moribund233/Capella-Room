@@ -13,6 +13,62 @@ use crate::services::audit_service::AuditService;
 use crate::services::auth_service::Claims;
 use crate::state::AppState;
 
+/// 从路径中提取目标信息
+/// 返回 (target_type, target_id)
+fn extract_target_from_path(path: &str) -> (Option<String>, Option<uuid::Uuid>) {
+    // 移除 API 前缀
+    let path = path.strip_prefix("/api").unwrap_or(path);
+    let path = path.strip_prefix("/v1").unwrap_or(path);
+
+    // 分割路径
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+    if segments.is_empty() {
+        return (None, None);
+    }
+
+    // 确定目标类型
+    let target_type = match segments[0] {
+        "rooms" => Some("room"),
+        "users" => Some("user"),
+        "messages" => Some("message"),
+        "admin" => {
+            // 处理 /admin/rooms/{id}, /admin/users/{id}, /admin/audit/* 等
+            if segments.len() >= 2 {
+                match segments[1] {
+                    "rooms" => Some("room"),
+                    "users" => Some("user"),
+                    "messages" => Some("message"),
+                    "audit" => Some("audit"),
+                    "configs" => Some("config"),
+                    _ => Some("admin"),
+                }
+            } else {
+                Some("admin")
+            }
+        }
+        "auth" => Some("auth"),
+        "ws" => Some("websocket"),
+        _ => None,
+    };
+
+    // 尝试提取 UUID
+    let target_id = if segments[0] == "admin" && segments.len() >= 3 {
+        // 对于 /admin/audit/* 路径，不提取 ID
+        if segments[1] == "audit" {
+            None
+        } else {
+            segments[2].parse::<uuid::Uuid>().ok()
+        }
+    } else if segments.len() >= 2 && segments[0] != "admin" {
+        segments[1].parse::<uuid::Uuid>().ok()
+    } else {
+        None
+    };
+
+    (target_type.map(|s| s.to_string()), target_id)
+}
+
 /// 审计中间件
 /// 透明记录 HTTP 请求的关键信息
 #[derive(Clone)]
@@ -122,6 +178,17 @@ impl AuditMiddleware {
             log = log.with_actor(uid, role);
         }
 
+        // 设置目标信息
+        let (target_type, target_id) = extract_target_from_path(&path);
+        if let Some(t_type) = target_type {
+            if let Some(t_id) = target_id {
+                log = log.with_target(t_type, t_id);
+            } else {
+                // 只有目标类型，没有具体目标ID
+                log.target_type = Some(t_type);
+            }
+        }
+
         // 设置元数据
         let mut metadata =
             AuditMetadata::new()
@@ -229,6 +296,32 @@ impl AuditMiddleware {
             }
         }
 
+        // 审计系统相关操作
+        if path.contains("/admin/audit") {
+            if path.contains("/export") {
+                return AuditEventType::AuditExport;
+            }
+            if path.contains("/stats") {
+                return AuditEventType::AuditStatsQuery;
+            }
+            if path.contains("/alerts") {
+                if method == Method::PUT {
+                    return AuditEventType::AlertRuleUpdate;
+                }
+                return AuditEventType::AlertQuery;
+            }
+            if path.contains("/rules") && method == Method::PUT {
+                return AuditEventType::AlertRuleUpdate;
+            }
+            if path.contains("/cleanup") && method == Method::POST {
+                return AuditEventType::AuditCleanup;
+            }
+            // 审计日志查询
+            if path.contains("/logs") || path.contains("/admin/audit") {
+                return AuditEventType::AuditQuery;
+            }
+        }
+
         // 默认返回系统事件
         AuditEventType::SystemUnauthorizedAccess
     }
@@ -310,5 +403,11 @@ pub fn get_event_description(event_type: &AuditEventType) -> &'static str {
         AuditEventType::SystemLoginFailure => "登录失败",
         AuditEventType::SystemUnauthorizedAccess => "未授权访问",
         AuditEventType::SystemRateLimitTriggered => "触发限流",
+        AuditEventType::AuditQuery => "审计查询",
+        AuditEventType::AuditExport => "审计导出",
+        AuditEventType::AuditStatsQuery => "审计统计查询",
+        AuditEventType::AlertQuery => "告警查询",
+        AuditEventType::AlertRuleUpdate => "告警规则更新",
+        AuditEventType::AuditCleanup => "审计清理",
     }
 }

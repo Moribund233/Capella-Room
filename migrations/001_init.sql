@@ -67,7 +67,14 @@ CREATE TYPE audit_event_type AS ENUM (
     -- 系统事件
     'system_login_failure',
     'system_unauthorized_access',
-    'system_rate_limit_triggered'
+    'system_rate_limit_triggered',
+    -- 审计系统事件
+    'audit_query',
+    'audit_export',
+    'audit_stats_query',
+    'alert_query',
+    'alert_rule_update',
+    'audit_cleanup'
 );
 
 -- 审计严重级别枚举

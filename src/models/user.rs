@@ -128,6 +128,7 @@ pub struct UserResponse {
     pub avatar_url: Option<String>,
     pub status: UserStatus,
     pub role: UserRole,
+    pub created_at: DateTime<Utc>,
 }
 
 impl User {
@@ -140,6 +141,7 @@ impl User {
             avatar_url: self.avatar_url.clone(),
             status: self.status.clone(),
             role: self.role.clone(),
+            created_at: self.created_at,
         }
     }
 }

@@ -7,6 +7,7 @@ import {
   UserFilled,
   Monitor,
   Document,
+  DocumentChecked,
 } from '@element-plus/icons-vue'
 
 /**
@@ -72,6 +73,11 @@ const menuList = ref<MenuItem[]>([
     path: '/monitor',
     name: '系统监控',
     icon: Monitor,
+  },
+  {
+    path: '/audit',
+    name: '审计系统',
+    icon: DocumentChecked,
   },
   {
     path: '/documents',

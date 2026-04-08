@@ -3,6 +3,110 @@
  * 仪表盘页面
  * 系统概览和数据统计
  */
+
+import { ref, onMounted, onUnmounted } from 'vue'
+import { getSystemStats, getActivityStats, getHealthStatus } from '@/api'
+import type { SystemStats, ActivityStats, HealthStatus } from '@/api/dashboard'
+import { ApiError } from '@/api/client'
+import { User, CircleCheck, OfficeBuilding, ChatDotRound, WarnTriangleFilled, InfoFilled, Connection } from '@element-plus/icons-vue'
+
+/** 系统统计数据 */
+const systemStats = ref<SystemStats | null>(null)
+/** 活跃度统计数据 */
+const activityStats = ref<ActivityStats | null>(null)
+/** 系统健康状态 */
+const healthStatus = ref<HealthStatus | null>(null)
+/** 加载状态 */
+const loading = ref(true)
+/** 错误信息 */
+const error = ref<string | null>(null)
+/** 自动刷新定时器 */
+let refreshTimer: number | null = null
+
+/**
+ * 获取所有统计数据
+ */
+async function fetchDashboardData() {
+  try {
+    loading.value = true
+    error.value = null
+
+    const [statsRes, activityRes, healthRes] = await Promise.all([
+      getSystemStats(),
+      getActivityStats(),
+      getHealthStatus(),
+    ])
+
+    systemStats.value = statsRes.data ?? null
+    activityStats.value = activityRes.data ?? null
+    healthStatus.value = healthRes.data ?? null
+  } catch (err) {
+    if (err instanceof ApiError) {
+      error.value = err.message
+    } else {
+      error.value = '获取数据失败'
+    }
+    console.error('Failed to fetch dashboard data:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 格式化数字，超过1000显示为k
+ */
+function formatNumber(num: number | undefined): string {
+  if (num === undefined || num === null) return '-'
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
+  return num.toString()
+}
+
+/**
+ * 获取健康状态样式
+ */
+function getHealthStatusClass(status: string | undefined): string {
+  if (!status) return 'status-unknown'
+  switch (status.toLowerCase()) {
+    case 'healthy':
+      return 'status-healthy'
+    case 'degraded':
+      return 'status-degraded'
+    case 'unhealthy':
+      return 'status-unhealthy'
+    default:
+      return 'status-unknown'
+  }
+}
+
+/**
+ * 获取健康状态文本
+ */
+function getHealthStatusText(status: string | undefined): string {
+  if (!status) return '未知'
+  switch (status.toLowerCase()) {
+    case 'healthy':
+      return '健康'
+    case 'degraded':
+      return '降级'
+    case 'unhealthy':
+      return '异常'
+    default:
+      return status
+  }
+}
+
+onMounted(() => {
+  fetchDashboardData()
+  // 每30秒自动刷新
+  refreshTimer = window.setInterval(fetchDashboardData, 30000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+  }
+})
 </script>
 
 <template>
@@ -12,60 +116,131 @@
       <p class="page-desc">欢迎回来，这里是系统概览</p>
     </div>
 
-    <div class="card-grid">
-      <!-- 统计卡片 -->
-      <div class="stat-card">
-        <div class="stat-icon" style="background-color: var(--primary-alpha); color: var(--primary)">
-          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">1,234</span>
-          <span class="stat-label">总访问量</span>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon" style="background-color: var(--success-alpha); color: var(--success)">
-          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">56</span>
-          <span class="stat-label">活跃用户</span>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon" style="background-color: var(--warning-alpha); color: var(--warning)">
-          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">128</span>
-          <span class="stat-label">文档数量</span>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon" style="background-color: var(--info-alpha); color: var(--info)">
-          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-value">99.9%</span>
-          <span class="stat-label">系统状态</span>
-        </div>
-      </div>
+    <!-- 错误提示 -->
+    <div v-if="error" class="error-alert">
+      <span>{{ error }}</span>
+      <button class="retry-btn" @click="fetchDashboardData">重试</button>
     </div>
 
-    <!-- 内容区域占位 -->
-    <div class="content-section">
-      <div class="card">
-        <div class="card-header">
-          <h3>最近活动</h3>
+    <!-- 加载状态 -->
+    <div v-if="loading && !systemStats" class="loading-state">
+      <div class="loading-spinner"></div>
+      <span>加载中...</span>
+    </div>
+
+    <template v-else>
+      <!-- 核心统计卡片 -->
+      <div class="card-grid">
+        <!-- 总用户数 -->
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: var(--primary-alpha); color: var(--primary)">
+            <User class="stat-svg-icon" />
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ formatNumber(systemStats?.total_users) }}</span>
+            <span class="stat-label">总用户数</span>
+          </div>
         </div>
-        <div class="card-body">
-          <p class="placeholder-text">活动列表将在这里显示</p>
+
+        <!-- 在线用户 -->
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: var(--success-alpha); color: var(--success)">
+            <CircleCheck class="stat-svg-icon" />
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ formatNumber(systemStats?.online_users) }}</span>
+            <span class="stat-label">在线用户</span>
+          </div>
+        </div>
+
+        <!-- 总房间数 -->
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: var(--warning-alpha); color: var(--warning)">
+            <OfficeBuilding class="stat-svg-icon" />
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ formatNumber(systemStats?.total_rooms) }}</span>
+            <span class="stat-label">聊天室</span>
+          </div>
+        </div>
+
+        <!-- 总消息数 -->
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: var(--info-alpha); color: var(--info)">
+            <ChatDotRound class="stat-svg-icon" />
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ formatNumber(systemStats?.total_messages) }}</span>
+            <span class="stat-label">总消息数</span>
+          </div>
         </div>
       </div>
-    </div>
+
+      <!-- 第二行统计 -->
+      <div class="card-grid secondary-grid">
+        <!-- WebSocket 连接数 -->
+        <div class="stat-card compact">
+          <div class="stat-icon small" style="background-color: var(--primary-alpha); color: var(--primary)">
+            <Connection class="stat-svg-icon small" />
+          </div>
+          <div class="stat-info">
+            <span class="stat-value small">{{ formatNumber(systemStats?.active_connections) }}</span>
+            <span class="stat-label">WebSocket 连接</span>
+          </div>
+        </div>
+
+        <!-- 系统健康状态 -->
+        <div class="stat-card compact">
+          <div class="stat-icon small" :class="getHealthStatusClass(healthStatus?.status)">
+            <CircleCheck v-if="healthStatus?.status === 'healthy'" class="stat-svg-icon small" />
+            <WarnTriangleFilled v-else-if="healthStatus?.status === 'degraded'" class="stat-svg-icon small" />
+            <InfoFilled v-else class="stat-svg-icon small" />
+          </div>
+          <div class="stat-info">
+            <span class="stat-value small">{{ getHealthStatusText(healthStatus?.status) }}</span>
+            <span class="stat-label">系统状态</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 活跃度统计 -->
+      <div class="content-section">
+        <div class="card">
+          <div class="card-header">
+            <h3>活跃度统计</h3>
+            <span class="refresh-hint" :class="{ 'refreshing': loading }">每30秒自动刷新</span>
+          </div>
+          <div class="card-body">
+            <div class="activity-grid">
+              <div class="activity-item">
+                <span class="activity-label">日活跃用户</span>
+                <span class="activity-value">{{ formatNumber(activityStats?.daily_active_users) }}</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-label">周活跃用户</span>
+                <span class="activity-value">{{ formatNumber(activityStats?.weekly_active_users) }}</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-label">月活跃用户</span>
+                <span class="activity-value">{{ formatNumber(activityStats?.monthly_active_users) }}</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-label">日消息</span>
+                <span class="activity-value">{{ formatNumber(activityStats?.daily_messages) }}</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-label">周消息</span>
+                <span class="activity-value">{{ formatNumber(activityStats?.weekly_messages) }}</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-label">月消息</span>
+                <span class="activity-value">{{ formatNumber(activityStats?.monthly_messages) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -90,10 +265,70 @@
   color: var(--text-secondary);
 }
 
+/* 错误提示 */
+.error-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4);
+  background-color: var(--error-alpha);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-6);
+  color: var(--error);
+}
+
+.retry-btn {
+  padding: var(--spacing-2) var(--spacing-4);
+  background-color: var(--error);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: opacity var(--transition-fast);
+}
+
+.retry-btn:hover {
+  opacity: 0.9;
+}
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-12);
+  color: var(--text-secondary);
+  gap: var(--spacing-4);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-primary);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 统计卡片 */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+}
+
+.secondary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   margin-bottom: var(--spacing-6);
 }
 
@@ -113,6 +348,10 @@
   box-shadow: var(--shadow-md);
 }
 
+.stat-card.compact {
+  padding: var(--spacing-4);
+}
+
 .stat-icon {
   flex-shrink: 0;
   width: 48px;
@@ -121,6 +360,22 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lg);
+}
+
+.stat-icon.small {
+  width: 40px;
+  height: 40px;
+}
+
+.stat-svg-icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.stat-svg-icon.small {
+  width: 20px;
+  height: 20px;
 }
 
 .stat-info {
@@ -135,11 +390,37 @@
   color: var(--text-primary);
 }
 
+.stat-value.small {
+  font-size: var(--font-size-xl);
+}
+
 .stat-label {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
 
+/* 系统状态样式 */
+.status-healthy {
+  background-color: var(--success-alpha) !important;
+  color: var(--success) !important;
+}
+
+.status-degraded {
+  background-color: var(--warning-alpha) !important;
+  color: var(--warning) !important;
+}
+
+.status-unhealthy {
+  background-color: var(--error-alpha) !important;
+  color: var(--error) !important;
+}
+
+.status-unknown {
+  background-color: var(--border-primary) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* 内容区域 */
 .content-section {
   margin-top: var(--spacing-6);
 }
@@ -152,6 +433,9 @@
 }
 
 .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: var(--spacing-4) var(--spacing-6);
   border-bottom: 1px solid var(--border-secondary);
 }
@@ -162,13 +446,41 @@
   color: var(--text-primary);
 }
 
+.refresh-hint {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.refresh-hint.refreshing {
+  color: var(--primary);
+}
+
 .card-body {
   padding: var(--spacing-6);
 }
 
-.placeholder-text {
-  color: var(--text-tertiary);
+/* 活跃度统计 */
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-6);
+}
+
+.activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
   text-align: center;
-  padding: var(--spacing-8) 0;
+}
+
+.activity-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.activity-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
 }
 </style>

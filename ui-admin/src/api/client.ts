@@ -4,8 +4,7 @@
  */
 
 /** API 基础 URL */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-
+const BASE_URL = import.meta.env.VITE_API_BASE_URL
 /** 请求配置接口 */
 interface RequestConfig extends RequestInit {
   /** 是否跳过认证 */
@@ -47,14 +46,15 @@ function getToken(): string | null {
 
 /**
  * 发送 HTTP 请求
- * @param endpoint API 端点（不包含基础 URL）
+ * @param endpoint API 端点（不包含基础 URL，或以 // 开头表示跳过 BASE_URL）
  * @param config 请求配置
  * @returns API 响应数据
  * @throws ApiError 请求失败时抛出
  */
 export async function request<T>(endpoint: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
   const { skipAuth, ...fetchConfig } = config
-  const url = `${BASE_URL}${endpoint}`
+  // 如果 endpoint 以 // 开头，则去掉 // 直接使用后面的路径（跳过 BASE_URL）
+  const url = endpoint.startsWith('//') ? endpoint.slice(1) : `${BASE_URL}${endpoint}`
 
   // 设置默认请求头
   const headers: Record<string, string> = {

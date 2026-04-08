@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use serde_json::json;
 use tokio::sync::RwLock;
 use tokio::time::interval;
@@ -330,6 +330,7 @@ impl AuditService {
             event_type: log.event_type.clone(),
             severity: log.severity(),
             actor_id: log.actor_id,
+            actor_name: None,
             actor_role: log.actor_role,
             target_type: log.target_type.clone(),
             target_id: log.target_id,
@@ -611,11 +612,14 @@ impl AuditService {
 
         let pool = self.db.pool();
 
-        // 使用动态查询构建
+        // 使用动态查询构建，LEFT JOIN 获取用户名
         let mut logs_query = sqlx::QueryBuilder::new(
-            "SELECT id, event_type, severity, actor_id, actor_role, target_type, target_id, 
-             action, description, metadata, status, error_message, created_at 
-             FROM audit_logs WHERE 1=1",
+            "SELECT al.id, al.event_type, al.severity, al.actor_id, u.username as actor_name, 
+             al.actor_role, al.target_type, al.target_id, al.action, al.description, 
+             al.metadata, al.status, al.error_message, al.created_at 
+             FROM audit_logs al 
+             LEFT JOIN users u ON al.actor_id = u.id 
+             WHERE 1=1",
         );
 
         let mut count_query = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM audit_logs WHERE 1=1");
@@ -780,6 +784,46 @@ impl AuditService {
             .map(|(date, count)| DailyCount { date, count })
             .collect();
 
+        // 计算今日开始时间（当天 00:00:00）
+        let today_start = Utc::now()
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Utc)
+            .unwrap();
+        let today_logs: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM audit_logs WHERE created_at >= $1")
+                .bind(today_start)
+                .fetch_one(pool)
+                .await
+                .map_err(AppError::Database)?;
+
+        // 计算本周开始时间（7 天前）
+        let week_start = Utc::now() - chrono::Duration::days(7);
+        let week_logs: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM audit_logs WHERE created_at >= $1")
+                .bind(week_start)
+                .fetch_one(pool)
+                .await
+                .map_err(AppError::Database)?;
+
+        // 计算本月开始时间（当月 1 号 00:00:00）
+        let now = Utc::now();
+        let month_start = now
+            .date_naive()
+            .with_day(1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Utc)
+            .unwrap();
+        let month_logs: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM audit_logs WHERE created_at >= $1")
+                .bind(month_start)
+                .fetch_one(pool)
+                .await
+                .map_err(AppError::Database)?;
+
         let alerts_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_alerts")
             .fetch_one(pool)
             .await
@@ -793,6 +837,9 @@ impl AuditService {
 
         Ok(AuditStats {
             total_logs,
+            today_logs,
+            week_logs,
+            month_logs,
             logs_by_severity,
             logs_by_event_type,
             logs_by_day,

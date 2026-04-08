@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useThemeStore } from '@/stores/theme'
-import AppSidebar from './components/AppSidebar.vue'
-import AppHeader from './components/AppHeader.vue'
-import AppFooter from './components/AppFooter.vue'
+import AppSidebar from './AppSidebar.vue'
+import AppHeader from './AppHeader.vue'
+import AppFooter from './AppFooter.vue'
 
 /**
  * 主布局组件
