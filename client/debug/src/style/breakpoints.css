@@ -1,0 +1,158 @@
+/* 响应式断点 */
+
+/* 断点定义
+   - mobile: < 768px
+   - tablet: 768px - 1024px
+   - desktop: > 1024px
+*/
+
+/* 移动端优先的基础样式 */
+.sidebar {
+  width: var(--sidebar-collapsed-width);
+}
+
+.main-content {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+/* 平板端 (>= 768px) */
+@media screen and (min-width: 768px) {
+  .sidebar {
+    width: var(--sidebar-width);
+  }
+
+  .main-content {
+    margin-left: var(--sidebar-width);
+  }
+
+  .page-container {
+    padding: var(--space-lg);
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 桌面端 (>= 1024px) */
+@media screen and (min-width: 1024px) {
+  .page-container {
+    padding: var(--space-xl);
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+}
+
+/* 大屏 (>= 1440px) */
+@media screen and (min-width: 1440px) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* 响应式工具类 */
+
+/* 仅在移动端显示 */
+.mobile-only {
+  display: block;
+}
+
+@media screen and (min-width: 768px) {
+  .mobile-only {
+    display: none;
+  }
+}
+
+/* 仅在桌面端显示 */
+.desktop-only {
+  display: none;
+}
+
+@media screen and (min-width: 1024px) {
+  .desktop-only {
+    display: block;
+  }
+}
+
+/* 响应式间距 */
+@media screen and (max-width: 767px) {
+  .responsive-p {
+    padding: var(--space-md);
+  }
+
+  .responsive-m {
+    margin: var(--space-md);
+  }
+
+  .responsive-gap {
+    gap: var(--space-sm);
+  }
+}
+
+@media screen and (min-width: 768px) {
+  .responsive-p {
+    padding: var(--space-lg);
+  }
+
+  .responsive-m {
+    margin: var(--space-lg);
+  }
+
+  .responsive-gap {
+    gap: var(--space-md);
+  }
+}
+
+/* 响应式字体 */
+@media screen and (max-width: 767px) {
+  .responsive-text {
+    font-size: 14px;
+  }
+
+  .responsive-title {
+    font-size: 18px;
+  }
+}
+
+@media screen and (min-width: 768px) {
+  .responsive-text {
+    font-size: 16px;
+  }
+
+  .responsive-title {
+    font-size: 24px;
+  }
+}
+
+/* 响应式表格 */
+@media screen and (max-width: 767px) {
+  .data-table {
+    font-size: 14px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-sm);
+  }
+}
+
+/* 响应式表单 */
+@media screen and (max-width: 767px) {
+  .form-section {
+    padding: var(--space-md);
+  }
+
+  .action-group {
+    flex-direction: column;
+  }
+
+  .action-group .n-button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,107 @@
+/* 全局颜色变量 - 米白+墨绿主题 */
+
+:root {
+  /* ========== 主色调 - 墨绿系列 ========== */
+  --primary: #1b4d3e;
+  --primary-light: #2c7a62;
+  --primary-dark: #0f2e26;
+  --primary-hover: #236b56;
+  --primary-active: #1a5243;
+
+  /* ========== 背景色 - 米白系列 ========== */
+  --bg-primary: #faf9f6;
+  --bg-secondary: #f5f5dc;
+  --bg-tertiary: #f0efe9;
+  --bg-white: #ffffff;
+  --bg-dark: #2d3436;
+
+  /* ========== 文字色 ========== */
+  --text-primary: #2d3436;
+  --text-secondary: #636e72;
+  --text-muted: #b2bec3;
+  --text-white: #ffffff;
+  --text-light: rgba(255, 255, 255, 0.9);
+
+  /* ========== 边框色 ========== */
+  --border: #dfe6e9;
+  --border-light: #f0f0f0;
+  --border-dark: #b2bec3;
+
+  /* ========== 功能色 ========== */
+  /* 成功 */
+  --success: #00b894;
+  --success-light: #55efc4;
+  --success-dark: #00a383;
+  --success-bg: rgba(0, 184, 148, 0.1);
+
+  /* 警告 */
+  --warning: #fdcb6e;
+  --warning-light: #ffeaa7;
+  --warning-dark: #e1b12c;
+  --warning-bg: rgba(253, 203, 110, 0.2);
+
+  /* 错误 */
+  --error: #d63031;
+  --error-light: #ff7675;
+  --error-dark: #c0392b;
+  --error-bg: rgba(214, 48, 49, 0.1);
+
+  /* 信息 */
+  --info: #74b9ff;
+  --info-light: #a8d8ff;
+  --info-dark: #0984e3;
+  --info-bg: rgba(116, 185, 255, 0.1);
+
+  /* ========== 阴影色 ========== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-primary: 0 4px 12px rgba(27, 77, 62, 0.3);
+
+  /* ========== 渐变 ========== */
+  --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-light));
+  --gradient-success: linear-gradient(135deg, var(--success), var(--success-light));
+  --gradient-warning: linear-gradient(135deg, var(--warning), var(--warning-light));
+  --gradient-error: linear-gradient(135deg, var(--error), var(--error-light));
+
+  /* ========== 状态色 ========== */
+  --status-online: #00b894;
+  --status-offline: #b2bec3;
+  --status-away: #fdcb6e;
+  --status-busy: #d63031;
+
+  /* ========== 日志色 ========== */
+  --log-info: #74b9ff;
+  --log-success: #00b894;
+  --log-warning: #fdcb6e;
+  --log-error: #d63031;
+  --log-time: #6c757d;
+  --log-bg: #1e1e1e;
+}
+
+/* ========== 颜色工具类 ========== */
+
+/* 背景色 */
+.bg-primary { background-color: var(--primary); }
+.bg-primary-light { background-color: var(--primary-light); }
+.bg-primary-dark { background-color: var(--primary-dark); }
+.bg-success { background-color: var(--success); }
+.bg-warning { background-color: var(--warning); }
+.bg-error { background-color: var(--error); }
+.bg-info { background-color: var(--info); }
+
+/* 文字色 */
+.text-primary { color: var(--primary); }
+.text-primary-light { color: var(--primary-light); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-error { color: var(--error); }
+.text-info { color: var(--info); }
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+
+/* 边框色 */
+.border-primary { border-color: var(--primary); }
+.border-success { border-color: var(--success); }
+.border-warning { border-color: var(--warning); }
+.border-error { border-color: var(--error); }
