@@ -217,6 +217,55 @@ pub async fn delete_user(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn admin_reset_user_password(
+    State(state): State<Arc<AppState>>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+    Path(user_id): Path<Uuid>,
+    Extension(CurrentUserRole(current_role)): Extension<CurrentUserRole>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
+    Json(request): Json<AdminResetPasswordRequest>,
+) -> Result<Json<ApiResponse<UserResponse>>> {
+    if !current_role.is_super_admin() {
+        return Err(AppError::Forbidden);
+    }
+
+    let target_user = state
+        .user_service()
+        .get_user_by_id(user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    if target_user.role.is_super_admin() {
+        return Err(AppError::Forbidden);
+    }
+
+    if request.new_password.len() < 8 {
+        return Err(AppError::Validation(
+            "Password must be at least 8 characters long".to_string(),
+        ));
+    }
+
+    let password_hash = state.auth_service().hash_password(&request.new_password)?;
+
+    state
+        .user_service()
+        .update_password(user_id, &password_hash)
+        .await?;
+
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "password_reset", "user", user_id, ip)
+            .await;
+    });
+
+    Ok(Json(ApiResponse::success(target_user.to_response())))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListConfigsQuery {
     pub category: Option<String>,
@@ -225,6 +274,11 @@ pub struct ListConfigsQuery {
 #[derive(Debug, Deserialize)]
 pub struct UpdateConfigRequest {
     pub value: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminResetPasswordRequest {
+    pub new_password: String,
 }
 
 pub async fn list_configs(

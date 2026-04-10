@@ -65,13 +65,26 @@ pub struct User {
 }
 
 /// 用户状态
-#[derive(Debug, Clone, Serialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, sqlx::Type, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "user_status", rename_all = "lowercase")]
 pub enum UserStatus {
     Online,
     Offline,
     Away,
+    Disabled,
+}
+
+impl UserStatus {
+    /// 检查用户是否被禁用
+    pub fn is_disabled(&self) -> bool {
+        matches!(self, UserStatus::Disabled)
+    }
+
+    /// 检查用户是否可用（未被禁用）
+    pub fn is_active(&self) -> bool {
+        !self.is_disabled()
+    }
 }
 
 /// 用户注册请求

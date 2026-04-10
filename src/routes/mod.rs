@@ -180,6 +180,10 @@ fn admin_router() -> Router<Arc<AppState>> {
         )
         .route("/users/:user_id/role", put(admin::update_user_role))
         .route("/users/:user_id/status", put(admin::set_user_status))
+        .route(
+            "/users/:user_id/password",
+            put(admin::admin_reset_user_password),
+        )
         // 房间管理
         .route("/rooms", get(admin::list_rooms))
         .route(

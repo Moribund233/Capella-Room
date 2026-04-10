@@ -7,7 +7,7 @@
 -- ============================================
 
 -- 用户状态枚举
-CREATE TYPE user_status AS ENUM ('online', 'offline', 'away');
+CREATE TYPE user_status AS ENUM ('online', 'offline', 'away', 'disabled');
 
 -- 成员角色枚举
 CREATE TYPE member_role AS ENUM ('owner', 'admin', 'member');

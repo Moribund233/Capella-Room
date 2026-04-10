@@ -295,10 +295,36 @@ impl ConfigManager {
     pub async fn reset_to_defaults(&self) -> Result<Vec<SystemConfigItem>> {
         info!("Resetting all configurations to defaults...");
 
+        // 删除所有可编辑的配置
         sqlx::query("DELETE FROM system_configs WHERE is_editable = true")
             .execute(self.db.pool())
             .await?;
 
+        // 重新插入默认配置
+        let defaults = Self::get_default_configs();
+        for (key, value, value_type, description, category, is_editable, is_hot_reloadable) in
+            defaults
+        {
+            if is_editable {
+                sqlx::query(
+                    r#"
+                    INSERT INTO system_configs (key, value, value_type, description, category, is_editable, is_hot_reloadable)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    "#
+                )
+                .bind(key)
+                .bind(value)
+                .bind(value_type)
+                .bind(description)
+                .bind(category)
+                .bind(is_editable)
+                .bind(is_hot_reloadable)
+                .execute(self.db.pool())
+                .await?;
+            }
+        }
+
+        // 重新加载配置
         self.reload_from_database().await?;
 
         info!("Configurations reset to defaults");
@@ -499,6 +525,152 @@ impl ConfigManager {
                 "system",
                 true,
                 true,
+            ),
+            // 审计配置
+            (
+                "audit.enabled",
+                "true",
+                "bool",
+                "启用审计日志",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.log_retention_days",
+                "90",
+                "int",
+                "审计日志保留天数",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.buffer_size",
+                "100",
+                "int",
+                "审计日志缓冲区大小",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.flush_interval_seconds",
+                "5",
+                "int",
+                "审计日志缓冲区刷新间隔（秒）",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.alert_enabled",
+                "true",
+                "bool",
+                "启用审计告警检测",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.alert_cooldown_minutes",
+                "10",
+                "int",
+                "审计告警冷却时间（分钟）",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.auto_archive_enabled",
+                "true",
+                "bool",
+                "启用审计日志自动归档",
+                "audit",
+                true,
+                true,
+            ),
+            (
+                "audit.archive_hour",
+                "3",
+                "int",
+                "审计日志自动归档时间（小时，0-23）",
+                "audit",
+                true,
+                true,
+            ),
+            // Redis 配置
+            (
+                "redis.enabled",
+                "false",
+                "bool",
+                "启用 Redis",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.pool_size",
+                "10",
+                "int",
+                "Redis 连接池大小",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.timeout_secs",
+                "5",
+                "int",
+                "Redis 连接超时时间（秒）",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.channel_prefix",
+                "seredeli",
+                "string",
+                "Redis Pub/Sub 频道前缀",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.stream_max_len",
+                "100000",
+                "int",
+                "Redis Stream 最大长度",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.consumer_batch_size",
+                "100",
+                "int",
+                "Redis Consumer 批量消费大小",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.consumer_poll_interval_ms",
+                "1000",
+                "int",
+                "Redis Consumer 消费间隔（毫秒）",
+                "redis",
+                true,
+                false,
+            ),
+            (
+                "redis.config_sync_enabled",
+                "true",
+                "bool",
+                "启用 Redis 配置同步",
+                "redis",
+                true,
+                false,
             ),
         ]
     }

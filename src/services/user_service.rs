@@ -440,9 +440,9 @@ impl UserService {
     /// 禁用/启用用户
     pub async fn set_user_disabled(&self, user_id: Uuid, disabled: bool) -> Result<User> {
         let status = if disabled {
-            UserStatus::Offline
+            UserStatus::Disabled
         } else {
-            UserStatus::Online
+            UserStatus::Offline
         };
 
         let user = sqlx::query_as::<_, User>(

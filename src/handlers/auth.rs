@@ -125,6 +125,19 @@ pub async fn login(
         }
     };
 
+    // 检查用户是否被禁用
+    if user.status.is_disabled() {
+        // 记录登录失败审计日志
+        let email = request.email.clone();
+        let audit_service = Arc::clone(&state.audit_service);
+        tokio::spawn(async move {
+            let _ = audit_service
+                .log_login_failure(&email, ip, "账号已被禁用")
+                .await;
+        });
+        return Err(AppError::Auth("账号已被禁用，请联系管理员".to_string()));
+    }
+
     // 验证密码
     let password_valid = state
         .auth_service()
