@@ -63,6 +63,7 @@ const isMyRoom = (room: Room) => {
 
 // ========== 表格列定义 ==========
 const columns = [
+  { title: '房间ID', key: 'id', width: 220 },
   { title: '房间名称', key: 'name', width: 200 },
   { title: '描述', key: 'description', ellipsis: { tooltip: true } },
   { title: '类型', key: 'is_private', width: 100 },
@@ -277,6 +278,13 @@ onMounted(() => {
               <span style="font-weight: 500">{{ row.name }}</span>
               <n-tag v-if="isMyRoom(row)" size="tiny" type="primary">已加入</n-tag>
             </n-space>
+          </template>
+
+          <!-- 房间ID -->
+          <template v-if="column.key === 'id'">
+            <n-ellipsis style="max-width: 200px">
+              {{ row.id }}
+            </n-ellipsis>
           </template>
 
           <!-- 描述 -->

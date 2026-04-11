@@ -11,25 +11,19 @@ use seredeli_room::{
     redis::{ConfigSyncManager, RedisManager},
     routes::create_router,
     state::AppState,
-    utils::logging::MetricsCollector,
+    utils::logging::{init_logging, MetricsCollector},
     websocket::manager::WebSocketManager,
 };
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Windows 控制台编码处理：设置为 UTF-8
-    #[cfg(windows)]
-    {
-        use std::process::Command;
-        // 设置控制台代码页为 UTF-8 (65001)
-        let _ = Command::new("cmd").args(["/C", "chcp", "65001"]).output();
-    }
+    // 先加载配置以确定是否在维护模式
+    let config = ConfigLoader::load()?;
 
-    init_logging();
+    // 初始化日志系统（维护模式下打印更详细的日志）
+    init_logging(config.system.maintenance_mode);
 
     info!("Starting Seredeli Room server...");
-
-    let config = ConfigLoader::load()?;
     info!("Configuration loaded successfully");
     info!(
         "Server will run on {}:{}",
@@ -179,26 +173,6 @@ async fn initialize_super_admin(
     Ok(())
 }
 
-fn init_logging() {
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        tracing_subscriber::EnvFilter::new("info,seredeli_room=debug,tower_http=debug")
-    });
-
-    let is_production = std::env::var("APP_ENV")
-        .map(|env| env == "production")
-        .unwrap_or(false);
-
-    let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .with_target(true)
-        .with_thread_ids(!is_production)
-        .with_file(!is_production)
-        .with_line_number(!is_production)
-        .with_ansi(false);
-
-    subscriber.init();
-}
-
 async fn create_shutdown_signal() {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
@@ -233,6 +207,6 @@ mod tests {
 
     #[test]
     fn test_logging_init() {
-        init_logging();
+        init_logging(false);
     }
 }

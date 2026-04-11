@@ -58,8 +58,13 @@ export async function getRooms(params?: {
   if (params?.page) queryParams.page = String(params.page)
   if (params?.per_page) queryParams.per_page = String(params.per_page)
 
-  const response = await apiClient.get<Room[]>('/api/v1/rooms', queryParams)
-  return response.data
+  const response = await apiClient.get<Room[] | RoomListResponse>('/api/v1/rooms', queryParams)
+  // 适配两种可能的响应格式：直接返回数组或包装在 rooms 字段中
+  const data = response.data
+  if (Array.isArray(data)) {
+    return data
+  }
+  return data.rooms || []
 }
 
 /**

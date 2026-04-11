@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     Extension, Json,
 };
-use chrono::{DateTime, Utc};
+
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -575,43 +575,4 @@ pub async fn get_activity_stats(
         weekly_messages: stats.weekly_messages,
         monthly_messages: stats.monthly_messages,
     })))
-}
-
-// ==================== 日志查看接口 ====================
-
-#[derive(Debug, Deserialize)]
-pub struct ListLogsQuery {
-    pub level: Option<String>,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
-    pub limit: Option<i64>,
-    pub offset: Option<i64>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct LogEntry {
-    pub timestamp: DateTime<Utc>,
-    pub level: String,
-    pub message: String,
-    pub target: Option<String>,
-    pub fields: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct LogListResponse {
-    pub logs: Vec<LogEntry>,
-    pub total: i64,
-}
-
-pub async fn list_logs(
-    Query(_query): Query<ListLogsQuery>,
-) -> Result<Json<ApiResponse<LogListResponse>>> {
-    let logs = Vec::new();
-    let total = 0;
-
-    Ok(Json(ApiResponse::success(LogListResponse { logs, total })))
-}
-
-pub async fn download_logs() -> Result<StatusCode> {
-    Ok(StatusCode::NOT_IMPLEMENTED)
 }

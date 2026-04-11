@@ -8,7 +8,7 @@ use axum::{
 use futures::{sink::SinkExt, stream::StreamExt};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::{interval, timeout};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -539,10 +539,127 @@ async fn handle_message(
             handle_mark_all_notifications_read(user_id, state, tx).await?;
         }
 
+        // ========== 系统日志流 ==========
+        // 订阅系统日志
+        WebSocketMessage::SubscribeLogs { level, module } => {
+            handle_subscribe_logs(user_id, level, module, state, tx).await?;
+        }
+
+        // 取消订阅系统日志
+        WebSocketMessage::UnsubscribeLogs => {
+            handle_unsubscribe_logs(user_id, state, tx).await?;
+        }
+
         // 其他消息类型
         _ => {
             warn!("Unhandled message type from user {}: {:?}", user_id, msg);
         }
+    }
+
+    Ok(())
+}
+
+/// 处理订阅系统日志
+async fn handle_subscribe_logs(
+    user_id: Uuid,
+    level: Option<String>,
+    module: Option<String>,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!(
+        "User {} subscribing to logs with level={:?}, module={:?}",
+        user_id, level, module
+    );
+
+    // 获取日志广播器
+    let broadcaster = state.log_broadcaster();
+
+    // 创建日志接收器
+    let mut log_receiver = broadcaster.subscribe();
+
+    // 发送订阅确认
+    let confirm = WebSocketMessage::LogSubscriptionConfirmed {
+        success: true,
+        message: format!("Subscribed to logs: level={:?}, module={:?}", level, module),
+    };
+    if let Ok(json) = confirm.to_json() {
+        let _ = tx.send(json).await;
+    }
+
+    // 启动日志转发任务
+    let tx_for_logs = tx.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                biased;
+
+                // 接收日志条目
+                entry = log_receiver.recv() => {
+                    match entry {
+                        Ok(log_entry) => {
+                            // 应用过滤器
+                            let should_send = match (&level, &module) {
+                                (None, None) => true,
+                                (Some(l), None) => l == "all" || l == &log_entry.level,
+                                (None, Some(m)) => m == "all" || m == &log_entry.target,
+                                (Some(l), Some(m)) => {
+                                    (l == "all" || l == &log_entry.level)
+                                    && (m == "all" || m == &log_entry.target)
+                                }
+                            };
+
+                            if should_send {
+                                let log_msg = WebSocketMessage::LogEntry {
+                                    level: log_entry.level,
+                                    target: log_entry.target,
+                                    message: log_entry.message,
+                                    timestamp: log_entry.timestamp,
+                                    fields: log_entry.fields,
+                                };
+                                if let Ok(json) = log_msg.to_json() {
+                                    if tx_for_logs.send(json).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            debug!("Log receiver lagged behind by {} messages", n);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            debug!("Log channel closed, stopping log forwarding");
+                            break;
+                        }
+                    }
+                }
+
+                // 如果发送者关闭，停止接收
+                _ = tokio::time::sleep(Duration::from_secs(60)) => {
+                    debug!("Log subscription timeout for user, stopping");
+                    break;
+                }
+            }
+        }
+    });
+
+    Ok(())
+}
+
+/// 处理取消订阅系统日志
+async fn handle_unsubscribe_logs(
+    user_id: Uuid,
+    _state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("User {} unsubscribing from logs", user_id);
+
+    let confirm = WebSocketMessage::LogSubscriptionConfirmed {
+        success: true,
+        message: "Unsubscribed from logs".to_string(),
+    };
+    if let Ok(json) = confirm.to_json() {
+        let _ = tx.send(json).await;
     }
 
     Ok(())

@@ -307,6 +307,38 @@ pub enum WebSocketMessage {
         actions: Vec<PendingActionInfo>,
         total: usize,
     },
+
+    // ========== 系统日志流 ==========
+    /// 订阅系统日志
+    SubscribeLogs {
+        /// 日志级别过滤: error, warn, info, debug, all
+        #[serde(skip_serializing_if = "Option::is_none")]
+        level: Option<String>,
+        /// 模块过滤: websocket, room, message, performance, all
+        #[serde(skip_serializing_if = "Option::is_none")]
+        module: Option<String>,
+    },
+
+    /// 取消订阅系统日志
+    UnsubscribeLogs,
+
+    /// 系统日志条目（实时推送）
+    LogEntry {
+        /// 日志级别
+        level: String,
+        /// 日志模块/目标
+        target: String,
+        /// 日志消息
+        message: String,
+        /// 时间戳
+        timestamp: DateTime<Utc>,
+        /// 相关字段（可选）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fields: Option<serde_json::Value>,
+    },
+
+    /// 订阅确认
+    LogSubscriptionConfirmed { success: bool, message: String },
 }
 
 /// 通知类型枚举

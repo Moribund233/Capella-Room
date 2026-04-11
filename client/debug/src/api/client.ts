@@ -8,6 +8,9 @@ import { getAccessToken } from './token'
 // API 基础配置
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL
 
+// Token 过期事件名称
+export const TOKEN_EXPIRED_EVENT = 'token_expired'
+
 // 请求配置接口
 interface RequestConfig extends RequestInit {
   params?: Record<string, string>
@@ -26,6 +29,16 @@ function buildUrl(endpoint: string, params?: Record<string, string>): string {
   }
 
   return url.toString()
+}
+
+/**
+ * 触发 token 过期事件
+ */
+function triggerTokenExpired(message: string = '登录已过期，请重新登录') {
+  // 使用自定义事件通知应用 token 已过期
+  window.dispatchEvent(new CustomEvent(TOKEN_EXPIRED_EVENT, {
+    detail: { message }
+  }))
 }
 
 /**
@@ -69,6 +82,13 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     } catch {
       // 如果不是 JSON，构造一个错误响应
       throw new Error(responseText || `HTTP ${response.status}`)
+    }
+
+    // 处理 401 未授权错误
+    if (response.status === 401) {
+      const errorMessage = data.message || '登录已过期，请重新登录'
+      triggerTokenExpired(errorMessage)
+      throw new Error(errorMessage)
     }
 
     if (!response.ok) {

@@ -549,8 +549,7 @@ curl http://localhost:3000/health
 - `DELETE /api/v1/admin/messages/:id` - 删除违规消息
 - `GET /api/v1/admin/stats` - 系统统计（用户数、房间数、消息数、在线用户数）
 - `GET /api/v1/admin/stats/activity` - 活跃度统计（日活、周活、月活）
-- `GET /api/v1/admin/logs` - 查看应用运行日志（支持级别过滤、时间范围）
-- `GET /api/v1/admin/logs/download` - 下载日志文件
+- `WebSocket SubscribeLogs` - 订阅系统日志流（支持级别过滤、模块过滤）
 
 ## 开发指南
 

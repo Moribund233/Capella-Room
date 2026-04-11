@@ -46,5 +46,43 @@ export {
   type RoomDetailResponse,
 } from './room'
 
-// 从 types/api 重新导出 Room 类型
-export type { Room } from '@/types/api'
+// 用户管理 API
+export {
+  getUsers,
+  getUserDetail,
+  updateUser,
+  deleteUser,
+  createUser,
+  type UserListResponse,
+  type UpdateUserRequest,
+  type CreateUserRequest,
+} from './user'
+
+// 消息管理 API
+export {
+  getRoomMessages,
+  sendMessage,
+  searchMessages,
+  deleteMessage,
+  editMessage,
+  getMessageDetail,
+  type Message,
+  type MessageListResponse,
+  type SendMessageRequest,
+  type SearchMessageParams,
+} from './message'
+
+// 系统状态 API
+export {
+  getSystemStatus,
+  getSystemStats,
+  getAdminSystemStats,
+  getConnectionInfo,
+  type SystemStatus,
+  type SystemStats,
+  type AdminSystemStats,
+  type ConnectionInfo,
+} from './system'
+
+// 从 types/api 重新导出类型
+export type { Room, User } from '@/types/api'

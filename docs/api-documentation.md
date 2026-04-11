@@ -1057,31 +1057,77 @@ Content-Type: `multipart/form-data`
 
 ***
 
-### 日志查看
+### 系统日志流 (WebSocket)
 
-#### 18. 查看日志
+系统日志通过 WebSocket 实时推送。客户端需要发送订阅消息来接收日志。
 
-**GET** `/api/v1/admin/logs`
+#### 18. 订阅系统日志
 
-##### 查询参数
+通过 WebSocket 发送：
 
-| 参数           | 类型       | 说明                         |
-| ------------ | -------- | -------------------------- |
-| `level`      | string   | 日志级别：error、warn、info、debug |
-| `start_time` | datetime | 开始时间                       |
-| `end_time`   | datetime | 结束时间                       |
+```json
+{
+  "type": "SubscribeLogs",
+  "payload": {
+    "level": "info",
+    "module": "websocket"
+  }
+}
+```
 
-***
+##### 参数说明
 
-#### 19. 下载日志
+| 参数     | 类型   | 说明                                                         |
+| -------- | ------ | ------------------------------------------------------------ |
+| `level`  | string | 日志级别过滤：error、warn、info、debug、all（默认 all）      |
+| `module` | string | 模块过滤：websocket、room、message、performance、all（默认 all） |
 
-**GET** `/api/v1/admin/logs/download`
+##### 响应
+
+```json
+{
+  "type": "LogSubscriptionConfirmed",
+  "payload": {
+    "success": true,
+    "message": "Subscribed to logs: level=info, module=websocket"
+  }
+}
+```
+
+#### 19. 接收日志条目
+
+订阅成功后，服务端会实时推送日志：
+
+```json
+{
+  "type": "LogEntry",
+  "payload": {
+    "level": "info",
+    "target": "websocket",
+    "message": "WebSocket connection established",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "fields": {
+      "user_id": "550e8400-e29b-41d4-a716-446655440000",
+      "username": "admin",
+      "event": "connect"
+    }
+  }
+}
+```
+
+#### 20. 取消订阅
+
+```json
+{
+  "type": "UnsubscribeLogs"
+}
+```
 
 ***
 
 ### 待办通知管理
 
-#### 20. 获取待办通知列表
+#### 21. 获取待办通知列表
 
 **GET** `/api/v1/admin/pending-actions`
 

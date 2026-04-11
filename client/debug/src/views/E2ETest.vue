@@ -114,6 +114,7 @@ const runScenario = async (scenarioId: string) => {
       progress.value = Math.round((completedSteps / totalSteps) * 100)
 
       const step = scenario.steps[index]
+      if (!step) return
       if (stepResult.success) {
         addLog('success', `✓ ${step.name} (${stepResult.duration}ms)`)
       } else {

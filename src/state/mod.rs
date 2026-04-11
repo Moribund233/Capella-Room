@@ -11,13 +11,17 @@ use crate::services::message_service::MessageService;
 use crate::services::notification_service::NotificationService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
-use crate::utils::logging::MetricsCollector;
+use crate::utils::logging::{
+    init_global_log_broadcaster, LogBroadcaster, MetricsCollector, StructuredLogger,
+};
 use crate::websocket::manager::WebSocketManager;
 
 pub struct AppState {
     pub db: Database,
     pub ws_manager: Arc<WebSocketManager>,
     pub metrics_collector: Arc<MetricsCollector>,
+    pub log_broadcaster: Arc<LogBroadcaster>,
+    pub logger: Arc<StructuredLogger>,
     pub auth_service: AuthService,
     pub user_service: UserService,
     pub room_service: RoomService,
@@ -36,6 +40,8 @@ impl fmt::Debug for AppState {
             .field("db", &self.db)
             .field("ws_manager", &self.ws_manager)
             .field("metrics_collector", &"<MetricsCollector>")
+            .field("log_broadcaster", &"<LogBroadcaster>")
+            .field("logger", &"<StructuredLogger>")
             .field("auth_service", &"<AuthService>")
             .field("user_service", &"<UserService>")
             .field("room_service", &"<RoomService>")
@@ -56,6 +62,11 @@ impl AppState {
         metrics_collector: Arc<MetricsCollector>,
         config_manager: Arc<ConfigManager>,
     ) -> anyhow::Result<Arc<Self>> {
+        let log_broadcaster = Arc::new(LogBroadcaster::new(1000));
+        // 初始化全局日志广播器
+        init_global_log_broadcaster((*log_broadcaster).clone());
+        let logger = Arc::new(StructuredLogger);
+
         let jwt_config = crate::config::JwtConfig {
             secret: config.jwt.secret.clone(),
             expiration_hours: config.jwt.expiration_hours,
@@ -107,6 +118,8 @@ impl AppState {
             db,
             ws_manager: ws_manager.clone(),
             metrics_collector,
+            log_broadcaster,
+            logger,
             auth_service,
             user_service,
             room_service,
@@ -135,6 +148,14 @@ impl AppState {
 
     pub fn metrics_collector(&self) -> &MetricsCollector {
         &self.metrics_collector
+    }
+
+    pub fn log_broadcaster(&self) -> &LogBroadcaster {
+        &self.log_broadcaster
+    }
+
+    pub fn logger(&self) -> &StructuredLogger {
+        &self.logger
     }
 
     pub fn auth_service(&self) -> &AuthService {
@@ -194,6 +215,8 @@ impl Clone for AppState {
             db: self.db.clone(),
             ws_manager: Arc::clone(&self.ws_manager),
             metrics_collector: Arc::clone(&self.metrics_collector),
+            log_broadcaster: Arc::clone(&self.log_broadcaster),
+            logger: Arc::clone(&self.logger),
             auth_service: AuthService::new(jwt_config),
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { Send, Play, Trash2, Save, FileJson, Clock, CheckCircle, XCircle } from 'lucide-vue-next'
+import { Send, Trash2, FileJson, Clock, CheckCircle, XCircle } from 'lucide-vue-next'
 import { apiClient } from '@/api'
 
 const apiBaseUrl = ref('http://localhost:8080/api/v1')
@@ -35,13 +35,41 @@ const apiEndpoints = [
   { label: '搜索消息', method: 'GET', path: '/messages/search', category: '消息' }
 ]
 
-const requestHistory = ref([
-  { method: 'GET', path: '/api/v1/rooms', status: 200, time: '45ms', timestamp: '10:30:15' },
-  { method: 'POST', path: '/api/v1/auth/login', status: 200, time: '120ms', timestamp: '10:28:32' },
-  { method: 'GET', path: '/api/v1/users/me', status: 401, time: '15ms', timestamp: '10:25:10' }
-])
+// 请求历史记录接口
+interface RequestHistoryItem {
+  method: string
+  path: string
+  status: number
+  time: string
+  timestamp: string
+}
+
+const requestHistory = ref<RequestHistoryItem[]>([])
 
 const message = useMessage()
+
+// 从本地存储加载历史记录
+const loadHistoryFromStorage = () => {
+  try {
+    const stored = localStorage.getItem('api_test_history')
+    if (stored) {
+      requestHistory.value = JSON.parse(stored)
+    }
+  } catch {
+    // 忽略存储错误
+  }
+}
+
+// 保存历史记录到本地存储
+const saveHistoryToStorage = () => {
+  try {
+    // 只保留最近20条记录
+    const trimmed = requestHistory.value.slice(0, 20)
+    localStorage.setItem('api_test_history', JSON.stringify(trimmed))
+  } catch {
+    // 忽略存储错误
+  }
+}
 
 const selectEndpoint = (endpoint: (typeof apiEndpoints)[0]) => {
   selectedMethod.value = endpoint.method
@@ -89,6 +117,7 @@ const sendRequest = async () => {
       time: `${responseTime.value}ms`,
       timestamp: new Date().toLocaleTimeString()
     })
+    saveHistoryToStorage()
   } catch (error) {
     responseStatus.value = 500
     responseTime.value = Date.now() - startTime
@@ -103,6 +132,7 @@ const sendRequest = async () => {
       time: `${responseTime.value}ms`,
       timestamp: new Date().toLocaleTimeString()
     })
+    saveHistoryToStorage()
 
     message.error(`请求失败: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
@@ -114,13 +144,23 @@ const clearResponse = () => {
   responseTime.value = 0
 }
 
+const clearHistory = () => {
+  requestHistory.value = []
+  saveHistoryToStorage()
+}
+
 const loadTemplate = (method: string) => {
   const templates: Record<string, string> = {
     POST: JSON.stringify({ name: '新房间', description: '房间描述', is_public: true }, null, 2),
-    PUT: JSON.stringify({ name: '更新的房间', description: '更新后的描述' }, null, 2),   PATCH: JSON.stringify({ description: '部分更新' }, null, 2)
+    PUT: JSON.stringify({ name: '更新的房间', description: '更新后的描述' }, null, 2),
+    PATCH: JSON.stringify({ description: '部分更新' }, null, 2)
   }
   requestBody.value = templates[method] || ''
 }
+
+onMounted(() => {
+  loadHistoryFromStorage()
+})
 </script>
 
 <template>

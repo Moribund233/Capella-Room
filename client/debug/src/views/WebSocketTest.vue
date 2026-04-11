@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
-import { wsClient } from '@/api'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useWebSocketStore } from '@/stores/websocket'
 import { useAuthStore } from '@/stores/auth'
-import type { WebSocketMessage, ConnectionStatus } from '@/types/websocket'
+import { storeToRefs } from 'pinia'
+import { getMyRooms, type Room } from '@/api'
+import { useMessage } from 'naive-ui'
 import {
   Wifi,
   WifiOff,
@@ -11,172 +13,91 @@ import {
   Square,
   Trash2,
   MessageSquare,
-  Users,
   RefreshCw,
   LogIn,
   LogOut,
   MessageCircle,
+  List,
 } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
+const wsStore = useWebSocketStore()
+const message = useMessage()
+const {
+  status,
+  isConnected,
+  isConnecting,
+  joinedRooms,
+  currentRoom: storeCurrentRoom,
+  chatMessages,
+  onlineUsers,
+  latency,
+  reconnectAttempts
+} = storeToRefs(wsStore)
 
-// ========== 连接状态 ==========
-const connectionStatus = ref<ConnectionStatus>('disconnected')
-const latency = ref<number | null>(null)
-const lastPingTime = ref<number | null>(null)
-const joinedRooms = ref<string[]>([])
-const onlineUsers = ref<number>(0)
-
-// ========== 房间管理 ==========
+// ========== 本地状态 ==========
 const roomIdInput = ref('')
-const currentRoom = ref<string | null>(null)
-
-// ========== 消息 ==========
 const chatInput = ref('')
 const replyToMessageId = ref<string | null>(null)
-const messages = ref<
-  Array<{
-    id: string
-    type: 'system' | 'sent' | 'received'
-    content: string
-    time: string
-    sender?: string
-    roomId?: string
-  }>
->([
+const myRooms = ref<Room[]>([])
+const showRoomSelector = ref(false)
+const localMessages = ref<Array<{
+  id: string
+  type: 'system' | 'sent' | 'received'
+  content: string
+  time: string
+  sender?: string
+  roomId?: string
+}>>([
   {
     id: '0',
     type: 'system',
-    content: 'WebSocket 测试页面已加载，点击"连接"开始测试',
+    content: 'WebSocket 测试页面已加载',
     time: new Date().toLocaleTimeString(),
   },
 ])
 
+// 同步 store 的 currentRoom
+const currentRoom = computed({
+  get: () => storeCurrentRoom.value,
+  set: (val) => { storeCurrentRoom.value = val }
+})
+
 // ========== 计算属性 ==========
-const isConnected = computed(() => connectionStatus.value === 'connected')
-const isConnecting = computed(() => connectionStatus.value === 'connecting')
-const isReconnecting = computed(() => connectionStatus.value === 'reconnecting')
+const isReconnecting = computed(() => status.value === 'reconnecting')
 
 const statusText = computed(() => {
-  switch (connectionStatus.value) {
+  switch (status.value) {
     case 'connected':
       return '已连接'
     case 'connecting':
       return '连接中...'
     case 'reconnecting':
-      return '重连中...'
-    case 'error':
-      return '连接错误'
-    default:
+      return `重连中(${reconnectAttempts.value})`
+    case 'disconnected':
       return '未连接'
+    default:
+      return '未知'
   }
 })
 
 const statusType = computed(() => {
-  switch (connectionStatus.value) {
+  switch (status.value) {
     case 'connected':
       return 'success'
     case 'connecting':
     case 'reconnecting':
       return 'warning'
-    case 'error':
+    case 'disconnected':
       return 'error'
     default:
       return 'default'
   }
 })
 
-// ========== WebSocket 事件处理 ==========
-const handleConnect = () => {
-  connectionStatus.value = 'connected'
-  addSystemMessage('WebSocket 连接已建立')
-  // 连接成功后获取在线用户
-  wsClient.getOnlineUsers()
-}
-
-const handleDisconnect = () => {
-  connectionStatus.value = 'disconnected'
-  joinedRooms.value = []
-  addSystemMessage('WebSocket 连接已断开')
-}
-
-const handleError = (error: Error) => {
-  addSystemMessage(`连接错误: ${error.message}`, 'error')
-}
-
-const handleMessage = (message: WebSocketMessage) => {
-  switch (message.type) {
-    case 'AuthResult':
-      if (message.payload.success) {
-        addSystemMessage('认证成功')
-      } else {
-        addSystemMessage(`认证失败: ${message.payload.message}`, 'error')
-      }
-      break
-
-    case 'Pong':
-      if (lastPingTime.value) {
-        latency.value = Date.now() - lastPingTime.value
-        lastPingTime.value = null
-      }
-      break
-
-    case 'RoomJoined':
-      joinedRooms.value.push(message.payload.room_id)
-      addSystemMessage(`已加入房间: ${message.payload.room_id}`)
-      break
-
-    case 'RoomLeft':
-      joinedRooms.value = joinedRooms.value.filter((id) => id !== message.payload.room_id)
-      addSystemMessage(`已离开房间: ${message.payload.room_id}`)
-      break
-
-    case 'UserJoined':
-      addSystemMessage(`用户 ${message.payload.username} 加入房间`, 'info', message.payload.room_id)
-      break
-
-    case 'UserLeft':
-      addSystemMessage(`用户 ${message.payload.username} 离开房间`, 'info', message.payload.room_id)
-      break
-
-    case 'NewMessage':
-      messages.value.push({
-        id: message.payload.message_id,
-        type: 'received',
-        content: message.payload.content,
-        time: new Date(message.payload.created_at).toLocaleTimeString(),
-        sender: message.payload.sender_name,
-        roomId: message.payload.room_id,
-      })
-      break
-
-    case 'GlobalOnlineUsers':
-      onlineUsers.value = message.payload.total
-      break
-
-    case 'OnlineUsers':
-      addSystemMessage(
-        `房间 ${message.payload.room_id} 在线用户: ${message.payload.users.map((u) => u.username).join(', ')}`
-      )
-      break
-
-    case 'Error':
-      addSystemMessage(`错误: ${message.payload.message}`, 'error')
-      break
-
-    case 'SystemMessage':
-      addSystemMessage(message.payload.content)
-      break
-
-    default:
-      // 其他消息类型记录到控制台
-      console.log('收到消息:', message)
-  }
-}
-
 // ========== 消息辅助函数 ==========
 const addSystemMessage = (content: string, level: 'info' | 'error' = 'info', roomId?: string) => {
-  messages.value.push({
+  localMessages.value.push({
     id: Date.now().toString(),
     type: 'system',
     content,
@@ -185,52 +106,59 @@ const addSystemMessage = (content: string, level: 'info' | 'error' = 'info', roo
   })
 }
 
+// 监听 store 中的聊天消息
+watch(chatMessages, (newMessages) => {
+  // 将 store 的消息同步到本地显示
+  newMessages.forEach(msg => {
+    const exists = localMessages.value.some(m => m.id === msg.id)
+    if (!exists) {
+      localMessages.value.push(msg)
+    }
+  })
+}, { deep: true })
+
 // ========== 连接控制 ==========
-const connectWebSocket = async () => {
-  try {
-    connectionStatus.value = 'connecting'
-    wsClient.setHandlers({
-      onConnect: handleConnect,
-      onDisconnect: handleDisconnect,
-      onError: handleError,
-      onMessage: handleMessage,
-    })
-    await wsClient.connect()
-  } catch (error) {
-    connectionStatus.value = 'error'
-    addSystemMessage(`连接失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
-  }
+const connectWebSocket = () => {
+  wsStore.connect()
 }
 
 const disconnectWebSocket = () => {
-  wsClient.disconnect()
+  wsStore.disconnect()
+  addSystemMessage('WebSocket 连接已断开')
 }
 
 // ========== 房间管理 ==========
 const joinRoom = () => {
   if (!roomIdInput.value) return
-  const success = wsClient.joinRoom(roomIdInput.value)
+  const success = wsStore.joinRoom(roomIdInput.value)
   if (success) {
     currentRoom.value = roomIdInput.value
     roomIdInput.value = ''
+    addSystemMessage(`已加入房间: ${currentRoom.value}`)
   }
 }
 
 const leaveRoom = (roomId: string) => {
-  wsClient.leaveRoom(roomId)
+  wsStore.leaveRoom(roomId)
   if (currentRoom.value === roomId) {
     currentRoom.value = null
   }
+  addSystemMessage(`已离开房间: ${roomId}`)
 }
 
 // ========== 消息发送 ==========
 const sendChatMessage = () => {
   if (!chatInput.value || !currentRoom.value) return
 
-  const success = wsClient.sendChatMessage(currentRoom.value, chatInput.value, replyToMessageId.value || undefined)
+  const success = wsStore.sendChatMessage(
+    currentRoom.value,
+    chatInput.value,
+    replyToMessageId.value || undefined
+  )
 
   if (success) {
-    messages.value.push({
+    // 添加到本地消息
+    localMessages.value.push({
       id: Date.now().toString(),
       type: 'sent',
       content: chatInput.value,
@@ -244,13 +172,12 @@ const sendChatMessage = () => {
 }
 
 const sendPing = () => {
-  lastPingTime.value = Date.now()
-  wsClient.ping()
+  wsStore.ping()
 }
 
 // ========== 其他操作 ==========
 const clearMessages = () => {
-  messages.value = [
+  localMessages.value = [
     {
       id: '0',
       type: 'system',
@@ -258,15 +185,47 @@ const clearMessages = () => {
       time: new Date().toLocaleTimeString(),
     },
   ]
+  wsStore.clearChatMessages()
 }
 
 const refreshOnlineUsers = () => {
-  wsClient.getOnlineUsers()
+  wsStore.getOnlineUsers()
+}
+
+// ========== 房间列表 ==========
+const loadMyRooms = async () => {
+  try {
+    myRooms.value = await getMyRooms()
+    showRoomSelector.value = true
+  } catch (error) {
+    message.error('加载房间列表失败')
+    console.error(error)
+  }
+}
+
+const selectRoom = (room: Room) => {
+  // 如果房间还没加入，先加入
+  if (!joinedRooms.value.includes(room.id)) {
+    const success = wsStore.joinRoom(room.id)
+    if (success) {
+      addSystemMessage(`已加入房间: ${room.name} (${room.id})`)
+    }
+  }
+  currentRoom.value = room.id
+  showRoomSelector.value = false
+  message.success(`已选择房间: ${room.name}`)
 }
 
 // ========== 生命周期 ==========
+onMounted(() => {
+  // 如果未连接，自动连接
+  if (!isConnected.value) {
+    wsStore.connect()
+  }
+})
+
 onUnmounted(() => {
-  wsClient.disconnect()
+  // 注意：不在组件卸载时断开连接，因为它是全局共享的
 })
 </script>
 
@@ -344,6 +303,12 @@ onUnmounted(() => {
               </template>
               加入
             </n-button>
+            <n-button :disabled="!isConnected" @click="loadMyRooms">
+              <template #icon>
+                <List class="icon-sm" />
+              </template>
+              从列表选择
+            </n-button>
           </n-input-group>
 
           <n-divider />
@@ -398,7 +363,7 @@ onUnmounted(() => {
           "
         >
           <div
-            v-for="msg in messages"
+            v-for="msg in localMessages"
             :key="msg.id"
             style="margin-bottom: var(--space-sm); font-family: monospace; font-size: 13px"
           >
@@ -479,13 +444,13 @@ onUnmounted(() => {
 
           <div class="form-section-title">快捷操作</div>
           <n-space wrap>
-            <n-button size="small" :disabled="!isConnected" @click="wsClient.sendTyping(currentRoom!)">
+            <n-button size="small" :disabled="!isConnected || !currentRoom" @click="wsStore.sendTyping(currentRoom!)">
               正在输入...
             </n-button>
             <n-button
               size="small"
-              :disabled="!isConnected"
-              @click="wsClient.sendStopTyping(currentRoom!)"
+              :disabled="!isConnected || !currentRoom"
+              @click="wsStore.sendStopTyping(currentRoom!)"
             >
               停止输入
             </n-button>
@@ -493,5 +458,37 @@ onUnmounted(() => {
         </div>
       </div>
     </n-card>
+
+    <!-- 房间选择器弹窗 -->
+    <n-modal
+      v-model:show="showRoomSelector"
+      title="选择房间"
+      preset="card"
+      style="width: 500px"
+    >
+      <n-empty v-if="myRooms.length === 0" description="暂无已加入的房间" />
+      <n-list v-else bordered>
+        <n-list-item
+          v-for="room in myRooms"
+          :key="room.id"
+          clickable
+          @click="selectRoom(room)"
+        >
+          <n-thing :title="room.name" :description="room.id">
+            <template #description>
+              <n-space vertical size="small">
+                <n-text type="info" style="font-size: 12px">ID: {{ room.id }}</n-text>
+                <n-text depth="3" style="font-size: 12px">{{ room.description || '无描述' }}</n-text>
+              </n-space>
+            </template>
+            <template #avatar>
+              <n-tag :type="room.is_private ? 'warning' : 'success'" size="small">
+                {{ room.is_private ? '私有' : '公开' }}
+              </n-tag>
+            </template>
+          </n-thing>
+        </n-list-item>
+      </n-list>
+    </n-modal>
   </div>
 </template>

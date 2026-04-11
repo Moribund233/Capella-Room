@@ -1,7 +1,100 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
+use tokio::sync::broadcast;
 use tracing::{info, warn};
 use uuid::Uuid;
+
+/// 初始化 Windows 控制台 UTF-8 编码
+/// 在 Windows 系统上设置控制台代码页为 UTF-8 (65001)
+pub fn init_windows_console() {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        let _ = Command::new("cmd").args(["/C", "chcp", "65001"]).output();
+    }
+}
+
+/// 初始化日志系统
+///
+/// # Arguments
+/// * `is_maintenance_mode` - 是否在维护模式下（维护模式会打印更详细的日志，包括文件名和行号）
+pub fn init_logging(is_maintenance_mode: bool) {
+    init_windows_console();
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        tracing_subscriber::EnvFilter::new("info,seredeli_room=debug,tower_http=debug")
+    });
+
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_target(true)
+        .with_thread_ids(is_maintenance_mode)
+        .with_file(is_maintenance_mode)
+        .with_line_number(is_maintenance_mode)
+        .with_ansi(false);
+
+    subscriber.init();
+}
+
+/// 全局日志广播器实例
+static GLOBAL_LOG_BROADCASTER: OnceLock<LogBroadcaster> = OnceLock::new();
+
+/// 初始化全局日志广播器
+pub fn init_global_log_broadcaster(broadcaster: LogBroadcaster) {
+    let _ = GLOBAL_LOG_BROADCASTER.set(broadcaster);
+}
+
+/// 获取全局日志广播器
+pub fn get_global_log_broadcaster() -> Option<&'static LogBroadcaster> {
+    GLOBAL_LOG_BROADCASTER.get()
+}
+
+/// 日志条目
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LogEntry {
+    pub level: String,
+    pub target: String,
+    pub message: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub fields: Option<serde_json::Value>,
+}
+
+/// 日志广播器
+#[derive(Debug, Clone)]
+pub struct LogBroadcaster {
+    sender: broadcast::Sender<LogEntry>,
+}
+
+impl LogBroadcaster {
+    /// 创建新的日志广播器
+    pub fn new(capacity: usize) -> Self {
+        let (sender, _) = broadcast::channel(capacity);
+        Self { sender }
+    }
+
+    /// 订阅日志
+    pub fn subscribe(&self) -> broadcast::Receiver<LogEntry> {
+        self.sender.subscribe()
+    }
+
+    /// 广播日志
+    pub fn broadcast(&self, entry: LogEntry) {
+        // 忽略发送失败（没有订阅者时）
+        let _ = self.sender.send(entry);
+    }
+
+    /// 获取订阅者数量
+    pub fn subscriber_count(&self) -> usize {
+        self.sender.receiver_count()
+    }
+}
+
+impl Default for LogBroadcaster {
+    fn default() -> Self {
+        Self::new(1000)
+    }
+}
 
 /// 性能指标收集器
 pub struct MetricsCollector {
@@ -92,15 +185,41 @@ pub struct MetricsSnapshot {
 pub struct StructuredLogger;
 
 impl StructuredLogger {
+    /// 广播日志条目
+    fn broadcast(level: &str, target: &str, message: &str, fields: Option<serde_json::Value>) {
+        if let Some(broadcaster) = get_global_log_broadcaster() {
+            let entry = LogEntry {
+                level: level.to_string(),
+                target: target.to_string(),
+                message: message.to_string(),
+                timestamp: chrono::Utc::now(),
+                fields,
+            };
+            broadcaster.broadcast(entry);
+        }
+    }
+
     /// 记录 WebSocket 连接事件
     pub fn websocket_connect(user_id: Uuid, username: &str, ip: Option<&str>) {
+        let ip_str = ip.unwrap_or("unknown");
         info!(
             target: "websocket",
             user_id = %user_id,
             username = %username,
-            ip = ip.unwrap_or("unknown"),
+            ip = ip_str,
             event = "connect",
             "WebSocket connection established"
+        );
+        Self::broadcast(
+            "info",
+            "websocket",
+            "WebSocket connection established",
+            Some(serde_json::json!({
+                "user_id": user_id,
+                "username": username,
+                "ip": ip_str,
+                "event": "connect"
+            })),
         );
     }
 
@@ -114,6 +233,17 @@ impl StructuredLogger {
             event = "disconnect",
             "WebSocket connection closed"
         );
+        Self::broadcast(
+            "info",
+            "websocket",
+            "WebSocket connection closed",
+            Some(serde_json::json!({
+                "user_id": user_id,
+                "username": username,
+                "reason": reason,
+                "event": "disconnect"
+            })),
+        );
     }
 
     /// 记录房间加入事件
@@ -126,6 +256,17 @@ impl StructuredLogger {
             event = "join",
             "User joined room"
         );
+        Self::broadcast(
+            "info",
+            "room",
+            "User joined room",
+            Some(serde_json::json!({
+                "user_id": user_id,
+                "username": username,
+                "room_id": room_id,
+                "event": "join"
+            })),
+        );
     }
 
     /// 记录房间离开事件
@@ -137,6 +278,17 @@ impl StructuredLogger {
             room_id = %room_id,
             event = "leave",
             "User left room"
+        );
+        Self::broadcast(
+            "info",
+            "room",
+            "User left room",
+            Some(serde_json::json!({
+                "user_id": user_id,
+                "username": username,
+                "room_id": room_id,
+                "event": "leave"
+            })),
         );
     }
 
@@ -160,6 +312,20 @@ impl StructuredLogger {
             event = "message_sent",
             "Message sent to room"
         );
+        Self::broadcast(
+            "info",
+            "message",
+            "Message sent to room",
+            Some(serde_json::json!({
+                "message_id": message_id,
+                "room_id": room_id,
+                "user_id": user_id,
+                "username": username,
+                "content_length": content_length,
+                "latency_ms": latency_ms,
+                "event": "message_sent"
+            })),
+        );
     }
 
     /// 记录错误事件
@@ -178,10 +344,23 @@ impl StructuredLogger {
             event = "error",
             "Error occurred"
         );
+        Self::broadcast(
+            "warn",
+            "error",
+            "Error occurred",
+            Some(serde_json::json!({
+                "error_code": error_code,
+                "error_message": error_message,
+                "user_id": user_id,
+                "room_id": room_id,
+                "event": "error"
+            })),
+        );
     }
 
     /// 记录性能事件
     pub fn performance_event(event_name: &str, duration_ms: u128, details: &str) {
+        let level = if duration_ms > 100 { "warn" } else { "info" };
         if duration_ms > 100 {
             warn!(
                 target: "performance",
@@ -201,6 +380,21 @@ impl StructuredLogger {
                 "Performance event"
             );
         }
+        Self::broadcast(
+            level,
+            "performance",
+            if duration_ms > 100 {
+                "Slow operation detected"
+            } else {
+                "Performance event"
+            },
+            Some(serde_json::json!({
+                "event_name": event_name,
+                "duration_ms": duration_ms,
+                "details": details,
+                "event": if duration_ms > 100 { "slow_operation" } else { "performance" }
+            })),
+        );
     }
 }
 

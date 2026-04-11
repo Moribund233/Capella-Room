@@ -2,8 +2,10 @@
  * 认证状态管理 Store
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { defineStore } from 'pinia'
+import { useRouter } from 'vue-router'
+import { useMessage } from 'naive-ui'
 import type { User, LoginRequest, RegisterRequest } from '@/types/api'
 import {
   login as loginApi,
@@ -13,6 +15,7 @@ import {
   getStoredUser,
   isAuthenticated as checkIsAuthenticated,
 } from '@/api/auth'
+import { TOKEN_EXPIRED_EVENT } from '@/api/client'
 
 export const useAuthStore = defineStore('auth', () => {
   // ========== State ==========
@@ -145,6 +148,41 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  /**
+   * 处理 Token 过期
+   * 清除认证状态并重定向到登录页
+   */
+  function handleTokenExpired(message: string = '登录已过期，请重新登录') {
+    const router = useRouter()
+    const messageApi = useMessage()
+
+    // 清除用户状态
+    user.value = null
+
+    // 显示提示消息
+    messageApi.warning(message)
+
+    // 重定向到登录页
+    router.push('/login')
+  }
+
+  /**
+   * 初始化 Token 过期监听
+   * 在组件挂载时调用
+   */
+  function initTokenExpiredListener() {
+    const handleExpired = (event: CustomEvent<{ message: string }>) => {
+      handleTokenExpired(event.detail.message)
+    }
+
+    window.addEventListener(TOKEN_EXPIRED_EVENT, handleExpired as EventListener)
+
+    // 返回清理函数，用于组件卸载时移除监听
+    return () => {
+      window.removeEventListener(TOKEN_EXPIRED_EVENT, handleExpired as EventListener)
+    }
+  }
+
   return {
     // State
     user,
@@ -165,5 +203,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchCurrentUser,
     clearError,
+    handleTokenExpired,
+    initTokenExpiredListener,
   }
 })

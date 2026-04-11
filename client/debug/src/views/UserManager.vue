@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useMessage, useDialog } from 'naive-ui'
 import {
   Search,
   UserPlus,
@@ -13,81 +14,189 @@ import {
   XCircle,
   RefreshCw
 } from 'lucide-vue-next'
+import { getUsers, deleteUser, createUser, updateUser, type User as UserType } from '@/api'
 
+const message = useMessage()
+const dialog = useDialog()
+
+// ========== 状态 ==========
+const users = ref<UserType[]>([])
+const loading = ref(false)
 const searchQuery = ref('')
 const showCreateModal = ref(false)
-const selectedUser = ref<any>(null)
+const showEditModal = ref(false)
+const selectedUser = ref<UserType | null>(null)
 
-const users = ref([
-  {
-    id: '1',
-    username: 'admin',
-    email: 'admin@seredeli.com',
-    role: 'superadmin',
-    status: 'active',
-    created_at: '2024-01-01',
-    last_login: '2024-03-10 10:30:00'
-  },
-  {
-    id: '2',
-    username: 'user_123',
-    email: 'user123@example.com',
-    role: 'user',
-    status: 'active',
-    created_at: '2024-01-15',
-    last_login: '2024-03-09 15:20:00'
-  },
-  {
-    id: '3',
-    username: 'test_user',
-    email: 'test@example.com',
-    role: 'user',
-    status: 'inactive',
-    created_at: '2024-02-01',
-    last_login: '2024-02-15 09:10:00'
-  }
-])
-
+// 表单数据
 const newUser = ref({
   username: '',
   email: '',
   password: '',
-  role: 'user'
+  role: 'user' as 'user' | 'admin'
 })
 
+const editForm = ref({
+  username: '',
+  email: '',
+  role: 'user' as 'user' | 'admin' | 'super_admin',
+  status: 'active' as 'active' | 'inactive'
+})
+
+// ========== 计算属性 ==========
+const filteredUsers = computed(() => {
+  if (!searchQuery.value) return users.value
+  const query = searchQuery.value.toLowerCase()
+  return users.value.filter(
+    (user) =>
+      user.username.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query)
+  )
+})
+
+// ========== 表格列定义 ==========
 const columns = [
-  { title: '用户名', key: 'username' },
-  { title: '邮箱', key: 'email' },
-  { title: '角色', key: 'role' },
-  { title: '状态', key: 'status' },
-  { title: '最后登录', key: 'last_login' },
-  { title: '操作', key: 'actions' }
+  { title: '用户名', key: 'username', width: 150 },
+  { title: '邮箱', key: 'email', width: 200 },
+  { title: '角色', key: 'role', width: 120 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '创建时间', key: 'created_at', width: 150 },
+  { title: '最后登录', key: 'last_login', width: 150 },
+  { title: '操作', key: 'actions', width: 150, fixed: 'right' as const },
 ]
 
-const createUser = () => {
-  users.value.push({
-    id: String(users.value.length + 1),
-    username: newUser.value.username,
-    email: newUser.value.email,
-    role: newUser.value.role,
-    status: 'active',
-    created_at: new Date().toISOString().split('T')[0] || '',
-    last_login: '-'
-  })
-  showCreateModal.value = false
-  newUser.value = { username: '', email: '', password: '', role: 'user' }
-}
-
-const deleteUser = (user: any) => {
-  const index = users.value.findIndex((u) => u.id === user.id)
-  if (index > -1) {
-    users.value.splice(index, 1)
+// ========== 数据加载 ==========
+const loadUsers = async () => {
+  loading.value = true
+  try {
+    const data = await getUsers()
+    users.value = data
+  } catch (error) {
+    message.error('加载用户列表失败')
+    console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 
-const viewUserDetails = (user: any) => {
-  selectedUser.value = user
+// ========== 创建用户 ==========
+const handleCreate = async () => {
+  if (!newUser.value.username.trim()) {
+    message.warning('请输入用户名')
+    return
+  }
+  if (!newUser.value.email.trim()) {
+    message.warning('请输入邮箱')
+    return
+  }
+  if (!newUser.value.password.trim()) {
+    message.warning('请输入密码')
+    return
+  }
+
+  try {
+    await createUser({
+      username: newUser.value.username.trim(),
+      email: newUser.value.email.trim(),
+      password: newUser.value.password.trim(),
+      role: newUser.value.role,
+    })
+    message.success('用户创建成功')
+    showCreateModal.value = false
+    resetCreateForm()
+    loadUsers()
+  } catch (error) {
+    message.error('创建用户失败')
+    console.error(error)
+  }
 }
+
+// ========== 编辑用户 ==========
+const openEditModal = (user: UserType) => {
+  selectedUser.value = user
+  editForm.value = {
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+  }
+  showEditModal.value = true
+}
+
+const handleUpdate = async () => {
+  if (!selectedUser.value) return
+  if (!editForm.value.username.trim()) {
+    message.warning('请输入用户名')
+    return
+  }
+
+  try {
+    await updateUser(selectedUser.value.id, {
+      username: editForm.value.username.trim(),
+      email: editForm.value.email.trim(),
+      role: editForm.value.role,
+      status: editForm.value.status,
+    })
+    message.success('用户更新成功')
+    showEditModal.value = false
+    loadUsers()
+  } catch (error) {
+    message.error('更新用户失败')
+    console.error(error)
+  }
+}
+
+// ========== 删除用户 ==========
+const handleDelete = (user: UserType) => {
+  dialog.warning({
+    title: '确认删除',
+    content: `确定要删除用户 "${user.username}" 吗？此操作不可恢复。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await deleteUser(user.id)
+        message.success('用户已删除')
+        loadUsers()
+      } catch (error) {
+        message.error('删除用户失败')
+        console.error(error)
+      }
+    },
+  })
+}
+
+// ========== 辅助函数 ==========
+const resetCreateForm = () => {
+  newUser.value = {
+    username: '',
+    email: '',
+    password: '',
+    role: 'user',
+  }
+}
+
+const getRoleText = (role: string) => {
+  const roleMap: Record<string, string> = {
+    user: '普通用户',
+    admin: '管理员',
+    super_admin: '超级管理员',
+  }
+  return roleMap[role] || role
+}
+
+const getRoleType = (role: string): 'default' | 'primary' | 'error' => {
+  const typeMap: Record<string, 'default' | 'primary' | 'error'> = {
+    user: 'default',
+    admin: 'primary',
+    super_admin: 'error',
+  }
+  return typeMap[role] || 'default'
+}
+
+// ========== 初始化 ==========
+onMounted(() => {
+  loadUsers()
+})
 </script>
 
 <template>
@@ -109,7 +218,7 @@ const viewUserDetails = (user: any) => {
               <Search class="icon-sm" />
             </template>
           </n-input>
-          <n-button>
+          <n-button @click="loadUsers">
             <template #icon>
               <RefreshCw class="icon-sm" />
             </template>
@@ -127,7 +236,13 @@ const viewUserDetails = (user: any) => {
 
     <!-- 用户列表 -->
     <n-card>
-      <n-data-table :columns="columns" :data="users" :bordered="false">
+      <n-data-table
+        :columns="columns"
+        :data="filteredUsers"
+        :loading="loading"
+        :bordered="false"
+        :scroll-x="900"
+      >
         <template #bodyCell="{ column, row }">
           <template v-if="column.key === 'username'">
             <n-space align="center">
@@ -144,11 +259,11 @@ const viewUserDetails = (user: any) => {
             </n-space>
           </template>
           <template v-if="column.key === 'role'">
-            <n-tag :type="row.role === 'superadmin' ? 'error' : 'default'" size="small">
+            <n-tag :type="getRoleType(row.role)" size="small">
               <template #icon>
                 <Shield class="icon-sm" />
               </template>
-              {{ row.role === 'superadmin' ? '超级管理员' : '普通用户' }}
+              {{ getRoleText(row.role) }}
             </n-tag>
           </template>
           <template v-if="column.key === 'status'">
@@ -159,21 +274,27 @@ const viewUserDetails = (user: any) => {
               {{ row.status === 'active' ? '活跃' : '未激活' }}
             </n-tag>
           </template>
+          <template v-if="column.key === 'created_at'">
+            <n-space align="center">
+              <Clock class="icon-sm" style="color: var(--text-muted)" />
+              <span>{{ new Date(row.created_at).toLocaleString() }}</span>
+            </n-space>
+          </template>
           <template v-if="column.key === 'last_login'">
             <n-space align="center">
               <Clock class="icon-sm" style="color: var(--text-muted)" />
-              <span>{{ row.last_login }}</span>
+              <span>{{ row.last_login ? new Date(row.last_login).toLocaleString() : '-' }}</span>
             </n-space>
           </template>
           <template v-if="column.key === 'actions'">
             <n-space>
-              <n-button size="small" text type="primary" @click="viewUserDetails(row)">
+              <n-button size="small" text type="primary" @click="openEditModal(row)">
                 <template #icon>
                   <Edit class="icon-sm" />
                 </template>
                 编辑
               </n-button>
-              <n-button size="small" text type="error" @click="deleteUser(row)">
+              <n-button size="small" text type="error" @click="handleDelete(row)">
                 <template #icon>
                   <Trash2 class="icon-sm" />
                 </template>
@@ -198,47 +319,49 @@ const viewUserDetails = (user: any) => {
           <n-input v-model:value="newUser.password" type="password" placeholder="输入密码" />
         </n-form-item>
         <n-form-item label="角色">
-          <n-select
-            v-model:value="newUser.role"
-            :options="[
-              { label: '普通用户', value: 'user' },
-              { label: '管理员', value: 'admin' }
-            ]"
-          />
+          <n-select v-model:value="newUser.role" :options="[
+            { label: '普通用户', value: 'user' },
+            { label: '管理员', value: 'admin' }
+          ]" />
         </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
           <n-button @click="showCreateModal = false">取消</n-button>
-          <n-button type="primary" @click="createUser">添加</n-button>
+          <n-button type="primary" @click="handleCreate">创建</n-button>
         </n-space>
       </template>
     </n-modal>
 
-    <!-- 用户详情弹窗 -->
-    <n-modal
-      v-model:show="selectedUser"
-      :title="selectedUser?.username"
-      preset="card"
-      style="width: 500px"
-    >
-      <n-descriptions v-if="selectedUser" :columns="2" bordered>
-        <n-descriptions-item label="ID">{{ selectedUser.id }}</n-descriptions-item>
-        <n-descriptions-item label="用户名">{{ selectedUser.username }}</n-descriptions-item>
-        <n-descriptions-item label="邮箱" :span="2">{{ selectedUser.email }}</n-descriptions-item>
-        <n-descriptions-item label="角色">
-          <n-tag :type="selectedUser.role === 'superadmin' ? 'error' : 'default'">
-            {{ selectedUser.role === 'superadmin' ? '超级管理员' : '普通用户' }}
-          </n-tag>
-        </n-descriptions-item>
-        <n-descriptions-item label="状态">
-          <n-tag :type="selectedUser.status === 'active' ? 'success' : 'warning'">
-            {{ selectedUser.status === 'active' ? '活跃' : '未激活' }}
-          </n-tag>
-        </n-descriptions-item>
-        <n-descriptions-item label="创建时间">{{ selectedUser.created_at }}</n-descriptions-item>
-        <n-descriptions-item label="最后登录">{{ selectedUser.last_login }}</n-descriptions-item>
-      </n-descriptions>
+    <!-- 编辑用户弹窗 -->
+    <n-modal v-model:show="showEditModal" title="编辑用户" preset="card" style="width: 500px">
+      <n-form label-placement="left" label-width="80">
+        <n-form-item label="用户名" required>
+          <n-input v-model:value="editForm.username" placeholder="输入用户名" />
+        </n-form-item>
+        <n-form-item label="邮箱" required>
+          <n-input v-model:value="editForm.email" placeholder="输入邮箱" />
+        </n-form-item>
+        <n-form-item label="角色">
+          <n-select v-model:value="editForm.role" :options="[
+            { label: '普通用户', value: 'user' },
+            { label: '管理员', value: 'admin' },
+            { label: '超级管理员', value: 'super_admin' }
+          ]" />
+        </n-form-item>
+        <n-form-item label="状态">
+          <n-select v-model:value="editForm.status" :options="[
+            { label: '活跃', value: 'active' },
+            { label: '未激活', value: 'inactive' }
+          ]" />
+        </n-form-item>
+      </n-form>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showEditModal = false">取消</n-button>
+          <n-button type="primary" @click="handleUpdate">保存</n-button>
+        </n-space>
+      </template>
     </n-modal>
   </div>
 </template>

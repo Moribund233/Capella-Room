@@ -1,86 +1,159 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useMessage } from 'naive-ui'
 import {
   Send,
   Search,
   RefreshCw,
   MessageSquare,
   Trash2,
-  Edit,
-  Reply,
-  History,
-  User
+  Reply
 } from 'lucide-vue-next'
+import { getRoomMessages, deleteMessage, searchMessages, getRooms, type Room } from '@/api'
+import type { Message } from '@/api/message'
+import { useWebSocketStore } from '@/stores/websocket'
+import { storeToRefs } from 'pinia'
 
-const selectedRoom = ref('lobby')
+const message = useMessage()
+const wsStore = useWebSocketStore()
+const { isConnected: wsConnected } = storeToRefs(wsStore)
+
+// ========== 状态 ==========
+const rooms = ref<Room[]>([])
+const selectedRoomId = ref<string>('')
+const messages = ref<Message[]>([])
+const loading = ref(false)
 const messageContent = ref('')
 const searchQuery = ref('')
+const searchResults = ref<Message[]>([])
+const showSearchPanel = ref(false)
+const hasMore = ref(false)
+const replyToMessage = ref<Message | null>(null)
 
-const rooms = [
-  { label: '大厅', value: 'lobby' },
-  { label: '技术交流', value: 'tech' },
-  { label: '测试房间', value: 'test' }
-]
-
-const messages = ref([
-  {
-    id: '1',
-    content: '大家好！欢迎来到 Seredeli Room！',
-    sender: 'admin',
-    sender_id: '1',
-    room_id: 'lobby',
-    created_at: '2024-03-10 10:00:00',
-    type: 'text'
-  },
-  {
-    id: '2',
-    content: '这个项目看起来很棒！',
-    sender: 'user_123',
-    sender_id: '2',
-    room_id: 'lobby',
-    created_at: '2024-03-10 10:05:00',
-    type: 'text'
-  },
-  {
-    id: '3',
-    content: 'WebSocket 功能测试成功',
-    sender: 'test_user',
-    sender_id: '3',
-    room_id: 'lobby',
-    created_at: '2024-03-10 10:10:00',
-    type: 'text'
-  },
-  {
-    id: '4',
-    content: '有人知道如何部署到生产环境吗？',
-    sender: 'user_456',
-    sender_id: '4',
-    room_id: 'lobby',
-    created_at: '2024-03-10 10:15:00',
-    type: 'text'
-  }
-])
-
-const sendMessage = () => {
-  if (!messageContent.value) return
-  messages.value.push({
-    id: String(messages.value.length + 1),
-    content: messageContent.value,
-    sender: 'current_user',
-    sender_id: '99',
-    room_id: selectedRoom.value,
-    created_at: new Date().toLocaleString(),
-    type: 'text'
-  })
-  messageContent.value = ''
-}
-
-const deleteMessage = (msg: any) => {
-  const index = messages.value.findIndex((m) => m.id === msg.id)
-  if (index > -1) {
-    messages.value.splice(index, 1)
+// ========== 数据加载 ==========
+const loadRooms = async () => {
+  try {
+    const data = await getRooms()
+    rooms.value = data
+    if (data.length > 0 && !selectedRoomId.value) {
+      const firstRoom = data[0]
+      if (firstRoom && firstRoom.id) {
+        selectedRoomId.value = firstRoom.id
+      }
+    }
+  } catch (error) {
+    message.error('加载房间列表失败')
+    console.error(error)
   }
 }
+
+const loadMessages = async () => {
+  if (!selectedRoomId.value) return
+
+  loading.value = true
+  try {
+    const result = await getRoomMessages(selectedRoomId.value, { limit: 50 })
+    messages.value = result.messages
+    hasMore.value = result.has_more
+  } catch (error) {
+    message.error('加载消息失败')
+    console.error(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// ========== 发送消息 ==========
+const handleSendMessage = async () => {
+  if (!messageContent.value.trim() || !selectedRoomId.value) return
+
+  if (!wsConnected.value) {
+    message.error('WebSocket 未连接，无法发送消息')
+    return
+  }
+
+  try {
+    // 通过 WebSocket 发送消息
+    const success = wsStore.send({
+      type: 'ChatMessage',
+      payload: {
+        room_id: selectedRoomId.value,
+        content: messageContent.value.trim(),
+        reply_to: replyToMessage.value?.id || null
+      }
+    })
+
+    if (success) {
+      messageContent.value = ''
+      replyToMessage.value = null
+      message.success('消息已发送')
+      // 延迟后刷新消息列表
+      setTimeout(() => loadMessages(), 500)
+    } else {
+      message.error('发送消息失败，请检查 WebSocket 连接')
+    }
+  } catch (error) {
+    message.error('发送消息失败')
+    console.error(error)
+  }
+}
+
+// ========== 删除消息 ==========
+const handleDeleteMessage = async (msg: Message) => {
+  try {
+    await deleteMessage(msg.id)
+    message.success('消息已删除')
+    await loadMessages()
+  } catch (error) {
+    message.error('删除消息失败')
+    console.error(error)
+  }
+}
+
+// ========== 搜索消息 ==========
+const handleSearch = async () => {
+  if (!searchQuery.value.trim()) {
+    showSearchPanel.value = false
+    return
+  }
+
+  try {
+    const result = await searchMessages({
+      query: searchQuery.value.trim(),
+      room_id: selectedRoomId.value,
+    })
+    searchResults.value = result.messages
+    showSearchPanel.value = true
+  } catch (error) {
+    message.error('搜索消息失败')
+    console.error(error)
+  }
+}
+
+// ========== 回复消息 ==========
+const handleReply = (msg: Message) => {
+  replyToMessage.value = msg
+}
+
+const cancelReply = () => {
+  replyToMessage.value = null
+}
+
+// ========== 监听房间变化 ==========
+watch(selectedRoomId, () => {
+  loadMessages()
+  showSearchPanel.value = false
+  searchQuery.value = ''
+})
+
+// ========== 初始化 ==========
+onMounted(() => {
+  loadRooms()
+  // 连接 WebSocket（如果未连接）
+  if (!wsConnected.value) {
+    wsStore.connect()
+  }
+})
 </script>
 
 <template>
@@ -101,8 +174,13 @@ const deleteMessage = (msg: any) => {
       <n-card title="消息测试">
         <template #header-extra>
           <n-space>
-            <n-select v-model:value="selectedRoom" :options="rooms" style="width: 150px" />
-            <n-button text>
+            <n-select
+              v-model:value="selectedRoomId"
+              :options="rooms.map(r => ({ label: r.name, value: r.id }))"
+              placeholder="选择房间"
+              style="width: 180px"
+            />
+            <n-button text @click="loadMessages">
               <template #icon>
                 <RefreshCw class="icon-sm" />
               </template>
@@ -122,31 +200,37 @@ const deleteMessage = (msg: any) => {
             margin-bottom: var(--space-md);
           "
         >
+          <div v-if="loading" style="text-align: center; padding: var(--space-xl)">
+            <n-spin size="medium" />
+          </div>
+          <div v-else-if="messages.length === 0" style="text-align: center; padding: var(--space-xl); color: var(--text-muted)">
+            暂无消息
+          </div>
           <div
             v-for="msg in messages"
             :key="msg.id"
             style="margin-bottom: var(--space-md); padding: var(--space-md); background-color: var(--bg-white); border-radius: var(--radius-md)"
           >
+            <!-- 回复引用 -->
+            <div v-if="msg.reply_to" style="margin-bottom: var(--space-sm); padding: var(--space-sm); background-color: var(--bg-secondary); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-muted)">
+              <Reply class="icon-sm" style="display: inline; vertical-align: middle; margin-right: 4px" />
+              回复消息
+            </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm)">
               <n-space align="center">
                 <n-avatar size="small" :style="{ backgroundColor: 'var(--primary)' }">
                   {{ msg.sender.charAt(0).toUpperCase() }}
                 </n-avatar>
                 <span style="font-weight: 500">{{ msg.sender }}</span>
-                <span style="font-size: 12px; color: var(--text-muted)">{{ msg.created_at }}</span>
+                <span style="font-size: 12px; color: var(--text-muted)">{{ new Date(msg.created_at).toLocaleString() }}</span>
               </n-space>
               <n-space>
-                <n-button size="tiny" text>
+                <n-button size="tiny" text @click="handleReply(msg)">
                   <template #icon>
                     <Reply class="icon-sm" />
                   </template>
                 </n-button>
-                <n-button size="tiny" text>
-                  <template #icon>
-                    <Edit class="icon-sm" />
-                  </template>
-                </n-button>
-                <n-button size="tiny" text type="error" @click="deleteMessage(msg)">
+                <n-button size="tiny" text type="error" @click="handleDeleteMessage(msg)">
                   <template #icon>
                     <Trash2 class="icon-sm" />
                   </template>
@@ -157,14 +241,27 @@ const deleteMessage = (msg: any) => {
           </div>
         </div>
 
+        <!-- 回复提示 -->
+        <div v-if="replyToMessage" style="margin-bottom: var(--space-sm); padding: var(--space-sm); background-color: var(--bg-secondary); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center">
+          <span style="font-size: 13px; color: var(--text-muted)">
+            <Reply class="icon-sm" style="display: inline; vertical-align: middle; margin-right: 4px" />
+            回复 {{ replyToMessage.sender }}: {{ replyToMessage.content.substring(0, 30) }}{{ replyToMessage.content.length > 30 ? '...' : '' }}
+          </span>
+          <n-button size="tiny" text @click="cancelReply">
+            <template #icon>
+              <Trash2 class="icon-sm" />
+            </template>
+          </n-button>
+        </div>
+
         <!-- 发送消息 -->
         <n-input-group>
           <n-input
             v-model:value="messageContent"
             placeholder="输入消息内容..."
-            @keyup.enter="sendMessage"
+            @keyup.enter="handleSendMessage"
           />
-          <n-button type="primary" @click="sendMessage">
+          <n-button type="primary" @click="handleSendMessage">
             <template #icon>
               <Send class="icon-sm" />
             </template>
@@ -180,12 +277,13 @@ const deleteMessage = (msg: any) => {
             v-model:value="searchQuery"
             placeholder="搜索消息内容..."
             style="margin-bottom: var(--space-md)"
+            @keyup.enter="handleSearch"
           >
             <template #prefix>
               <Search class="icon-sm" />
             </template>
           </n-input>
-          <n-button type="primary" block>
+          <n-button type="primary" block @click="handleSearch">
             <template #icon>
               <Search class="icon-sm" />
             </template>
@@ -193,44 +291,38 @@ const deleteMessage = (msg: any) => {
           </n-button>
         </n-card>
 
-        <n-card title="搜索选项">
-          <n-form label-placement="left" label-width="80">
-            <n-form-item label="房间">
-              <n-select v-model:value="selectedRoom" :options="rooms" />
-            </n-form-item>
-            <n-form-item label="用户">
-              <n-input placeholder="用户名" />
-            </n-form-item>
-            <n-form-item label="时间范围">
-              <n-date-picker type="daterange" style="width: 100%" />
-            </n-form-item>
-            <n-form-item label="消息类型">
-              <n-checkbox-group>
-                <n-space>
-                  <n-checkbox label="文本" value="text" checked />
-                  <n-checkbox label="图片" value="image" />
-                  <n-checkbox label="文件" value="file" />
-                </n-space>
-              </n-checkbox-group>
-            </n-form-item>
-          </n-form>
+        <!-- 搜索结果 -->
+        <n-card v-if="showSearchPanel" title="搜索结果">
+          <div style="max-height: 400px; overflow-y: auto">
+            <div v-if="searchResults.length === 0" style="text-align: center; padding: var(--space-lg); color: var(--text-muted)">
+              未找到匹配的消息
+            </div>
+            <div
+              v-for="msg in searchResults"
+              :key="msg.id"
+              style="margin-bottom: var(--space-md); padding: var(--space-md); background-color: var(--bg-secondary); border-radius: var(--radius-md)"
+            >
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs)">
+                <span style="font-weight: 500; font-size: 13px">{{ msg.sender }}</span>
+                <span style="font-size: 11px; color: var(--text-muted)">{{ new Date(msg.created_at).toLocaleString() }}</span>
+              </div>
+              <div style="color: var(--text-primary); font-size: 13px">{{ msg.content }}</div>
+            </div>
+          </div>
         </n-card>
 
-        <n-card title="操作">
-          <n-space vertical style="width: 100%">
-            <n-button block>
-              <template #icon>
-                <History class="icon-sm" />
-              </template>
-              查看历史记录
-            </n-button>
-            <n-button block>
-              <template #icon>
-                <Trash2 class="icon-sm" />
-              </template>
-              批量删除
-            </n-button>
-          </n-space>
+        <n-card title="房间信息">
+          <n-descriptions :column="1" size="small">
+            <n-descriptions-item label="当前房间">
+              {{ rooms.find(r => r.id === selectedRoomId)?.name || '未选择' }}
+            </n-descriptions-item>
+            <n-descriptions-item label="消息数量">
+              {{ messages.length }}
+            </n-descriptions-item>
+            <n-descriptions-item label="在线成员">
+              {{ rooms.find(r => r.id === selectedRoomId)?.member_count || 0 }}
+            </n-descriptions-item>
+          </n-descriptions>
         </n-card>
       </div>
     </div>

@@ -197,9 +197,6 @@ fn admin_router() -> Router<Arc<AppState>> {
         // 系统统计
         .route("/stats", get(admin::get_stats))
         .route("/stats/activity", get(admin::get_activity_stats))
-        // 日志查看
-        .route("/logs", get(admin::list_logs))
-        .route("/logs/download", get(admin::download_logs))
         // 系统配置管理
         .route(
             "/configs",

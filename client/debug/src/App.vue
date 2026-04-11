@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from './components/layout/MainLayout.vue'
@@ -12,6 +12,10 @@ onMounted(() => {
   if (authStore.isAuthenticated) {
     authStore.fetchCurrentUser()
   }
+
+  // 初始化 Token 过期监听
+  const cleanup = authStore.initTokenExpiredListener()
+  onUnmounted(cleanup)
 })
 </script>
 

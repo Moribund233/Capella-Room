@@ -303,15 +303,17 @@ export class ConcurrentTester {
 
       // 获取可用房间
       const rooms = await getRooms()
-      const roomIds = rooms.map((r) => r.id)
+      const roomIds = rooms.map((r) => r.id).filter((id): id is string => id !== undefined)
 
       // 用户加入房间
       const activeUsers = Array.from(this.users.values()).filter((u) => u.isActive)
       await Promise.all(
         activeUsers.map(async (user) => {
           for (let i = 0; i < config.roomsPerUser && i < roomIds.length; i++) {
+            const roomId = roomIds[i]
+            if (!roomId) continue
             try {
-              await this.joinRoom(user, roomIds[i])
+              await this.joinRoom(user, roomId)
             } catch (error) {
               errors.push({
                 userId: user.id,
@@ -332,7 +334,9 @@ export class ConcurrentTester {
           while (Date.now() < testEndTime && !this.abortController?.signal.aborted) {
             if (user.joinedRooms.size > 0) {
               const roomId = Array.from(user.joinedRooms)[0]
+              if (!roomId) continue
               const content = testData.messages[Math.floor(Math.random() * testData.messages.length)]
+              if (!content) continue
 
               try {
                 await this.sendMessage(user, roomId, content)
