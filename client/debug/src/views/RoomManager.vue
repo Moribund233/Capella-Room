@@ -68,7 +68,7 @@ const columns = [
   { title: '描述', key: 'description', ellipsis: { tooltip: true } },
   { title: '类型', key: 'is_private', width: 100 },
   { title: '成员数', key: 'member_count', width: 100 },
-  { title: '创建者', key: 'owner_id', width: 120 },
+  { title: '创建者', key: 'owner', width: 120 },
   { title: '操作', key: 'actions', width: 200, fixed: 'right' },
 ]
 
@@ -313,10 +313,21 @@ onMounted(() => {
           </template>
 
           <!-- 创建者 -->
-          <template v-if="column.key === 'owner_id'">
-            <n-ellipsis style="max-width: 100px">
-              {{ row.owner_id }}
-            </n-ellipsis>
+          <template v-if="column.key === 'owner'">
+            <n-space align="center">
+              <n-avatar
+                v-if="row.owner?.avatar_url"
+                :src="row.owner.avatar_url"
+                size="small"
+                round
+              />
+              <n-avatar v-else size="small" round>
+                {{ row.owner?.username?.charAt(0)?.toUpperCase() || '?' }}
+              </n-avatar>
+              <n-ellipsis style="max-width: 80px">
+                {{ row.owner?.username || 'Unknown' }}
+              </n-ellipsis>
+            </n-space>
           </template>
 
           <!-- 操作 -->
@@ -350,7 +361,7 @@ onMounted(() => {
 
               <!-- 编辑 -->
               <n-button
-                v-if="row.owner_id === authStore.user?.id"
+                v-if="row.owner?.id === authStore.user?.id"
                 size="small"
                 text
                 type="info"
@@ -364,7 +375,7 @@ onMounted(() => {
 
               <!-- 删除 -->
               <n-button
-                v-if="row.owner_id === authStore.user?.id || authStore.isAdmin"
+                v-if="row.owner?.id === authStore.user?.id || authStore.isAdmin"
                 size="small"
                 text
                 type="error"

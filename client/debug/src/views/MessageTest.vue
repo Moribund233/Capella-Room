@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   Send,
@@ -9,14 +9,14 @@ import {
   Trash2,
   Reply
 } from 'lucide-vue-next'
-import { getRoomMessages, deleteMessage, searchMessages, getRooms, type Room } from '@/api'
+import { getRoomMessages, deleteMessage, searchMessages, getRooms, joinRoom, type Room } from '@/api'
 import type { Message } from '@/api/message'
 import { useWebSocketStore } from '@/stores/websocket'
 import { storeToRefs } from 'pinia'
 
 const message = useMessage()
 const wsStore = useWebSocketStore()
-const { isConnected: wsConnected } = storeToRefs(wsStore)
+const { isConnected: wsConnected, joinedRooms } = storeToRefs(wsStore)
 
 // ========== 状态 ==========
 const rooms = ref<Room[]>([])
@@ -29,6 +29,7 @@ const searchResults = ref<Message[]>([])
 const showSearchPanel = ref(false)
 const hasMore = ref(false)
 const replyToMessage = ref<Message | null>(null)
+const joiningRoom = ref(false)
 
 // ========== 数据加载 ==========
 const loadRooms = async () => {
@@ -139,19 +140,100 @@ const cancelReply = () => {
   replyToMessage.value = null
 }
 
+// ========== 加入房间 ==========
+const handleJoinRoom = async (roomId: string) => {
+  console.log('[MessageTest] handleJoinRoom called:', roomId, 'joiningRoom:', joiningRoom.value, 'joinedRooms:', joinedRooms.value)
+
+  if (!roomId || joiningRoom.value) {
+    console.log('[MessageTest] Skip join: no roomId or already joining')
+    return
+  }
+
+  // 检查是否已加入
+  if (joinedRooms.value.includes(roomId)) {
+    console.log('[MessageTest] Skip join: already in joinedRooms')
+    return
+  }
+
+  joiningRoom.value = true
+  try {
+    // 1. 调用 HTTP API 加入房间
+    await joinRoom(roomId)
+    message.success('已加入房间')
+  } catch (error: any) {
+    // 如果已经是成员，忽略错误继续
+    // 注意：API client 抛出的是普通 Error，没有 response 属性
+    // 需要通过错误消息判断是否已经是成员
+    const errorMessage = error.message || ''
+    if (errorMessage.includes('409') || errorMessage.includes('已经是') || errorMessage.includes('already')) {
+      console.log('已经是房间成员，继续 WebSocket 加入')
+    } else {
+      message.error(`加入房间失败: ${errorMessage || '未知错误'}`)
+      joiningRoom.value = false
+      return
+    }
+  }
+
+  // 2. 通过 WebSocket 加入房间
+  if (wsConnected.value) {
+    wsStore.send({
+      type: 'JoinRoom',
+      payload: { room_id: roomId }
+    })
+  }
+
+  joiningRoom.value = false
+}
+
 // ========== 监听房间变化 ==========
-watch(selectedRoomId, () => {
-  loadMessages()
+watch(selectedRoomId, (newRoomId) => {
+  if (newRoomId) {
+    loadMessages()
+    // 如果 WebSocket 已连接，立即加入房间
+    if (wsConnected.value) {
+      handleJoinRoom(newRoomId)
+    }
+  }
   showSearchPanel.value = false
   searchQuery.value = ''
 })
 
+// 监听 WebSocket 连接状态，连接成功后加入当前选中的房间
+watch(wsConnected, (connected) => {
+  console.log('[MessageTest] WebSocket connected:', connected, 'selectedRoomId:', selectedRoomId.value)
+  if (connected && selectedRoomId.value) {
+    // 重置 joiningRoom 状态，确保可以重新加入
+    joiningRoom.value = false
+    handleJoinRoom(selectedRoomId.value)
+  }
+})
+
 // ========== 初始化 ==========
+let wsUnsubscribe: (() => void) | null = null
+
 onMounted(() => {
   loadRooms()
-  // 连接 WebSocket（如果未连接）
-  if (!wsConnected.value) {
+  // 连接 WebSocket（如果未连接且不在连接中）
+  if (!wsConnected.value && !wsStore.isConnecting) {
+    console.log('[MessageTest] 初始化 WebSocket 连接')
     wsStore.connect()
+  }
+
+  // 注册消息处理器监听新消息
+  wsUnsubscribe = wsStore.onMessage('NewMessage', (payload: any) => {
+    // 如果是当前房间的消息，刷新消息列表
+    if (payload?.room_id === selectedRoomId.value) {
+      console.log('[MessageTest] 收到新消息，刷新列表')
+      loadMessages()
+    }
+  })
+})
+
+onUnmounted(() => {
+  // 取消消息订阅
+  if (wsUnsubscribe) {
+    wsUnsubscribe()
+    wsUnsubscribe = null
   }
 })
 </script>
@@ -169,9 +251,9 @@ onMounted(() => {
       <p class="page-subtitle">测试消息发送、接收和搜索功能</p>
     </div>
 
-    <div style="display: grid; grid-template-columns: 1fr 350px; gap: var(--space-lg)">
+    <div class="message-test-flex">
       <!-- 左侧：消息区域 -->
-      <n-card title="消息测试">
+      <n-card title="消息测试" class="message-test-left">
         <template #header-extra>
           <n-space>
             <n-select
@@ -218,10 +300,15 @@ onMounted(() => {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm)">
               <n-space align="center">
-                <n-avatar size="small" :style="{ backgroundColor: 'var(--primary)' }">
-                  {{ msg.sender.charAt(0).toUpperCase() }}
+                <n-avatar
+                  v-if="msg.sender?.avatar_url"
+                  size="small"
+                  :src="msg.sender.avatar_url"
+                />
+                <n-avatar v-else size="small" :style="{ backgroundColor: 'var(--primary)' }">
+                  {{ msg.sender?.username?.charAt(0)?.toUpperCase() || '?' }}
                 </n-avatar>
-                <span style="font-weight: 500">{{ msg.sender }}</span>
+                <span style="font-weight: 500">{{ msg.sender?.username || 'Unknown' }}</span>
                 <span style="font-size: 12px; color: var(--text-muted)">{{ new Date(msg.created_at).toLocaleString() }}</span>
               </n-space>
               <n-space>
@@ -245,7 +332,7 @@ onMounted(() => {
         <div v-if="replyToMessage" style="margin-bottom: var(--space-sm); padding: var(--space-sm); background-color: var(--bg-secondary); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center">
           <span style="font-size: 13px; color: var(--text-muted)">
             <Reply class="icon-sm" style="display: inline; vertical-align: middle; margin-right: 4px" />
-            回复 {{ replyToMessage.sender }}: {{ replyToMessage.content.substring(0, 30) }}{{ replyToMessage.content.length > 30 ? '...' : '' }}
+            回复 {{ replyToMessage.sender?.username || 'Unknown' }}: {{ replyToMessage.content.substring(0, 30) }}{{ replyToMessage.content.length > 30 ? '...' : '' }}
           </span>
           <n-button size="tiny" text @click="cancelReply">
             <template #icon>
@@ -271,7 +358,7 @@ onMounted(() => {
       </n-card>
 
       <!-- 右侧：搜索和历史 -->
-      <div style="display: flex; flex-direction: column; gap: var(--space-lg)">
+      <div class="message-test-right">
         <n-card title="消息搜索">
           <n-input
             v-model:value="searchQuery"
@@ -303,7 +390,7 @@ onMounted(() => {
               style="margin-bottom: var(--space-md); padding: var(--space-md); background-color: var(--bg-secondary); border-radius: var(--radius-md)"
             >
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs)">
-                <span style="font-weight: 500; font-size: 13px">{{ msg.sender }}</span>
+                <span style="font-weight: 500; font-size: 13px">{{ msg.sender?.username || 'Unknown' }}</span>
                 <span style="font-size: 11px; color: var(--text-muted)">{{ new Date(msg.created_at).toLocaleString() }}</span>
               </div>
               <div style="color: var(--text-primary); font-size: 13px">{{ msg.content }}</div>
@@ -328,3 +415,39 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 消息测试 - Flex布局 */
+.message-test-flex {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.message-test-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-test-right {
+  flex: 0 0 350px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 767px) {
+  .message-test-flex {
+    flex-direction: column;
+  }
+
+  .message-test-left,
+  .message-test-right {
+    flex: 1 1 100%;
+  }
+
+  .message-test-right {
+    flex-basis: auto;
+  }
+}
+</style>

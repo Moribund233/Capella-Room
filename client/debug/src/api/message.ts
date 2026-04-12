@@ -4,18 +4,9 @@
  */
 
 import { apiClient } from './client'
+import type { Message } from '@/types/api'
 
-// 消息信息
-export interface Message {
-  id: string
-  content: string
-  sender: string
-  sender_id: string
-  room_id: string
-  created_at: string
-  type: 'text' | 'image' | 'file'
-  reply_to?: string
-}
+export type { Message } from '@/types/api'
 
 // 消息列表响应
 export interface MessageListResponse {

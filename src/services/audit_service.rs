@@ -13,11 +13,11 @@ use crate::config::{ConfigChangeEvent, ConfigManager};
 use crate::db::Database;
 use crate::error::{AppError, Result};
 use crate::models::audit::{
-    AlertQuery, AlertRule, AlertStatus, AuditAlert, AuditEventType, AuditLog, AuditLogQuery,
+    AlertQuery, AlertRule, AlertStatus, AuditAlert, AuditAlertResponse, AuditEventType, AuditLog, AuditLogQuery,
     AuditMetadata, AuditSeverity, AuditStats, CreateAlertRequest, CreateAuditLogRequest,
     DailyCount, EventTypeCount, SeverityCount, UpdateAlertRuleRequest,
 };
-use crate::models::user::UserRole;
+use crate::models::user::{UserInfo, UserRole};
 use crate::redis::{AuditLogStreamMessage, StreamManager};
 use crate::services::alert_engine::AlertEngine;
 use crate::services::alert_handler::AlertHandler;
@@ -702,8 +702,8 @@ impl AuditService {
         let pool = self.db.pool();
 
         let log: Option<AuditLog> = sqlx::query_as(
-            "SELECT id, event_type, severity, actor_id, actor_role, target_type, target_id, 
-             action, description, metadata, status, error_message, created_at 
+            "SELECT id, event_type, severity, actor_id, actor_name, actor_role, target_type, target_id,
+             action, description, metadata, status, error_message, created_at
              FROM audit_logs WHERE id = $1",
         )
         .bind(log_id)
@@ -921,14 +921,14 @@ impl AuditService {
     }
 
     /// 查询告警列表
-    pub async fn query_alerts(&self, query: AlertQuery) -> Result<(Vec<AuditAlert>, i64)> {
+    pub async fn query_alerts(&self, query: AlertQuery) -> Result<(Vec<AuditAlertResponse>, i64)> {
         let limit = query.limit.unwrap_or(50);
         let offset = query.offset.unwrap_or(0);
 
         let mut sql = String::from(
-            "SELECT id, rule_id, alert_type, severity, title, description, related_logs, 
-             source_ip, affected_user_id, status, acknowledged_by, acknowledged_at, 
-             resolved_by, resolved_at, created_at, updated_at 
+            "SELECT id, rule_id, alert_type, severity, title, description, related_logs,
+             source_ip, affected_user_id, status, acknowledged_by, acknowledged_at,
+             resolved_by, resolved_at, created_at, updated_at
              FROM audit_alerts WHERE 1=1",
         );
         let mut count_sql = String::from("SELECT COUNT(*) FROM audit_alerts WHERE 1=1");
@@ -990,7 +990,55 @@ impl AuditService {
             .await
             .map_err(AppError::Database)?;
 
-        Ok((alerts, total))
+        // 收集所有用户ID
+        let mut user_ids: Vec<Uuid> = alerts
+            .iter()
+            .filter_map(|a| a.affected_user_id)
+            .collect();
+        user_ids.extend(alerts.iter().filter_map(|a| a.acknowledged_by));
+        user_ids.extend(alerts.iter().filter_map(|a| a.resolved_by));
+        user_ids.sort_unstable();
+        user_ids.dedup();
+
+        // 批量查询用户信息
+        let user_infos = self.get_user_infos(&user_ids).await?;
+
+        // 转换为响应
+        let responses: Vec<AuditAlertResponse> = alerts
+            .into_iter()
+            .map(|alert| {
+                let affected_user = alert.affected_user_id.and_then(|id| user_infos.get(&id).cloned());
+                let acknowledged_by = alert.acknowledged_by.and_then(|id| user_infos.get(&id).cloned());
+                let resolved_by = alert.resolved_by.and_then(|id| user_infos.get(&id).cloned());
+                alert.to_response(affected_user, acknowledged_by, resolved_by)
+            })
+            .collect();
+
+        Ok((responses, total))
+    }
+
+    /// 批量获取用户信息
+    async fn get_user_infos(&self, user_ids: &[Uuid]) -> Result<std::collections::HashMap<Uuid, UserInfo>> {
+        if user_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let rows: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
+            r#"
+            SELECT id, username, avatar_url FROM users WHERE id = ANY($1)
+            "#,
+        )
+        .bind(user_ids)
+        .fetch_all(self.db.pool())
+        .await
+        .map_err(AppError::Database)?;
+
+        let mut map = std::collections::HashMap::new();
+        for (id, username, avatar_url) in rows {
+            map.insert(id, UserInfo::new(id, username, avatar_url));
+        }
+
+        Ok(map)
     }
 
     /// 更新告警状态

@@ -6,7 +6,7 @@ use std::fmt;
 use std::net::IpAddr;
 use uuid::Uuid;
 
-use crate::models::user::UserRole;
+use crate::models::user::{UserInfo, UserRole};
 
 /// 审计事件类型
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
@@ -221,6 +221,56 @@ pub struct AuditAlert {
     pub resolved_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// 审计告警响应（包含用户信息）
+#[derive(Debug, Clone, Serialize)]
+pub struct AuditAlertResponse {
+    pub id: Uuid,
+    pub rule_id: Option<Uuid>,
+    pub alert_type: String,
+    pub severity: AuditSeverity,
+    pub title: String,
+    pub description: String,
+    pub related_logs: Option<Vec<Uuid>>,
+    pub source_ip: Option<String>,
+    pub affected_user: Option<UserInfo>,
+    pub status: AlertStatus,
+    pub acknowledged_by: Option<UserInfo>,
+    pub acknowledged_at: Option<DateTime<Utc>>,
+    pub resolved_by: Option<UserInfo>,
+    pub resolved_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl AuditAlert {
+    /// 转换为响应DTO
+    pub fn to_response(
+        &self,
+        affected_user: Option<UserInfo>,
+        acknowledged_by: Option<UserInfo>,
+        resolved_by: Option<UserInfo>,
+    ) -> AuditAlertResponse {
+        AuditAlertResponse {
+            id: self.id,
+            rule_id: self.rule_id,
+            alert_type: self.alert_type.clone(),
+            severity: self.severity.clone(),
+            title: self.title.clone(),
+            description: self.description.clone(),
+            related_logs: self.related_logs.clone(),
+            source_ip: self.source_ip.clone(),
+            affected_user,
+            status: self.status.clone(),
+            acknowledged_by,
+            acknowledged_at: self.acknowledged_at,
+            resolved_by,
+            resolved_at: self.resolved_at,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
 }
 
 /// 告警规则数据库模型
@@ -453,7 +503,7 @@ impl Default for AlertQuery {
 /// 告警列表响应
 #[derive(Debug, Clone, Serialize)]
 pub struct AlertListResponse {
-    pub alerts: Vec<AuditAlert>,
+    pub alerts: Vec<AuditAlertResponse>,
     pub total: i64,
     pub limit: i64,
     pub offset: i64,

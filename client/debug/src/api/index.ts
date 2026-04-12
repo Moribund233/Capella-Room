@@ -66,7 +66,6 @@ export {
   deleteMessage,
   editMessage,
   getMessageDetail,
-  type Message,
   type MessageListResponse,
   type SendMessageRequest,
   type SearchMessageParams,
@@ -85,4 +84,4 @@ export {
 } from './system'
 
 // 从 types/api 重新导出类型
-export type { Room, User } from '@/types/api'
+export type { Room, User, UserInfo, SenderInfo, Message, FileResource, AuditAlert } from '@/types/api'

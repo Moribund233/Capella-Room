@@ -144,6 +144,34 @@ pub struct UserResponse {
     pub created_at: DateTime<Utc>,
 }
 
+/// 简化用户信息（用于嵌套在其他响应中）
+#[derive(Debug, Clone, Serialize)]
+pub struct UserInfo {
+    pub id: Uuid,
+    pub username: String,
+    pub avatar_url: Option<String>,
+}
+
+impl UserInfo {
+    /// 创建新的 UserInfo
+    pub fn new(id: Uuid, username: String, avatar_url: Option<String>) -> Self {
+        Self {
+            id,
+            username,
+            avatar_url,
+        }
+    }
+
+    /// 从 User 创建 UserInfo
+    pub fn from_user(user: &User) -> Self {
+        Self {
+            id: user.id,
+            username: user.username.clone(),
+            avatar_url: user.avatar_url.clone(),
+        }
+    }
+}
+
 impl User {
     /// 转换为响应DTO
     pub fn to_response(&self) -> UserResponse {

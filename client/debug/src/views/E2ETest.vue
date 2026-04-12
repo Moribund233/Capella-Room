@@ -274,9 +274,9 @@ onUnmounted(() => {
       <p class="page-subtitle">执行端到端场景测试和并发测试</p>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="card-grid" style="margin-bottom: var(--space-lg)">
-      <n-card class="stat-card">
+    <!-- 统计卡片 - 紧凑布局 -->
+    <div class="card-flex compact" style="margin-bottom: var(--space-lg)">
+      <n-card class="card-flex-item stat-card">
         <div class="stat-icon" style="background: var(--success)">
           <CheckCircle class="icon-lg" />
         </div>
@@ -285,7 +285,7 @@ onUnmounted(() => {
           <div class="stat-label">通过</div>
         </div>
       </n-card>
-      <n-card class="stat-card">
+      <n-card class="card-flex-item stat-card">
         <div class="stat-icon" style="background: var(--error)">
           <XCircle class="icon-lg" />
         </div>
@@ -294,7 +294,7 @@ onUnmounted(() => {
           <div class="stat-label">失败</div>
         </div>
       </n-card>
-      <n-card class="stat-card">
+      <n-card class="card-flex-item stat-card">
         <div class="stat-icon" style="background: var(--info)">
           <Clock class="icon-lg" />
         </div>
@@ -333,10 +333,10 @@ onUnmounted(() => {
       </n-tab-pane>
     </n-tabs>
 
-    <!-- 场景测试面板 -->
-    <div v-if="activeTab === 'scenarios'" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg)">
+    <!-- 场景测试面板 - Flex布局 -->
+    <div v-if="activeTab === 'scenarios'" class="e2e-panel-flex">
       <!-- 左侧：场景列表 -->
-      <n-card title="测试场景">
+      <n-card title="测试场景" class="e2e-panel-left">
         <n-list>
           <n-list-item v-for="scenario in predefinedScenarios" :key="scenario.id">
             <n-thing :title="scenario.name" :description="scenario.description">
@@ -363,7 +363,7 @@ onUnmounted(() => {
       </n-card>
 
       <!-- 右侧：执行状态 -->
-      <div style="display: flex; flex-direction: column; gap: var(--space-lg)">
+      <div class="e2e-panel-right">
         <n-card title="执行状态">
           <n-space vertical>
             <n-progress :percentage="progress" :indicator-placement="'inside'" />
@@ -407,10 +407,10 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 并发测试面板 -->
-    <div v-if="activeTab === 'concurrent'" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg)">
+    <!-- 并发测试面板 - Flex布局 -->
+    <div v-if="activeTab === 'concurrent'" class="e2e-panel-flex">
       <!-- 左侧：配置 -->
-      <n-card title="并发测试配置">
+      <n-card title="并发测试配置" class="e2e-panel-left">
         <n-form label-placement="left" label-width="120">
           <n-form-item label="虚拟用户数">
             <n-input-number v-model:value="concurrentConfig.userCount" :min="1" :max="1000" style="width: 100%" />
@@ -445,8 +445,8 @@ onUnmounted(() => {
       </n-card>
 
       <!-- 右侧：结果 -->
-      <n-card title="测试结果">
-        <div v-if="currentConcurrentResult" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md)">
+      <n-card title="测试结果" class="e2e-panel-right">
+        <div v-if="currentConcurrentResult" class="concurrent-stats-flex">
           <n-statistic label="总用户数" :value="currentConcurrentResult.totalUsers" />
           <n-statistic label="活跃用户数" :value="currentConcurrentResult.activeUsers" />
           <n-statistic label="总消息数" :value="currentConcurrentResult.totalMessages" />
@@ -539,37 +539,43 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* 统计卡片 - 紧凑设计 */
 .stat-card {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  width: auto;
 }
 
 .stat-icon {
-  width: 56px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-white);
+  flex-shrink: 0;
 }
 
 .stat-content {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--text-primary);
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-secondary);
-  margin-top: 4px;
+  line-height: 1.2;
 }
 
 .log-panel {
@@ -602,5 +608,89 @@ onUnmounted(() => {
 
 .log-warning {
   color: var(--warning);
+}
+
+/* E2E面板 - Flex布局 */
+.e2e-panel-flex {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.e2e-panel-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.e2e-panel-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 并发测试统计 - Flex布局 */
+.concurrent-stats-flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.concurrent-stats-flex .n-statistic {
+  flex: 1 1 calc(50% - var(--space-md) / 2);
+  min-width: 140px;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 767px) {
+  .e2e-panel-flex {
+    flex-direction: column;
+  }
+
+  .e2e-panel-left,
+  .e2e-panel-right {
+    flex: 1 1 100%;
+  }
+
+  .concurrent-stats-flex .n-statistic {
+    flex: 1 1 100%;
+  }
+
+  /* 统计卡片 - 移动端紧凑水平排列 */
+  .card-flex.compact {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: var(--space-sm);
+  }
+
+  .card-flex.compact .card-flex-item {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .card-flex.compact .stat-card {
+    padding: var(--space-sm);
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .card-flex.compact .stat-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .card-flex.compact .stat-icon .icon-lg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .card-flex.compact .stat-value {
+    font-size: 16px;
+  }
+
+  .card-flex.compact .stat-label {
+    font-size: 10px;
+  }
 }
 </style>

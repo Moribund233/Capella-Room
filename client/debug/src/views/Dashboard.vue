@@ -249,9 +249,9 @@ onUnmounted(() => {
       </p>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="card-grid" style="margin-bottom: var(--space-xl)">
-      <n-card v-for="(stat, index) in statCards" :key="index" class="stat-card">
+    <!-- 统计卡片 - Flex紧凑布局 -->
+    <div class="card-flex compact" style="margin-bottom: var(--space-xl)">
+      <n-card v-for="(stat, index) in statCards" :key="index" class="card-flex-item stat-card">
         <div class="stat-icon">
           <component :is="stat.icon" class="icon-lg" />
         </div>
@@ -262,28 +262,28 @@ onUnmounted(() => {
       </n-card>
     </div>
 
-    <!-- 管理员统计信息 -->
+    <!-- 管理员统计信息 - Flex布局 -->
     <n-card v-if="isAdmin && adminStats" title="管理员统计" style="margin-bottom: var(--space-lg)">
-      <n-grid :cols="3" :x-gap="16" :y-gap="16">
-        <n-grid-item>
+      <div class="admin-stats-flex">
+        <div class="admin-stat-item">
           <n-statistic label="总用户数" :value="adminStats.total_users" />
-        </n-grid-item>
-        <n-grid-item>
+        </div>
+        <div class="admin-stat-item">
           <n-statistic label="总房间数" :value="adminStats.total_rooms" />
-        </n-grid-item>
-        <n-grid-item>
+        </div>
+        <div class="admin-stat-item">
           <n-statistic label="总消息数" :value="adminStats.total_messages" />
-        </n-grid-item>
-        <n-grid-item>
+        </div>
+        <div class="admin-stat-item">
           <n-statistic label="在线用户" :value="adminStats.online_users" />
-        </n-grid-item>
-        <n-grid-item>
+        </div>
+        <div class="admin-stat-item">
           <n-statistic label="今日新用户" :value="adminStats.today_new_users" />
-        </n-grid-item>
-        <n-grid-item>
+        </div>
+        <div class="admin-stat-item">
           <n-statistic label="今日消息数" :value="adminStats.today_messages" />
-        </n-grid-item>
-      </n-grid>
+        </div>
+      </div>
     </n-card>
 
     <!-- 管理员统计加载错误提示 -->
@@ -313,9 +313,10 @@ onUnmounted(() => {
       您当前以普通用户身份登录，部分详细统计数据需要管理员权限才能查看。
     </n-alert>
 
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-lg)">
+    <!-- 主内容区域 - Flex布局 -->
+    <div class="dashboard-main-flex">
       <!-- 左侧：日志面板 -->
-      <n-card title="系统日志">
+      <n-card title="系统日志" class="dashboard-log-card">
         <template #header-extra>
           <div style="display: flex; align-items: center; gap: 8px">
             <n-tag v-if="wsConnected" type="success" size="small">已连接</n-tag>
@@ -338,77 +339,203 @@ onUnmounted(() => {
       </n-card>
 
       <!-- 右侧：快捷操作 -->
-      <n-card title="快捷操作">
-        <div style="display: flex; flex-direction: column; gap: var(--space-md)">
+      <n-card title="快捷操作" class="dashboard-action-card">
+        <div class="quick-actions-flex">
           <n-button
             v-for="(action, index) in quickActions"
             :key="index"
             size="large"
-            style="justify-content: flex-start; height: 60px"
+            class="quick-action-btn"
             @click="navigateTo(action.route)"
           >
             <template #icon>
               <component :is="action.icon" class="icon-md" />
             </template>
-            <div style="text-align: left; margin-left: var(--space-sm)">
-              <div style="font-weight: 500">{{ action.label }}</div>
-              <div style="font-size: 12px; color: var(--text-secondary)">{{ action.desc }}</div>
+            <div class="quick-action-content">
+              <div class="quick-action-label">{{ action.label }}</div>
+              <div class="quick-action-desc">{{ action.desc }}</div>
             </div>
           </n-button>
         </div>
       </n-card>
     </div>
 
-    <!-- 连接信息 -->
+    <!-- 连接信息 - Flex布局 -->
     <n-card title="连接信息" style="margin-top: var(--space-lg)">
-      <n-descriptions :columns="3" bordered>
-        <n-descriptions-item label="API 地址">
-          {{ connectionInfo?.api_url || 'http://localhost:8080' }}
-        </n-descriptions-item>
-        <n-descriptions-item label="WebSocket">
-          {{ connectionInfo?.websocket_url || 'ws://localhost:8080/ws' }}
-        </n-descriptions-item>
-        <n-descriptions-item label="版本">
-          {{ connectionInfo?.version || 'v0.9.0' }}
-        </n-descriptions-item>
-      </n-descriptions>
+      <div class="connection-info-flex">
+        <div class="connection-info-item">
+          <span class="connection-label">API 地址：</span>
+          <span class="connection-value">{{ connectionInfo?.api_url || 'http://localhost:8080' }}</span>
+        </div>
+        <div class="connection-info-item">
+          <span class="connection-label">WebSocket：</span>
+          <span class="connection-value">{{ connectionInfo?.websocket_url || 'ws://localhost:8080/ws' }}</span>
+        </div>
+        <div class="connection-info-item">
+          <span class="connection-label">版本：</span>
+          <span class="connection-value">{{ connectionInfo?.version || 'v0.9.0' }}</span>
+        </div>
+      </div>
     </n-card>
   </div>
 </template>
 
 <style scoped>
-.stat-card {
+/* 管理员统计 - Flex布局 */
+.admin-stats-flex {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+}
+
+.admin-stat-item {
+  flex: 1 1 calc(33.333% - var(--space-lg) * 2 / 3);
+  min-width: 150px;
+}
+
+/* 主内容区域 - Flex布局 */
+.dashboard-main-flex {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.dashboard-log-card {
+  flex: 2;
+  min-width: 0;
+}
+
+.dashboard-action-card {
+  flex: 1;
+  min-width: 250px;
+}
+
+/* 快捷操作 - Flex布局 */
+.quick-actions-flex {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-md);
 }
 
+.quick-action-btn {
+  justify-content: flex-start;
+  height: 60px;
+  width: 100%;
+}
+
+.quick-action-content {
+  text-align: left;
+  margin-left: var(--space-sm);
+}
+
+.quick-action-label {
+  font-weight: 500;
+}
+
+.quick-action-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 连接信息 - Flex布局 */
+.connection-info-flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md) var(--space-xl);
+}
+
+.connection-info-item {
+  flex: 1 1 auto;
+  min-width: 200px;
+}
+
+.connection-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.connection-value {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 统计卡片 - 紧凑设计 */
+.stat-card {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  width: auto;
+}
+
 .stat-icon {
-  width: 56px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: var(--gradient-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-white);
+  flex-shrink: 0;
 }
 
 .stat-content {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
+/* 移动端适配 */
+@media screen and (max-width: 767px) {
+  .admin-stats-flex {
+    gap: var(--space-md);
+  }
+
+  .admin-stat-item {
+    flex: 1 1 calc(50% - var(--space-md) / 2);
+    min-width: 120px;
+  }
+
+  .dashboard-main-flex {
+    flex-direction: column;
+  }
+
+  .dashboard-log-card,
+  .dashboard-action-card {
+    flex: 1 1 100%;
+    min-width: auto;
+  }
+
+  .quick-action-btn {
+    height: 50px;
+  }
+
+  .connection-info-flex {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .connection-info-item {
+    min-width: auto;
+  }
+}
+
+/* 统计卡片值和标签 - 紧凑设计 */
 .stat-value {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-secondary);
+  line-height: 1.2;
 }
 
+/* 日志面板 */
 .log-panel {
   background-color: var(--log-bg);
   border-radius: var(--radius-md);
@@ -443,5 +570,20 @@ onUnmounted(() => {
 
 .log-error {
   color: var(--log-error);
+}
+
+@media screen and (max-width: 375px) {
+  .admin-stat-item {
+    flex: 1 1 100%;
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
 }
 </style>

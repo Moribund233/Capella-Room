@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
-import { getMyRooms, type Room } from '@/api'
+import { getRooms, getMyRooms, joinRoom as joinRoomApi, type Room } from '@/api'
 import { useMessage } from 'naive-ui'
 import {
   Wifi,
@@ -128,15 +128,38 @@ const disconnectWebSocket = () => {
 }
 
 // ========== 房间管理 ==========
-const joinRoom = () => {
+const pendingJoinRoom = ref<string | null>(null)
+
+const joinRoom = async () => {
   if (!roomIdInput.value) return
-  const success = wsStore.joinRoom(roomIdInput.value)
-  if (success) {
-    currentRoom.value = roomIdInput.value
-    roomIdInput.value = ''
-    addSystemMessage(`已加入房间: ${currentRoom.value}`)
+  const roomId = roomIdInput.value
+
+  try {
+    // 1. 先调用 HTTP API 加入房间（添加到房间成员列表）
+    await joinRoomApi(roomId)
+    addSystemMessage(`已加入房间成员: ${roomId}`)
+
+    // 2. 再通过 WebSocket 加入房间（建立实时连接）
+    const success = wsStore.joinRoom(roomId)
+    if (success) {
+      pendingJoinRoom.value = roomId
+      roomIdInput.value = ''
+      addSystemMessage(`正在连接房间: ${roomId}...`)
+    }
+  } catch (error: any) {
+    addSystemMessage(`加入房间失败: ${error.message || '未知错误'}`, 'error')
   }
 }
+
+// 监听加入房间确认
+watch(joinedRooms, (newRooms) => {
+  if (pendingJoinRoom.value && newRooms.includes(pendingJoinRoom.value)) {
+    currentRoom.value = pendingJoinRoom.value
+    addSystemMessage(`已加入房间: ${currentRoom.value}`)
+    message.success(`已选择房间: ${currentRoom.value}`)
+    pendingJoinRoom.value = null
+  }
+})
 
 const leaveRoom = (roomId: string) => {
   wsStore.leaveRoom(roomId)
@@ -149,6 +172,12 @@ const leaveRoom = (roomId: string) => {
 // ========== 消息发送 ==========
 const sendChatMessage = () => {
   if (!chatInput.value || !currentRoom.value) return
+
+  // 确保已经加入房间（服务器已确认）
+  if (!joinedRooms.value.includes(currentRoom.value)) {
+    addSystemMessage('正在加入房间，请稍后再试...', 'error')
+    return
+  }
 
   const success = wsStore.sendChatMessage(
     currentRoom.value,
@@ -193,33 +222,53 @@ const refreshOnlineUsers = () => {
 }
 
 // ========== 房间列表 ==========
-const loadMyRooms = async () => {
+const loadRoomList = async () => {
   try {
-    myRooms.value = await getMyRooms()
+    // 管理员加载所有房间，普通用户只加载公共房间
+    const isAdmin = authStore.isAdmin
+    const rooms = await getRooms({
+      is_public: isAdmin ? undefined : true
+    })
+    myRooms.value = rooms || []
     showRoomSelector.value = true
   } catch (error) {
     message.error('加载房间列表失败')
     console.error(error)
+    myRooms.value = []
   }
 }
 
-const selectRoom = (room: Room) => {
-  // 如果房间还没加入，先加入
-  if (!joinedRooms.value.includes(room.id)) {
-    const success = wsStore.joinRoom(room.id)
-    if (success) {
-      addSystemMessage(`已加入房间: ${room.name} (${room.id})`)
-    }
-  }
-  currentRoom.value = room.id
+const selectRoom = async (room: Room) => {
   showRoomSelector.value = false
-  message.success(`已选择房间: ${room.name}`)
+
+  // 如果房间还没加入，先通过 HTTP API 加入，再通过 WebSocket 加入
+  if (!joinedRooms.value.includes(room.id)) {
+    try {
+      // 1. 先调用 HTTP API 加入房间（添加到房间成员列表）
+      await joinRoomApi(room.id)
+      addSystemMessage(`已加入房间成员: ${room.name}`)
+
+      // 2. 再通过 WebSocket 加入房间（建立实时连接）
+      const success = wsStore.joinRoom(room.id)
+      if (success) {
+        pendingJoinRoom.value = room.id
+        addSystemMessage(`正在连接房间: ${room.name}...`)
+      }
+    } catch (error: any) {
+      addSystemMessage(`加入房间失败: ${error.message || '未知错误'}`, 'error')
+    }
+  } else {
+    // 已经加入，直接设置当前房间
+    currentRoom.value = room.id
+    message.success(`已选择房间: ${room.name}`)
+  }
 }
 
 // ========== 生命周期 ==========
 onMounted(() => {
-  // 如果未连接，自动连接
-  if (!isConnected.value) {
+  // 如果未连接且不在连接中，自动连接
+  if (!isConnected.value && !wsStore.isConnecting) {
+    console.log('[WebSocketTest] 初始化 WebSocket 连接')
     wsStore.connect()
   }
 })
@@ -239,34 +288,41 @@ onUnmounted(() => {
       <p class="page-subtitle">测试 WebSocket 实时通信功能</p>
     </div>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg)">
+    <!-- 连接控制和房间管理 - Flex布局 -->
+    <div class="ws-control-flex">
       <!-- 左侧：连接控制 -->
-      <n-card title="连接状态">
-        <n-descriptions :columns="1" bordered>
-          <n-descriptions-item label="连接状态">
-            <n-tag :type="statusType">
-              <template #icon>
-                <component :is="isConnected ? Wifi : WifiOff" class="icon-sm" />
-              </template>
-              {{ statusText }}
-            </n-tag>
-            <n-spin v-if="isConnecting || isReconnecting" size="small" style="margin-left: 8px" />
-          </n-descriptions-item>
-          <n-descriptions-item label="当前用户">
-            {{ authStore.username || '未登录' }}
-          </n-descriptions-item>
-          <n-descriptions-item label="延迟">
-            {{ latency !== null ? `${latency}ms` : '-' }}
-          </n-descriptions-item>
-          <n-descriptions-item label="全局在线用户">
-            <div style="display: flex; align-items: center; gap: var(--space-sm)">
+      <n-card title="连接状态" class="ws-control-card">
+        <div class="ws-status-list">
+          <div class="ws-status-item">
+            <span class="ws-status-label">连接状态</span>
+            <div class="ws-status-value">
+              <n-tag :type="statusType">
+                <template #icon>
+                  <component :is="isConnected ? Wifi : WifiOff" class="icon-sm" />
+                </template>
+                {{ statusText }}
+              </n-tag>
+              <n-spin v-if="isConnecting || isReconnecting" size="small" style="margin-left: 8px" />
+            </div>
+          </div>
+          <div class="ws-status-item">
+            <span class="ws-status-label">当前用户</span>
+            <span class="ws-status-value">{{ authStore.username || '未登录' }}</span>
+          </div>
+          <div class="ws-status-item">
+            <span class="ws-status-label">延迟</span>
+            <span class="ws-status-value">{{ latency !== null ? `${latency}ms` : '-' }}</span>
+          </div>
+          <div class="ws-status-item">
+            <span class="ws-status-label">全局在线用户</span>
+            <div class="ws-status-value">
               <span>{{ onlineUsers }}</span>
               <n-button size="tiny" text type="primary" @click="refreshOnlineUsers">
                 <RefreshCw class="icon-sm" />
               </n-button>
             </div>
-          </n-descriptions-item>
-        </n-descriptions>
+          </div>
+        </div>
 
         <n-divider />
 
@@ -293,7 +349,7 @@ onUnmounted(() => {
       </n-card>
 
       <!-- 右侧：房间管理 -->
-      <n-card title="房间管理">
+      <n-card title="房间管理" class="ws-room-card">
         <n-space vertical>
           <n-input-group>
             <n-input v-model:value="roomIdInput" placeholder="输入房间ID" @keyup.enter="joinRoom" />
@@ -303,7 +359,7 @@ onUnmounted(() => {
               </template>
               加入
             </n-button>
-            <n-button :disabled="!isConnected" @click="loadMyRooms">
+            <n-button :disabled="!isConnected" @click="loadRoomList">
               <template #icon>
                 <List class="icon-sm" />
               </template>
@@ -349,25 +405,16 @@ onUnmounted(() => {
         </n-button>
       </template>
 
-      <div style="display: grid; grid-template-columns: 1fr 350px; gap: var(--space-lg)">
+      <!-- 消息区域 - Flex布局 -->
+      <div class="ws-message-flex">
         <!-- 消息列表 -->
-        <div
-          style="
-            background-color: var(--bg-secondary);
-            border-radius: var(--radius-md);
-            padding: var(--space-md);
-            min-height: 350px;
-            max-height: 450px;
-            overflow-y: auto;
-            border: 1px solid var(--border-light);
-          "
-        >
+        <div class="ws-message-list">
           <div
             v-for="msg in localMessages"
             :key="msg.id"
-            style="margin-bottom: var(--space-sm); font-family: monospace; font-size: 13px"
+            class="ws-message-item"
           >
-            <span style="color: var(--text-muted)">[{{ msg.time }}]</span>
+            <span class="ws-message-time">[{{ msg.time }}]</span>
             <n-tag
               size="tiny"
               :type="
@@ -377,33 +424,31 @@ onUnmounted(() => {
                     ? 'success'
                     : 'default'
               "
-              style="margin-right: var(--space-sm)"
+              class="ws-message-type"
             >
               {{ msg.type === 'sent' ? '发送' : msg.type === 'received' ? '接收' : '系统' }}
             </n-tag>
-            <span v-if="msg.sender" style="color: var(--primary); margin-right: 4px">
+            <span v-if="msg.sender" class="ws-message-sender">
               {{ msg.sender }}:
             </span>
             <span
-              :style="{
-                color:
-                  msg.type === 'sent'
-                    ? 'var(--info)'
-                    : msg.type === 'received'
-                      ? 'var(--success)'
-                      : 'var(--warning)',
+              class="ws-message-content"
+              :class="{
+                'msg-sent': msg.type === 'sent',
+                'msg-received': msg.type === 'received',
+                'msg-system': msg.type === 'system'
               }"
             >
               {{ msg.content }}
             </span>
-            <span v-if="msg.roomId" style="color: var(--text-muted); margin-left: 4px">
+            <span v-if="msg.roomId" class="ws-message-room">
               ({{ msg.roomId }})
             </span>
           </div>
         </div>
 
         <!-- 发送消息 -->
-        <div style="display: flex; flex-direction: column; gap: var(--space-md)">
+        <div class="ws-message-input">
           <n-alert v-if="!currentRoom" type="warning" :show-icon="false" size="small">
             请先加入并选择一个房间
           </n-alert>
@@ -443,7 +488,7 @@ onUnmounted(() => {
           <n-divider />
 
           <div class="form-section-title">快捷操作</div>
-          <n-space wrap>
+          <div class="ws-quick-actions">
             <n-button size="small" :disabled="!isConnected || !currentRoom" @click="wsStore.sendTyping(currentRoom!)">
               正在输入...
             </n-button>
@@ -454,7 +499,7 @@ onUnmounted(() => {
             >
               停止输入
             </n-button>
-          </n-space>
+          </div>
         </div>
       </div>
     </n-card>
@@ -492,3 +537,176 @@ onUnmounted(() => {
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+/* 连接控制和房间管理 - Flex布局 */
+.ws-control-flex {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.ws-control-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.ws-room-card {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 状态列表 */
+.ws-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.ws-status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.ws-status-item:last-child {
+  border-bottom: none;
+}
+
+.ws-status-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.ws-status-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* 消息区域 - Flex布局 */
+.ws-message-flex {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.ws-message-list {
+  flex: 1;
+  min-width: 0;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  min-height: 350px;
+  max-height: 450px;
+  overflow-y: auto;
+  border: 1px solid var(--border-light);
+}
+
+.ws-message-input {
+  flex: 0 0 350px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.ws-message-item {
+  margin-bottom: var(--space-sm);
+  font-family: monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.ws-message-time {
+  color: var(--text-muted);
+}
+
+.ws-message-type {
+  margin-right: var(--space-sm);
+}
+
+.ws-message-sender {
+  color: var(--primary);
+  margin-right: 4px;
+}
+
+.ws-message-content {
+  margin-right: 4px;
+}
+
+.ws-message-content.msg-sent {
+  color: var(--info);
+}
+
+.ws-message-content.msg-received {
+  color: var(--success);
+}
+
+.ws-message-content.msg-system {
+  color: var(--warning);
+}
+
+.ws-message-room {
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+/* 快捷操作 */
+.ws-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 767px) {
+  .ws-control-flex {
+    flex-direction: column;
+  }
+
+  .ws-control-card,
+  .ws-room-card {
+    flex: 1 1 100%;
+  }
+
+  .ws-message-flex {
+    flex-direction: column;
+  }
+
+  .ws-message-list {
+    min-height: 200px;
+    max-height: 300px;
+  }
+
+  .ws-message-input {
+    flex: 1 1 100%;
+    min-width: auto;
+  }
+
+  .ws-status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .ws-quick-actions {
+    flex-direction: column;
+  }
+
+  .ws-quick-actions .n-button {
+    width: 100%;
+  }
+}
+
+@media screen and (max-width: 375px) {
+  .ws-message-list {
+    padding: var(--space-sm);
+  }
+
+  .ws-message-item {
+    font-size: 12px;
+  }
+}
+</style>

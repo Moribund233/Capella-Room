@@ -4,6 +4,7 @@ use crate::{
     db::Database,
     error::{AppError, Result},
     models::room::{MemberRole, Room, RoomMember, RoomResponse},
+    models::user::UserInfo,
 };
 
 /// 聊天室服务
@@ -80,6 +81,8 @@ impl RoomService {
                         r.name,
                         r.description,
                         r.owner_id,
+                        u.username as owner_username,
+                        u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
                         r.created_at,
@@ -87,11 +90,12 @@ impl RoomService {
                         COUNT(rm.user_id) as member_count
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
+                    LEFT JOIN users u ON r.owner_id = u.id
                     WHERE (r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     ))
                     AND r.name ILIKE $2
-                    GROUP BY r.id
+                    GROUP BY r.id, u.username, u.avatar_url
                     ORDER BY r.created_at DESC
                     LIMIT $3 OFFSET $4
                     "#,
@@ -110,6 +114,8 @@ impl RoomService {
                         r.name,
                         r.description,
                         r.owner_id,
+                        u.username as owner_username,
+                        u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
                         r.created_at,
@@ -117,10 +123,11 @@ impl RoomService {
                         COUNT(rm.user_id) as member_count
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
+                    LEFT JOIN users u ON r.owner_id = u.id
                     WHERE r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     )
-                    GROUP BY r.id
+                    GROUP BY r.id, u.username, u.avatar_url
                     ORDER BY r.created_at DESC
                     LIMIT $2 OFFSET $3
                     "#,
@@ -141,6 +148,8 @@ impl RoomService {
                         r.name,
                         r.description,
                         r.owner_id,
+                        u.username as owner_username,
+                        u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
                         r.created_at,
@@ -148,9 +157,10 @@ impl RoomService {
                         COUNT(rm.user_id) as member_count
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
+                    LEFT JOIN users u ON r.owner_id = u.id
                     WHERE r.is_private = false
                     AND r.name ILIKE $1
-                    GROUP BY r.id
+                    GROUP BY r.id, u.username, u.avatar_url
                     ORDER BY r.created_at DESC
                     LIMIT $2 OFFSET $3
                     "#,
@@ -168,6 +178,8 @@ impl RoomService {
                         r.name,
                         r.description,
                         r.owner_id,
+                        u.username as owner_username,
+                        u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
                         r.created_at,
@@ -175,8 +187,9 @@ impl RoomService {
                         COUNT(rm.user_id) as member_count
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
+                    LEFT JOIN users u ON r.owner_id = u.id
                     WHERE r.is_private = false
-                    GROUP BY r.id
+                    GROUP BY r.id, u.username, u.avatar_url
                     ORDER BY r.created_at DESC
                     LIMIT $1 OFFSET $2
                     "#,
@@ -203,11 +216,13 @@ impl RoomService {
             // 登录用户：可以看到所有公开房间 + 自己加入的私有房间
             sqlx::query_as::<_, RoomRow>(
                 r#"
-                SELECT 
+                SELECT
                     r.id,
                     r.name,
                     r.description,
                     r.owner_id,
+                    u.username as owner_username,
+                    u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
                     r.created_at,
@@ -215,10 +230,11 @@ impl RoomService {
                     COUNT(rm.user_id) as member_count
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
+                LEFT JOIN users u ON r.owner_id = u.id
                 WHERE r.is_private = false OR EXISTS (
                     SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                 )
-                GROUP BY r.id
+                GROUP BY r.id, u.username, u.avatar_url
                 ORDER BY r.updated_at DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -232,11 +248,13 @@ impl RoomService {
             // 未登录用户：只能看到公开房间
             sqlx::query_as::<_, RoomRow>(
                 r#"
-                SELECT 
+                SELECT
                     r.id,
                     r.name,
                     r.description,
                     r.owner_id,
+                    u.username as owner_username,
+                    u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
                     r.created_at,
@@ -244,8 +262,9 @@ impl RoomService {
                     COUNT(rm.user_id) as member_count
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
+                LEFT JOIN users u ON r.owner_id = u.id
                 WHERE r.is_private = false
-                GROUP BY r.id
+                GROUP BY r.id, u.username, u.avatar_url
                 ORDER BY r.updated_at DESC
                 LIMIT $1 OFFSET $2
                 "#,
@@ -277,11 +296,13 @@ impl RoomService {
     pub async fn get_room_detail(&self, room_id: Uuid) -> Result<Option<RoomResponse>> {
         let row = sqlx::query_as::<_, RoomRow>(
             r#"
-            SELECT 
+            SELECT
                 r.id,
                 r.name,
                 r.description,
                 r.owner_id,
+                u.username as owner_username,
+                u.avatar_url as owner_avatar_url,
                 r.is_private,
                 r.max_members,
                 r.created_at,
@@ -289,8 +310,9 @@ impl RoomService {
                 COUNT(rm.user_id) as member_count
             FROM rooms r
             LEFT JOIN room_members rm ON r.id = rm.room_id
+            LEFT JOIN users u ON r.owner_id = u.id
             WHERE r.id = $1
-            GROUP BY r.id
+            GROUP BY r.id, u.username, u.avatar_url
             "#,
         )
         .bind(room_id)
@@ -637,11 +659,13 @@ impl RoomService {
     pub async fn get_user_rooms(&self, user_id: Uuid) -> Result<Vec<RoomResponse>> {
         let rows = sqlx::query_as::<_, RoomRow>(
             r#"
-            SELECT 
+            SELECT
                 r.id,
                 r.name,
                 r.description,
                 r.owner_id,
+                u.username as owner_username,
+                u.avatar_url as owner_avatar_url,
                 r.is_private,
                 r.max_members,
                 r.created_at,
@@ -650,8 +674,9 @@ impl RoomService {
             FROM rooms r
             JOIN room_members rm ON r.id = rm.room_id
             LEFT JOIN room_members rm2 ON r.id = rm2.room_id
+            LEFT JOIN users u ON r.owner_id = u.id
             WHERE rm.user_id = $1
-            GROUP BY r.id
+            GROUP BY r.id, u.username, u.avatar_url
             ORDER BY r.created_at DESC
             "#,
         )
@@ -687,11 +712,13 @@ impl RoomService {
         let rows = if let Some(query) = search {
             sqlx::query_as::<_, RoomRow>(
                 r#"
-                SELECT 
+                SELECT
                     r.id,
                     r.name,
                     r.description,
                     r.owner_id,
+                    u.username as owner_username,
+                    u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
                     r.created_at,
@@ -699,8 +726,9 @@ impl RoomService {
                     COUNT(rm.user_id) as member_count
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
+                LEFT JOIN users u ON r.owner_id = u.id
                 WHERE r.name ILIKE $1
-                GROUP BY r.id
+                GROUP BY r.id, u.username, u.avatar_url
                 ORDER BY r.created_at DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -713,11 +741,13 @@ impl RoomService {
         } else {
             sqlx::query_as::<_, RoomRow>(
                 r#"
-                SELECT 
+                SELECT
                     r.id,
                     r.name,
                     r.description,
                     r.owner_id,
+                    u.username as owner_username,
+                    u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
                     r.created_at,
@@ -725,7 +755,8 @@ impl RoomService {
                     COUNT(rm.user_id) as member_count
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
-                GROUP BY r.id
+                LEFT JOIN users u ON r.owner_id = u.id
+                GROUP BY r.id, u.username, u.avatar_url
                 ORDER BY r.created_at DESC
                 LIMIT $1 OFFSET $2
                 "#,
@@ -771,7 +802,7 @@ impl RoomService {
     }
 }
 
-/// 用于查询的房间行（包含成员数）
+/// 用于查询的房间行（包含成员数和所有者信息）
 #[derive(Debug, Clone, sqlx::FromRow)]
 #[allow(dead_code)]
 struct RoomRow {
@@ -779,6 +810,8 @@ struct RoomRow {
     pub name: String,
     pub description: Option<String>,
     pub owner_id: Uuid,
+    pub owner_username: String,
+    pub owner_avatar_url: Option<String>,
     pub is_private: bool,
     pub max_members: i32,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -792,7 +825,7 @@ impl RoomRow {
             id: self.id,
             name: self.name,
             description: self.description,
-            owner_id: self.owner_id,
+            owner: UserInfo::new(self.owner_id, self.owner_username, self.owner_avatar_url),
             is_private: self.is_private,
             max_members: self.max_members,
             member_count: self.member_count,

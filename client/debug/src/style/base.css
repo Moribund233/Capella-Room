@@ -13,6 +13,10 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 防止移动端页面缩放问题 */
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -21,6 +25,18 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
+  /* 确保body占满视口 */
+  min-height: 100vh;
+  min-height: 100dvh; /* 动态视口高度，适配移动端 */
+  width: 100%;
+  overflow-x: hidden; /* 防止水平滚动 */
+}
+
+/* 移动端基础适配 */
+#app {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ========== Naive UI 全局样式覆盖 ========== */

@@ -1,4 +1,4 @@
-/* 响应式断点 */
+/* 响应式断点 - Flex弹性布局 */
 
 /* 断点定义
    - mobile: < 768px
@@ -6,42 +6,108 @@
    - desktop: > 1024px
 */
 
-/* 移动端优先的基础样式 */
-.sidebar {
-  width: var(--sidebar-collapsed-width);
+/* ========== 移动端基础样式 (< 768px) ========== */
+@media screen and (max-width: 767px) {
+  /* 页面基础 */
+  .page-container {
+    padding: var(--space-md);
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  /* Flex布局 - 移动端垂直排列 */
+  .flex-row {
+    flex-direction: column;
+  }
+
+  .flex-row > * {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 响应式间距 */
+  .responsive-p {
+    padding: var(--space-md);
+  }
+
+  .responsive-m {
+    margin: var(--space-md);
+  }
+
+  .responsive-gap {
+    gap: var(--space-sm);
+  }
+
+  /* 响应式字体 */
+  .responsive-text {
+    font-size: 14px;
+  }
+
+  .responsive-title {
+    font-size: 18px;
+  }
+
+  /* 响应式表格 */
+  .data-table {
+    font-size: 14px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-sm);
+  }
+
+  /* 响应式表单 */
+  .form-section {
+    padding: var(--space-md);
+  }
+
+  .action-group {
+    flex-direction: column;
+  }
+
+  .action-group .n-button {
+    width: 100%;
+  }
 }
 
-.main-content {
-  margin-left: var(--sidebar-collapsed-width);
-}
-
-/* 平板端 (>= 768px) */
+/* ========== 平板端 (>= 768px) ========== */
 @media screen and (min-width: 768px) {
-  .sidebar {
-    width: var(--sidebar-width);
-  }
-
-  .main-content {
-    margin-left: var(--sidebar-width);
-  }
-
   .page-container {
     padding: var(--space-lg);
   }
 
-  .card-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .responsive-p {
+    padding: var(--space-lg);
+  }
+
+  .responsive-m {
+    margin: var(--space-lg);
+  }
+
+  .responsive-gap {
+    gap: var(--space-md);
+  }
+
+  .responsive-text {
+    font-size: 16px;
+  }
+
+  .responsive-title {
+    font-size: 24px;
   }
 }
 
-/* 桌面端 (>= 1024px) */
+/* ========== 桌面端 (>= 1024px) ========== */
 @media screen and (min-width: 1024px) {
   .page-container {
     padding: var(--space-xl);
-  }
-
-  .card-grid {
-    grid-template-columns: repeat(3, 1fr);
   }
 
   .page-title {
@@ -49,14 +115,15 @@
   }
 }
 
-/* 大屏 (>= 1440px) */
+/* ========== 大屏 (>= 1440px) ========== */
 @media screen and (min-width: 1440px) {
-  .card-grid {
-    grid-template-columns: repeat(4, 1fr);
+  .page-container {
+    max-width: 1400px;
+    margin: 0 auto;
   }
 }
 
-/* 响应式工具类 */
+/* ========== 响应式工具类 ========== */
 
 /* 仅在移动端显示 */
 .mobile-only {
@@ -80,79 +147,121 @@
   }
 }
 
-/* 响应式间距 */
+/* 隐藏元素 */
+.hidden {
+  display: none !important;
+}
+
+/* 移动端隐藏 */
 @media screen and (max-width: 767px) {
-  .responsive-p {
-    padding: var(--space-md);
-  }
-
-  .responsive-m {
-    margin: var(--space-md);
-  }
-
-  .responsive-gap {
-    gap: var(--space-sm);
+  .hidden-mobile {
+    display: none !important;
   }
 }
 
-@media screen and (min-width: 768px) {
-  .responsive-p {
-    padding: var(--space-lg);
-  }
-
-  .responsive-m {
-    margin: var(--space-lg);
-  }
-
-  .responsive-gap {
-    gap: var(--space-md);
+/* 平板端隐藏 */
+@media screen and (min-width: 768px) and (max-width: 1023px) {
+  .hidden-tablet {
+    display: none !important;
   }
 }
 
-/* 响应式字体 */
-@media screen and (max-width: 767px) {
-  .responsive-text {
-    font-size: 14px;
-  }
-
-  .responsive-title {
-    font-size: 18px;
+/* 桌面端隐藏 */
+@media screen and (min-width: 1024px) {
+  .hidden-desktop {
+    display: none !important;
   }
 }
 
-@media screen and (min-width: 768px) {
-  .responsive-text {
-    font-size: 16px;
-  }
+/* ========== Flex布局工具类 ========== */
 
-  .responsive-title {
-    font-size: 24px;
-  }
+/* 基础Flex容器 */
+.flex {
+  display: flex;
 }
 
-/* 响应式表格 */
-@media screen and (max-width: 767px) {
-  .data-table {
-    font-size: 14px;
-  }
-
-  .data-table th,
-  .data-table td {
-    padding: var(--space-sm);
-  }
+.flex-inline {
+  display: inline-flex;
 }
 
-/* 响应式表单 */
-@media screen and (max-width: 767px) {
-  .form-section {
-    padding: var(--space-md);
-  }
+/* 方向 */
+.flex-row {
+  flex-direction: row;
+}
 
-  .action-group {
-    flex-direction: column;
-  }
+.flex-col {
+  flex-direction: column;
+}
 
-  .action-group .n-button {
-    width: 100%;
-  }
+/* 换行 */
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.flex-nowrap {
+  flex-wrap: nowrap;
+}
+
+/* 对齐 */
+.flex-center {
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-between {
+  justify-content: space-between;
+}
+
+.flex-around {
+  justify-content: space-around;
+}
+
+.flex-start {
+  justify-content: flex-start;
+}
+
+.flex-end {
+  justify-content: flex-end;
+}
+
+/* Flex项 */
+.flex-1 {
+  flex: 1 1 0%;
+}
+
+.flex-auto {
+  flex: 1 1 auto;
+}
+
+.flex-none {
+  flex: none;
+}
+
+.flex-grow {
+  flex-grow: 1;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Gap */
+.gap-xs {
+  gap: var(--space-xs);
+}
+
+.gap-sm {
+  gap: var(--space-sm);
+}
+
+.gap-md {
+  gap: var(--space-md);
+}
+
+.gap-lg {
+  gap: var(--space-lg);
+}
+
+.gap-xl {
+  gap: var(--space-xl);
 }

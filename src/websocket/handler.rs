@@ -446,6 +446,15 @@ async fn handle_message(
     last_pong: &Arc<std::sync::Mutex<Instant>>,
 ) -> anyhow::Result<()> {
     match msg {
+        // 心跳请求 - 回复 Pong（支持客户端主导的心跳）
+        WebSocketMessage::Ping => {
+            let pong = WebSocketMessage::Pong;
+            if let Ok(json) = pong.to_json() {
+                let _ = tx.send(json).await;
+            }
+            debug!("Received ping from user: {}, sent pong", user_id);
+        }
+
         // 心跳响应
         WebSocketMessage::Pong => {
             if let Ok(mut last) = last_pong.lock() {

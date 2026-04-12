@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './client'
+import type { ClientConfig } from '@/types/config'
 
 // 系统状态
 export interface SystemStatus {
@@ -100,4 +101,14 @@ export async function getConnectionInfo(): Promise<ConnectionInfo> {
     websocket_url: wsUrl,
     version: response.data.version
   }
+}
+
+/**
+ * 获取客户端配置
+ * 使用 /api/config/client 端点（公开）
+ * @returns 客户端配置（WebSocket、重连、上传等配置）
+ */
+export async function getClientConfig(): Promise<ClientConfig> {
+  const response = await apiClient.get<ClientConfig>('/api/config/client')
+  return response.data
 }

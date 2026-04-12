@@ -7,7 +7,7 @@ use chrono::Utc;
 use std::sync::Arc;
 
 use crate::{
-    handlers::{admin, audit, auth, file, message, room, user},
+    handlers::{admin, audit, auth, config, file, message, room, user},
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
     middleware::auth_middleware,
@@ -29,6 +29,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/health/live", get(liveness_check))
         // API 版本信息
         .route("/api/version", get(api_version))
+        // 客户端配置（公开访问）
+        .route("/api/config/client", get(config::get_client_config))
         // WebSocket 端点
         .route("/ws", get(ws_handler));
 

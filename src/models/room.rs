@@ -4,6 +4,8 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::models::user::UserInfo;
+
 /// 聊天室数据库模型
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Room {
@@ -66,7 +68,7 @@ pub struct RoomResponse {
     pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
-    pub owner_id: Uuid,
+    pub owner: UserInfo,
     pub is_private: bool,
     pub max_members: i32,
     pub member_count: i64,
@@ -75,13 +77,13 @@ pub struct RoomResponse {
 }
 
 impl Room {
-    /// 转换为响应DTO
-    pub fn to_response(&self, member_count: i64) -> RoomResponse {
+    /// 转换为响应DTO（需要传入所有者信息）
+    pub fn to_response(&self, member_count: i64, owner: UserInfo) -> RoomResponse {
         RoomResponse {
             id: self.id,
             name: self.name.clone(),
             description: self.description.clone(),
-            owner_id: self.owner_id,
+            owner,
             is_private: self.is_private,
             max_members: self.max_members,
             member_count,

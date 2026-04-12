@@ -5,21 +5,15 @@ import Sidebar from './Sidebar.vue'
 <template>
   <n-message-provider>
     <n-dialog-provider>
-      <n-layout has-sider class="main-layout">
-        <n-layout-sider
-          :width="240"
-          :collapsed-width="64"
-          :native-scrollbar="false"
-          class="layout-sider"
-        >
-          <Sidebar />
-        </n-layout-sider>
-        <n-layout class="layout-content">
-          <n-layout-content class="content-wrapper">
-            <slot />
-          </n-layout-content>
-        </n-layout>
-      </n-layout>
+      <div class="main-layout">
+        <!-- Sidebar 组件 -->
+        <Sidebar />
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+          <slot />
+        </main>
+      </div>
     </n-dialog-provider>
   </n-message-provider>
 </template>
@@ -27,33 +21,38 @@ import Sidebar from './Sidebar.vue'
 <style scoped>
 .main-layout {
   min-height: 100vh;
+  min-height: 100dvh; /* 动态视口高度 */
+  width: 100%;
+  display: flex;
 }
 
-.layout-sider {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 100;
-}
-
-.layout-content {
+/* 桌面端：主内容默认有左边距 */
+.main-content {
+  flex: 1;
   margin-left: 240px;
   min-height: 100vh;
+  min-height: 100dvh;
+  width: calc(100% - 240px);
   background-color: var(--bg-primary);
+  padding: var(--space-lg);
+  transition: margin-left 0.3s ease, width 0.3s ease;
+  overflow-x: hidden; /* 防止内容溢出 */
 }
 
-.content-wrapper {
-  min-height: 100vh;
-}
-
+/* 移动端：主内容无左边距 */
 @media screen and (max-width: 767px) {
-  .layout-sider {
-    display: none;
+  .main-layout {
+    flex-direction: column;
+    width: 100%;
   }
 
-  .layout-content {
+  .main-content {
     margin-left: 0;
+    width: 100%;
+    padding: var(--space-md);
+    padding-top: calc(var(--space-md) + 56px); /* 为右上角按钮留空间 */
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 }
 </style>

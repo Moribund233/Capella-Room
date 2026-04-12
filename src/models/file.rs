@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+use crate::models::user::UserInfo;
+
 /// 文件分类
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
@@ -90,6 +92,22 @@ impl FileResource {
             mime_type: self.mime_type.clone(),
             category: self.category.clone(),
             usage_type: self.usage_type.clone(),
+            uploader: None,
+            created_at: self.created_at,
+        }
+    }
+
+    /// 转换为文件响应DTO（包含上传者信息）
+    pub fn to_response_with_uploader(&self, uploader: Option<UserInfo>) -> FileResponse {
+        FileResponse {
+            id: self.id,
+            original_name: self.original_name.clone(),
+            file_url: self.file_url.clone(),
+            file_size: self.file_size,
+            mime_type: self.mime_type.clone(),
+            category: self.category.clone(),
+            usage_type: self.usage_type.clone(),
+            uploader,
             created_at: self.created_at,
         }
     }
@@ -139,6 +157,7 @@ pub struct FileResponse {
     pub mime_type: String,
     pub category: FileCategory,
     pub usage_type: FileUsageType,
+    pub uploader: Option<UserInfo>,
     pub created_at: DateTime<Utc>,
 }
 

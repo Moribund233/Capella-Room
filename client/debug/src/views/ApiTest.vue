@@ -173,9 +173,10 @@ onMounted(() => {
       <p class="page-subtitle">测试 REST API 接口</p>
     </div>
 
-    <div style="display: grid; grid-template-columns: 280px 1fr; gap: var(--space-lg)">
+    <!-- API测试布局 - Flex布局 -->
+    <div class="api-test-flex">
       <!-- 左侧：API 列表 -->
-      <n-card title="API 端点" style="max-height: 600px; overflow-y: auto">
+      <n-card title="API 端点" class="api-list-card">
         <n-collapse>
           <n-collapse-item title="认证" name="auth">
             <n-list hoverable clickable>
@@ -256,18 +257,18 @@ onMounted(() => {
       </n-card>
 
       <!-- 右侧：请求测试 -->
-      <div style="display: flex; flex-direction: column; gap: var(--space-lg)">
+      <div class="api-test-main">
         <n-card title="请求配置">
           <n-space vertical size="large">
-            <n-input-group>
+            <n-input-group class="api-request-group">
               <n-select
                 v-model:value="selectedMethod"
                 :options="methods"
-                style="width: 120px"
+                class="api-method-select"
                 @update:value="loadTemplate"
               />
-              <n-input v-model:value="apiBaseUrl" style="width: 200px" />
-              <n-input v-model:value="apiPath" placeholder="/path" />
+              <n-input v-model:value="apiBaseUrl" class="api-base-url" />
+              <n-input v-model:value="apiPath" placeholder="/path" class="api-path-input" />
               <n-button type="primary" @click="sendRequest">
                 <template #icon>
                   <Send class="icon-sm" />
@@ -317,10 +318,81 @@ onMounted(() => {
             :rows="12"
             readonly
             placeholder="响应结果将显示在这里..."
-            style="font-family: monospace; font-size: 13px"
+            class="api-response-input"
           />
         </n-card>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* API测试布局 - Flex布局 */
+.api-test-flex {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.api-list-card {
+  flex: 0 0 280px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.api-test-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.api-request-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.api-method-select {
+  width: 120px;
+}
+
+.api-base-url {
+  width: 200px;
+}
+
+.api-path-input {
+  flex: 1;
+  min-width: 150px;
+}
+
+.api-response-input {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 767px) {
+  .api-test-flex {
+    flex-direction: column;
+  }
+
+  .api-list-card {
+    flex: 1 1 100%;
+    max-height: 300px;
+  }
+
+  .api-test-main {
+    flex: 1 1 100%;
+  }
+
+  .api-method-select,
+  .api-base-url {
+    width: 100%;
+  }
+
+  .api-path-input {
+    min-width: auto;
+  }
+}
+</style>

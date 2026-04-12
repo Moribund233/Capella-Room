@@ -9,7 +9,7 @@ export interface ApiResponse<T> {
   data: T
 }
 
-// 用户信息
+// 用户信息（完整）
 export interface User {
   id: string
   username: string
@@ -18,6 +18,20 @@ export interface User {
   status: 'active' | 'inactive'
   created_at: string
   last_login?: string
+}
+
+// 用户信息（简化版，用于嵌套）
+export interface UserInfo {
+  id: string
+  username: string
+  avatar_url?: string
+}
+
+// 发送者信息
+export interface SenderInfo {
+  id: string
+  username: string
+  avatar_url?: string
 }
 
 // 登录请求
@@ -66,18 +80,46 @@ export interface Room {
   member_count: number
   created_at: string
   updated_at: string
-  owner_id: string
+  owner: UserInfo  // 修改：从 owner_id 改为 owner
 }
 
 // 消息信息
 export interface Message {
   id: string
   content: string
-  sender: string
-  sender_id: string
+  sender: SenderInfo  // 修改：从 string 改为 SenderInfo 对象
   room_id: string
   created_at: string
   type: 'text' | 'image' | 'file'
+}
+
+// 文件资源信息
+export interface FileResource {
+  id: string
+  original_name: string
+  file_url: string
+  file_size: number
+  mime_type: string
+  category: 'image' | 'document' | 'video' | 'audio' | 'other'
+  usage_type: 'avatar' | 'message' | 'room_cover' | 'general'
+  uploader?: UserInfo  // 新增：上传者信息
+  created_at: string
+}
+
+// 审计告警信息
+export interface AuditAlert {
+  id: string
+  rule_id?: string
+  alert_type: string
+  severity: 'info' | 'warning' | 'error' | 'critical'
+  title: string
+  description: string
+  affected_user?: UserInfo  // 新增：受影响用户信息
+  acknowledged_by?: UserInfo  // 新增：确认者信息
+  resolved_by?: UserInfo  // 新增：解决者信息
+  status: 'new' | 'acknowledged' | 'resolved' | 'ignored'
+  created_at: string
+  updated_at: string
 }
 
 // WebSocket 消息

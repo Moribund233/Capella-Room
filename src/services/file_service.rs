@@ -13,6 +13,7 @@ use crate::{
         is_allowed_mime_type, FileCategory, FileListResponse, FileQueryParams, FileResource,
         FileResponse, FileUploadResponse, FileUsageType,
     },
+    models::user::UserInfo,
 };
 
 /// 文件服务
@@ -341,9 +342,49 @@ impl FileService {
             }
         };
 
-        let files: Vec<FileResponse> = files.into_iter().map(|f| f.to_response()).collect();
+        // 收集所有上传者ID
+        let uploader_ids: Vec<Uuid> = files
+            .iter()
+            .filter_map(|f| f.uploader_id)
+            .collect();
+
+        // 批量查询上传者信息
+        let uploader_infos = self.get_user_infos(&uploader_ids).await?;
+
+        // 转换为响应
+        let files: Vec<FileResponse> = files
+            .into_iter()
+            .map(|f| {
+                let uploader = f.uploader_id.and_then(|id| uploader_infos.get(&id).cloned());
+                f.to_response_with_uploader(uploader)
+            })
+            .collect();
 
         Ok(FileListResponse { files, total })
+    }
+
+    /// 批量获取用户信息
+    async fn get_user_infos(&self, user_ids: &[Uuid]) -> Result<std::collections::HashMap<Uuid, UserInfo>> {
+        if user_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let rows: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
+            r#"
+            SELECT id, username, avatar_url FROM users WHERE id = ANY($1)
+            "#,
+        )
+        .bind(user_ids)
+        .fetch_all(self.db.pool())
+        .await
+        .map_err(AppError::Database)?;
+
+        let mut map = std::collections::HashMap::new();
+        for (id, username, avatar_url) in rows {
+            map.insert(id, UserInfo::new(id, username, avatar_url));
+        }
+
+        Ok(map)
     }
 
     /// 软删除文件

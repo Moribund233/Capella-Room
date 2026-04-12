@@ -228,3 +228,125 @@ impl From<SystemConfigRecord> for SystemConfigItem {
 }
 
 pub type SharedConfig = Arc<RwLock<AppConfig>>;
+
+// ==================== 客户端配置 ====================
+
+/// 客户端配置
+/// 供前端应用获取的服务端配置子集
+#[derive(Debug, Clone, Serialize)]
+pub struct ClientConfig {
+    /// WebSocket 配置
+    pub websocket: ClientWebSocketConfig,
+    /// 重连配置
+    pub reconnect: ClientReconnectConfig,
+    /// 上传配置
+    pub upload: ClientUploadConfig,
+    /// 系统状态
+    pub system: ClientSystemConfig,
+}
+
+/// 客户端 WebSocket 配置
+#[derive(Debug, Clone, Serialize)]
+pub struct ClientWebSocketConfig {
+    /// 心跳间隔（秒）
+    pub heartbeat_interval_secs: u64,
+    /// 心跳超时（秒）
+    pub heartbeat_timeout_secs: u64,
+    /// 认证超时（秒）
+    pub auth_timeout_secs: u64,
+}
+
+/// 客户端重连配置
+#[derive(Debug, Clone, Serialize)]
+pub struct ClientReconnectConfig {
+    /// 基础延迟（毫秒）
+    pub base_delay_ms: u64,
+    /// 最大延迟（毫秒）
+    pub max_delay_ms: u64,
+    /// 最大重连次数
+    pub max_attempts: u32,
+    /// 延迟倍数（指数退避）
+    pub multiplier: u32,
+}
+
+/// 客户端上传配置
+#[derive(Debug, Clone, Serialize)]
+pub struct ClientUploadConfig {
+    /// 最大文件大小（字节）
+    pub max_file_size: usize,
+    /// 人类可读的最大文件大小（如 "10MB"）
+    pub max_file_size_human: String,
+}
+
+/// 客户端系统配置
+#[derive(Debug, Clone, Serialize)]
+pub struct ClientSystemConfig {
+    /// 系统名称
+    pub name: String,
+    /// 系统版本
+    pub version: String,
+    /// 是否处于维护模式
+    pub maintenance_mode: bool,
+    /// 维护模式提示消息
+    pub maintenance_message: String,
+}
+
+impl ClientConfig {
+    /// 从 AppConfig 创建客户端配置
+    pub fn from_app_config(config: &AppConfig) -> Self {
+        Self {
+            websocket: ClientWebSocketConfig {
+                heartbeat_interval_secs: config.websocket.heartbeat_interval_secs,
+                heartbeat_timeout_secs: config.websocket.heartbeat_timeout_secs,
+                auth_timeout_secs: config.websocket.auth_timeout_secs,
+            },
+            reconnect: ClientReconnectConfig {
+                base_delay_ms: config.reconnect.base_delay_ms,
+                max_delay_ms: config.reconnect.max_delay_ms,
+                max_attempts: config.reconnect.max_attempts,
+                multiplier: config.reconnect.multiplier,
+            },
+            upload: ClientUploadConfig {
+                max_file_size: config.upload.max_file_size,
+                max_file_size_human: format_file_size(config.upload.max_file_size),
+            },
+            system: ClientSystemConfig {
+                name: config.system.name.clone(),
+                version: config.system.version.clone(),
+                maintenance_mode: config.system.maintenance_mode,
+                maintenance_message: config.system.maintenance_message.clone(),
+            },
+        }
+    }
+}
+
+/// 将字节大小格式化为人类可读的字符串
+fn format_file_size(size: usize) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    if size == 0 {
+        return "0 B".to_string();
+    }
+    let exp = (size as f64).log(1024.0).min(UNITS.len() as f64 - 1.0) as usize;
+    let value = size as f64 / 1024f64.powi(exp as i32);
+    if exp == 0 {
+        format!("{} {}", size, UNITS[0])
+    } else {
+        format!("{:.1} {}", value, UNITS[exp])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_file_size() {
+        assert_eq!(format_file_size(0), "0 B");
+        assert_eq!(format_file_size(512), "512 B");
+        assert_eq!(format_file_size(1024), "1.0 KB");
+        assert_eq!(format_file_size(1536), "1.5 KB");
+        assert_eq!(format_file_size(1024 * 1024), "1.0 MB");
+        assert_eq!(format_file_size(10 * 1024 * 1024), "10.0 MB");
+        assert_eq!(format_file_size(1024 * 1024 * 1024), "1.0 GB");
+    }
+}

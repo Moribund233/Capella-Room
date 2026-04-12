@@ -227,6 +227,7 @@ CREATE TABLE audit_logs (
     event_type audit_event_type NOT NULL,
     severity audit_severity NOT NULL DEFAULT 'info',
     actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    actor_name VARCHAR(50),
     actor_role user_role,
     target_type VARCHAR(50),
     target_id UUID,
