@@ -94,7 +94,7 @@ export async function refreshToken(): Promise<boolean> {
  */
 export async function logout(): Promise<void> {
   try {
-    await apiClient.post('/api/v1/auth/logout')
+    await apiClient.post('/api/v1/users/logout')
   } finally {
     clearTokens()
   }

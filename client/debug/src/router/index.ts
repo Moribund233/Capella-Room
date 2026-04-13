@@ -5,8 +5,7 @@ import WebSocketTest from '../views/WebSocketTest.vue'
 import ApiTest from '../views/ApiTest.vue'
 import RoomManager from '../views/RoomManager.vue'
 import UserManager from '../views/UserManager.vue'
-import MessageTest from '../views/MessageTest.vue'
-import E2ETest from '../views/E2ETest.vue'
+import RoomTest from '../views/RoomTest.vue'
 import Login from '../views/Login.vue'
 
 const router = createRouter({
@@ -49,16 +48,10 @@ const router = createRouter({
       meta: { title: '用户管理' }
     },
     {
-      path: '/messages',
-      name: 'messages',
-      component: MessageTest,
-      meta: { title: '消息测试' }
-    },
-    {
-      path: '/e2e',
-      name: 'e2e',
-      component: E2ETest,
-      meta: { title: '端到端测试' }
+      path: '/room-test',
+      name: 'room-test',
+      component: RoomTest,
+      meta: { title: '房间测试' }
     }
   ]
 })

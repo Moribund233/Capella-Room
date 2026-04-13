@@ -28,7 +28,6 @@ pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>
 /// 处理 WebSocket 连接
 /// 管理连接的整个生命周期
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
-    let _timer = PerformanceTimer::new("websocket_connection");
     info!("New WebSocket connection established");
 
     // 分割 socket 为发送和接收部分
@@ -46,40 +45,25 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         .message_buffer_size;
     let (tx, mut rx) = mpsc::channel::<String>(buffer_size);
 
-    // 等待认证或重连消息
+    // 等待认证或重连消息（使用性能计时器测量认证耗时）
+    let auth_timer = PerformanceTimer::new("websocket_auth");
     let (user_id, username, rooms_to_rejoin, is_reconnect) =
         match wait_for_auth(&mut receiver, &state).await {
-            Ok(AuthResult::NewConnection { user_id, username }) => {
-                info!(
-                    "WebSocket authenticated for user: {} ({})",
-                    username, user_id
-                );
-                StructuredLogger::websocket_connect(user_id, &username, None);
-                // 发送认证成功消息
-                let auth_success = WebSocketMessage::auth_success();
-                if let Ok(json) = auth_success.to_json() {
-                    let _ = sender.send(Message::Text(json)).await;
+            Ok(auth_result) => {
+                auth_timer.finish();
+                match auth_result {
+                    AuthResult::NewConnection { user_id, username } => {
+                        (user_id, username, Vec::new(), false)
+                    }
+                    AuthResult::Reconnection {
+                        user_id,
+                        username,
+                        rooms_to_rejoin,
+                    } => (user_id, username, rooms_to_rejoin, true),
                 }
-                (user_id, username, Vec::new(), false)
-            }
-            Ok(AuthResult::Reconnection {
-                user_id,
-                username,
-                rooms_to_rejoin,
-            }) => {
-                info!(
-                    "WebSocket reconnected for user: {} ({}), rooms: {:?}",
-                    username, user_id, rooms_to_rejoin
-                );
-                // 发送重连成功消息
-                let reconnect_success =
-                    WebSocketMessage::reconnect_success(rooms_to_rejoin.clone());
-                if let Ok(json) = reconnect_success.to_json() {
-                    let _ = sender.send(Message::Text(json)).await;
-                }
-                (user_id, username, rooms_to_rejoin, true)
             }
             Err(e) => {
+                auth_timer.finish();
                 warn!("WebSocket authentication failed: {}", e);
                 // 发送认证失败消息
                 let auth_fail = WebSocketMessage::auth_failed(&e.to_string());
@@ -92,6 +76,30 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             }
         };
 
+    // 记录认证成功日志
+    if is_reconnect {
+        info!(
+            "WebSocket reconnected for user: {} ({}), rooms: {:?}",
+            username, user_id, rooms_to_rejoin
+        );
+        // 发送重连成功消息
+        let reconnect_success = WebSocketMessage::reconnect_success(rooms_to_rejoin.clone());
+        if let Ok(json) = reconnect_success.to_json() {
+            let _ = sender.send(Message::Text(json)).await;
+        }
+    } else {
+        info!(
+            "WebSocket authenticated for user: {} ({})",
+            username, user_id
+        );
+        StructuredLogger::websocket_connect(user_id, &username, None);
+        // 发送认证成功消息
+        let auth_success = WebSocketMessage::auth_success();
+        if let Ok(json) = auth_success.to_json() {
+            let _ = sender.send(Message::Text(json)).await;
+        }
+    }
+
     // 如果是重连，先断开旧连接
     if is_reconnect && state.ws_manager().is_user_connected(user_id) {
         info!("Disconnecting old connection for user: {}", user_id);
@@ -102,6 +110,9 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     state
         .ws_manager()
         .connect(user_id, username.clone(), tx.clone());
+
+    // 记录连接指标
+    state.metrics_collector().record_connection();
 
     // 如果是重连，自动重新加入之前的房间
     if is_reconnect {
@@ -276,6 +287,9 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     info!("WebSocket connection closed for user: {}", user_id);
     StructuredLogger::websocket_disconnect(user_id, &username, "connection_closed");
     state.ws_manager().disconnect(user_id);
+
+    // 记录断开连接指标
+    state.metrics_collector().record_disconnect();
 }
 
 /// 认证结果类型

@@ -78,11 +78,11 @@ export async function updateUser(userId: string, data: UpdateUserRequest): Promi
 }
 
 /**
- * 删除用户
+ * 删除用户（管理员）
  * @param userId 用户ID
  */
 export async function deleteUser(userId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/users/${userId}`)
+  await apiClient.delete(`/api/v1/admin/users/${userId}`)
 }
 
 /**

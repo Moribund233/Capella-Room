@@ -3,10 +3,11 @@
  */
 
 // 通用响应格式
+// 后端返回格式: { success: bool, data?: T, message?: string }
 export interface ApiResponse<T> {
-  code: number
-  message: string
+  success: boolean
   data: T
+  message?: string
 }
 
 // 用户信息（完整）
@@ -91,6 +92,7 @@ export interface Message {
   room_id: string
   created_at: string
   type: 'text' | 'image' | 'file'
+  reply_to?: string  // 回复的消息ID
 }
 
 // 文件资源信息

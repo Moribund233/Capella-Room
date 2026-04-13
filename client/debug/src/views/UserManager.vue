@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useMessage, useDialog } from 'naive-ui'
+import { ref, onMounted, computed, h } from 'vue'
+import { useMessage, useDialog, NButton, NSpace, NTag, NAvatar } from 'naive-ui'
 import {
   Search,
   UserPlus,
@@ -55,13 +55,78 @@ const filteredUsers = computed(() => {
 
 // ========== 表格列定义 ==========
 const columns = [
-  { title: '用户名', key: 'username', width: 150 },
-  { title: '邮箱', key: 'email', width: 200 },
-  { title: '角色', key: 'role', width: 120 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '创建时间', key: 'created_at', width: 150 },
-  { title: '最后登录', key: 'last_login', width: 150 },
-  { title: '操作', key: 'actions', width: 150, fixed: 'right' as const },
+  {
+    title: '用户名',
+    key: 'username',
+    width: 150,
+    render: (row: UserType) => h(NSpace, { align: 'center' }, () => [
+      h(NAvatar, { size: 'small', style: { backgroundColor: 'var(--primary)' } }, () =>
+        row.username.charAt(0).toUpperCase()
+      ),
+      h('span', { style: 'font-weight: 500' }, row.username)
+    ])
+  },
+  {
+    title: '邮箱',
+    key: 'email',
+    width: 200,
+    render: (row: UserType) => h(NSpace, { align: 'center' }, () => [
+      h(Mail, { class: 'icon-sm', style: { color: 'var(--text-muted)' } }),
+      row.email
+    ])
+  },
+  {
+    title: '角色',
+    key: 'role',
+    width: 120,
+    render: (row: UserType) => h(NTag, { type: getRoleType(row.role), size: 'small' }, () => [
+      h(Shield, { class: 'icon-sm' }),
+      getRoleText(row.role)
+    ])
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    render: (row: UserType) => h(NTag, { type: row.status === 'active' ? 'success' : 'warning', size: 'small' }, () => [
+      row.status === 'active' ? h(CheckCircle, { class: 'icon-sm' }) : h(XCircle, { class: 'icon-sm' }),
+      row.status === 'active' ? ' 活跃' : ' 未激活'
+    ])
+  },
+  {
+    title: '创建时间',
+    key: 'created_at',
+    width: 150,
+    render: (row: UserType) => h(NSpace, { align: 'center' }, () => [
+      h(Clock, { class: 'icon-sm', style: { color: 'var(--text-muted)' } }),
+      new Date(row.created_at).toLocaleString()
+    ])
+  },
+  {
+    title: '最后登录',
+    key: 'last_login',
+    width: 150,
+    render: (row: UserType) => h(NSpace, { align: 'center' }, () => [
+      h(Clock, { class: 'icon-sm', style: { color: 'var(--text-muted)' } }),
+      row.last_login ? new Date(row.last_login).toLocaleString() : '-'
+    ])
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 150,
+    fixed: 'right' as const,
+    render: (row: UserType) => h(NSpace, {}, () => [
+      h(NButton, { size: 'small', text: true, type: 'primary', onClick: () => openEditModal(row) }, () => [
+        h(Edit, { class: 'icon-sm' }),
+        ' 编辑'
+      ]),
+      h(NButton, { size: 'small', text: true, type: 'error', onClick: () => handleDelete(row) }, () => [
+        h(Trash2, { class: 'icon-sm' }),
+        ' 删除'
+      ])
+    ])
+  },
 ]
 
 // ========== 数据加载 ==========
@@ -157,8 +222,13 @@ const handleDelete = (user: UserType) => {
         await deleteUser(user.id)
         message.success('用户已删除')
         loadUsers()
-      } catch (error) {
-        message.error('删除用户失败')
+      } catch (error: any) {
+        // 处理权限不足错误
+        if (error.message?.includes('403') || error.message?.includes('Forbidden') || error.message?.includes('权限')) {
+          message.error('权限不足：需要管理员权限才能删除用户')
+        } else {
+          message.error('删除用户失败：' + (error.message || '未知错误'))
+        }
         console.error(error)
       }
     },
@@ -242,68 +312,7 @@ onMounted(() => {
         :loading="loading"
         :bordered="false"
         :scroll-x="900"
-      >
-        <template #bodyCell="{ column, row }">
-          <template v-if="column.key === 'username'">
-            <n-space align="center">
-              <n-avatar size="small" :style="{ backgroundColor: 'var(--primary)' }">
-                {{ row.username.charAt(0).toUpperCase() }}
-              </n-avatar>
-              <span style="font-weight: 500">{{ row.username }}</span>
-            </n-space>
-          </template>
-          <template v-if="column.key === 'email'">
-            <n-space align="center">
-              <Mail class="icon-sm" style="color: var(--text-muted)" />
-              <span>{{ row.email }}</span>
-            </n-space>
-          </template>
-          <template v-if="column.key === 'role'">
-            <n-tag :type="getRoleType(row.role)" size="small">
-              <template #icon>
-                <Shield class="icon-sm" />
-              </template>
-              {{ getRoleText(row.role) }}
-            </n-tag>
-          </template>
-          <template v-if="column.key === 'status'">
-            <n-tag :type="row.status === 'active' ? 'success' : 'warning'" size="small">
-              <template #icon>
-                <component :is="row.status === 'active' ? CheckCircle : XCircle" class="icon-sm" />
-              </template>
-              {{ row.status === 'active' ? '活跃' : '未激活' }}
-            </n-tag>
-          </template>
-          <template v-if="column.key === 'created_at'">
-            <n-space align="center">
-              <Clock class="icon-sm" style="color: var(--text-muted)" />
-              <span>{{ new Date(row.created_at).toLocaleString() }}</span>
-            </n-space>
-          </template>
-          <template v-if="column.key === 'last_login'">
-            <n-space align="center">
-              <Clock class="icon-sm" style="color: var(--text-muted)" />
-              <span>{{ row.last_login ? new Date(row.last_login).toLocaleString() : '-' }}</span>
-            </n-space>
-          </template>
-          <template v-if="column.key === 'actions'">
-            <n-space>
-              <n-button size="small" text type="primary" @click="openEditModal(row)">
-                <template #icon>
-                  <Edit class="icon-sm" />
-                </template>
-                编辑
-              </n-button>
-              <n-button size="small" text type="error" @click="handleDelete(row)">
-                <template #icon>
-                  <Trash2 class="icon-sm" />
-                </template>
-                删除
-              </n-button>
-            </n-space>
-          </template>
-        </template>
-      </n-data-table>
+      />
     </n-card>
 
     <!-- 创建用户弹窗 -->

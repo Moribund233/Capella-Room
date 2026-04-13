@@ -115,7 +115,7 @@ const handleLogin = async () => {
   if (success && authStore.user) {
     successMessage.value = `欢迎回来，${authStore.user.username}（${authStore.roleText}）`
     showSuccessMessage.value = true
-    
+
     // 延迟跳转到首页
     setTimeout(() => {
       router.push('/')
@@ -136,7 +136,7 @@ const handleRegister = async () => {
   if (success && authStore.user) {
     successMessage.value = `注册成功，欢迎 ${authStore.user.username}（${authStore.roleText}）`
     showSuccessMessage.value = true
-    
+
     // 延迟跳转到首页
     setTimeout(() => {
       router.push('/')
@@ -176,7 +176,7 @@ const handleTabChange = (tab: string) => {
           <TestTube class="icon-xl" />
         </div>
         <h1 class="brand-title">Seredeli Room</h1>
-        <p class="brand-subtitle">调试客户端</p>
+        <p class="brand-subtitle">调试平台</p>
       </div>
 
       <!-- 登录/注册表单卡片 -->
@@ -347,7 +347,7 @@ const handleTabChange = (tab: string) => {
 
       <!-- 底部信息 -->
       <p class="footer-text">
-        Seredeli Room 调试客户端 · 实时聊天室后端服务调试工具
+        Seredeli Room 调试平台 · 实时聊天室后端服务调试工具
       </p>
     </div>
   </div>

@@ -1,107 +1,68 @@
-/* 全局颜色变量 - 米白+墨绿主题 */
+/* 全局颜色变量 - 米白+浅灰主题 */
 
 :root {
-  /* ========== 主色调 - 墨绿系列 ========== */
-  --primary: #1b4d3e;
-  --primary-light: #2c7a62;
-  --primary-dark: #0f2e26;
-  --primary-hover: #236b56;
-  --primary-active: #1a5243;
+  /* ========== 主色调 - 浅灰蓝系列 ========== */
+  --primary: #5a6c7d;
+  --primary-light: #7a8fa3;
+  --primary-dark: #3d4a56;
+  --primary-hover: #6b7d8f;
+  --primary-active: #4a5a6a;
 
   /* ========== 背景色 - 米白系列 ========== */
   --bg-primary: #faf9f6;
-  --bg-secondary: #f5f5dc;
-  --bg-tertiary: #f0efe9;
+  --bg-secondary: #f5f5f0;
+  --bg-tertiary: #ebeae5;
   --bg-white: #ffffff;
-  --bg-dark: #2d3436;
+  --bg-dark: #3d3d3d;
 
   /* ========== 文字色 ========== */
-  --text-primary: #2d3436;
-  --text-secondary: #636e72;
-  --text-muted: #b2bec3;
+  --text-primary: #3d3d3d;
+  --text-secondary: #666666;
+  --text-muted: #999999;
   --text-white: #ffffff;
   --text-light: rgba(255, 255, 255, 0.9);
 
   /* ========== 边框色 ========== */
-  --border: #dfe6e9;
-  --border-light: #f0f0f0;
-  --border-dark: #b2bec3;
+  --border: #d9d9d9;
+  --border-light: #e8e8e8;
+  --border-dark: #b0b0b0;
 
   /* ========== 功能色 ========== */
   /* 成功 */
-  --success: #00b894;
-  --success-light: #55efc4;
-  --success-dark: #00a383;
-  --success-bg: rgba(0, 184, 148, 0.1);
+  --success: #6b9b7a;
+  --success-light: #8fbc8f;
+  --success-dark: #4a7c59;
+  --success-bg: rgba(107, 155, 122, 0.1);
 
   /* 警告 */
-  --warning: #fdcb6e;
-  --warning-light: #ffeaa7;
-  --warning-dark: #e1b12c;
-  --warning-bg: rgba(253, 203, 110, 0.2);
+  --warning: #d4a574;
+  --warning-light: #e6c9a8;
+  --warning-dark: #b8860b;
+  --warning-bg: rgba(212, 165, 116, 0.2);
 
   /* 错误 */
-  --error: #d63031;
-  --error-light: #ff7675;
-  --error-dark: #c0392b;
-  --error-bg: rgba(214, 48, 49, 0.1);
+  --error: #c17b7b;
+  --error-light: #d4a5a5;
+  --error-dark: #a05050;
+  --error-bg: rgba(193, 123, 123, 0.1);
 
   /* 信息 */
-  --info: #74b9ff;
-  --info-light: #a8d8ff;
-  --info-dark: #0984e3;
-  --info-bg: rgba(116, 185, 255, 0.1);
+  --info: #7a9eb8;
+  --info-light: #a8c5d9;
+  --info-dark: #5a7a8f;
+  --info-bg: rgba(122, 158, 184, 0.1);
 
-  /* ========== 阴影色 ========== */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  --shadow-primary: 0 4px 12px rgba(27, 77, 62, 0.3);
+  /* ========== 中性色 ========== */
+  --gray-100: #f7f7f7;
+  --gray-200: #e8e8e8;
+  --gray-300: #d9d9d9;
+  --gray-400: #b0b0b0;
+  --gray-500: #888888;
+  --gray-600: #666666;
+  --gray-700: #4a4a4a;
+  --gray-800: #3d3d3d;
+  --gray-900: #2d2d2d;
 
-  /* ========== 渐变 ========== */
-  --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-light));
-  --gradient-success: linear-gradient(135deg, var(--success), var(--success-light));
-  --gradient-warning: linear-gradient(135deg, var(--warning), var(--warning-light));
-  --gradient-error: linear-gradient(135deg, var(--error), var(--error-light));
-
-  /* ========== 状态色 ========== */
-  --status-online: #00b894;
-  --status-offline: #b2bec3;
-  --status-away: #fdcb6e;
-  --status-busy: #d63031;
-
-  /* ========== 日志色 ========== */
-  --log-info: #74b9ff;
-  --log-success: #00b894;
-  --log-warning: #fdcb6e;
-  --log-error: #d63031;
-  --log-time: #6c757d;
-  --log-bg: #1e1e1e;
+  /* ========== 渐变色 ========== */
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
 }
-
-/* ========== 颜色工具类 ========== */
-
-/* 背景色 */
-.bg-primary { background-color: var(--primary); }
-.bg-primary-light { background-color: var(--primary-light); }
-.bg-primary-dark { background-color: var(--primary-dark); }
-.bg-success { background-color: var(--success); }
-.bg-warning { background-color: var(--warning); }
-.bg-error { background-color: var(--error); }
-.bg-info { background-color: var(--info); }
-
-/* 文字色 */
-.text-primary { color: var(--primary); }
-.text-primary-light { color: var(--primary-light); }
-.text-success { color: var(--success); }
-.text-warning { color: var(--warning); }
-.text-error { color: var(--error); }
-.text-info { color: var(--info); }
-.text-muted { color: var(--text-muted); }
-.text-secondary { color: var(--text-secondary); }
-
-/* 边框色 */
-.border-primary { border-color: var(--primary); }
-.border-success { border-color: var(--success); }
-.border-warning { border-color: var(--warning); }
-.border-error { border-color: var(--error); }

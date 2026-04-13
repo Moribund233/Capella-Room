@@ -58,18 +58,132 @@ const filteredRooms = computed(() => {
 })
 
 const isMyRoom = (room: Room) => {
-  return myRooms.value.some((r) => r.id === room.id)
+  return (myRooms.value || []).some((r) => r.id === room.id)
+}
+
+// 判断是否可以编辑房间（房主）
+const canEdit = (room: Room) => {
+  const currentUserId = authStore.user?.id
+  const ownerId = room.owner?.id
+  console.log('[RoomManager] canEdit:', { roomId: room.id, currentUserId, ownerId, canEdit: currentUserId === ownerId })
+  return currentUserId === ownerId
+}
+
+// 判断是否可以删除房间（房主或管理员）
+const canDelete = (room: Room) => {
+  const currentUserId = authStore.user?.id
+  const ownerId = room.owner?.id
+  const isAdmin = authStore.isAdmin
+  const canDelete = currentUserId === ownerId || isAdmin
+  console.log('[RoomManager] canDelete:', { roomId: room.id, currentUserId, ownerId, isAdmin, canDelete })
+  return canDelete
 }
 
 // ========== 表格列定义 ==========
+import { h } from 'vue'
+import { NButton, NSpace, NTag, NEllipsis, NAvatar, NIcon } from 'naive-ui'
+
 const columns = [
-  { title: '房间ID', key: 'id', width: 220 },
-  { title: '房间名称', key: 'name', width: 200 },
-  { title: '描述', key: 'description', ellipsis: { tooltip: true } },
-  { title: '类型', key: 'is_private', width: 100 },
-  { title: '成员数', key: 'member_count', width: 100 },
-  { title: '创建者', key: 'owner', width: 120 },
-  { title: '操作', key: 'actions', width: 200, fixed: 'right' },
+  {
+    title: '房间ID',
+    key: 'id',
+    width: 220,
+    render: (row: Room) => h(NEllipsis, { style: 'max-width: 200px' }, () => row.id)
+  },
+  {
+    title: '房间名称',
+    key: 'name',
+    width: 200,
+    render: (row: Room) => h(NSpace, { align: 'center' }, () => [
+      h('span', { style: 'font-weight: 500' }, row.name),
+      isMyRoom(row) ? h(NTag, { size: 'tiny', type: 'primary' }, () => '已加入') : null
+    ])
+  },
+  {
+    title: '描述',
+    key: 'description',
+    ellipsis: { tooltip: true },
+    render: (row: Room) => row.description || '-'
+  },
+  {
+    title: '类型',
+    key: 'is_private',
+    width: 100,
+    render: (row: Room) => h(NTag, { type: row.is_private ? 'warning' : 'success', size: 'small' }, () => [
+      h(NIcon, { component: row.is_private ? Lock : Globe, class: 'icon-sm' }),
+      row.is_private ? ' 私有' : ' 公开'
+    ])
+  },
+  {
+    title: '成员数',
+    key: 'member_count',
+    width: 100,
+    render: (row: Room) => h(NSpace, { align: 'center' }, () => [
+      h(NIcon, { component: Users, class: 'icon-sm' }),
+      String(row.member_count)
+    ])
+  },
+  {
+    title: '创建者',
+    key: 'owner',
+    width: 120,
+    render: (row: Room) => h(NSpace, { align: 'center' }, () => [
+      h(NAvatar, {
+        size: 'small',
+        round: true,
+        src: row.owner?.avatar_url
+      }, () => row.owner?.username?.charAt(0)?.toUpperCase() || '?'),
+      h(NEllipsis, { style: 'max-width: 80px' }, () => row.owner?.username || 'Unknown')
+    ])
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 200,
+    fixed: 'right',
+    render: (row: Room) => {
+      const buttons: ReturnType<typeof h>[] = []
+
+      // 加入/离开按钮
+      if (!isMyRoom(row)) {
+        buttons.push(h(NButton, {
+          size: 'small',
+          type: 'primary',
+          text: true,
+          onClick: () => handleJoin(row)
+        }, () => [h(NIcon, { component: LogIn, class: 'icon-sm' }), ' 加入']))
+      } else {
+        buttons.push(h(NButton, {
+          size: 'small',
+          type: 'warning',
+          text: true,
+          onClick: () => handleLeave(row)
+        }, () => [h(NIcon, { component: LogOut, class: 'icon-sm' }), ' 离开']))
+      }
+
+      // 编辑按钮
+      if (canEdit(row)) {
+        buttons.push(h(NButton, {
+          size: 'small',
+          type: 'info',
+          text: true,
+          onClick: () => openEditModal(row)
+        }, () => [h(NIcon, { component: Edit, class: 'icon-sm' }), ' 编辑']))
+      }
+
+      // 删除按钮
+      if (canDelete(row)) {
+        buttons.push(h(NButton, {
+          size: 'small',
+          type: 'error',
+          text: true,
+          onClick: () => handleDelete(row)
+        }, () => [h(NIcon, { component: Trash2, class: 'icon-sm' }), ' 删除']))
+      }
+
+      return h(NSpace, {}, () => buttons)
+    }
+  },
 ]
 
 // ========== 数据加载 ==========
@@ -270,126 +384,7 @@ onMounted(() => {
         :bordered="false"
         :loading="loading"
         :scroll-x="1000"
-      >
-        <template #bodyCell="{ column, row }">
-          <!-- 房间名称 -->
-          <template v-if="column.key === 'name'">
-            <n-space align="center">
-              <span style="font-weight: 500">{{ row.name }}</span>
-              <n-tag v-if="isMyRoom(row)" size="tiny" type="primary">已加入</n-tag>
-            </n-space>
-          </template>
-
-          <!-- 房间ID -->
-          <template v-if="column.key === 'id'">
-            <n-ellipsis style="max-width: 200px">
-              {{ row.id }}
-            </n-ellipsis>
-          </template>
-
-          <!-- 描述 -->
-          <template v-if="column.key === 'description'">
-            <n-ellipsis style="max-width: 200px">
-              {{ row.description || '-' }}
-            </n-ellipsis>
-          </template>
-
-          <!-- 类型 -->
-          <template v-if="column.key === 'is_private'">
-            <n-tag :type="row.is_private ? 'warning' : 'success'" size="small">
-              <template #icon>
-                <component :is="row.is_private ? Lock : Globe" class="icon-sm" />
-              </template>
-              {{ row.is_private ? '私有' : '公开' }}
-            </n-tag>
-          </template>
-
-          <!-- 成员数 -->
-          <template v-if="column.key === 'member_count'">
-            <n-space align="center">
-              <Users class="icon-sm" />
-              <span>{{ row.member_count }}</span>
-            </n-space>
-          </template>
-
-          <!-- 创建者 -->
-          <template v-if="column.key === 'owner'">
-            <n-space align="center">
-              <n-avatar
-                v-if="row.owner?.avatar_url"
-                :src="row.owner.avatar_url"
-                size="small"
-                round
-              />
-              <n-avatar v-else size="small" round>
-                {{ row.owner?.username?.charAt(0)?.toUpperCase() || '?' }}
-              </n-avatar>
-              <n-ellipsis style="max-width: 80px">
-                {{ row.owner?.username || 'Unknown' }}
-              </n-ellipsis>
-            </n-space>
-          </template>
-
-          <!-- 操作 -->
-          <template v-if="column.key === 'actions'">
-            <n-space>
-              <!-- 加入/离开 -->
-              <n-button
-                v-if="!isMyRoom(row)"
-                size="small"
-                type="primary"
-                text
-                @click="handleJoin(row)"
-              >
-                <template #icon>
-                  <LogIn class="icon-sm" />
-                </template>
-                加入
-              </n-button>
-              <n-button
-                v-else
-                size="small"
-                type="warning"
-                text
-                @click="handleLeave(row)"
-              >
-                <template #icon>
-                  <LogOut class="icon-sm" />
-                </template>
-                离开
-              </n-button>
-
-              <!-- 编辑 -->
-              <n-button
-                v-if="row.owner?.id === authStore.user?.id"
-                size="small"
-                text
-                type="info"
-                @click="openEditModal(row)"
-              >
-                <template #icon>
-                  <Edit class="icon-sm" />
-                </template>
-                编辑
-              </n-button>
-
-              <!-- 删除 -->
-              <n-button
-                v-if="row.owner?.id === authStore.user?.id || authStore.isAdmin"
-                size="small"
-                text
-                type="error"
-                @click="handleDelete(row)"
-              >
-                <template #icon>
-                  <Trash2 class="icon-sm" />
-                </template>
-                删除
-              </n-button>
-            </n-space>
-          </template>
-        </template>
-      </n-data-table>
+      />
     </n-card>
 
     <!-- 创建房间弹窗 -->

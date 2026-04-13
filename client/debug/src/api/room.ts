@@ -28,10 +28,12 @@ export interface UpdateRoomRequest {
 
 // 房间成员信息
 export interface RoomMember {
-  id: string
+  user_id: string
   username: string
   role: 'owner' | 'admin' | 'member'
   joined_at: string
+  email?: string
+  avatar_url?: string | null
 }
 
 // 房间详情响应
@@ -83,8 +85,8 @@ export async function getRoomDetail(roomId: string): Promise<RoomDetailResponse>
  * @returns 创建的房间
  */
 export async function createRoom(data: CreateRoomRequest): Promise<Room> {
-  const response = await apiClient.post<{ room: Room }>('/api/v1/rooms', data)
-  return response.data.room
+  const response = await apiClient.post<Room>('/api/v1/rooms', data)
+  return response.data
 }
 
 /**
@@ -94,8 +96,8 @@ export async function createRoom(data: CreateRoomRequest): Promise<Room> {
  * @returns 更新后的房间
  */
 export async function updateRoom(roomId: string, data: UpdateRoomRequest): Promise<Room> {
-  const response = await apiClient.put<{ room: Room }>(`/api/v1/rooms/${roomId}`, data)
-  return response.data.room
+  const response = await apiClient.put<Room>(`/api/v1/rooms/${roomId}`, data)
+  return response.data
 }
 
 /**
@@ -128,5 +130,15 @@ export async function leaveRoom(roomId: string): Promise<void> {
  */
 export async function getMyRooms(): Promise<Room[]> {
   const response = await apiClient.get<Room[]>('/api/v1/users/me/rooms')
+  return response.data
+}
+
+/**
+ * 获取房间成员列表
+ * @param roomId 房间ID
+ * @returns 成员列表
+ */
+export async function getRoomMembers(roomId: string): Promise<RoomMember[]> {
+  const response = await apiClient.get<RoomMember[]>(`/api/v1/rooms/${roomId}/members`)
   return response.data
 }

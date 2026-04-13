@@ -10,7 +10,6 @@ import {
   Users,
   TestTube,
   LogOut,
-  CheckCircle,
   Menu,
   X
 } from 'lucide-vue-next'
@@ -30,8 +29,7 @@ const menuItems = [
   { key: 'api', label: 'API测试', icon: Plug, path: '/api' },
   { key: 'rooms', label: '房间管理', icon: MessageSquare, path: '/rooms' },
   { key: 'users', label: '用户管理', icon: Users, path: '/users' },
-  { key: 'messages', label: '消息测试', icon: TestTube, path: '/messages' },
-  { key: 'e2e', label: '端到端测试', icon: CheckCircle, path: '/e2e' }
+  { key: 'room-test', label: '房间测试', icon: TestTube, path: '/room-test' }
 ]
 
 const activeKey = computed(() => {

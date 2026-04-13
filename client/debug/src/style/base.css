@@ -40,63 +40,32 @@ body {
 }
 
 /* ========== Naive UI 全局样式覆盖 ========== */
+/* 注意：以下样式仅做轻微调整，不强制覆盖组件默认颜色 */
 
 .n-layout {
-  background-color: var(--bg-primary) !important;
+  background-color: var(--bg-primary);
 }
 
 .n-layout-sider {
-  background-color: var(--primary) !important;
+  background-color: var(--bg-white);
 }
 
 .n-menu {
-  background-color: transparent !important;
-}
-
-.n-menu .n-menu-item {
-  color: var(--text-secondary) !important;
-}
-
-.n-menu .n-menu-item:hover {
-  color: var(--primary) !important;
-  background-color: var(--bg-tertiary) !important;
-}
-
-.n-menu .n-menu-item--selected {
-  color: var(--text-white) !important;
-  background-color: var(--primary) !important;
+  background-color: transparent;
 }
 
 .n-card {
-  background-color: var(--bg-white) !important;
-  border-radius: var(--radius-lg) !important;
-  box-shadow: var(--shadow-sm) !important;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .n-card-header {
-  border-bottom: 1px solid var(--border-light) !important;
-  padding: var(--space-md) var(--space-lg) !important;
-}
-
-.n-button--primary-type {
-  background-color: var(--primary) !important;
-}
-
-.n-button--primary-type:hover {
-  background-color: var(--primary-hover) !important;
-}
-
-/* 链接样式按钮 - 无背景色 */
-.n-button.n-button--text-type.n-button--primary-type {
-  background-color: transparent !important;
-}
-
-.n-input {
-  background-color: var(--bg-primary) !important;
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--space-md) var(--space-lg);
 }
 
 .n-tag {
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius-sm);
 }
 
 /* ========== 间距变量 ========== */

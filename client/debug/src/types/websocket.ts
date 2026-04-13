@@ -79,6 +79,11 @@ export type MessageType =
   | 'PendingActionResponse'
   | 'GetPendingActions'
   | 'PendingActionsList'
+  // 日志系统
+  | 'LogEntry'
+  | 'SubscribeLogs'
+  | 'UnsubscribeLogs'
+  | 'LogSubscriptionConfirmed'
 
 /** 通知类型 */
 export type NotificationType = 'new' | 'important' | 'warning' | 'info'
@@ -475,6 +480,37 @@ export interface PendingActionsListMessage extends WebSocketMessageBase {
   payload: { actions: PendingActionInfo[]; total: number }
 }
 
+// ========== 日志系统 ==========
+
+/** 日志条目 */
+export interface LogEntryMessage extends WebSocketMessageBase {
+  type: 'LogEntry'
+  payload: {
+    level: string
+    target: string
+    message: string
+    timestamp: string
+    fields?: Record<string, unknown>
+  }
+}
+
+/** 订阅日志 */
+export interface SubscribeLogsMessage extends WebSocketMessageBase {
+  type: 'SubscribeLogs'
+  payload: { level: string; module: string }
+}
+
+/** 取消订阅日志 */
+export interface UnsubscribeLogsMessage extends WebSocketMessageBase {
+  type: 'UnsubscribeLogs'
+}
+
+/** 日志订阅确认 */
+export interface LogSubscriptionConfirmedMessage extends WebSocketMessageBase {
+  type: 'LogSubscriptionConfirmed'
+  payload: { success: boolean }
+}
+
 // ========== 联合类型 ==========
 
 /** 所有可能的 WebSocket 消息 */
@@ -527,6 +563,10 @@ export type WebSocketMessage =
   | PendingActionResponseMessage
   | GetPendingActionsMessage
   | PendingActionsListMessage
+  | LogEntryMessage
+  | SubscribeLogsMessage
+  | UnsubscribeLogsMessage
+  | LogSubscriptionConfirmedMessage
 
 // ========== 连接状态 ==========
 

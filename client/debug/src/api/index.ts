@@ -33,6 +33,7 @@ export { wsClient, WebSocketClient } from './websocket'
 export {
   getRooms,
   getRoomDetail,
+  getRoomMembers,
   createRoom,
   updateRoom,
   deleteRoom,

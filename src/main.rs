@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
 
     let state = AppState::new(
         db.clone(),
-        ws_manager,
+        ws_manager.clone(),
         config.clone(),
         Arc::clone(&metrics_collector),
         Arc::clone(&shared_config_manager),
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
 
     initialize_super_admin(&state, &config.admin.initial).await?;
 
-    let app = create_router(state);
+    let app = create_router(state.clone());
 
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port)
         .parse()
@@ -104,11 +104,16 @@ async fn main() -> Result<()> {
 
     let shutdown_signal = create_shutdown_signal();
 
+    // 启动指标报告任务
     let metrics_clone = Arc::clone(&metrics_collector);
+    let ws_manager_for_metrics = ws_manager.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(60));
         loop {
             interval.tick().await;
+            // 更新活跃房间数
+            let active_rooms = ws_manager_for_metrics.get_active_room_count() as u64;
+            metrics_clone.update_active_rooms(active_rooms);
             metrics_clone.log_periodic_metrics();
         }
     });

@@ -15,6 +15,7 @@ use crate::{
     services::auth_service::Claims,
     services::room_service::RoomMemberWithUser,
     state::AppState,
+    utils::permission::is_admin,
 };
 
 /// 查询参数
@@ -191,10 +192,11 @@ pub async fn delete_room(
         .extract_user_id(&claims)
         .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
 
-    // 检查权限（只有 Owner 可以删除）
+    // 检查权限（Owner 或管理员可以删除）
     let is_owner = state.room_service().is_room_owner(room_id, user_id).await?;
+    let is_admin_user = is_admin(&claims.role);
 
-    if !is_owner {
+    if !is_owner && !is_admin_user {
         return Err(AppError::Forbidden);
     }
 

@@ -1,9 +1,11 @@
 /**
  * WebSocket Client
  * 负责 WebSocket 连接管理、消息收发、断线重连
+ * 仅包含连接层逻辑，不包含业务逻辑
  */
 
 import { getAccessToken } from './token'
+import { getConnectionConfig } from '@/config/websocketConfig'
 import type {
   WebSocketMessage,
   ConnectionStatus,
@@ -13,14 +15,6 @@ import type {
 
 // WebSocket 基础配置
 const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
-
-// 默认配置
-const DEFAULT_CONFIG: Required<WebSocketConfig> = {
-  maxReconnectAttempts: 5,
-  reconnectInterval: 3000,
-  heartbeatInterval: 30000,
-  connectTimeout: 10000,
-}
 
 class WebSocketClient {
   private ws: WebSocket | null = null
@@ -32,11 +26,31 @@ class WebSocketClient {
   private reconnectTimer: number | null = null
   private connectTimer: number | null = null
   private messageQueue: WebSocketMessage[] = []
-  private joinedRooms: Set<string> = new Set()
+  private customToken: string | null = null
 
   constructor(config: WebSocketConfig = {}, handlers: WebSocketEventHandlers = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config }
+    const defaultConfig = getConnectionConfig()
+    this.config = {
+      maxReconnectAttempts: config.maxReconnectAttempts ?? defaultConfig.maxReconnectAttempts,
+      reconnectInterval: config.reconnectInterval ?? defaultConfig.reconnectInterval,
+      heartbeatInterval: config.heartbeatInterval ?? defaultConfig.heartbeatInterval,
+      connectTimeout: config.connectTimeout ?? defaultConfig.connectTimeout,
+    }
     this.handlers = handlers
+  }
+
+  /**
+   * 设置自定义 token（用于多用户场景）
+   */
+  setToken(token: string | null): void {
+    this.customToken = token
+  }
+
+  /**
+   * 获取 token（优先使用自定义 token）
+   */
+  private getToken(): string | null {
+    return this.customToken ?? getAccessToken()
   }
 
   // ========== 连接管理 ==========
@@ -67,7 +81,7 @@ class WebSocketClient {
 
       this.setConnectionStatus('connecting')
 
-      const token = getAccessToken()
+      const token = this.getToken()
       if (!token) {
         this.setConnectionStatus('error')
         reject(new Error('No access token'))
@@ -95,16 +109,6 @@ class WebSocketClient {
           this.setConnectionStatus('connected')
           this.reconnectAttempts = 0
           this.startHeartbeat()
-
-          // 连接成功后立即发送认证消息
-          const token = getAccessToken()
-          if (token) {
-            this.send({
-              type: 'Auth',
-              payload: { token }
-            })
-          }
-
           this.flushMessageQueue()
           this.handlers.onConnect?.()
           resolve()
@@ -136,7 +140,6 @@ class WebSocketClient {
    */
   disconnect(): void {
     this.clearAllTimers()
-    this.joinedRooms.clear()
 
     if (this.ws) {
       this.ws.onclose = null
@@ -185,141 +188,6 @@ class WebSocketClient {
     }
   }
 
-  /**
-   * 发送认证消息
-   */
-  auth(token: string): boolean {
-    return this.send({
-      type: 'Auth',
-      payload: { token },
-    })
-  }
-
-  /**
-   * 加入房间
-   */
-  joinRoom(roomId: string): boolean {
-    const success = this.send({
-      type: 'JoinRoom',
-      payload: { room_id: roomId },
-    })
-
-    if (success) {
-      this.joinedRooms.add(roomId)
-    }
-
-    return success
-  }
-
-  /**
-   * 离开房间
-   */
-  leaveRoom(roomId: string): boolean {
-    const success = this.send({
-      type: 'LeaveRoom',
-      payload: { room_id: roomId },
-    })
-
-    if (success) {
-      this.joinedRooms.delete(roomId)
-    }
-
-    return success
-  }
-
-  /**
-   * 发送聊天消息
-   */
-  sendChatMessage(roomId: string, content: string, replyTo?: string): boolean {
-    return this.send({
-      type: 'ChatMessage',
-      payload: {
-        room_id: roomId,
-        content,
-        reply_to: replyTo,
-      },
-    })
-  }
-
-  /**
-   * 发送正在输入状态
-   */
-  sendTyping(roomId: string): boolean {
-    return this.send({
-      type: 'Typing',
-      payload: { room_id: roomId },
-    })
-  }
-
-  /**
-   * 发送停止输入状态
-   */
-  sendStopTyping(roomId: string): boolean {
-    return this.send({
-      type: 'StopTyping',
-      payload: { room_id: roomId },
-    })
-  }
-
-  /**
-   * 标记消息已读
-   */
-  markMessageRead(messageId: string): boolean {
-    return this.send({
-      type: 'MessageRead',
-      payload: { message_id: messageId },
-    })
-  }
-
-  /**
-   * 编辑消息
-   */
-  editMessage(messageId: string, newContent: string): boolean {
-    return this.send({
-      type: 'EditMessage',
-      payload: {
-        message_id: messageId,
-        new_content: newContent,
-      },
-    })
-  }
-
-  /**
-   * 删除消息
-   */
-  deleteMessage(messageId: string): boolean {
-    return this.send({
-      type: 'DeleteMessage',
-      payload: { message_id: messageId },
-    })
-  }
-
-  /**
-   * 更新用户状态
-   */
-  updateUserStatus(status: 'online' | 'away' | 'busy' | 'offline'): boolean {
-    return this.send({
-      type: 'UpdateStatus',
-      payload: { status },
-    })
-  }
-
-  /**
-   * 获取在线用户列表
-   */
-  getOnlineUsers(): boolean {
-    return this.send({
-      type: 'GetOnlineUsers',
-    })
-  }
-
-  /**
-   * 发送心跳
-   */
-  ping(): boolean {
-    return this.send({ type: 'Ping' })
-  }
-
   // ========== 事件处理 ==========
 
   /**
@@ -366,31 +234,6 @@ class WebSocketClient {
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data) as WebSocketMessage
-
-      // 处理心跳响应
-      if (message.type === 'Pong') {
-        return
-      }
-
-      // 处理认证结果
-      if (message.type === 'AuthResult') {
-        if (!message.payload.success) {
-          console.error('WebSocket auth failed:', message.payload.message)
-          this.disconnect()
-          return
-        }
-      }
-
-      // 处理重连结果
-      if (message.type === 'ReconnectResult') {
-        if (message.payload.success && message.payload.rooms_to_rejoin) {
-          // 自动重新加入房间
-          message.payload.rooms_to_rejoin.forEach((roomId) => {
-            this.joinRoom(roomId)
-          })
-        }
-      }
-
       this.handlers.onMessage?.(message)
     } catch (error) {
       console.error('Failed to parse message:', error)
@@ -412,7 +255,7 @@ class WebSocketClient {
   private startHeartbeat(): void {
     this.heartbeatTimer = window.setInterval(() => {
       if (this.isConnected()) {
-        this.ping()
+        this.send({ type: 'Ping' })
       }
     }, this.config.heartbeatInterval)
   }

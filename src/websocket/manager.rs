@@ -357,6 +357,14 @@ impl WebSocketManager {
         self.connections.len()
     }
 
+    /// 获取活跃房间数（有用户的房间）
+    pub fn get_active_room_count(&self) -> usize {
+        self.room_subscribers
+            .iter()
+            .filter(|entry| !entry.value().is_empty())
+            .count()
+    }
+
     /// 检查用户是否在线
     pub fn is_user_online(&self, user_id: Uuid) -> bool {
         self.connections.contains_key(&user_id)

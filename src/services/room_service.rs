@@ -382,9 +382,9 @@ impl RoomService {
         let room = self.get_room_by_id(room_id).await?;
         let room = room.ok_or(AppError::NotFound)?;
 
-        // 检查是否已经是成员
+        // 检查是否已经是成员 - 幂等处理：如果已经是成员，直接返回成功
         if self.is_user_in_room(room_id, user_id).await? {
-            return Err(AppError::Conflict("您已经是该聊天室的成员".to_string()));
+            return Ok(());
         }
 
         // 检查房间是否已满

@@ -72,6 +72,11 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
       headers,
     })
 
+    // 处理 204 No Content（删除成功）
+    if (response.status === 204) {
+      return { success: true, data: {} as T, message: '' }
+    }
+
     // 获取响应文本
     const responseText = await response.text()
 
@@ -89,6 +94,11 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
       const errorMessage = data.message || '登录已过期，请重新登录'
       triggerTokenExpired(errorMessage)
       throw new Error(errorMessage)
+    }
+
+    // 处理 403 权限不足错误
+    if (response.status === 403) {
+      throw new Error(data.message || '权限不足')
     }
 
     if (!response.ok) {

@@ -11,9 +11,18 @@ use validator::Validate;
 use crate::{
     error::{AppError, Result},
     models::message::{EditMessageRequest, MessageEditResponse, MessageResponse},
+    models::response::ApiResponse,
     services::auth_service::Claims,
     state::AppState,
 };
+
+/// 消息列表响应
+#[derive(Debug, serde::Serialize)]
+pub struct MessageListResponse {
+    pub messages: Vec<MessageResponse>,
+    pub total: i64,
+    pub has_more: bool,
+}
 
 /// 获取聊天室消息历史查询参数
 #[derive(Debug, Deserialize)]
@@ -34,7 +43,7 @@ pub async fn get_room_messages(
     State(state): State<Arc<AppState>>,
     Path(room_id): Path<Uuid>,
     Query(query): Query<GetMessagesQuery>,
-) -> Result<Json<Vec<MessageResponse>>> {
+) -> Result<Json<ApiResponse<MessageListResponse>>> {
     let limit = query.limit.min(100);
 
     let messages = state
@@ -42,7 +51,14 @@ pub async fn get_room_messages(
         .get_room_messages(room_id, limit, query.before)
         .await?;
 
-    Ok(Json(messages))
+    let total = messages.len() as i64;
+    let has_more = total >= limit;
+
+    Ok(Json(ApiResponse::success(MessageListResponse {
+        messages,
+        total,
+        has_more,
+    })))
 }
 
 /// 搜索消息查询参数

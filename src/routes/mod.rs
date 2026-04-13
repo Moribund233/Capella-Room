@@ -97,7 +97,6 @@ fn auth_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/register", post(auth::register))
         .route("/login", post(auth::login))
-        .route("/logout", post(user::logout))
         .route("/refresh", post(auth::refresh_token))
 }
 
@@ -109,6 +108,7 @@ fn user_routes() -> Router<Arc<AppState>> {
         .route("/me", put(user::update_user))
         .route("/me/password", put(user::change_password))
         .route("/me/rooms", get(room::get_my_rooms))
+        .route("/logout", post(user::logout))
         // 用户列表和详情
         .route("/", get(user::list_users))
         .route("/:user_id", get(user::get_user_by_id))

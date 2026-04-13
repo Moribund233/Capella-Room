@@ -1,13 +1,20 @@
 /**
  * WebSocket Store
- * 集中管理 WebSocket 连接，提供自动重连、消息订阅等功能
+ * 集中管理 WebSocket 业务逻辑和状态
+ * 使用 WebSocketClient 处理连接层
  */
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { getAccessToken } from '@/api'
-import { getClientConfig } from '@/api/system'
-import type { ClientConfig } from '@/types/config'
+import { wsClient } from '@/api/websocket'
+import {
+  getReconnectStrategy,
+  calculateReconnectDelay,
+  initWebSocketConfig as initConfig,
+  isConfigInitialized,
+} from '@/config/websocketConfig'
+import type { WebSocketMessage } from '@/types/websocket'
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
 
@@ -34,20 +41,13 @@ export interface ChatMessage {
   roomId?: string
 }
 
-// 服务端配置（动态获取）
-let serverConfig: ClientConfig | null = null
-
 export const useWebSocketStore = defineStore('websocket', () => {
   // ========== State ==========
-  const ws = ref<WebSocket | null>(null)
   const status = ref<WebSocketStatus>('disconnected')
   const logs = ref<LogEntry[]>([])
   const logSubscribed = ref(false)
   const lastError = ref<string | null>(null)
   const reconnectAttempts = ref(0)
-  const reconnectTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-  const heartbeatTimer = ref<ReturnType<typeof setInterval> | null>(null)
-  const lastPongTime = ref<number>(Date.now())
 
   // 聊天相关状态
   const joinedRooms = ref<string[]>([])
@@ -56,22 +56,15 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const onlineUsers = ref<number>(0)
   const latency = ref<number | null>(null)
   const lastPingTime = ref<number | null>(null)
+  const lastPongTime = ref<number>(Date.now())
 
   // ========== Constants ==========
-  // 从服务端配置获取，如未获取则使用默认值
-  const getHeartbeatInterval = () => (serverConfig?.websocket.heartbeat_interval_secs ?? 30) * 1000
-  const getHeartbeatTimeout = () => (serverConfig?.websocket.heartbeat_timeout_secs ?? 90) * 1000
-  const getReconnectBaseDelay = () => serverConfig?.reconnect.base_delay_ms ?? 1000
-  const getReconnectMaxDelay = () => serverConfig?.reconnect.max_delay_ms ?? 30000
-  const getMaxReconnectAttempts = () => serverConfig?.reconnect.max_attempts ?? 10
-
   const MAX_LOGS = 100
   const MAX_CHAT_MESSAGES = 200
 
   // ========== Getters ==========
   const isConnected = computed(() => status.value === 'connected')
   const isConnecting = computed(() => status.value === 'connecting' || status.value === 'reconnecting')
-  const canReconnect = computed(() => reconnectAttempts.value < getMaxReconnectAttempts())
 
   // 消息处理器列表
   const messageHandlers = ref<MessageHandler[]>([])
@@ -95,62 +88,11 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   /**
-   * 启动心跳保活
-   */
-  function startHeartbeat() {
-    // 清除旧的心跳定时器
-    if (heartbeatTimer.value) {
-      clearInterval(heartbeatTimer.value)
-      heartbeatTimer.value = null
-    }
-
-    // 重置最后pong时间
-    lastPongTime.value = Date.now()
-
-    const heartbeatInterval = getHeartbeatInterval()
-    const heartbeatTimeout = getHeartbeatTimeout()
-
-    // 启动心跳定时器
-    heartbeatTimer.value = setInterval(() => {
-      if (ws.value?.readyState === WebSocket.OPEN) {
-        // 检查是否超时未收到pong
-        const now = Date.now()
-        if (now - lastPongTime.value > heartbeatTimeout) {
-          console.warn(`心跳超时(${heartbeatTimeout}ms)，关闭连接并重连`)
-          ws.value.close(1000, 'Heartbeat timeout')
-          return
-        }
-
-        // 发送ping
-        lastPingTime.value = now
-        send({ type: 'Ping' })
-      }
-    }, heartbeatInterval)
-  }
-
-  /**
-   * 停止心跳
-   */
-  function stopHeartbeat() {
-    if (heartbeatTimer.value) {
-      clearInterval(heartbeatTimer.value)
-      heartbeatTimer.value = null
-    }
-  }
-
-  /**
    * 连接到 WebSocket
    */
   function connect() {
-    // 如果已经连接，不再重复连接
-    if (ws.value?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket 已连接，跳过')
-      return
-    }
-
-    // 如果正在连接中，等待
-    if (ws.value?.readyState === WebSocket.CONNECTING) {
-      console.log('WebSocket 正在连接中，跳过')
+    // 如果已经连接或正在连接，跳过
+    if (wsClient.isConnected() || status.value === 'connecting') {
       return
     }
 
@@ -161,97 +103,47 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
 
-    // 清除之前的重连定时器
-    if (reconnectTimer.value) {
-      clearTimeout(reconnectTimer.value)
-      reconnectTimer.value = null
-    }
-
     // 设置状态
-    const wasDisconnected = status.value === 'disconnected'
     status.value = reconnectAttempts.value > 0 ? 'reconnecting' : 'connecting'
 
-    // 如果是首次连接或完全断开后重连，重置joinedRooms
-    if (wasDisconnected && reconnectAttempts.value === 0) {
-      joinedRooms.value = []
-    }
-
-    const baseUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
-    const wsUrl = baseUrl.endsWith('/ws') ? baseUrl : `${baseUrl}/ws`
-
-    console.log(`[WebSocket] 正在连接到: ${wsUrl}`)
-
-    try {
-      ws.value = new WebSocket(wsUrl)
-
-      ws.value.onopen = () => {
+    // 设置 WebSocketClient 事件处理器
+    wsClient.setHandlers({
+      onConnect: () => {
         console.log('[WebSocket] 连接成功')
         status.value = 'connected'
         reconnectAttempts.value = 0
         lastError.value = null
         lastPongTime.value = Date.now()
 
-        // 启动心跳
-        startHeartbeat()
-
-        // 发送认证消息
-        send({
-          type: 'Auth',
-          payload: { token }
-        })
-      }
-
-      ws.value.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          handleMessage(msg)
-        } catch (e) {
-          console.error('解析 WebSocket 消息失败:', e)
+        // 连接成功后发送认证消息
+        const token = getAccessToken()
+        if (token) {
+          send({
+            type: 'Auth',
+            payload: { token }
+          })
         }
-      }
-
-      ws.value.onclose = (event) => {
-        console.log('[WebSocket] 连接关闭', event.code, event.reason, 'wasClean:', event.wasClean)
-
-        // 停止心跳
-        stopHeartbeat()
-
-        // 如果已经是断开状态，不重复处理
-        if (status.value === 'disconnected') {
-          return
-        }
-
+      },
+      onDisconnect: () => {
+        console.log('[WebSocket] 连接断开')
         status.value = 'disconnected'
-
-        // 清理 WebSocket 引用（但保留重连逻辑）
-        const shouldReconnect = canReconnect.value
-
-        // 延迟清理引用，避免竞态条件
-        setTimeout(() => {
-          if (ws.value?.readyState === WebSocket.CLOSED) {
-            ws.value = null
-          }
-        }, 100)
-
-        // 如果不是正常关闭且可以重连，安排重连
-        // 1000 = 正常关闭, 1001 = 离开页面
-        const isNormalClose = event.code === 1000 || event.code === 1001
-        if (!isNormalClose && shouldReconnect) {
-          scheduleReconnect()
-        }
-      }
-
-      ws.value.onerror = (error) => {
+        logSubscribed.value = false
+      },
+      onError: (error) => {
         console.error('[WebSocket] 错误:', error)
         lastError.value = '连接错误'
-        // 注意：onerror 后通常会触发 onclose，所以不重连
+      },
+      onMessage: (message) => {
+        handleMessage(message)
       }
-    } catch (error) {
-      console.error('[WebSocket] 创建连接失败:', error)
-      lastError.value = '创建连接失败'
+    })
+
+    // 连接
+    wsClient.connect().catch((error) => {
+      console.error('[WebSocket] 连接失败:', error)
       status.value = 'disconnected'
       scheduleReconnect()
-    }
+    })
   }
 
   /**
@@ -260,26 +152,11 @@ export const useWebSocketStore = defineStore('websocket', () => {
   function disconnect() {
     console.log('[WebSocket] 主动断开连接')
 
-    // 停止心跳
-    stopHeartbeat()
-
-    // 清除重连定时器
-    if (reconnectTimer.value) {
-      clearTimeout(reconnectTimer.value)
-      reconnectTimer.value = null
-    }
-
     // 重置重连计数
     reconnectAttempts.value = 0
 
-    // 关闭连接（正常关闭，不重连）
-    if (ws.value) {
-      // 先移除事件处理器，避免触发重连
-      ws.value.onclose = null
-      ws.value.onerror = null
-      ws.value.close(1000, '主动断开')
-      ws.value = null
-    }
+    // 断开连接
+    wsClient.disconnect()
 
     status.value = 'disconnected'
     logSubscribed.value = false
@@ -291,17 +168,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
    * 发送消息
    */
   function send(message: { type: string; payload?: unknown }): boolean {
-    if (ws.value?.readyState === WebSocket.OPEN) {
-      try {
-        ws.value.send(JSON.stringify(message))
-        return true
-      } catch (e) {
-        console.error('[WebSocket] 发送消息失败:', e)
-        return false
-      }
-    }
-    console.warn('[WebSocket] 未连接，无法发送消息:', message.type)
-    return false
+    return wsClient.send(message as WebSocketMessage)
   }
 
   /**
@@ -419,7 +286,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   /**
    * 处理收到的消息
    */
-  function handleMessage(msg: { type: string; payload?: unknown }) {
+  function handleMessage(msg: WebSocketMessage) {
     // 调试日志
     console.log('[WebSocket] 收到消息:', msg.type)
 
@@ -428,7 +295,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       .filter(h => h.type === msg.type)
       .forEach(h => {
         try {
-          h.callback(msg.payload)
+          h.callback('payload' in msg ? msg.payload : undefined)
         } catch (e) {
           console.error('消息处理器执行失败:', e)
         }
@@ -531,8 +398,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
    * 安排重连
    */
   function scheduleReconnect() {
-    const maxReconnectAttempts = getMaxReconnectAttempts()
-    if (reconnectAttempts.value >= maxReconnectAttempts) {
+    const strategy = getReconnectStrategy()
+    if (reconnectAttempts.value >= strategy.maxAttempts) {
       console.error('[WebSocket] 达到最大重连次数，停止重连')
       lastError.value = '连接失败，请刷新页面重试'
       return
@@ -541,16 +408,11 @@ export const useWebSocketStore = defineStore('websocket', () => {
     reconnectAttempts.value++
 
     // 指数退避算法
-    const baseDelay = getReconnectBaseDelay()
-    const maxDelay = getReconnectMaxDelay()
-    const delay = Math.min(
-      baseDelay * Math.pow(2, reconnectAttempts.value - 1),
-      maxDelay
-    )
+    const delay = calculateReconnectDelay(reconnectAttempts.value)
 
     console.log(`[WebSocket] 计划 ${delay}ms 后进行第 ${reconnectAttempts.value} 次重连`)
 
-    reconnectTimer.value = setTimeout(() => {
+    setTimeout(() => {
       console.log(`[WebSocket] 执行第 ${reconnectAttempts.value} 次重连`)
       connect()
     }, delay)
@@ -573,8 +435,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
     // Getters
     isConnected,
     isConnecting,
-    canReconnect,
-    ws,
 
     // Actions
     connect,
@@ -601,14 +461,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
  * 初始化 WebSocket 配置
  * 从服务端获取配置并应用到 WebSocket Store
  * 应在应用启动时调用
+ * @deprecated 直接使用 @/config/websocketConfig 中的 initWebSocketConfig
  */
 export async function initWebSocketConfig(): Promise<void> {
-  try {
-    const config = await getClientConfig()
-    serverConfig = config
-    console.log('[WebSocket] 已加载服务端配置:', config)
-  } catch (error) {
-    console.warn('[WebSocket] 无法获取服务端配置，使用默认值:', error)
-    // 使用默认值，serverConfig 保持为 null
+  if (!isConfigInitialized()) {
+    await initConfig()
   }
 }
