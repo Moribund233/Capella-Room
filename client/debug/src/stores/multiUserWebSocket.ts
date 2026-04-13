@@ -102,18 +102,17 @@ export const useMultiUserWebSocketStore = defineStore('multiUserWebSocket', () =
       },
       {
         onConnect: () => {
+          // WebSocketClient 的 connect() 现在会在认证成功后才 resolve
+          // onConnect 回调在认证成功后触发，状态已经设置为 connected
           state.status = 'connected'
           state.connectedAt = Date.now()
-          console.log(`[MultiWS] 用户 ${user.username} 连接成功`)
-
-          // 发送认证消息
-          client.send({
-            type: 'Auth',
-            payload: { token: accessToken },
-          })
+          console.log(`[MultiWS] 用户 ${user.username} 连接并认证成功`)
+          // 注意：认证消息已由 WebSocketClient 在连接时自动发送，无需重复发送
         },
         onDisconnect: () => {
           state.status = 'disconnected'
+          state.connectedAt = null
+          state.joinedRooms = []  // 断开时清空已加入房间列表
           console.log(`[MultiWS] 用户 ${user.username} 连接断开`)
         },
         onError: (error) => {

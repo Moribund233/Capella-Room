@@ -409,5 +409,11 @@ pub fn get_event_description(event_type: &AuditEventType) -> &'static str {
         AuditEventType::AlertQuery => "告警查询",
         AuditEventType::AlertRuleUpdate => "告警规则更新",
         AuditEventType::AuditCleanup => "审计清理",
+        AuditEventType::IpBlocked => "IP被阻止",
+        AuditEventType::IpWhitelistDenied => "IP不在白名单",
+        AuditEventType::IpRateLimited => "IP频率限制",
+        AuditEventType::IpListAdded => "添加IP列表",
+        AuditEventType::IpListRemoved => "移除IP列表",
+        AuditEventType::IpListUpdated => "更新IP列表",
     }
 }

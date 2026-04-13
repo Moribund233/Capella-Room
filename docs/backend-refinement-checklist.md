@@ -284,6 +284,133 @@ const interval = serverConfig.websocket.heartbeat_interval_secs * 1000;
 
 ---
 
+## 0003-WebSocket 未认证消息绕过风险 [P0-紧急] - ✅ 已修复
+
+**位置**: `src/websocket/handler.rs` - `handle_message` 函数
+
+**问题描述**:
+后端仅在连接建立后的首条消息进行认证检查，后续消息默认已通过认证。但前端在异常情况下（如断线重连）可能：
+1. 连接断开后消息队列仍保留待发送的业务消息（如 `ChatMessage`）
+2. 重连后自动刷新消息队列，在认证完成前发送业务消息
+3. 后端收到未认证的业务消息，虽拒绝但已造成安全风险
+
+**日志证据**:
+```
+2026-04-13T14:07:39.163688Z  WARN seredeli_room::websocket::handler: 
+  First message must be authentication or reconnect, got: ChatMessage { 
+    room_id: 4bfa11aa-b30d-46ad-8b62-9c17b8dd82ae, 
+    content: "这个功能好用", 
+    reply_to: None 
+  }
+```
+
+**安全风险评估**:
+
+| 风险项 | 严重程度 | 说明 |
+|--------|---------|------|
+| **消息伪造** | 🔴 高 | 未认证用户可能通过重连机制发送消息 |
+| **身份冒充** | 🔴 高 | 如果队列中有旧消息，可能以旧身份发送 |
+| **信息泄露** | 🟡 中 | 消息内容在日志中可见 |
+| **拒绝服务** | 🟡 中 | 大量重连+消息发送可能耗尽资源 |
+
+**根本原因**:
+1. **后端**: 仅验证首条消息，未维护"已认证"状态，后续消息无状态检查
+2. **前端**: 断线重连时未清空消息队列，可能在认证前发送业务消息
+3. **协议**: 缺乏"连接状态机"定义，前后端对连接生命周期理解不一致
+
+**修复方案**:
+
+### 1. 后端强化（必须）
+
+**A. 连接状态机模式**
+```rust
+enum ConnectionState {
+    Unauthenticated,  // 只允许 Auth/Reconnect
+    Authenticated,    // 允许所有消息
+}
+
+// 每条消息都检查状态，不只是首条
+async fn handle_message(
+    state: &mut ConnectionState,
+    msg: WebSocketMessage,
+    // ...
+) -> Result<()> {
+    match state {
+        ConnectionState::Unauthenticated => {
+            if !is_auth_message(&msg) {
+                return Err("Unauthorized: authentication required");
+            }
+            // 认证成功后切换状态
+            *state = ConnectionState::Authenticated;
+        }
+        ConnectionState::Authenticated => {
+            // 正常处理业务消息
+        }
+    }
+}
+```
+
+**B. 连接断开时清理资源**
+- 断开连接时清理该连接的所有待处理消息
+- 记录安全审计日志
+
+### 2. 前端修复（必须）
+
+**A. 断开连接时清空消息队列**
+```typescript
+disconnect(): void {
+    this.messageQueue = []  // 清空队列，防止重连后发送旧消息
+    // ... 其他清理
+}
+```
+
+**B. 认证后才允许入队**
+```typescript
+send(message: WebSocketMessage): boolean {
+    // 未认证时不允许发送业务消息
+    if (!this.isAuthenticated() && !isAuthMessage(message)) {
+        console.error('Cannot send message before authentication');
+        return false;
+    }
+    // ...
+}
+```
+
+**C. 认证完成后才 resolve connect() Promise**
+```typescript
+// 当前：onopen 后立即 resolve
+// 修复：收到 AuthResult { success: true } 后才 resolve
+```
+
+### 3. 审计日志（建议）
+
+记录所有安全相关事件：
+- 认证失败尝试（WARN 级别）
+- 未认证消息尝试（WARN 级别）
+- 异常连接模式（如短时间内大量连接）
+
+**状态**: ✅ 已修复
+
+**修复内容**:
+1. **连接状态机** - 实现 `ConnectionState` 枚举（`Unauthenticated` / `Authenticated`）
+2. **首条消息强制认证** - `wait_for_auth` 函数强制要求首条消息为 `Auth` 或 `Reconnect`
+3. **状态检查** - 每条消息都通过 `is_message_allowed` 检查当前状态
+4. **安全日志** - 未认证消息尝试记录 WARN 级别日志
+
+**验证代码位置**:
+- `src/websocket/handler.rs:L44-65` - `ConnectionState` 定义和 `is_message_allowed` 方法
+- `src/websocket/handler.rs:L470-569` - `wait_for_auth` 强制认证
+- `src/websocket/handler.rs:L350-367` - 消息处理时的状态检查
+
+**影响文件**:
+- `src/websocket/handler.rs` - 连接状态机和认证检查
+
+**关联任务**: ✅ 全部完成
+- ✅ 后端: 实现连接状态机，每条消息验证认证状态
+- ✅ 测试: WebSocket 测试覆盖认证流程
+
+---
+
 *文档创建时间: 2026-04-10*
 *关联任务: 阶段9 - 后端细节优化*
-*更新时间: 2026-04-12 - 添加 0002 问题修复验证记录和配置同步方案*
+*更新时间: 2026-04-13 - 添加 0003 WebSocket 安全问题*

@@ -40,6 +40,7 @@ export {
   joinRoom,
   leaveRoom,
   getMyRooms,
+  kickMember,
   type RoomListResponse,
   type CreateRoomRequest,
   type UpdateRoomRequest,

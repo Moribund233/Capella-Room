@@ -1,11 +1,12 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket},
-        State, WebSocketUpgrade,
+        ConnectInfo, State, WebSocketUpgrade,
     },
     response::Response,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, mpsc};
@@ -14,21 +15,123 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
+    models::security::IpCheckResult,
     state::AppState,
     utils::logging::{PerformanceTimer, StructuredLogger},
     websocket::protocol::{MissedMessage, ReplyToInfo, UserInfo, UserStatus, WebSocketMessage},
 };
 
+/// 连接上下文
+/// 封装 WebSocket 连接的相关信息，便于传递和扩展
+/// 为后续 IP 白名单/黑名单检查等安全功能预留
+#[derive(Debug, Clone)]
+struct ConnectionContext {
+    /// 客户端 IP 地址
+    client_ip: SocketAddr,
+    /// 用户代理（可选）
+    user_agent: Option<String>,
+}
+
+impl ConnectionContext {
+    fn new(client_ip: SocketAddr) -> Self {
+        Self {
+            client_ip,
+            user_agent: None,
+        }
+    }
+}
+
+/// 连接状态机
+/// 用于跟踪 WebSocket 连接的认证状态
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ConnectionState {
+    /// 未认证状态 - 只允许 Auth/Reconnect 消息
+    Unauthenticated,
+    /// 已认证状态 - 允许所有业务消息
+    Authenticated,
+}
+
+impl ConnectionState {
+    /// 检查消息类型是否允许在当前状态下发送
+    fn is_message_allowed(&self, msg: &WebSocketMessage) -> bool {
+        match self {
+            ConnectionState::Unauthenticated => matches!(
+                msg,
+                WebSocketMessage::Auth { .. } | WebSocketMessage::Reconnect { .. }
+            ),
+            ConnectionState::Authenticated => true,
+        }
+    }
+}
+
 /// WebSocket升级处理器
 /// 处理WebSocket连接升级请求
-pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+pub async fn ws_handler(
+    ws: WebSocketUpgrade,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    // 创建连接上下文，包含客户端 IP 等信息
+    let ctx = ConnectionContext::new(addr);
+    ws.on_upgrade(move |socket| handle_socket(socket, state, ctx))
 }
 
 /// 处理 WebSocket 连接
 /// 管理连接的整个生命周期
-async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
-    info!("New WebSocket connection established");
+async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionContext) {
+    info!(
+        "New WebSocket connection established from {}",
+        ctx.client_ip
+    );
+
+    // 执行 IP 安全检查
+    match state
+        .ip_security_service()
+        .check_ip(ctx.client_ip.ip())
+        .await
+    {
+        Ok(IpCheckResult::Allowed) => {
+            debug!("IP {} passed security check", ctx.client_ip.ip());
+        }
+        Ok(result) => {
+            warn!("IP {} blocked: {:?}", ctx.client_ip.ip(), result);
+            state
+                .ip_security_service()
+                .log_ip_check(ctx.client_ip.ip(), &result, ctx.user_agent.as_deref())
+                .await;
+
+            // 发送拒绝连接消息并关闭
+            let (mut sender, _receiver) = socket.split();
+            let reject_msg = WebSocketMessage::Error {
+                code: "IP_BLOCKED".to_string(),
+                message: result
+                    .rejection_reason()
+                    .unwrap_or_else(|| "Access denied".to_string()),
+            };
+            if let Ok(json) = reject_msg.to_json() {
+                let _ = sender.send(Message::Text(json)).await;
+            }
+            let _ = sender.close().await;
+            return;
+        }
+        Err(e) => {
+            error!("IP security check failed: {}", e);
+            // 根据安全策略，检查失败时拒绝连接
+            let (mut sender, _receiver) = socket.split();
+            let error_msg = WebSocketMessage::Error {
+                code: "SECURITY_CHECK_FAILED".to_string(),
+                message: "Security check failed".to_string(),
+            };
+            if let Ok(json) = error_msg.to_json() {
+                let _ = sender.send(Message::Text(json)).await;
+            }
+            let _ = sender.close().await;
+            return;
+        }
+    }
+
+    // IP 安全检查通过，继续处理
+    let _conn_state = ConnectionState::Unauthenticated;
 
     // 分割 socket 为发送和接收部分
     let (mut sender, mut receiver) = socket.split();
@@ -47,19 +150,22 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
     // 等待认证或重连消息（使用性能计时器测量认证耗时）
     let auth_timer = PerformanceTimer::new("websocket_auth");
-    let (user_id, username, rooms_to_rejoin, is_reconnect) =
+    let (user_id, username, rooms_to_rejoin, is_reconnect, token) =
         match wait_for_auth(&mut receiver, &state).await {
             Ok(auth_result) => {
                 auth_timer.finish();
                 match auth_result {
-                    AuthResult::NewConnection { user_id, username } => {
-                        (user_id, username, Vec::new(), false)
-                    }
+                    AuthResult::NewConnection {
+                        user_id,
+                        username,
+                        token,
+                    } => (user_id, username, Vec::new(), false, token),
                     AuthResult::Reconnection {
                         user_id,
                         username,
                         rooms_to_rejoin,
-                    } => (user_id, username, rooms_to_rejoin, true),
+                        token,
+                    } => (user_id, username, rooms_to_rejoin, true, token),
                 }
             }
             Err(e) => {
@@ -76,11 +182,22 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             }
         };
 
+    // 认证成功，状态已转换为已认证
+    debug!(
+        "Connection state transitioned to Authenticated for user: {}",
+        user_id
+    );
+
     // 记录认证成功日志
     if is_reconnect {
         info!(
-            "WebSocket reconnected for user: {} ({}), rooms: {:?}",
-            username, user_id, rooms_to_rejoin
+            "WebSocket reconnected for user: {} ({}), rooms: {:?}, ip: {}",
+            username, user_id, rooms_to_rejoin, ctx.client_ip
+        );
+        StructuredLogger::websocket_connect(
+            user_id,
+            &username,
+            Some(&ctx.client_ip.ip().to_string()),
         );
         // 发送重连成功消息
         let reconnect_success = WebSocketMessage::reconnect_success(rooms_to_rejoin.clone());
@@ -89,10 +206,14 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         }
     } else {
         info!(
-            "WebSocket authenticated for user: {} ({})",
-            username, user_id
+            "WebSocket authenticated for user: {} ({}), ip: {}",
+            username, user_id, ctx.client_ip
         );
-        StructuredLogger::websocket_connect(user_id, &username, None);
+        StructuredLogger::websocket_connect(
+            user_id,
+            &username,
+            Some(&ctx.client_ip.ip().to_string()),
+        );
         // 发送认证成功消息
         let auth_success = WebSocketMessage::auth_success();
         if let Ok(json) = auth_success.to_json() {
@@ -175,18 +296,35 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let heartbeat_interval_secs = ws_config.heartbeat_interval_secs;
     let heartbeat_timeout_secs = ws_config.heartbeat_timeout_secs;
 
+    // 克隆 state 用于发送任务
+    let state_for_send = Arc::clone(&state);
+
     // 启动消息发送任务
     let mut send_task = tokio::spawn(async move {
         // 发送心跳间隔（从配置读取）
         let mut heartbeat_interval = interval(Duration::from_secs(heartbeat_interval_secs));
         // 心跳超时时间（从配置读取）
         let heartbeat_timeout = Duration::from_secs(heartbeat_timeout_secs);
+        // Token 验证间隔（每 5 分钟验证一次）
+        let mut token_check_interval = interval(Duration::from_secs(300));
 
         loop {
             tokio::select! {
                 // 从通道接收消息并发送给客户端
                 Some(message) = rx.recv() => {
                     if sender.send(Message::Text(message)).await.is_err() {
+                        break;
+                    }
+                }
+                // 定时验证 Token 是否过期
+                _ = token_check_interval.tick() => {
+                    if let Err(e) = state_for_send.auth_service().verify_access_token(&token) {
+                        warn!("Token expired for user: {}, disconnecting: {}", user_id, e);
+                        // 发送 Token 过期错误消息
+                        let expired_msg = WebSocketMessage::error("TOKEN_EXPIRED", "Token expired, please reconnect");
+                        if let Ok(json) = expired_msg.to_json() {
+                            let _ = sender.send(Message::Text(json)).await;
+                        }
                         break;
                     }
                 }
@@ -224,12 +362,31 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let tx_clone = tx.clone();
     let username_for_recv = username.clone();
 
+    // 初始化连接状态为已认证（因为 wait_for_auth 已经成功返回）
+    let connection_state = ConnectionState::Authenticated;
+
     // 启动消息接收任务
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(message)) = receiver.next().await {
             match message {
                 Message::Text(text) => match WebSocketMessage::from_json(&text) {
                     Ok(ws_msg) => {
+                        // 检查消息是否允许在当前状态下发送
+                        if !connection_state.is_message_allowed(&ws_msg) {
+                            warn!(
+                                "Unauthorized message from user {} in {:?} state: {:?}",
+                                user_id, connection_state, ws_msg
+                            );
+                            let error_msg = WebSocketMessage::error(
+                                "UNAUTHORIZED",
+                                "Message not allowed before authentication",
+                            );
+                            if let Ok(json) = error_msg.to_json() {
+                                let _ = tx_clone.send(json).await;
+                            }
+                            continue;
+                        }
+
                         if let Err(e) = handle_message(
                             ws_msg,
                             user_id,
@@ -295,12 +452,17 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 /// 认证结果类型
 enum AuthResult {
     /// 新连接
-    NewConnection { user_id: Uuid, username: String },
+    NewConnection {
+        user_id: Uuid,
+        username: String,
+        token: String,
+    },
     /// 重连（携带需要恢复的房间列表）
     Reconnection {
         user_id: Uuid,
         username: String,
         rooms_to_rejoin: Vec<Uuid>,
+        token: String,
     },
 }
 
@@ -331,6 +493,7 @@ async fn wait_for_auth(
                             .map(|(user_id, username)| AuthResult::NewConnection {
                                 user_id,
                                 username,
+                                token: token.clone(),
                             })
                     }
                     // 重连请求
@@ -447,6 +610,7 @@ async fn handle_reconnect(token: &str, state: &AppState) -> anyhow::Result<AuthR
         user_id,
         username,
         rooms_to_rejoin,
+        token: token.to_string(),
     })
 }
 

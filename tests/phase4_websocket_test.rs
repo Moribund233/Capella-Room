@@ -150,7 +150,17 @@ async fn setup_test_server() -> (TestServer, Database) {
         logging: Default::default(),
         system: Default::default(),
         admin: Default::default(),
-        audit: Default::default(),
+        audit: seredeli_room::config::AuditConfig {
+            enabled: true,
+            log_retention_days: 90,
+            buffer_size: 100,
+            flush_interval_seconds: 5,
+            excluded_paths: vec![],
+            alert_enabled: true,
+            alert_cooldown_minutes: 10,
+            auto_archive_enabled: true,
+            archive_hour: 3,
+        },
         redis: Default::default(),
     };
 
@@ -177,7 +187,10 @@ async fn setup_test_server() -> (TestServer, Database) {
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
 
     tokio::spawn(async move {
-        let server = axum::serve(listener, app);
+        let server = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        );
         tokio::select! {
             _ = server => {},
             _ = shutdown_rx => {},

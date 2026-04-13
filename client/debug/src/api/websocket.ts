@@ -5,7 +5,7 @@
  */
 
 import { getAccessToken } from './token'
-import { getConnectionConfig } from '@/config/websocketConfig'
+import { getConnectionConfig, getHeartbeatConfig } from '@/config/websocketConfig'
 import type {
   WebSocketMessage,
   ConnectionStatus,
@@ -27,6 +27,13 @@ class WebSocketClient {
   private connectTimer: number | null = null
   private messageQueue: WebSocketMessage[] = []
   private customToken: string | null = null
+  // 服务端主导心跳相关
+  private lastPingTime: number = 0
+  private heartbeatTimeoutTimer: number | null = null
+  // 认证状态管理
+  private isAuthenticated: boolean = false
+  private authResolve: (() => void) | null = null
+  private authReject: ((error: Error) => void) | null = null
 
   constructor(config: WebSocketConfig = {}, handlers: WebSocketEventHandlers = {}) {
     const defaultConfig = getConnectionConfig()
@@ -70,27 +77,32 @@ class WebSocketClient {
   }
 
   /**
-   * 连接 WebSocket
+   * 连接 WebSocket（认证成功后 resolve）
    */
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.isConnected()) {
+      if (this.isConnected() && this.isAuthenticated) {
         resolve()
         return
       }
 
       this.setConnectionStatus('connecting')
+      this.isAuthenticated = false
+      this.authResolve = resolve
+      this.authReject = reject
 
       const token = this.getToken()
       if (!token) {
         this.setConnectionStatus('error')
+        this.isAuthenticated = false
         reject(new Error('No access token'))
         return
       }
 
       // 确保 URL 不以 /ws 结尾，避免重复
       const baseUrl = WS_BASE_URL.endsWith('/ws') ? WS_BASE_URL : `${WS_BASE_URL}/ws`
-      const wsUrl = `${baseUrl}?token=${encodeURIComponent(token)}`
+      // 不再在 URL 中传递 token，改为通过消息体发送
+      const wsUrl = baseUrl
 
       try {
         this.ws = new WebSocket(wsUrl)
@@ -100,18 +112,17 @@ class WebSocketClient {
           if (this.connectionStatus === 'connecting') {
             this.ws?.close()
             this.setConnectionStatus('error')
+            this.isAuthenticated = false
             reject(new Error('Connection timeout'))
           }
         }, this.config.connectTimeout)
 
         this.ws.onopen = () => {
           this.clearConnectTimer()
-          this.setConnectionStatus('connected')
-          this.reconnectAttempts = 0
-          this.startHeartbeat()
-          this.flushMessageQueue()
-          this.handlers.onConnect?.()
-          resolve()
+          // 连接成功后立即发送认证消息
+          // 注意：这里不 resolve，等待认证成功后再 resolve
+          this.sendInternal({ type: 'Auth', payload: { token } })
+          console.log('[WebSocket] Connection opened, sent authentication')
         }
 
         this.ws.onclose = () => {
@@ -121,8 +132,13 @@ class WebSocketClient {
         this.ws.onerror = (error) => {
           this.clearConnectTimer()
           this.setConnectionStatus('error')
+          this.isAuthenticated = false
+          if (this.authReject) {
+            this.authReject(new Error('WebSocket error'))
+            this.authReject = null
+            this.authResolve = null
+          }
           this.handlers.onError?.(new Error('WebSocket error'))
-          reject(error)
         }
 
         this.ws.onmessage = (event) => {
@@ -130,6 +146,7 @@ class WebSocketClient {
         }
       } catch (error) {
         this.setConnectionStatus('error')
+        this.isAuthenticated = false
         reject(error)
       }
     })
@@ -169,23 +186,48 @@ class WebSocketClient {
   // ========== 消息发送 ==========
 
   /**
-   * 发送消息
+   * 发送消息（公开方法，带认证检查）
    */
   send(message: WebSocketMessage): boolean {
+    // 未认证时不允许发送业务消息（除了认证相关消息）
+    if (!this.isAuthenticated && !this.isAuthMessage(message)) {
+      console.error('[WebSocket] Cannot send message before authentication')
+      return false
+    }
+
     if (!this.isConnected()) {
       // 未连接时加入队列
       this.messageQueue.push(message)
       return false
     }
 
+    return this.sendInternal(message)
+  }
+
+  /**
+   * 内部发送方法（不检查认证状态）
+   */
+  private sendInternal(message: WebSocketMessage): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.messageQueue.push(message)
+      return false
+    }
+
     try {
-      this.ws!.send(JSON.stringify(message))
+      this.ws.send(JSON.stringify(message))
       return true
     } catch (error) {
       console.error('Failed to send message:', error)
       this.messageQueue.push(message)
       return false
     }
+  }
+
+  /**
+   * 检查是否为认证相关消息
+   */
+  private isAuthMessage(message: WebSocketMessage): boolean {
+    return message.type === 'Auth' || message.type === 'Reconnect'
   }
 
   // ========== 事件处理 ==========
@@ -202,6 +244,8 @@ class WebSocketClient {
    */
   private handleClose(): void {
     this.clearAllTimers()
+    this.isAuthenticated = false
+    this.messageQueue = []  // 清空队列，防止重连后发送旧消息
     this.setConnectionStatus('disconnected')
     this.handlers.onDisconnect?.()
 
@@ -234,10 +278,115 @@ class WebSocketClient {
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data) as WebSocketMessage
+
+      // 处理认证结果
+      if (message.type === 'AuthResult') {
+        this.handleAuthResult(message)
+        return
+      }
+
+      // 处理后端发送的 Ping 消息，回复 Pong 并重置超时检测
+      if (message.type === 'Ping') {
+        this.handleServerPing()
+        return
+      }
+
+      // 处理错误消息（包括 Token 过期）
+      if (message.type === 'Error') {
+        const errorMsg = message.payload as { code?: string; message?: string }
+        if (errorMsg.code === 'TOKEN_EXPIRED') {
+          console.error('[WebSocket] Token expired, disconnecting')
+          this.isAuthenticated = false
+          // 触发断开连接，前端应该重新获取 token 后重连
+          this.handlers.onError?.(new Error('Token expired'))
+          this.disconnect()
+          return
+        }
+      }
+
       this.handlers.onMessage?.(message)
     } catch (error) {
       console.error('Failed to parse message:', error)
     }
+  }
+
+  /**
+   * 处理认证结果
+   */
+  private handleAuthResult(message: Extract<WebSocketMessage, { type: 'AuthResult' }>): void {
+    const authResult = message.payload
+
+    if (authResult.success) {
+      console.log('[WebSocket] Authentication successful')
+      this.isAuthenticated = true
+      this.setConnectionStatus('connected')
+      this.reconnectAttempts = 0
+      this.startHeartbeat()
+      this.flushMessageQueue()
+
+      // 认证成功后才 resolve connect() Promise
+      if (this.authResolve) {
+        this.authResolve()
+        this.authResolve = null
+        this.authReject = null
+      }
+
+      this.handlers.onConnect?.()
+    } else {
+      console.error('[WebSocket] Authentication failed:', authResult.message)
+      this.isAuthenticated = false
+      this.setConnectionStatus('error')
+
+      // 认证失败 reject connect() Promise
+      if (this.authReject) {
+        this.authReject(new Error(`Authentication failed: ${authResult.message}`))
+        this.authResolve = null
+        this.authReject = null
+      }
+
+      this.handlers.onError?.(new Error(`Authentication failed: ${authResult.message}`))
+      this.disconnect()
+    }
+  }
+
+  /**
+   * 处理服务端发送的 Ping
+   * - 回复 Pong
+   * - 重置心跳超时检测
+   */
+  private handleServerPing(): void {
+    // 回复 Pong
+    this.send({ type: 'Pong' })
+    this.lastPingTime = Date.now()
+
+    // 重置超时检测
+    this.resetHeartbeatTimeout()
+
+    // 调试日志（生产环境可移除）
+    console.debug('[WebSocket] Received Ping, sent Pong')
+  }
+
+  /**
+   * 重置心跳超时检测
+   * 如果在超时时间内未收到下一个 Ping，则认为连接已断开
+   */
+  private resetHeartbeatTimeout(): void {
+    // 清除旧的超时定时器
+    if (this.heartbeatTimeoutTimer) {
+      clearTimeout(this.heartbeatTimeoutTimer)
+    }
+
+    // 获取服务端配置的超时时间（加上缓冲时间）
+    const { timeoutMs } = getHeartbeatConfig()
+    // 使用服务端超时时间的 80% 作为检测阈值（留出缓冲）
+    const checkInterval = Math.floor(timeoutMs * 0.8)
+
+    // 设置新的超时检测
+    this.heartbeatTimeoutTimer = window.setTimeout(() => {
+      console.warn('[WebSocket] Heartbeat timeout - no Ping received from server within', checkInterval, 'ms')
+      // 触发重连
+      this.handleClose()
+    }, checkInterval)
   }
 
   /**
@@ -250,14 +399,15 @@ class WebSocketClient {
   // ========== 定时器管理 ==========
 
   /**
-   * 启动心跳
+   * 启动心跳检测（服务端主导模式）
+   * 不再主动发送 Ping，而是等待服务端的 Ping 并回复 Pong
+   * 同时启动超时检测，如果在配置时间内未收到 Ping，则触发重连
    */
   private startHeartbeat(): void {
-    this.heartbeatTimer = window.setInterval(() => {
-      if (this.isConnected()) {
-        this.send({ type: 'Ping' })
-      }
-    }, this.config.heartbeatInterval)
+    // 服务端主导模式：不主动发送心跳，只被动响应
+    // 初始化超时检测（等待第一个 Ping）
+    this.resetHeartbeatTimeout()
+    console.log('[WebSocket] Heartbeat monitoring started (server-led mode)')
   }
 
   /**
@@ -267,6 +417,17 @@ class WebSocketClient {
     this.clearHeartbeatTimer()
     this.clearReconnectTimer()
     this.clearConnectTimer()
+    this.clearHeartbeatTimeoutTimer()
+  }
+
+  /**
+   * 清空心跳超时检测定时器
+   */
+  private clearHeartbeatTimeoutTimer(): void {
+    if (this.heartbeatTimeoutTimer) {
+      clearTimeout(this.heartbeatTimeoutTimer)
+      this.heartbeatTimeoutTimer = null
+    }
   }
 
   /**

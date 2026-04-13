@@ -299,6 +299,9 @@ const renderParamInput = (param: ToolParam) => {
 .tool-bar {
   display: flex;
   align-items: center;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 .param-form {

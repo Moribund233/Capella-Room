@@ -290,6 +290,8 @@ const handleJoinRoom = (user: TestUser) => {
 .online-users {
   height: 100%;
   overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 .user-item {

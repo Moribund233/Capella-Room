@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { MessageSquare, Users, Shield, RefreshCw } from 'lucide-vue-next'
-import { getRooms, joinRoom, getRoomMembers, type Room, type RoomMember } from '@/api'
+import { getRooms, joinRoom, getRoomMembers, kickMember, type Room, type RoomMember } from '@/api'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useAuthStore } from '@/stores/auth'
 import { useMultiUserAuthStore } from '@/stores/multiUserAuth'
@@ -205,8 +205,21 @@ const handleTestUserJoinRoom = async (user: TestUser) => {
 }
 
 // ========== 踢出成员 ==========
-const handleKickMember = (memberId: string) => {
-  message.info('踢出成员功能需要后端 API 支持')
+const handleKickMember = async (memberId: string) => {
+  if (!selectedRoomId.value) {
+    message.warning('请先选择房间')
+    return
+  }
+
+  try {
+    await kickMember(selectedRoomId.value, memberId)
+    message.success('成员已被踢出')
+    // 刷新成员列表
+    await loadRoomMembers()
+  } catch (error: any) {
+    const errorMsg = error.message || '未知错误'
+    message.error(`踢出成员失败: ${errorMsg}`)
+  }
 }
 
 // ========== 设置管理员 ==========

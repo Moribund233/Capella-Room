@@ -7,7 +7,7 @@ use chrono::Utc;
 use std::sync::Arc;
 
 use crate::{
-    handlers::{admin, audit, auth, config, file, message, room, user},
+    handlers::{admin, audit, auth, config, file, message, room, security, user},
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
     middleware::auth_middleware,
@@ -210,6 +210,8 @@ fn admin_router() -> Router<Arc<AppState>> {
         )
         // 审计系统路由
         .nest("/audit", audit_routes())
+        // IP 安全路由
+        .nest("/security", security_routes())
 }
 
 /// 审计系统路由
@@ -228,6 +230,32 @@ fn audit_routes() -> Router<Arc<AppState>> {
         .route("/rules/:id", put(audit::update_alert_rule))
         // 日志清理
         .route("/cleanup", post(audit::cleanup_audit_logs))
+}
+
+/// IP 安全路由
+fn security_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        // IP 列表管理
+        .route(
+            "/ip-list",
+            get(security::list_ip_entries).post(security::add_ip_entry),
+        )
+        .route("/ip-list/batch", post(security::batch_add_ip_entries))
+        .route(
+            "/ip-list/:id",
+            put(security::update_ip_entry).delete(security::remove_ip_entry),
+        )
+        // IP 检查
+        .route("/ip-check", post(security::check_ip))
+        // 统计信息
+        .route("/stats", get(security::get_security_stats))
+        // 缓存管理
+        .route("/refresh-cache", post(security::refresh_cache))
+        // 清理过期条目
+        .route("/cleanup-expired", post(security::cleanup_expired))
+        // 白名单模式
+        .route("/whitelist-mode", get(security::get_whitelist_mode))
+        .route("/whitelist-mode", post(security::set_whitelist_mode))
 }
 
 /// 健康检查

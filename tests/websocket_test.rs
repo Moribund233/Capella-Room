@@ -144,7 +144,17 @@ async fn setup_test_server() -> (TestServer, Database) {
         },
         reconnect: Default::default(),
         logging: Default::default(),
-        audit: Default::default(),
+        audit: seredeli_room::config::AuditConfig {
+            enabled: true,
+            log_retention_days: 90,
+            buffer_size: 100,
+            flush_interval_seconds: 5,
+            excluded_paths: vec![],
+            alert_enabled: true,
+            alert_cooldown_minutes: 10,
+            auto_archive_enabled: true,
+            archive_hour: 3,
+        },
         system: Default::default(),
         admin: Default::default(),
         redis: Default::default(),
@@ -171,7 +181,10 @@ async fn setup_test_server() -> (TestServer, Database) {
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
 
     tokio::spawn(async move {
-        let server = axum::serve(listener, app);
+        let server = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        );
         tokio::select! {
             _ = server => {},
             _ = shutdown_rx => {},
@@ -216,7 +229,9 @@ async fn create_test_user_with_token(_db: &Database, username: &str) -> (Uuid, S
     };
 
     // 生成 token
-    let tokens = auth_service.generate_token_pair(user.id, user.role.clone()).unwrap();
+    let tokens = auth_service
+        .generate_token_pair(user.id, user.role.clone())
+        .unwrap();
 
     (user.id, password.to_string(), tokens.access_token)
 }

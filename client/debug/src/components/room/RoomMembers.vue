@@ -140,6 +140,8 @@ const handleJoinRoom = async (member: RoomMember) => {
   // 发送加入房间消息
   const success = wsStore.joinRoom(testUser.id, props.roomId)
   if (success) {
+    // 记录用户加入的房间
+    authStore.addUserJoinedRoom(testUser.id, props.roomId)
     message.success(`测试用户 ${member.username} 正在加入房间...`)
     // 等待服务器确认
     setTimeout(() => {
@@ -163,9 +165,9 @@ watch(() => props.roomId, () => {
 }, { immediate: true })
 
 // 组件挂载时初始化
-onMounted(() => {
-  // 从 sessionStorage 恢复测试用户数据
-  authStore.initialize()
+onMounted(async () => {
+  // 从 sessionStorage 恢复测试用户数据并重建 WebSocket 连接
+  await authStore.initialize()
 })
 </script>
 
@@ -260,6 +262,8 @@ onMounted(() => {
 .room-members {
   height: 100%;
   overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 .join-time {

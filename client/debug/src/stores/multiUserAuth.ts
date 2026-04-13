@@ -21,6 +21,7 @@ export interface TestUser {
   accessToken: string
   refreshToken: string
   isActive: boolean
+  joinedRooms?: string[]  // 用户已加入的房间列表
 }
 
 /**
@@ -121,12 +122,39 @@ export const useMultiUserAuthStore = defineStore('multiUserAuth', () => {
   // ========== Actions ==========
 
   /**
-   * 初始化：从 storage 恢复数据
+   * 初始化：从 storage 恢复数据并重建 WebSocket 连接
    * 在应用启动时调用
    */
-  function initialize() {
+  async function initialize() {
     if (!isRestored.value) {
       restoreFromStorage()
+
+      // 恢复 WebSocket 连接
+      if (testUsers.value.length > 0) {
+        const wsStore = useMultiUserWebSocketStore()
+        for (const user of testUsers.value) {
+          if (!wsStore.isUserConnected(user.id)) {
+            try {
+              await wsStore.createConnection(user.id, user.accessToken)
+              console.log('[MultiUserAuth] 恢复 WebSocket 连接:', user.username)
+
+              // 重新加入之前加入的房间
+              const joinedRooms = user.joinedRooms || []
+              if (joinedRooms.length > 0) {
+                console.log(`[MultiUserAuth] 用户 ${user.username} 重新加入 ${joinedRooms.length} 个房间`)
+                for (const roomId of joinedRooms) {
+                  setTimeout(() => {
+                    wsStore.joinRoom(user.id, roomId)
+                    console.log(`[MultiUserAuth] 用户 ${user.username} 重新加入房间: ${roomId}`)
+                  }, 500)
+                }
+              }
+            } catch (error) {
+              console.error('[MultiUserAuth] 恢复 WebSocket 连接失败:', user.username, error)
+            }
+          }
+        }
+      }
     }
   }
 
@@ -302,6 +330,50 @@ export const useMultiUserAuthStore = defineStore('multiUserAuth', () => {
   }
 
   /**
+   * 添加用户加入的房间
+   * @param userId 用户ID
+   * @param roomId 房间ID
+   */
+  function addUserJoinedRoom(userId: string, roomId: string): void {
+    const user = testUsers.value.find(u => u.id === userId)
+    if (user) {
+      if (!user.joinedRooms) {
+        user.joinedRooms = []
+      }
+      if (!user.joinedRooms.includes(roomId)) {
+        user.joinedRooms.push(roomId)
+        saveToStorage()
+      }
+    }
+  }
+
+  /**
+   * 移除用户加入的房间
+   * @param userId 用户ID
+   * @param roomId 房间ID
+   */
+  function removeUserJoinedRoom(userId: string, roomId: string): void {
+    const user = testUsers.value.find(u => u.id === userId)
+    if (user && user.joinedRooms) {
+      const index = user.joinedRooms.indexOf(roomId)
+      if (index > -1) {
+        user.joinedRooms.splice(index, 1)
+        saveToStorage()
+      }
+    }
+  }
+
+  /**
+   * 获取用户加入的房间列表
+   * @param userId 用户ID
+   * @returns 房间ID列表
+   */
+  function getUserJoinedRooms(userId: string): string[] {
+    const user = testUsers.value.find(u => u.id === userId)
+    return user?.joinedRooms || []
+  }
+
+  /**
    * 以指定用户身份发送 API 请求
    * @param userId 用户ID
    * @param endpoint API 端点
@@ -360,5 +432,8 @@ export const useMultiUserAuthStore = defineStore('multiUserAuth', () => {
     removeUser,
     clearUsers,
     requestAsUser,
+    addUserJoinedRoom,
+    removeUserJoinedRoom,
+    getUserJoinedRooms,
   }
 })

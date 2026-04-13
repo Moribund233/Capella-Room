@@ -425,7 +425,7 @@ mod room_service_tests {
         assert!(matches!(member.unwrap().role, MemberRole::Member));
     }
 
-    /// 测试重复加入聊天室
+    /// 测试重复加入聊天室 - 幂等性处理
     #[tokio::test]
     async fn test_join_room_already_member() {
         let db = setup_test_db().await;
@@ -439,14 +439,9 @@ mod room_service_tests {
             .await
             .unwrap();
 
-        // 尝试再次加入（已经是Owner）
+        // 尝试再次加入（已经是Owner）- 应该返回成功（幂等性）
         let result = room_service.join_room(room.id, user_id).await;
-        assert!(result.is_err());
-
-        match result.unwrap_err() {
-            AppError::Conflict(_) => (), // 预期错误
-            _ => panic!("Expected Conflict error"),
-        }
+        assert!(result.is_ok(), "重复加入应该返回成功（幂等性）");
     }
 
     /// 测试离开聊天室

@@ -1,9 +1,29 @@
+use std::fs;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 use tracing::{info, warn};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
+
+/// 获取当前时间对应的日志目录路径
+/// 格式: logs/yyyy-mm-dd/hh
+fn get_log_dir() -> PathBuf {
+    let now = chrono::Local::now();
+    let date_str = now.format("%Y-%m-%d").to_string();
+    let hour_str = now.format("%H").to_string();
+    PathBuf::from("logs").join(date_str).join(hour_str)
+}
+
+/// 获取当前时间对应的日志文件名
+/// 格式: yyyy-mm-dd-hh-mm.log (Windows 文件名不能包含冒号)
+fn get_log_filename() -> String {
+    let now = chrono::Local::now();
+    format!("{}.log", now.format("%Y-%m-%d-%H-%M"))
+}
 
 /// 初始化 Windows 控制台 UTF-8 编码
 /// 在 Windows 系统上设置控制台代码页为 UTF-8 (65001)
@@ -22,23 +42,74 @@ pub fn init_windows_console() {
 pub fn init_logging(is_maintenance_mode: bool) {
     init_windows_console();
 
+    // 创建日志目录
+    let log_dir = get_log_dir();
+    let log_file_path = log_dir.join(get_log_filename());
+
+    // 确保日志目录存在
+    if let Err(e) = fs::create_dir_all(&log_dir) {
+        eprintln!("Failed to create log directory: {}", e);
+    }
+
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         tracing_subscriber::EnvFilter::new("info,seredeli_room=debug,tower_http=debug")
     });
 
-    let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
+    // 创建日志文件
+    let log_file = match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file_path)
+    {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Failed to create log file: {}", e);
+            return;
+        }
+    };
+
+    // 创建非阻塞的文件写入器
+    let (non_blocking, guard) = tracing_appender::non_blocking(log_file);
+
+    // 保存 guard 到全局变量，防止被丢弃
+    let _ = LOG_GUARD.set(guard);
+
+    // 创建控制台和文件的 Layer
+    let console_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stdout)
         .with_target(true)
         .with_thread_ids(is_maintenance_mode)
         .with_file(is_maintenance_mode)
         .with_line_number(is_maintenance_mode)
         .with_ansi(false);
 
-    subscriber.init();
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking)
+        .with_target(true)
+        .with_thread_ids(is_maintenance_mode)
+        .with_file(is_maintenance_mode)
+        .with_line_number(is_maintenance_mode)
+        .with_ansi(false);
+
+    // 构建 subscriber
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(console_layer)
+        .with(file_layer)
+        .init();
+
+    info!(
+        target: "logging",
+        log_file = %log_file_path.display(),
+        "Logging system initialized"
+    );
 }
 
 /// 全局日志广播器实例
 static GLOBAL_LOG_BROADCASTER: OnceLock<LogBroadcaster> = OnceLock::new();
+
+/// 全局日志文件 guard，防止被丢弃导致日志写入失败
+static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
 
 /// 初始化全局日志广播器
 pub fn init_global_log_broadcaster(broadcaster: LogBroadcaster) {

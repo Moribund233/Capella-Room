@@ -5,6 +5,7 @@ pub mod config;
 pub mod file;
 pub mod message;
 pub mod room;
+pub mod security;
 pub mod user;
 
 // HTTP请求处理器模块
@@ -16,3 +17,4 @@ pub mod user;
 // - room: 聊天室处理器（创建、加入、离开、获取列表）
 // - message: 消息处理器（获取历史消息、搜索消息、删除消息）
 // - file: 文件上传处理器（上传、获取、删除文件）
+// - security: IP 安全处理器（白名单/黑名单管理）

@@ -1,10 +1,23 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useMessage } from 'naive-ui'
 import { Send, Trash2, Reply, LogIn, LogOut } from 'lucide-vue-next'
 import { getRoomMessages, deleteMessage, type Message } from '@/api'
 import { useWebSocketStore } from '@/stores/websocket'
 import type { TestUser } from '@/utils/authUtils'
+
+// 系统消息类型
+interface SystemMessage {
+  id: string
+  type: 'system'
+  content: string
+  created_at: string
+  system_type: 'join' | 'leave'
+  username: string
+}
+
+// 消息项类型（普通消息或系统消息）
+type MessageItem = Message | SystemMessage
 
 const props = defineProps<{
   roomId: string
@@ -20,21 +33,13 @@ const message = useMessage()
 const wsStore = useWebSocketStore()
 
 // ========== 状态 ==========
-const messages = ref<Message[]>([])
+const messages = shallowRef<MessageItem[]>([])
 const loading = ref(false)
 const messageContent = ref('')
 const replyToMessage = ref<Message | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const hasMore = ref(false)
-
-// 系统消息（成员加入/离开）
-interface SystemMessage {
-  id: string
-  type: 'system'
-  content: string
-  time: string
-}
-const systemMessages = ref<SystemMessage[]>([])
+const isAtBottom = ref(true)
 
 // ========== 计算属性 ==========
 const canSend = computed(() => {
@@ -43,11 +48,20 @@ const canSend = computed(() => {
 
 // 判断消息是否是自己发送的
 const isOwnMessage = (msg: Message): boolean => {
-  const senderId = msg.sender?.id
-  const currentUserId = props.currentUser?.id
-  const isOwn = senderId === currentUserId
-  return isOwn
+  return msg.sender?.id === props.currentUser?.id
 }
+
+// 判断消息项是否为系统消息
+const isSystemMessage = (msg: MessageItem): msg is SystemMessage => {
+  return msg.type === 'system'
+}
+
+// 按时间排序的消息（确保按时间正序：旧消息在前，新消息在后）
+const sortedMessages = computed(() => {
+  return [...messages.value].sort((a, b) => {
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  })
+})
 
 // ========== 消息加载 ==========
 const loadMessages = async () => {
@@ -55,10 +69,12 @@ const loadMessages = async () => {
 
   loading.value = true
   try {
-    const result = await getRoomMessages(props.roomId, { limit: 50 })
+    const result = await getRoomMessages(props.roomId, { limit: 100 })
     messages.value = result.messages
     hasMore.value = result.has_more
-    await scrollToBottom()
+    if (isAtBottom.value) {
+      await scrollToBottom()
+    }
   } catch (error) {
     message.error('加载消息失败')
     console.error('[ChatPanel] 加载消息错误:', error)
@@ -70,18 +86,30 @@ const loadMessages = async () => {
 const loadMoreMessages = async () => {
   if (!props.roomId || !hasMore.value || messages.value.length === 0) return
 
+  // 保存当前滚动位置
+  const container = messagesContainer.value
+  const oldScrollHeight = container?.scrollHeight || 0
+
   try {
-    const firstMessage = messages.value[0]
+    const firstMessage = sortedMessages.value[0]
     if (!firstMessage) return
+
     const result = await getRoomMessages(props.roomId, {
       before: firstMessage.id,
-      limit: 30,
+      limit: 50,
     })
 
     if (result.messages.length > 0) {
-      messages.value.unshift(...result.messages)
+      messages.value = [...result.messages, ...messages.value]
+      hasMore.value = result.has_more
+
+      // 恢复滚动位置
+      await nextTick()
+      if (container) {
+        const newScrollHeight = container.scrollHeight
+        container.scrollTop = newScrollHeight - oldScrollHeight
+      }
     }
-    hasMore.value = result.has_more
   } catch (error) {
     console.error('[ChatPanel] 加载更多消息错误:', error)
   }
@@ -91,12 +119,14 @@ const loadMoreMessages = async () => {
 const handleSendMessage = async () => {
   if (!canSend.value) return
 
+  const content = messageContent.value.trim()
+
   try {
     const success = wsStore.send({
       type: 'ChatMessage',
       payload: {
         room_id: props.roomId,
-        content: messageContent.value.trim(),
+        content: content,
         reply_to: replyToMessage.value?.id || null,
       },
     })
@@ -104,8 +134,9 @@ const handleSendMessage = async () => {
     if (success) {
       messageContent.value = ''
       replyToMessage.value = null
-      // 等待 WebSocket 推送新消息后刷新
-      setTimeout(() => loadMessages(), 200)
+      isAtBottom.value = true
+      // 等待服务器响应后加载新消息
+      setTimeout(() => loadMessages(), 100)
     } else {
       message.error('发送消息失败')
     }
@@ -120,8 +151,8 @@ const handleDeleteMessage = async (msg: Message) => {
   try {
     await deleteMessage(msg.id)
     message.success('消息已删除')
+    messages.value = messages.value.filter(m => m.id !== msg.id)
     emit('delete', msg.id)
-    await loadMessages()
   } catch (error) {
     message.error('删除消息失败')
     console.error(error)
@@ -141,9 +172,18 @@ const cancelReply = () => {
 // ========== 滚动控制 ==========
 const scrollToBottom = async () => {
   await nextTick()
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  const container = messagesContainer.value
+  if (container) {
+    container.scrollTop = container.scrollHeight
   }
+}
+
+const checkScrollPosition = () => {
+  const container = messagesContainer.value
+  if (!container) return
+
+  const threshold = 50
+  isAtBottom.value = container.scrollHeight - container.scrollTop - container.clientHeight <= threshold
 }
 
 // ========== 格式化时间 ==========
@@ -155,22 +195,64 @@ const formatTime = (dateStr: string): string => {
   })
 }
 
-// ========== 添加系统消息 ==========
-const addSystemMessage = (content: string) => {
-  systemMessages.value.push({
-    id: Date.now().toString() + Math.random().toString(),
-    type: 'system',
-    content,
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-  })
-  // 限制系统消息数量
-  if (systemMessages.value.length > 50) {
-    systemMessages.value = systemMessages.value.slice(-50)
+// ========== 处理新消息 ==========
+const handleNewMessage = (payload: any) => {
+  if (payload?.room_id !== props.roomId) return
+
+  // 添加新消息到列表
+  if (payload.message) {
+    const newMessage = payload.message as Message
+    // 检查是否已存在
+    if (!messages.value.find(m => m.id === newMessage.id)) {
+      messages.value = [...messages.value, newMessage]
+      if (isAtBottom.value) {
+        scrollToBottom()
+      }
+    }
+  } else {
+    // 如果没有完整消息数据，重新加载
+    setTimeout(() => loadMessages(), 100)
   }
-  scrollToBottom()
 }
 
-// ========== 监听新消息 ==========
+// ========== 处理系统消息（成员进入/离开） ==========
+const handleUserJoined = (payload: any) => {
+  if (payload?.room_id !== props.roomId) return
+
+  const systemMsg: SystemMessage = {
+    id: `system-join-${Date.now()}`,
+    type: 'system',
+    content: `${payload.username || 'Unknown'} 进入了房间`,
+    created_at: new Date().toISOString(),
+    system_type: 'join',
+    username: payload.username || 'Unknown'
+  }
+
+  messages.value = [...messages.value, systemMsg]
+  if (isAtBottom.value) {
+    scrollToBottom()
+  }
+}
+
+const handleUserLeft = (payload: any) => {
+  if (payload?.room_id !== props.roomId) return
+
+  const systemMsg: SystemMessage = {
+    id: `system-leave-${Date.now()}`,
+    type: 'system',
+    content: `${payload.username || 'Unknown'} 离开了房间`,
+    created_at: new Date().toISOString(),
+    system_type: 'leave',
+    username: payload.username || 'Unknown'
+  }
+
+  messages.value = [...messages.value, systemMsg]
+  if (isAtBottom.value) {
+    scrollToBottom()
+  }
+}
+
+// ========== WebSocket 监听 ==========
 let wsUnsubscribeNewMessage: (() => void) | null = null
 let wsUnsubscribeUserJoined: (() => void) | null = null
 let wsUnsubscribeUserLeft: (() => void) | null = null
@@ -178,26 +260,10 @@ let wsUnsubscribeUserLeft: (() => void) | null = null
 onMounted(() => {
   loadMessages()
 
-  // 注册消息处理器监听新消息
-  wsUnsubscribeNewMessage = wsStore.onMessage('NewMessage', (payload: any) => {
-    if (payload?.room_id === props.roomId) {
-      setTimeout(() => loadMessages(), 100)
-    }
-  })
-
-  // 监听用户加入房间
-  wsUnsubscribeUserJoined = wsStore.onMessage('UserJoined', (payload: any) => {
-    if (payload?.room_id === props.roomId) {
-      addSystemMessage(`${payload.username} 加入了房间`)
-    }
-  })
-
-  // 监听用户离开房间
-  wsUnsubscribeUserLeft = wsStore.onMessage('UserLeft', (payload: any) => {
-    if (payload?.room_id === props.roomId) {
-      addSystemMessage(`${payload.username} 离开了房间`)
-    }
-  })
+  // 注册消息处理器
+  wsUnsubscribeNewMessage = wsStore.onMessage('NewMessage', handleNewMessage)
+  wsUnsubscribeUserJoined = wsStore.onMessage('UserJoined', handleUserJoined)
+  wsUnsubscribeUserLeft = wsStore.onMessage('UserLeft', handleUserLeft)
 })
 
 onUnmounted(() => {
@@ -218,8 +284,8 @@ onUnmounted(() => {
 // 监听房间变化
 watch(() => props.roomId, () => {
   messages.value = []
-  systemMessages.value = []
   replyToMessage.value = null
+  isAtBottom.value = true
   loadMessages()
 })
 </script>
@@ -227,82 +293,94 @@ watch(() => props.roomId, () => {
 <template>
   <div class="chat-panel">
     <!-- 消息列表 -->
-    <div ref="messagesContainer" class="messages-container">
+    <div
+      ref="messagesContainer"
+      class="messages-container"
+      @scroll="checkScrollPosition"
+    >
+      <!-- 加载更多 -->
       <div v-if="hasMore" class="load-more">
         <n-button text size="small" @click="loadMoreMessages">
-          加载更多
+          加载更多历史消息
         </n-button>
       </div>
 
+      <!-- 加载状态 -->
       <div v-if="loading && messages.length === 0" class="loading-state">
         <n-spin size="medium" />
       </div>
 
-      <div v-else-if="messages.length === 0 && systemMessages.length === 0" class="empty-state">
-        <n-empty description="暂无消息" />
+      <!-- 空状态 -->
+      <div v-else-if="messages.length === 0" class="empty-state">
+        <n-empty description="暂无消息，开始聊天吧" />
       </div>
 
-      <!-- 系统消息（成员加入/离开） -->
-      <div
-        v-for="sysMsg in systemMessages"
-        :key="sysMsg.id"
-        class="system-message"
-      >
-        <n-divider dashed>
-          <n-space align="center" size="small" class="system-message-content">
-            <LogIn v-if="sysMsg.content.includes('加入')" :size="12" />
-            <LogOut v-else :size="12" />
-            <span class="system-text">{{ sysMsg.content }}</span>
-            <span class="system-time">{{ sysMsg.time }}</span>
-          </n-space>
-        </n-divider>
-      </div>
-
-      <!-- 聊天消息 -->
-      <div
-        v-for="msg in messages"
-        :key="msg.id"
-        :class="['message-wrapper', { 'message-wrapper-own': isOwnMessage(msg) }]"
-      >
+      <!-- 消息列表 -->
+      <template v-else>
         <div
-          :class="['message-item', { 'message-own': isOwnMessage(msg) }]"
+          v-for="msg in sortedMessages"
+          :key="msg.id"
+          :class="[
+            'message-item',
+            { 'message-own': !isSystemMessage(msg) && isOwnMessage(msg) },
+            { 'message-system': isSystemMessage(msg) }
+          ]"
         >
-          <!-- 回复引用 -->
-          <div v-if="msg.reply_to" class="reply-reference">
-            <Reply class="icon-xs" />
-            <span class="reply-text">
-              回复消息
-            </span>
-          </div>
+          <!-- 系统消息 -->
+          <template v-if="isSystemMessage(msg)">
+            <div class="system-message-content">
+              <component
+                :is="msg.system_type === 'join' ? LogIn : LogOut"
+                class="icon-xs"
+              />
+              <span class="system-text">{{ msg.content }}</span>
+              <span class="message-time">{{ formatTime(msg.created_at) }}</span>
+            </div>
+          </template>
 
-          <div class="message-header">
-            <n-avatar
-              v-if="msg.sender?.avatar_url"
-              size="small"
-              :src="msg.sender.avatar_url"
-            />
-            <n-avatar v-else size="small" :style="{ backgroundColor: isOwnMessage(msg) ? '#52c41a' : 'var(--primary)' }">
-              {{ msg.sender?.username?.charAt(0)?.toUpperCase() || '?' }}
-            </n-avatar>
-            <span class="sender-name">{{ msg.sender?.username || 'Unknown' }}</span>
-            <span class="message-time">{{ formatTime(msg.created_at) }}</span>
-            <n-space class="message-actions">
-              <n-button size="tiny" text @click="handleReply(msg)">
-                <template #icon>
-                  <Reply class="icon-xs" />
-                </template>
-              </n-button>
-              <n-button size="tiny" text type="error" @click="handleDeleteMessage(msg)">
-                <template #icon>
-                  <Trash2 class="icon-xs" />
-                </template>
-              </n-button>
-            </n-space>
-          </div>
+          <!-- 普通消息 -->
+          <template v-else>
+            <!-- 回复引用 -->
+            <div v-if="msg.reply_to" class="reply-reference">
+              <Reply class="icon-xs" />
+              <span class="reply-text">回复消息</span>
+            </div>
 
-          <div class="message-content">{{ msg.content }}</div>
+            <!-- 消息头部 -->
+            <div class="message-header">
+              <n-avatar
+                v-if="msg.sender?.avatar_url"
+                size="small"
+                :src="msg.sender.avatar_url"
+              />
+              <n-avatar
+                v-else
+                size="small"
+                :style="{ backgroundColor: isOwnMessage(msg) ? '#52c41a' : 'var(--primary-color)' }"
+              >
+                {{ msg.sender?.username?.charAt(0)?.toUpperCase() || '?' }}
+              </n-avatar>
+              <span class="sender-name">{{ msg.sender?.username || 'Unknown' }}</span>
+              <span class="message-time">{{ formatTime(msg.created_at) }}</span>
+              <n-space class="message-actions">
+                <n-button size="tiny" text @click="handleReply(msg)">
+                  <template #icon>
+                    <Reply class="icon-xs" />
+                  </template>
+                </n-button>
+                <n-button size="tiny" text type="error" @click="handleDeleteMessage(msg)">
+                  <template #icon>
+                    <Trash2 class="icon-xs" />
+                  </template>
+                </n-button>
+              </n-space>
+            </div>
+
+            <!-- 消息内容 -->
+            <div class="message-content">{{ msg.content }}</div>
+          </template>
         </div>
-      </div>
+      </template>
     </div>
 
     <!-- 回复提示 -->
@@ -310,7 +388,8 @@ watch(() => props.roomId, () => {
       <div class="reply-info">
         <Reply class="icon-xs" />
         <span>
-          回复 {{ replyToMessage.sender?.username || 'Unknown' }}: {{ replyToMessage.content.substring(0, 30) }}{{ replyToMessage.content.length > 30 ? '...' : '' }}
+          回复 {{ replyToMessage.sender?.username || 'Unknown' }}:
+          {{ replyToMessage.content.substring(0, 30) }}{{ replyToMessage.content.length > 30 ? '...' : '' }}
         </span>
       </div>
       <n-button size="tiny" text @click="cancelReply">
@@ -354,6 +433,8 @@ watch(() => props.roomId, () => {
   height: 100%;
   background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
 }
 
 .messages-container {
@@ -362,7 +443,7 @@ watch(() => props.roomId, () => {
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
 
 .load-more {
@@ -378,57 +459,50 @@ watch(() => props.roomId, () => {
   height: 200px;
 }
 
-/* 系统消息（成员加入/离开） */
-.system-message {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: var(--space-xs) 0;
-}
-
-.system-message :deep(.n-divider) {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.system-message-content {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.system-text {
-  color: var(--text-secondary);
-}
-
-.system-time {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-/* 消息包装器 - 用于对齐 */
-.message-wrapper {
-  display: flex;
-  justify-content: flex-start;
-  width: 100%;
-  margin-bottom: var(--space-sm);
-}
-
-.message-wrapper-own {
-  justify-content: flex-end;
-}
-
 /* 消息项 */
 .message-item {
   padding: var(--space-sm) var(--space-md);
   background-color: var(--bg-white);
   border-radius: var(--radius-md);
-  max-width: 70%;
+  max-width: 80%;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  align-self: flex-start;
 }
 
 .message-own {
   background-color: #e6f7ff;
   border: 1px solid #91d5ff;
+  align-self: flex-end;
+}
+
+/* 系统消息 */
+.message-system {
+  align-self: center;
+  max-width: 90%;
+  padding: var(--space-xs) var(--space-lg);
+  background-color: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.system-message-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.system-message-content .icon-xs {
+  color: var(--primary-color);
+}
+
+.system-text {
+  font-weight: 500;
 }
 
 .message-header {
@@ -459,14 +533,9 @@ watch(() => props.roomId, () => {
 }
 
 .message-content {
-  padding-left: 32px;
   color: var(--text-primary);
   word-break: break-word;
-}
-
-.message-own .message-content {
-  padding-left: 0;
-  padding-right: 32px;
+  line-height: 1.5;
 }
 
 .reply-reference {
@@ -508,8 +577,7 @@ watch(() => props.roomId, () => {
   padding: var(--space-md);
   background-color: var(--bg-white);
   border-top: 1px solid var(--border-color);
-  border-bottom-left-radius: var(--radius-md);
-  border-bottom-right-radius: var(--radius-md);
+  flex-shrink: 0;
 }
 
 .connection-status {

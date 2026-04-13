@@ -48,6 +48,13 @@ pub enum AuditEventType {
     AlertQuery,
     AlertRuleUpdate,
     AuditCleanup,
+    // IP 安全事件
+    IpBlocked,
+    IpWhitelistDenied,
+    IpRateLimited,
+    IpListAdded,
+    IpListRemoved,
+    IpListUpdated,
 }
 
 impl fmt::Display for AuditEventType {
@@ -82,6 +89,12 @@ impl fmt::Display for AuditEventType {
             AuditEventType::AlertQuery => "alert_query",
             AuditEventType::AlertRuleUpdate => "alert_rule_update",
             AuditEventType::AuditCleanup => "audit_cleanup",
+            AuditEventType::IpBlocked => "ip_blocked",
+            AuditEventType::IpWhitelistDenied => "ip_whitelist_denied",
+            AuditEventType::IpRateLimited => "ip_rate_limited",
+            AuditEventType::IpListAdded => "ip_list_added",
+            AuditEventType::IpListRemoved => "ip_list_removed",
+            AuditEventType::IpListUpdated => "ip_list_updated",
         };
         write!(f, "{}", s)
     }
@@ -120,6 +133,12 @@ impl AuditEventType {
             | AuditEventType::AlertQuery
             | AuditEventType::AlertRuleUpdate
             | AuditEventType::AuditCleanup => "audit",
+            AuditEventType::IpBlocked
+            | AuditEventType::IpWhitelistDenied
+            | AuditEventType::IpRateLimited
+            | AuditEventType::IpListAdded
+            | AuditEventType::IpListRemoved
+            | AuditEventType::IpListUpdated => "security",
         }
     }
 
@@ -132,6 +151,12 @@ impl AuditEventType {
             AuditEventType::AdminUserDelete
             | AuditEventType::AdminRoomDelete
             | AuditEventType::AdminMessageDelete => AuditSeverity::Warning,
+            AuditEventType::IpBlocked => AuditSeverity::Warning,
+            AuditEventType::IpWhitelistDenied => AuditSeverity::Warning,
+            AuditEventType::IpRateLimited => AuditSeverity::Info,
+            AuditEventType::IpListAdded
+            | AuditEventType::IpListRemoved
+            | AuditEventType::IpListUpdated => AuditSeverity::Info,
             _ => AuditSeverity::Info,
         }
     }

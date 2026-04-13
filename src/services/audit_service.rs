@@ -13,9 +13,9 @@ use crate::config::{ConfigChangeEvent, ConfigManager};
 use crate::db::Database;
 use crate::error::{AppError, Result};
 use crate::models::audit::{
-    AlertQuery, AlertRule, AlertStatus, AuditAlert, AuditAlertResponse, AuditEventType, AuditLog, AuditLogQuery,
-    AuditMetadata, AuditSeverity, AuditStats, CreateAlertRequest, CreateAuditLogRequest,
-    DailyCount, EventTypeCount, SeverityCount, UpdateAlertRuleRequest,
+    AlertQuery, AlertRule, AlertStatus, AuditAlert, AuditAlertResponse, AuditEventType, AuditLog,
+    AuditLogQuery, AuditMetadata, AuditSeverity, AuditStats, CreateAlertRequest,
+    CreateAuditLogRequest, DailyCount, EventTypeCount, SeverityCount, UpdateAlertRuleRequest,
 };
 use crate::models::user::{UserInfo, UserRole};
 use crate::redis::{AuditLogStreamMessage, StreamManager};
@@ -991,10 +991,7 @@ impl AuditService {
             .map_err(AppError::Database)?;
 
         // 收集所有用户ID
-        let mut user_ids: Vec<Uuid> = alerts
-            .iter()
-            .filter_map(|a| a.affected_user_id)
-            .collect();
+        let mut user_ids: Vec<Uuid> = alerts.iter().filter_map(|a| a.affected_user_id).collect();
         user_ids.extend(alerts.iter().filter_map(|a| a.acknowledged_by));
         user_ids.extend(alerts.iter().filter_map(|a| a.resolved_by));
         user_ids.sort_unstable();
@@ -1007,9 +1004,15 @@ impl AuditService {
         let responses: Vec<AuditAlertResponse> = alerts
             .into_iter()
             .map(|alert| {
-                let affected_user = alert.affected_user_id.and_then(|id| user_infos.get(&id).cloned());
-                let acknowledged_by = alert.acknowledged_by.and_then(|id| user_infos.get(&id).cloned());
-                let resolved_by = alert.resolved_by.and_then(|id| user_infos.get(&id).cloned());
+                let affected_user = alert
+                    .affected_user_id
+                    .and_then(|id| user_infos.get(&id).cloned());
+                let acknowledged_by = alert
+                    .acknowledged_by
+                    .and_then(|id| user_infos.get(&id).cloned());
+                let resolved_by = alert
+                    .resolved_by
+                    .and_then(|id| user_infos.get(&id).cloned());
                 alert.to_response(affected_user, acknowledged_by, resolved_by)
             })
             .collect();
@@ -1018,7 +1021,10 @@ impl AuditService {
     }
 
     /// 批量获取用户信息
-    async fn get_user_infos(&self, user_ids: &[Uuid]) -> Result<std::collections::HashMap<Uuid, UserInfo>> {
+    async fn get_user_infos(
+        &self,
+        user_ids: &[Uuid],
+    ) -> Result<std::collections::HashMap<Uuid, UserInfo>> {
         if user_ids.is_empty() {
             return Ok(std::collections::HashMap::new());
         }

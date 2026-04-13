@@ -142,3 +142,12 @@ export async function getRoomMembers(roomId: string): Promise<RoomMember[]> {
   const response = await apiClient.get<RoomMember[]>(`/api/v1/rooms/${roomId}/members`)
   return response.data
 }
+
+/**
+ * 踢出房间成员
+ * @param roomId 房间ID
+ * @param userId 要踢出的用户ID
+ */
+export async function kickMember(roomId: string, userId: string): Promise<void> {
+  await apiClient.delete(`/api/v1/rooms/${roomId}/members/${userId}`)
+}

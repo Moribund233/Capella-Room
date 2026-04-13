@@ -3,6 +3,7 @@ pub mod file;
 pub mod message;
 pub mod response;
 pub mod room;
+pub mod security;
 pub mod user;
 
 // 数据模型模块
@@ -12,3 +13,4 @@ pub mod user;
 // - message: 消息模型（Message、MessageType、SendMessageRequest 等）
 // - file: 文件资源模型（FileResource、FileCategory、FileUploadRequest 等）
 // - audit: 审计日志模型（AuditLog、AuditAlert、AlertRule 等）
+// - security: 安全模型（IpListEntry、IpListType、IpCheckResult 等）

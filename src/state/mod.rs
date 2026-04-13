@@ -7,6 +7,7 @@ use crate::redis::{pubsub::RedisPubSub, RedisManager, StreamManager};
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
+use crate::services::ip_security_service::IpSecurityService;
 use crate::services::message_service::MessageService;
 use crate::services::notification_service::NotificationService;
 use crate::services::room_service::RoomService;
@@ -29,6 +30,7 @@ pub struct AppState {
     pub file_service: FileService,
     pub notification_service: Arc<NotificationService>,
     pub audit_service: Arc<AuditService>,
+    pub ip_security_service: Arc<IpSecurityService>,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
     pub redis_manager: Option<Arc<RedisManager>>,
@@ -49,6 +51,7 @@ impl fmt::Debug for AppState {
             .field("file_service", &"<FileService>")
             .field("notification_service", &"<NotificationService>")
             .field("audit_service", &"<AuditService>")
+            .field("ip_security_service", &"<IpSecurityService>")
             .field("redis_manager", &self.redis_manager)
             .finish_non_exhaustive()
     }
@@ -99,6 +102,9 @@ impl AppState {
             .await,
         );
 
+        let ip_security_service =
+            Arc::new(IpSecurityService::new(db.clone(), audit_service.clone()).await);
+
         let upload_config = crate::config::UploadConfig {
             max_file_size: config.upload.max_file_size,
             base_url: config.upload.base_url.clone(),
@@ -127,6 +133,7 @@ impl AppState {
             file_service,
             notification_service,
             audit_service,
+            ip_security_service,
             config: shared_config,
             config_manager: config_manager.clone(),
             redis_manager,
@@ -186,6 +193,10 @@ impl AppState {
         &self.audit_service
     }
 
+    pub fn ip_security_service(&self) -> &IpSecurityService {
+        &self.ip_security_service
+    }
+
     pub fn config(&self) -> Arc<tokio::sync::RwLock<AppConfig>> {
         self.config.clone()
     }
@@ -225,6 +236,7 @@ impl Clone for AppState {
                 .expect("Failed to clone file service"),
             notification_service: Arc::clone(&self.notification_service),
             audit_service: Arc::clone(&self.audit_service),
+            ip_security_service: Arc::clone(&self.ip_security_service),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
             redis_manager: self.redis_manager.clone(),
