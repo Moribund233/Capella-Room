@@ -6,6 +6,7 @@ import ApiTest from '../views/ApiTest.vue'
 import RoomManager from '../views/RoomManager.vue'
 import UserManager from '../views/UserManager.vue'
 import RoomTest from '../views/RoomTest.vue'
+import LogManagement from '../views/LogManagement.vue'
 import Login from '../views/Login.vue'
 
 const router = createRouter({
@@ -52,6 +53,12 @@ const router = createRouter({
       name: 'room-test',
       component: RoomTest,
       meta: { title: '房间测试' }
+    },
+    {
+      path: '/logs',
+      name: 'logs',
+      component: LogManagement,
+      meta: { title: '日志管理' }
     }
   ]
 })

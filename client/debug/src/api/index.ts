@@ -79,10 +79,12 @@ export {
   getSystemStats,
   getAdminSystemStats,
   getConnectionInfo,
+  getPerformanceMetrics,
   type SystemStatus,
   type SystemStats,
   type AdminSystemStats,
   type ConnectionInfo,
+  type PerformanceMetrics,
 } from './system'
 
 // 从 types/api 重新导出类型

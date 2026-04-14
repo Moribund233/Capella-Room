@@ -257,7 +257,7 @@ mod jwt_token_tests {
         let auth_service = AuthService::new(jwt_config);
 
         let user_id = uuid::Uuid::new_v4();
-        let token_pair = auth_service.generate_token_pair(user_id, UserRole::User);
+        let token_pair = auth_service.generate_token_pair(user_id, "testuser", UserRole::User);
 
         assert!(token_pair.is_ok());
         let token_pair = token_pair.unwrap();
@@ -280,7 +280,7 @@ mod jwt_token_tests {
 
         let user_id = uuid::Uuid::new_v4();
         let token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
 
         // 验证有效 Token
@@ -303,7 +303,7 @@ mod jwt_token_tests {
 
         let user_id = uuid::Uuid::new_v4();
         let token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
 
         // 验证有效 Refresh Token
@@ -344,7 +344,7 @@ mod jwt_token_tests {
 
         let user_id = uuid::Uuid::new_v4();
         let token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
 
         // 尝试用 Refresh Token 作为 Access Token 验证
@@ -367,7 +367,7 @@ mod jwt_token_tests {
 
         let user_id = uuid::Uuid::new_v4();
         let token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
         let claims = auth_service
             .verify_access_token(&token_pair.access_token)
@@ -475,7 +475,7 @@ mod auth_service_integration_tests {
 
         // 4. 生成 Token
         let token_pair = auth_service
-            .generate_token_pair(found_user.id, found_user.role.clone())
+            .generate_token_pair(found_user.id, &found_user.username, found_user.role.clone())
             .expect("Token 生成失败");
 
         assert!(!token_pair.access_token.is_empty());
@@ -501,7 +501,7 @@ mod auth_service_integration_tests {
 
         // 1. 生成初始 Token
         let initial_token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .expect("初始 Token 生成失败");
 
         // 2. 验证 Refresh Token
@@ -516,7 +516,7 @@ mod auth_service_integration_tests {
 
         // 3. 生成新的 Token 对
         let new_token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .expect("新 Token 生成失败");
 
         // 4. 验证新 Token 有效
@@ -686,7 +686,7 @@ mod acceptance_tests {
 
         // 1. 生成 Token
         let token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
         assert!(!token_pair.access_token.is_empty());
         assert!(!token_pair.refresh_token.is_empty());
@@ -735,7 +735,7 @@ mod acceptance_tests {
 
         // 1. 生成有效 Token
         let token_pair = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
 
         // 2. 验证 Token 有效
@@ -767,7 +767,7 @@ mod acceptance_tests {
 
         // 1. 生成初始 Token
         let initial_tokens = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
 
         // 2. 验证 Refresh Token
@@ -779,7 +779,7 @@ mod acceptance_tests {
 
         // 3. 使用 Refresh Token 获取新 Token（模拟刷新）
         let new_tokens = auth_service
-            .generate_token_pair(user_id, UserRole::User)
+            .generate_token_pair(user_id, "testuser", UserRole::User)
             .unwrap();
 
         // 4. 验证新 Token 有效

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useMessage } from 'naive-ui'
-import { Send, Trash2, Reply, LogIn, LogOut } from 'lucide-vue-next'
+import { Send, Trash2, Reply, LogIn, LogOut, Bug, Activity, Wifi, WifiOff, Clock } from 'lucide-vue-next'
 import { getRoomMessages, deleteMessage, type Message } from '@/api'
 import { useWebSocketStore } from '@/stores/websocket'
 import type { TestUser } from '@/utils/authUtils'
+import { storeToRefs } from 'pinia'
 
 // 系统消息类型
 interface SystemMessage {
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 
 const message = useMessage()
 const wsStore = useWebSocketStore()
+const { isConnected, latency, status, reconnectAttempts } = storeToRefs(wsStore)
 
 // ========== 状态 ==========
 const messages = shallowRef<MessageItem[]>([])
@@ -40,6 +42,44 @@ const replyToMessage = ref<Message | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const hasMore = ref(false)
 const isAtBottom = ref(true)
+
+// ========== 调试模式 ==========
+const debugMode = ref(false)
+const connectionHistory = ref<Array<{
+  timestamp: string
+  event: 'connect' | 'disconnect' | 'reconnect'
+  message?: string
+}>>([])
+
+// 监听连接状态变化，记录到历史
+watch(status, (newStatus, oldStatus) => {
+  if (debugMode.value) {
+    const now = new Date().toLocaleTimeString()
+    if (newStatus === 'connected' && oldStatus !== 'connected') {
+      connectionHistory.value.unshift({
+        timestamp: now,
+        event: 'connect',
+        message: 'WebSocket 已连接'
+      })
+    } else if (newStatus === 'disconnected' && oldStatus !== 'disconnected') {
+      connectionHistory.value.unshift({
+        timestamp: now,
+        event: 'disconnect',
+        message: 'WebSocket 已断开'
+      })
+    } else if (newStatus === 'reconnecting') {
+      connectionHistory.value.unshift({
+        timestamp: now,
+        event: 'reconnect',
+        message: `正在重连 (第 ${reconnectAttempts.value} 次)`
+      })
+    }
+    // 只保留最近20条记录
+    if (connectionHistory.value.length > 20) {
+      connectionHistory.value = connectionHistory.value.slice(0, 20)
+    }
+  }
+})
 
 // ========== 计算属性 ==========
 const canSend = computed(() => {
@@ -399,8 +439,69 @@ watch(() => props.roomId, () => {
       </n-button>
     </div>
 
+    <!-- 调试面板 -->
+    <div v-if="debugMode" class="debug-panel">
+      <div class="debug-header">
+        <Bug class="icon-sm" />
+        <span>调试信息</span>
+        <n-tag :type="isConnected ? 'success' : 'error'" size="small">
+          {{ isConnected ? '已连接' : '未连接' }}
+        </n-tag>
+      </div>
+      <div class="debug-stats">
+        <n-space>
+          <n-statistic label="延迟" :value="latency !== null ? `${latency}ms` : '-'" />
+          <n-statistic label="重连次数" :value="reconnectAttempts" />
+          <n-statistic label="状态" :value="status" />
+        </n-space>
+      </div>
+      <div v-if="connectionHistory.length > 0" class="debug-history">
+        <div class="history-title">连接历史</div>
+        <div class="history-list">
+          <div
+            v-for="(item, index) in connectionHistory"
+            :key="index"
+            class="history-item"
+            :class="`history-${item.event}`"
+          >
+            <span class="history-time">[{{ item.timestamp }}]</span>
+            <n-tag size="tiny" :type="
+              item.event === 'connect' ? 'success' :
+              item.event === 'disconnect' ? 'error' : 'warning'
+            ">
+              {{ item.event === 'connect' ? '连接' :
+                 item.event === 'disconnect' ? '断开' : '重连' }}
+            </n-tag>
+            <span class="history-message">{{ item.message }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 发送区域 -->
     <div class="send-area">
+      <!-- 调试模式开关 -->
+      <div class="debug-toggle">
+        <n-switch v-model:value="debugMode" size="small">
+          <template #checked>调试模式开启</template>
+          <template #unchecked>调试模式</template>
+        </n-switch>
+        <n-space v-if="debugMode" size="small" style="margin-left: 16px;">
+          <n-tag size="tiny" :type="isConnected ? 'success' : 'error'">
+            <template #icon>
+              <component :is="isConnected ? Wifi : WifiOff" class="icon-xs" />
+            </template>
+            {{ isConnected ? '在线' : '离线' }}
+          </n-tag>
+          <n-tag v-if="latency !== null" size="tiny" type="info">
+            <template #icon>
+              <Clock class="icon-xs" />
+            </template>
+            {{ latency }}ms
+          </n-tag>
+        </n-space>
+      </div>
+
       <n-input-group>
         <n-input
           v-model:value="messageContent"
@@ -578,6 +679,90 @@ watch(() => props.roomId, () => {
   background-color: var(--bg-white);
   border-top: 1px solid var(--border-color);
   flex-shrink: 0;
+}
+
+.debug-toggle {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.debug-panel {
+  padding: var(--space-md);
+  background-color: #f6ffed;
+  border-top: 1px solid #b7eb8f;
+  border-bottom: 1px solid #b7eb8f;
+  flex-shrink: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  font-weight: 500;
+  color: var(--success);
+}
+
+.debug-stats {
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background-color: var(--bg-white);
+  border-radius: var(--radius-sm);
+}
+
+.debug-history {
+  margin-top: var(--space-sm);
+}
+
+.history-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 12px;
+  padding: var(--space-xs) var(--space-sm);
+  background-color: var(--bg-white);
+  border-radius: var(--radius-sm);
+}
+
+.history-time {
+  color: var(--text-muted);
+  min-width: 70px;
+}
+
+.history-message {
+  color: var(--text-secondary);
+}
+
+.history-connect {
+  border-left: 3px solid var(--success);
+}
+
+.history-disconnect {
+  border-left: 3px solid var(--error);
+}
+
+.history-reconnect {
+  border-left: 3px solid var(--warning);
 }
 
 .connection-status {

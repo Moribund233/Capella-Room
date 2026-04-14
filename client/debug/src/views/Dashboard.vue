@@ -15,18 +15,41 @@ import {
   getSystemStats,
   getAdminSystemStats,
   getConnectionInfo,
+  getPerformanceMetrics,
   type SystemStats,
   type AdminSystemStats,
   type ConnectionInfo,
-  getAccessToken
+  type PerformanceMetrics
 } from '@/api'
-import { useWebSocketStore, type LogEntry } from '@/stores/websocket'
+import { useWebSocketStore } from '@/stores/websocket'
 import { useMessage } from 'naive-ui'
 import { storeToRefs } from 'pinia'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { LineChart } from 'echarts/charts'
+import {
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  TitleComponent,
+  DataZoomComponent
+} from 'echarts/components'
+import VChart from 'vue-echarts'
+
+// 注册 ECharts 组件
+use([
+  CanvasRenderer,
+  LineChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  TitleComponent,
+  DataZoomComponent
+])
 
 const message = useMessage()
 const wsStore = useWebSocketStore()
-const { status: wsStatus, logs: wsLogs, logSubscribed, isConnected: wsConnected } = storeToRefs(wsStore)
+const { isConnected: wsConnected } = storeToRefs(wsStore)
 
 // ========== 状态 ==========
 const serverStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy')
@@ -39,22 +62,17 @@ const stats = ref<SystemStats>({
 const adminStats = ref<AdminSystemStats | null>(null)
 const connectionInfo = ref<ConnectionInfo | null>(null)
 const loading = ref(false)
-const isAdmin = ref(false)
 const adminStatsError = ref<string | null>(null)
 
-// 本地日志副本（用于显示格式化）
-const recentLogs = computed(() => {
-  return wsLogs.value.map((log: LogEntry) => ({
-    time: new Date(log.timestamp).toLocaleTimeString('zh-CN'),
-    level: log.level,
-    target: log.target,
-    message: log.message,
-    fields: log.fields
-  }))
-})
+// 性能指标数据
+const performanceMetrics = ref<PerformanceMetrics | null>(null)
+const performanceHistory = ref<PerformanceMetrics[]>([])
+const performanceError = ref<string | null>(null)
+const maxHistoryPoints = 20 // 最多保留20个数据点
 
 // 自动刷新定时器
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+let performanceTimer: ReturnType<typeof setInterval> | null = null
 
 // ========== 计算属性 ==========
 const displayStats = computed(() => {
@@ -91,9 +109,9 @@ const statCards = computed<StatCard[]>(() => {
     },
     {
       label: 'WebSocket',
-      value: wsConnected.value ? '已连接' : wsStatus.value === 'reconnecting' ? '重连中' : '未连接',
+      value: wsConnected.value ? '已连接' : '未连接',
       icon: Wifi,
-      status: wsConnected.value ? 'success' : wsStatus.value === 'reconnecting' ? 'warning' : 'error'
+      status: wsConnected.value ? 'success' : 'error'
     },
     {
       label: '在线用户',
@@ -113,45 +131,10 @@ const statCards = computed<StatCard[]>(() => {
 // ========== 快捷操作 ==========
 const quickActions = [
   { label: '测试 WebSocket', icon: Wifi, desc: '连接并测试实时通信', route: '/websocket' },
-  { label: 'API 调试', icon: Activity, desc: '测试 REST API 接口', route: '/api-test' },
+  { label: 'API 调试', icon: Activity, desc: '测试 REST API 接口', route: '/api' },
   { label: '查看日志', icon: Clock, desc: '查看系统运行日志', route: '/logs' },
-  { label: '性能监控', icon: Server, desc: '查看服务器性能指标', route: '/monitor' }
+  { label: '房间测试', icon: MessageSquare, desc: '测试房间聊天功能', route: '/room-test' }
 ]
-
-// ========== 检查用户权限 ==========
-const checkUserRole = () => {
-  const token = getAccessToken()
-  if (!token) {
-    isAdmin.value = false
-    return
-  }
-
-  try {
-    // 解析 JWT token 获取用户角色
-    const parts = token.split('.')
-    if (parts.length < 2) {
-      isAdmin.value = false
-      return
-    }
-    const base64Url = parts[1]
-    if (!base64Url) {
-      isAdmin.value = false
-      return
-    }
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    )
-    const payload = JSON.parse(jsonPayload)
-    isAdmin.value = payload.role === 'super_admin' || payload.role === 'admin'
-  } catch (e) {
-    console.error('解析 token 失败:', e)
-    isAdmin.value = false
-  }
-}
 
 // ========== 数据加载 ==========
 const loadDashboardData = async () => {
@@ -176,18 +159,16 @@ const loadDashboardData = async () => {
 
     connectionInfo.value = infoData
 
-    // 如果是管理员，加载详细统计
-    if (isAdmin.value) {
-      try {
-        const adminData = await getAdminSystemStats()
-        adminStats.value = adminData
-      } catch (error: any) {
-        console.error('加载管理员统计数据失败:', error)
-        adminStatsError.value = error.response?.status === 403
-          ? '权限不足，无法访问管理员统计'
-          : '加载管理员统计数据失败'
-        adminStats.value = null
-      }
+    // 加载管理员详细统计
+    try {
+      const adminData = await getAdminSystemStats()
+      adminStats.value = adminData
+    } catch (error: any) {
+      console.error('加载管理员统计数据失败:', error)
+      adminStatsError.value = error.response?.status === 403
+        ? '权限不足，无法访问管理员统计'
+        : '加载管理员统计数据失败'
+      adminStats.value = null
     }
   } catch (error) {
     console.error('加载仪表盘数据失败:', error)
@@ -197,6 +178,126 @@ const loadDashboardData = async () => {
   }
 }
 
+// ========== 性能指标加载 ==========
+const loadPerformanceMetrics = async () => {
+  try {
+    const metrics = await getPerformanceMetrics()
+    performanceMetrics.value = metrics
+    performanceError.value = null
+
+    // 添加到历史记录
+    performanceHistory.value.push(metrics)
+    // 限制历史记录长度
+    if (performanceHistory.value.length > maxHistoryPoints) {
+      performanceHistory.value.shift()
+    }
+  } catch (error: any) {
+    console.error('加载性能指标失败:', error)
+    performanceError.value = error.response?.status === 403
+      ? '权限不足'
+      : '加载性能指标失败'
+  }
+}
+
+// ========== ECharts 配置 ==========
+const getPerformanceChartOption = computed(() => {
+  const history = performanceHistory.value
+  if (history.length === 0) return undefined
+
+  const timestamps = history.map(h => {
+    const date = new Date(h.timestamp)
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+
+  return {
+    title: {
+      text: '实时性能监控',
+      left: 'center',
+      textStyle: { fontSize: 16, fontWeight: 'normal' }
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
+    },
+    legend: {
+      data: ['在线用户', '总连接数', '活跃房间', '总消息数'],
+      bottom: 0
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      top: '15%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: timestamps,
+      axisLabel: { rotate: 45, fontSize: 10 }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: '用户数/连接数',
+        position: 'left',
+        axisLine: { show: true },
+        axisLabel: { fontSize: 10 }
+      },
+      {
+        type: 'value',
+        name: '房间数/消息数',
+        position: 'right',
+        axisLine: { show: true },
+        axisLabel: { fontSize: 10 }
+      }
+    ],
+    series: [
+      {
+        name: '在线用户',
+        type: 'line',
+        smooth: true,
+        data: history.map(h => h.current_online_users),
+        itemStyle: { color: '#18a058' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(24, 160, 88, 0.3)' },
+              { offset: 1, color: 'rgba(24, 160, 88, 0.05)' }
+            ]
+          }
+        }
+      },
+      {
+        name: '总连接数',
+        type: 'line',
+        smooth: true,
+        data: history.map(h => h.total_connections),
+        itemStyle: { color: '#2080f0' },
+        yAxisIndex: 0
+      },
+      {
+        name: '活跃房间',
+        type: 'line',
+        smooth: true,
+        data: history.map(h => h.active_rooms),
+        itemStyle: { color: '#f0a020' },
+        yAxisIndex: 1
+      },
+      {
+        name: '总消息数',
+        type: 'line',
+        smooth: true,
+        data: history.map(h => h.total_messages),
+        itemStyle: { color: '#d03050' },
+        yAxisIndex: 1
+      }
+    ]
+  }
+})
+
 // ========== 刷新数据 ==========
 const refreshData = async () => {
   await loadDashboardData()
@@ -205,13 +306,11 @@ const refreshData = async () => {
 
 // ========== 路由跳转 ==========
 const navigateTo = (route: string) => {
-  // 使用 window.location 进行跳转，因为快捷操作可能对应不同路由
   window.location.href = route
 }
 
 // ========== 初始化 ==========
 onMounted(() => {
-  checkUserRole()
   loadDashboardData()
 
   // 连接 WebSocket（如果未连接）
@@ -221,11 +320,18 @@ onMounted(() => {
 
   // 每30秒自动刷新统计数据
   refreshTimer = setInterval(loadDashboardData, 30000)
+
+  // 加载性能指标并启动定时刷新
+  loadPerformanceMetrics()
+  performanceTimer = setInterval(loadPerformanceMetrics, 5000)
 })
 
 onUnmounted(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
+  }
+  if (performanceTimer) {
+    clearInterval(performanceTimer)
   }
   // 注意：不在组件卸载时断开 WebSocket，因为它是全局共享的
 })
@@ -240,7 +346,7 @@ onUnmounted(() => {
       </h1>
       <p class="page-subtitle">
         Seredeli Room 后端服务调试控制台
-        <n-tag v-if="isAdmin" type="success" size="small" style="margin-left: 8px">
+        <n-tag type="success" size="small" style="margin-left: 8px">
           <template #icon>
             <Shield style="width: 12px; height: 12px" />
           </template>
@@ -263,7 +369,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 管理员统计信息 - Flex布局 -->
-    <n-card v-if="isAdmin && adminStats" title="管理员统计" style="margin-bottom: var(--space-lg)">
+    <n-card v-if="adminStats" title="管理员统计" style="margin-bottom: var(--space-lg)">
       <div class="admin-stats-flex">
         <div class="admin-stat-item">
           <n-statistic label="总用户数" :value="adminStats.total_users" />
@@ -288,7 +394,7 @@ onUnmounted(() => {
 
     <!-- 管理员统计加载错误提示 -->
     <n-alert
-      v-if="isAdmin && adminStatsError"
+      v-if="adminStatsError"
       type="warning"
       :title="adminStatsError"
       closable
@@ -300,46 +406,31 @@ onUnmounted(() => {
       部分统计数据可能不可用，基础功能仍可正常使用。
     </n-alert>
 
-    <!-- 非管理员提示 -->
-    <n-alert
-      v-if="!isAdmin"
-      type="info"
-      title="普通用户视图"
-      style="margin-bottom: var(--space-lg)"
-    >
-      <template #icon>
-        <Shield />
-      </template>
-      您当前以普通用户身份登录，部分详细统计数据需要管理员权限才能查看。
-    </n-alert>
+    <!-- 性能监控图表 -->
+    <n-card title="实时性能监控" style="margin-bottom: var(--space-lg)">
+      <n-alert
+        v-if="performanceError"
+        type="warning"
+        :title="performanceError"
+        closable
+        style="margin-bottom: var(--space-md)"
+      />
+      <div v-else-if="performanceHistory.length === 0" class="performance-empty">
+        <n-spin size="small" />
+        <span style="margin-left: var(--space-sm)">加载性能数据中...</span>
+      </div>
+      <v-chart
+        v-else
+        class="performance-chart"
+        :option="getPerformanceChartOption"
+        autoresize
+      />
+    </n-card>
 
     <!-- 主内容区域 - Flex布局 -->
     <div class="dashboard-main-flex">
-      <!-- 左侧：日志面板 -->
-      <n-card title="系统日志" class="dashboard-log-card">
-        <template #header-extra>
-          <div style="display: flex; align-items: center; gap: 8px">
-            <n-tag v-if="wsConnected" type="success" size="small">已连接</n-tag>
-            <n-tag v-else-if="wsStatus === 'reconnecting'" type="warning" size="small">重连中({{ wsStore.reconnectAttempts }})</n-tag>
-            <n-tag v-else type="error" size="small">未连接</n-tag>
-            <n-tag v-if="logSubscribed" type="info" size="small">接收中</n-tag>
-          </div>
-        </template>
-        <div class="log-panel">
-          <div v-if="recentLogs.length === 0" style="text-align: center; color: var(--text-muted); padding: var(--space-lg)">
-            暂无日志数据
-          </div>
-          <div v-for="(log, index) in recentLogs" :key="index" class="log-entry">
-            <span class="log-time">[{{ log.time }}]</span>
-            <span :class="`log-${log.level}`">[{{ log.level.toUpperCase() }}]</span>
-            <span style="color: var(--text-secondary); margin-left: 4px">[{{ log.target }}]</span>
-            <span style="color: var(--text-white); margin-left: 8px">{{ log.message }}</span>
-          </div>
-        </div>
-      </n-card>
-
-      <!-- 右侧：快捷操作 -->
-      <n-card title="快捷操作" class="dashboard-action-card">
+      <!-- 快捷操作 -->
+      <n-card title="快捷操作" class="dashboard-action-card" style="flex: 1;">
         <div class="quick-actions-flex">
           <n-button
             v-for="(action, index) in quickActions"
@@ -397,11 +488,6 @@ onUnmounted(() => {
 .dashboard-main-flex {
   display: flex;
   gap: var(--space-lg);
-}
-
-.dashboard-log-card {
-  flex: 2;
-  min-width: 0;
 }
 
 .dashboard-action-card {
@@ -501,7 +587,6 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
-  .dashboard-log-card,
   .dashboard-action-card {
     flex: 1 1 100%;
     min-width: auto;
@@ -535,41 +620,18 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 
-/* 日志面板 */
-.log-panel {
-  background-color: var(--log-bg);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  line-height: 1.8;
-  max-height: 350px;
-  overflow-y: auto;
+/* 性能监控图表 */
+.performance-chart {
+  width: 100%;
+  height: 350px;
 }
 
-.log-entry {
-  padding: 2px 0;
-}
-
-.log-time {
-  color: var(--log-time);
-  margin-right: var(--space-sm);
-}
-
-.log-info {
-  color: var(--log-info);
-}
-
-.log-success {
-  color: var(--log-success);
-}
-
-.log-warning {
-  color: var(--log-warning);
-}
-
-.log-error {
-  color: var(--log-error);
+.performance-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 350px;
+  color: var(--text-secondary);
 }
 
 @media screen and (max-width: 375px) {

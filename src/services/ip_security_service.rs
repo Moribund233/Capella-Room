@@ -133,12 +133,8 @@ impl IpSecurityService {
         list_type: IpListType,
         cache: &RwLock<Vec<IpCacheEntry>>,
     ) -> Result<usize> {
-        let list_type_str = match list_type {
-            IpListType::Whitelist => "whitelist",
-            IpListType::Blacklist => "blacklist",
-        };
-
         // 查询所有条目（包括 CIDR 范围）
+        // 直接绑定 IpListType 枚举值，sqlx 会自动处理 PostgreSQL 枚举类型转换
         let rows = sqlx::query_as::<_, (String, Option<String>)>(
             r#"
             SELECT ip_address, ip_range_cidr FROM ip_lists
@@ -146,7 +142,7 @@ impl IpSecurityService {
             AND (expires_at IS NULL OR expires_at > NOW())
             "#,
         )
-        .bind(list_type_str)
+        .bind(list_type)
         .fetch_all(db.pool())
         .await?;
 
@@ -259,12 +255,9 @@ impl IpSecurityService {
             Self::validate_cidr(cidr)?;
         }
 
-        let list_type_str = match request.list_type {
-            IpListType::Whitelist => "whitelist",
-            IpListType::Blacklist => "blacklist",
-        };
-
         let ip_address_str = request.ip_address.to_string();
+
+        let list_type = request.list_type.clone();
 
         let entry = sqlx::query_as::<_, IpListEntry>(
             r#"
@@ -275,7 +268,7 @@ impl IpSecurityService {
         )
         .bind(&ip_address_str)
         .bind(request.ip_range_cidr)
-        .bind(list_type_str)
+        .bind(list_type.clone())
         .bind(request.description)
         .bind(created_by)
         .bind(request.expires_at)
@@ -289,7 +282,7 @@ impl IpSecurityService {
         let log = CreateAuditLogRequest::new(
             AuditEventType::IpListAdded,
             "add_ip_to_list",
-            format!("Added IP {} to {:?}", request.ip_address, request.list_type),
+            format!("Added IP {} to {:?}", request.ip_address, list_type),
         )
         .with_metadata(AuditMetadata::new().with_ip(request.ip_address));
 
@@ -297,7 +290,7 @@ impl IpSecurityService {
             error!("Failed to log IP list addition: {}", e);
         }
 
-        info!("Added IP {} to {:?}", request.ip_address, request.list_type);
+        info!("Added IP {} to {:?}", request.ip_address, list_type);
         Ok(entry)
     }
 
@@ -412,68 +405,145 @@ impl IpSecurityService {
         &self,
         query: IpListQuery,
     ) -> Result<(Vec<IpListEntryResponse>, i64)> {
-        let mut sql = String::from(
-            r#"
-            SELECT 
-                i.*,
-                u.username as created_by_username
-            FROM ip_lists i
-            LEFT JOIN users u ON i.created_by = u.id
-            WHERE 1=1
-            "#,
-        );
-
-        if let Some(ref list_type) = query.list_type {
-            sql.push_str(&format!(" AND i.list_type = '{}'", list_type));
-        }
-
-        if let Some(ip) = query.ip_address {
-            sql.push_str(&format!(" AND i.ip_address::text = '{}'", ip));
-        }
-
-        sql.push_str(" ORDER BY i.created_at DESC");
-
         let limit = query.limit.unwrap_or(50);
         let offset = query.offset.unwrap_or(0);
-        sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
 
-        let entries = sqlx::query_as::<_, IpListEntryResponse>(&sql)
-            .fetch_all(self.db.pool())
-            .await?;
+        // 根据查询条件构建不同的 SQL 查询
+        let (entries, total) = match (&query.list_type, query.ip_address) {
+            (Some(list_type), Some(ip)) => {
+                let list_type_clone = list_type.clone();
+                let entries = sqlx::query_as::<_, IpListEntryResponse>(
+                    r#"
+                    SELECT 
+                        i.*,
+                        u.username as created_by_username
+                    FROM ip_lists i
+                    LEFT JOIN users u ON i.created_by = u.id
+                    WHERE i.list_type = $1
+                    AND i.ip_address::text = $2
+                    ORDER BY i.created_at DESC
+                    LIMIT $3 OFFSET $4
+                    "#,
+                )
+                .bind(list_type_clone.clone())
+                .bind(ip.to_string())
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.db.pool())
+                .await?;
 
-        // 获取总数
-        let count_sql = r#"
-            SELECT COUNT(*) FROM ip_lists i
-            WHERE 1=1
-        "#;
-        let mut count_sql = count_sql.to_string();
-        if let Some(ref list_type) = query.list_type {
-            count_sql.push_str(&format!(" AND i.list_type = '{}'", list_type));
-        }
-        if let Some(ip) = query.ip_address {
-            count_sql.push_str(&format!(" AND i.ip_address::text = '{}'", ip));
-        }
+                let total = sqlx::query_scalar::<_, i64>(
+                    r#"
+                    SELECT COUNT(*) FROM ip_lists i
+                    WHERE i.list_type = $1
+                    AND i.ip_address::text = $2
+                    "#,
+                )
+                .bind(list_type_clone)
+                .bind(ip.to_string())
+                .fetch_one(self.db.pool())
+                .await?;
 
-        let total = sqlx::query_scalar::<_, i64>(&count_sql)
-            .fetch_one(self.db.pool())
-            .await?;
+                (entries, total)
+            }
+            (Some(list_type), None) => {
+                let list_type_clone = list_type.clone();
+                let entries = sqlx::query_as::<_, IpListEntryResponse>(
+                    r#"
+                    SELECT 
+                        i.*,
+                        u.username as created_by_username
+                    FROM ip_lists i
+                    LEFT JOIN users u ON i.created_by = u.id
+                    WHERE i.list_type = $1
+                    ORDER BY i.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                )
+                .bind(list_type_clone.clone())
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.db.pool())
+                .await?;
+
+                let total = sqlx::query_scalar::<_, i64>(
+                    "SELECT COUNT(*) FROM ip_lists WHERE list_type = $1",
+                )
+                .bind(list_type_clone)
+                .fetch_one(self.db.pool())
+                .await?;
+
+                (entries, total)
+            }
+            (None, Some(ip)) => {
+                let entries = sqlx::query_as::<_, IpListEntryResponse>(
+                    r#"
+                    SELECT 
+                        i.*,
+                        u.username as created_by_username
+                    FROM ip_lists i
+                    LEFT JOIN users u ON i.created_by = u.id
+                    WHERE i.ip_address::text = $1
+                    ORDER BY i.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                )
+                .bind(ip.to_string())
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.db.pool())
+                .await?;
+
+                let total = sqlx::query_scalar::<_, i64>(
+                    "SELECT COUNT(*) FROM ip_lists WHERE ip_address::text = $1",
+                )
+                .bind(ip.to_string())
+                .fetch_one(self.db.pool())
+                .await?;
+
+                (entries, total)
+            }
+            (None, None) => {
+                let entries = sqlx::query_as::<_, IpListEntryResponse>(
+                    r#"
+                    SELECT 
+                        i.*,
+                        u.username as created_by_username
+                    FROM ip_lists i
+                    LEFT JOIN users u ON i.created_by = u.id
+                    ORDER BY i.created_at DESC
+                    LIMIT $1 OFFSET $2
+                    "#,
+                )
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.db.pool())
+                .await?;
+
+                let total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM ip_lists")
+                    .fetch_one(self.db.pool())
+                    .await?;
+
+                (entries, total)
+            }
+        };
 
         Ok((entries, total))
     }
 
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<IpSecurityStats> {
-        let total_whitelist = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM ip_lists WHERE list_type = 'whitelist'",
-        )
-        .fetch_one(self.db.pool())
-        .await?;
+        let total_whitelist =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM ip_lists WHERE list_type = $1")
+                .bind(IpListType::Whitelist)
+                .fetch_one(self.db.pool())
+                .await?;
 
-        let total_blacklist = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM ip_lists WHERE list_type = 'blacklist'",
-        )
-        .fetch_one(self.db.pool())
-        .await?;
+        let total_blacklist =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM ip_lists WHERE list_type = $1")
+                .bind(IpListType::Blacklist)
+                .fetch_one(self.db.pool())
+                .await?;
 
         let expired_entries = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM ip_lists WHERE expires_at IS NOT NULL AND expires_at <= NOW()",

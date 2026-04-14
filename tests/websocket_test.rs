@@ -230,7 +230,7 @@ async fn create_test_user_with_token(_db: &Database, username: &str) -> (Uuid, S
 
     // 生成 token
     let tokens = auth_service
-        .generate_token_pair(user.id, user.role.clone())
+        .generate_token_pair(user.id, &user.username, user.role.clone())
         .unwrap();
 
     (user.id, password.to_string(), tokens.access_token)

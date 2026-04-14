@@ -149,7 +149,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
     let (tx, mut rx) = mpsc::channel::<String>(buffer_size);
 
     // 等待认证或重连消息（使用性能计时器测量认证耗时）
-    let auth_timer = PerformanceTimer::new("websocket_auth");
+    let mut auth_timer = PerformanceTimer::new("websocket_auth");
     let (user_id, username, rooms_to_rejoin, is_reconnect, token) =
         match wait_for_auth(&mut receiver, &state).await {
             Ok(auth_result) => {
@@ -549,6 +549,8 @@ async fn wait_for_auth(
 }
 
 /// 验证 Token 并返回用户信息
+/// 
+/// 优化：优先从JWT claims中获取用户名，避免数据库查询
 async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uuid, String)> {
     debug!("Authenticating token");
 
@@ -560,10 +562,17 @@ async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uu
                 anyhow::anyhow!("Invalid user ID: {}", e)
             })?;
 
-            // 获取用户信息
+            // 优化：优先从JWT claims中获取用户名，避免数据库查询
+            if let Some(username) = claims.username {
+                debug!("User authenticated from JWT claims: {} ({})", username, user_id);
+                return Ok((user_id, username));
+            }
+
+            // 兼容旧token：如果claims中没有用户名，则查询数据库
+            warn!("JWT claims missing username, falling back to database query for user: {}", user_id);
             match state.user_service().get_user_by_id(user_id).await {
                 Ok(Some(user)) => {
-                    debug!("User authenticated: {} ({})", user.username, user_id);
+                    debug!("User authenticated from database: {} ({})", user.username, user_id);
                     Ok((user_id, user.username))
                 }
                 Ok(None) => {
@@ -993,7 +1002,7 @@ async fn handle_chat_message(
     state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
-    let _timer = PerformanceTimer::new("handle_chat_message");
+    let mut _timer = PerformanceTimer::new("handle_chat_message");
     debug!("User {} sending message to room {}", user_id, room_id);
 
     // 1. 先验证消息内容（格式、长度等）

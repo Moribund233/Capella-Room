@@ -576,3 +576,28 @@ pub async fn get_activity_stats(
         monthly_messages: stats.monthly_messages,
     })))
 }
+
+// ==================== 性能指标接口 ====================
+
+#[derive(Debug, Serialize)]
+pub struct PerformanceMetrics {
+    pub total_messages: u64,
+    pub total_connections: u64,
+    pub current_online_users: u64,
+    pub active_rooms: u64,
+    pub timestamp: String,
+}
+
+pub async fn get_performance_metrics(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<PerformanceMetrics>>> {
+    let snapshot = state.metrics_collector().get_snapshot();
+
+    Ok(Json(ApiResponse::success(PerformanceMetrics {
+        total_messages: snapshot.total_messages,
+        total_connections: snapshot.total_connections,
+        current_online_users: snapshot.current_online_users,
+        active_rooms: snapshot.active_rooms,
+        timestamp: snapshot.timestamp.to_rfc3339(),
+    })))
+}

@@ -162,9 +162,10 @@ pub async fn login(
         .await;
 
     // 生成 JWT Token 对
-    let token_pair = state
-        .auth_service()
-        .generate_token_pair(user.id, user.role.clone())?;
+    let token_pair =
+        state
+            .auth_service()
+            .generate_token_pair(user.id, &user.username, user.role.clone())?;
 
     // 记录登录成功审计日志
     let user_id = user.id;
@@ -223,9 +224,10 @@ pub async fn refresh_token(
         .ok_or_else(|| AppError::Auth("用户不存在".to_string()))?;
 
     // 生成新的 Token 对
-    let token_pair = state
-        .auth_service()
-        .generate_token_pair(user_id, user.role)?;
+    let token_pair =
+        state
+            .auth_service()
+            .generate_token_pair(user_id, &user.username, user.role)?;
 
     Ok(Json(ApiResponse::success(RefreshTokenData {
         access_token: token_pair.access_token,

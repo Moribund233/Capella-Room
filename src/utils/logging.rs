@@ -473,6 +473,7 @@ impl StructuredLogger {
 pub struct PerformanceTimer {
     name: String,
     start: Instant,
+    finished: bool,
 }
 
 impl PerformanceTimer {
@@ -481,11 +482,13 @@ impl PerformanceTimer {
         Self {
             name: name.to_string(),
             start: Instant::now(),
+            finished: false,
         }
     }
 
     /// 结束计时并记录
-    pub fn finish(&self) -> Duration {
+    pub fn finish(&mut self) -> Duration {
+        self.finished = true;
         let duration = self.start.elapsed();
         StructuredLogger::performance_event(
             &self.name,
@@ -498,13 +501,17 @@ impl PerformanceTimer {
 
 impl Drop for PerformanceTimer {
     fn drop(&mut self) {
-        let duration = self.start.elapsed();
-        if duration.as_millis() > 1000 {
-            StructuredLogger::performance_event(
-                &self.name,
-                duration.as_millis(),
-                "Operation took longer than expected",
-            );
+        // 只有在未调用 finish 的情况下才报告慢操作
+        // 这避免了将连接保持时间误报为操作耗时
+        if !self.finished {
+            let duration = self.start.elapsed();
+            if duration.as_millis() > 1000 {
+                StructuredLogger::performance_event(
+                    &self.name,
+                    duration.as_millis(),
+                    "Operation took longer than expected (timer dropped without finish)",
+                );
+            }
         }
     }
 }
@@ -529,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_performance_timer() {
-        let timer = PerformanceTimer::new("test_operation");
+        let mut timer = PerformanceTimer::new("test_operation");
         std::thread::sleep(Duration::from_millis(10));
         let duration = timer.finish();
         assert!(duration.as_millis() >= 10);

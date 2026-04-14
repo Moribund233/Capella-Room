@@ -122,7 +122,7 @@ async fn create_test_admin(state: &AppState, username: &str, email: &str) -> (Uu
 
     let token = state
         .auth_service()
-        .generate_token_pair(user.id, user.role.clone())
+        .generate_token_pair(user.id, &user.username, user.role.clone())
         .unwrap();
 
     (user.id, token.access_token)

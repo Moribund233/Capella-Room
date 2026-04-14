@@ -8,10 +8,12 @@ import {
   Plug,
   MessageSquare,
   Users,
-  TestTube,
+  Bug,
   LogOut,
   Menu,
-  X
+  X,
+  FileText,
+  Home
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -23,17 +25,31 @@ const isCollapsed = ref(false)
 // 移动端抽屉开关状态
 const mobileDrawerOpen = ref(false)
 
-const menuItems = [
-  { key: 'dashboard', label: '仪表盘', icon: LayoutDashboard, path: '/' },
-  { key: 'websocket', label: 'WebSocket测试', icon: Wifi, path: '/websocket' },
-  { key: 'api', label: 'API测试', icon: Plug, path: '/api' },
-  { key: 'rooms', label: '房间管理', icon: MessageSquare, path: '/rooms' },
-  { key: 'users', label: '用户管理', icon: Users, path: '/users' },
-  { key: 'room-test', label: '房间测试', icon: TestTube, path: '/room-test' }
-]
+/**
+ * 菜单项配置
+ * 根据用户角色动态显示/隐藏
+ * 菜单顺序：仪表盘 -> 测试页 -> 管理页
+ */
+const menuItems = computed(() => {
+  const items = [
+    // 1. 仪表盘（仅管理员可见）
+    ...(authStore.isAdmin
+      ? [{ key: 'dashboard', label: '仪表盘', icon: LayoutDashboard, path: '/' }]
+      : []),
+    // 2. 测试页
+    { key: 'room-test', label: '房间测试', icon: Home, path: '/room-test' },
+    { key: 'websocket', label: 'WebSocket测试', icon: Wifi, path: '/websocket' },
+    { key: 'api', label: 'API测试', icon: Plug, path: '/api' },
+    // 3. 管理页
+    { key: 'rooms', label: '房间管理', icon: MessageSquare, path: '/rooms' },
+    { key: 'users', label: '用户管理', icon: Users, path: '/users' },
+    { key: 'logs', label: '日志管理', icon: FileText, path: '/logs' }
+  ]
+  return items
+})
 
 const activeKey = computed(() => {
-  const item = menuItems.find((item) => item.path === route.path)
+  const item = menuItems.value.find((item) => item.path === route.path)
   return item?.key || 'dashboard'
 })
 
@@ -48,7 +64,7 @@ const toggleMobileDrawer = () => {
 }
 
 const handleMenuClick = (key: string) => {
-  const item = menuItems.find((item) => item.key === key)
+  const item = menuItems.value.find((item) => item.key === key)
   if (item) {
     router.push(item.path)
   }
@@ -75,8 +91,8 @@ const handleLogout = async () => {
       <!-- Logo区域 -->
       <div class="sidebar-header">
         <div class="logo">
-          <TestTube class="icon-md" />
-          <span v-if="!isCollapsed" class="logo-text">Seredeli</span>
+          <Bug class="icon-md" />
+          <span v-if="!isCollapsed" class="logo-text">Debug</span>
         </div>
       </div>
 
@@ -147,8 +163,8 @@ const handleLogout = async () => {
       <div class="drawer-content">
         <div class="drawer-header">
           <div class="logo">
-            <TestTube class="icon-md" />
-            <span class="logo-text">Seredeli</span>
+            <Bug class="icon-md" />
+            <span class="logo-text">Debug</span>
           </div>
         </div>
 

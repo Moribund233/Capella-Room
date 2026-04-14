@@ -19,6 +19,7 @@ pub struct Claims {
     pub iat: usize,
     pub token_type: String,
     pub role: crate::models::user::UserRole,
+    pub username: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -73,9 +74,10 @@ impl AuthService {
     pub fn generate_token_pair(
         &self,
         user_id: Uuid,
+        username: &str,
         role: crate::models::user::UserRole,
     ) -> Result<TokenPair> {
-        let access_token = self.generate_access_token(user_id, role.clone())?;
+        let access_token = self.generate_access_token(user_id, username, role.clone())?;
         let refresh_token = self.generate_refresh_token(user_id, role)?;
 
         Ok(TokenPair {
@@ -88,6 +90,7 @@ impl AuthService {
     fn generate_access_token(
         &self,
         user_id: Uuid,
+        username: &str,
         role: crate::models::user::UserRole,
     ) -> Result<String> {
         let now = SystemTime::now()
@@ -103,6 +106,7 @@ impl AuthService {
             iat,
             token_type: "access".to_string(),
             role,
+            username: Some(username.to_string()),
         };
 
         let secret = self.get_secret()?;
@@ -134,6 +138,7 @@ impl AuthService {
             iat,
             token_type: "refresh".to_string(),
             role,
+            username: None,
         };
 
         let secret = self.get_secret()?;

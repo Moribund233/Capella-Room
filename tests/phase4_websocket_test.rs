@@ -223,7 +223,7 @@ async fn create_test_user_with_token(db: &Database, username: &str) -> (Uuid, St
     // 检查用户是否已存在
     if let Ok(Some(user)) = user_service.get_user_by_email(&email).await {
         let tokens = auth_service
-            .generate_token_pair(user.id, user.role.clone())
+            .generate_token_pair(user.id, &user.username, user.role.clone())
             .unwrap();
         return (user.id, password.to_string(), tokens.access_token);
     }
@@ -234,7 +234,7 @@ async fn create_test_user_with_token(db: &Database, username: &str) -> (Uuid, St
         .await
         .unwrap();
     let tokens = auth_service
-        .generate_token_pair(user.id, user.role.clone())
+        .generate_token_pair(user.id, &user.username, user.role.clone())
         .unwrap();
 
     (user.id, password.to_string(), tokens.access_token)

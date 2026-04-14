@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { TestTube, User, Lock, Mail, ArrowRight, CheckCircle } from 'lucide-vue-next'
+import { Bug, User, Lock, Mail, ArrowRight, CheckCircle } from 'lucide-vue-next'
 import type { TabsInst } from 'naive-ui'
 
 const router = useRouter()
@@ -173,9 +173,9 @@ const handleTabChange = (tab: string) => {
       <!-- 品牌 Logo -->
       <div class="brand-header">
         <div class="brand-logo">
-          <TestTube class="icon-xl" />
+          <Bug class="icon-xl" />
         </div>
-        <h1 class="brand-title">Seredeli Room</h1>
+        <h1 class="brand-title">Debug Room</h1>
         <p class="brand-subtitle">调试平台</p>
       </div>
 
@@ -347,7 +347,7 @@ const handleTabChange = (tab: string) => {
 
       <!-- 底部信息 -->
       <p class="footer-text">
-        Seredeli Room 调试平台 · 实时聊天室后端服务调试工具
+        Debug Room 调试平台 · 实时聊天室后端服务调试工具
       </p>
     </div>
   </div>

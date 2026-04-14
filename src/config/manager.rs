@@ -266,6 +266,12 @@ impl ConfigManager {
                 config.system.maintenance_message = item.value.clone();
                 debug!("Hot reloaded system.maintenance_message = {}", item.value);
             }
+            key if key.starts_with("database.") => {
+                info!(
+                    "Database configuration '{}' updated, restart required to take effect",
+                    key
+                );
+            }
             _ => {
                 warn!("Unknown configuration key for hot reload: {}", item.key);
             }
@@ -407,6 +413,24 @@ impl ConfigManager {
                 "服务器端口",
                 "server",
                 false,
+                false,
+            ),
+            (
+                "database.max_connections",
+                "10",
+                "int",
+                "数据库连接池最大连接数（需要重启服务生效）",
+                "database",
+                true,
+                false,
+            ),
+            (
+                "database.acquire_timeout_secs",
+                "30",
+                "int",
+                "数据库连接获取超时时间（秒，需要重启服务生效）",
+                "database",
+                true,
                 false,
             ),
             (

@@ -34,6 +34,10 @@ class WebSocketClient {
   private isAuthenticated: boolean = false
   private authResolve: (() => void) | null = null
   private authReject: ((error: Error) => void) | null = null
+  // 连接 Promise 缓存，防止重复连接
+  private connectingPromise: Promise<void> | null = null
+  // 标记是否已发送认证消息
+  private authSent: boolean = false
 
   constructor(config: WebSocketConfig = {}, handlers: WebSocketEventHandlers = {}) {
     const defaultConfig = getConnectionConfig()
@@ -80,14 +84,34 @@ class WebSocketClient {
    * 连接 WebSocket（认证成功后 resolve）
    */
   connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.isConnected() && this.isAuthenticated) {
-        resolve()
-        return
-      }
+    console.log(`[WebSocket] connect() called, status=${this.connectionStatus}, isConnected=${this.isConnected()}, isAuthenticated=${this.isAuthenticated}`)
 
+    // 已连接且已认证，直接返回
+    if (this.isConnected() && this.isAuthenticated) {
+      console.log('[WebSocket] Already connected and authenticated, returning')
+      return Promise.resolve()
+    }
+
+    // 如果正在连接中，返回现有的 Promise
+    if (this.connectionStatus === 'connecting' && this.connectingPromise) {
+      console.log('[WebSocket] Connection already in progress, returning existing promise')
+      return this.connectingPromise
+    }
+
+    // 创建新的连接 Promise
+    console.log('[WebSocket] Starting new connection...')
+    this.connectingPromise = this.doConnect()
+    return this.connectingPromise
+  }
+
+  /**
+   * 实际执行连接逻辑
+   */
+  private doConnect(): Promise<void> {
+    return new Promise((resolve, reject) => {
       this.setConnectionStatus('connecting')
       this.isAuthenticated = false
+      this.authSent = false  // 重置认证发送标记
       this.authResolve = resolve
       this.authReject = reject
 
@@ -95,6 +119,7 @@ class WebSocketClient {
       if (!token) {
         this.setConnectionStatus('error')
         this.isAuthenticated = false
+        this.connectingPromise = null
         reject(new Error('No access token'))
         return
       }
@@ -119,13 +144,20 @@ class WebSocketClient {
 
         this.ws.onopen = () => {
           this.clearConnectTimer()
+          // 防止重复发送认证消息
+          if (this.authSent) {
+            console.log('[WebSocket] Auth already sent, skipping')
+            return
+          }
           // 连接成功后立即发送认证消息
           // 注意：这里不 resolve，等待认证成功后再 resolve
+          this.authSent = true
           this.sendInternal({ type: 'Auth', payload: { token } })
           console.log('[WebSocket] Connection opened, sent authentication')
         }
 
-        this.ws.onclose = () => {
+        this.ws.onclose = (event) => {
+          console.log(`[WebSocket] onclose called, code=${event.code}, reason=${event.reason}, wasClean=${event.wasClean}`)
           this.handleClose()
         }
 
@@ -156,6 +188,8 @@ class WebSocketClient {
    * 断开连接
    */
   disconnect(): void {
+    console.log('[WebSocket] disconnect() called')
+    console.trace('[WebSocket] disconnect trace')
     this.clearAllTimers()
 
     if (this.ws) {
@@ -171,6 +205,9 @@ class WebSocketClient {
       this.ws = null
     }
 
+    this.isAuthenticated = false
+    this.authSent = false
+    this.connectingPromise = null
     this.setConnectionStatus('disconnected')
     this.handlers.onDisconnect?.()
   }
@@ -245,6 +282,8 @@ class WebSocketClient {
   private handleClose(): void {
     this.clearAllTimers()
     this.isAuthenticated = false
+    this.authSent = false  // 重置认证发送标记
+    this.connectingPromise = null  // 清理连接 Promise
     this.messageQueue = []  // 清空队列，防止重连后发送旧消息
     this.setConnectionStatus('disconnected')
     this.handlers.onDisconnect?.()
@@ -321,6 +360,7 @@ class WebSocketClient {
       this.isAuthenticated = true
       this.setConnectionStatus('connected')
       this.reconnectAttempts = 0
+      this.connectingPromise = null  // 清理连接 Promise
       this.startHeartbeat()
       this.flushMessageQueue()
 
@@ -336,6 +376,7 @@ class WebSocketClient {
       console.error('[WebSocket] Authentication failed:', authResult.message)
       this.isAuthenticated = false
       this.setConnectionStatus('error')
+      this.connectingPromise = null  // 清理连接 Promise
 
       // 认证失败 reject connect() Promise
       if (this.authReject) {

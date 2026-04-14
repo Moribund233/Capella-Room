@@ -115,14 +115,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
         lastError.value = null
         lastPongTime.value = Date.now()
 
-        // 连接成功后发送认证消息
-        const token = getAccessToken()
-        if (token) {
-          send({
-            type: 'Auth',
-            payload: { token }
-          })
-        }
+        // 注意：认证消息已由 WebSocketClient 在连接时自动发送，无需重复发送
       },
       onDisconnect: () => {
         console.log('[WebSocket] 连接断开')

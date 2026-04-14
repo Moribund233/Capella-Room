@@ -112,3 +112,22 @@ export async function getClientConfig(): Promise<ClientConfig> {
   const response = await apiClient.get<ClientConfig>('/api/config/client')
   return response.data
 }
+
+// 性能指标
+export interface PerformanceMetrics {
+  total_messages: number
+  total_connections: number
+  current_online_users: number
+  active_rooms: number
+  timestamp: string
+}
+
+/**
+ * 获取性能指标
+ * 使用 /api/v1/admin/stats/performance 端点（需要管理员权限）
+ * @returns 实时性能指标数据
+ */
+export async function getPerformanceMetrics(): Promise<PerformanceMetrics> {
+  const response = await apiClient.get<PerformanceMetrics>('/api/v1/admin/stats/performance')
+  return response.data
+}
