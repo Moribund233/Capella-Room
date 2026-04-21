@@ -79,4 +79,7 @@
   --shadow-3:
     0 6px 16px -8px rgba(0, 0, 0, 0.06), 0 9px 28px 0 rgba(0, 0, 0, 0.04),
     0 12px 48px 16px rgba(0, 0, 0, 0.02);
+
+  /* ========== Logo 滤镜（亮色主题：黑色 Logo 正常显示）========== */
+  --logo-filter: none;
 }

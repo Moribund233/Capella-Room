@@ -15,7 +15,7 @@ import type {
  * 应用基础配置
  */
 export const appConfig: AppConfig = {
-  name: 'SeredeliUI',
+  name: 'Seredeli Room',
   logo: '/favicon.svg',
   version: '1.0.0',
 }
@@ -31,9 +31,9 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
       path: '/home',
     },
     {
-      name: '示例',
-      icon: 'FileText',
-      path: '/example',
+      name: '房间',
+      icon: 'MessageSquare',
+      path: '/rooms',
     },
     {
       name: '设置',
@@ -148,27 +148,11 @@ export const quickBarConfig: QuickItemConfig[] = [
 
 /**
  * DockBar 页面级配置
+ * 为主页面配置 DockBar，用于子页面导航
+ * 键名为路由的第一级路径（如 'setting' 对应 /setting）
  */
 export const dockConfig: DockConfig = {
-  example: {
-    enabled: true,
-    position: 'bottom',
-    offset: 24,
-    items: [
-      {
-        key: 'overview',
-        label: '概览',
-        icon: 'Layout',
-        path: '/example/overview',
-      },
-      {
-        key: 'icons',
-        label: '图标',
-        icon: 'Smile',
-        path: '/example/icons',
-      },
-    ],
-  },
+  // 设置页 - 子页面通过 DockBar 导航
   setting: {
     enabled: true,
     position: 'bottom',

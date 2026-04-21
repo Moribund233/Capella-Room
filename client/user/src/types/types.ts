@@ -19,7 +19,7 @@ export type Breakpoint = 'mobile' | 'tablet' | 'desktop'
 /**
  * 主题类型
  */
-export type Theme = 'light' | 'dark'
+export type ThemeType = 'light' | 'dark'
 
 // ==================== 菜单相关类型 ====================
 
@@ -39,100 +39,6 @@ export interface MenuItem {
   children?: MenuItem[]
   /** 是否禁用 */
   disabled?: boolean
-}
-
-// ==================== 用户相关类型 ====================
-
-/**
- * 用户信息类型
- */
-export interface UserInfo {
-  /** 用户ID */
-  id: string
-  /** 用户名 */
-  username: string
-  /** 昵称 */
-  nickname?: string
-  /** 头像URL */
-  avatar?: string
-  /** 邮箱 */
-  email?: string
-  /** 角色 */
-  roles?: string[]
-}
-
-// ==================== API 相关类型 ====================
-
-/**
- * API响应类型
- */
-export interface ApiResponse<T = unknown> {
-  /** 状态码 */
-  code: number
-  /** 响应数据 */
-  data: T
-  /** 响应消息 */
-  message: string
-  /** 是否成功 */
-  success: boolean
-}
-
-/**
- * 分页参数类型
- */
-export interface PaginationParams {
-  /** 当前页码 */
-  page: number
-  /** 每页条数 */
-  pageSize: number
-}
-
-/**
- * 分页结果类型
- */
-export interface PaginationResult<T> {
-  /** 数据列表 */
-  list: T[]
-  /** 总条数 */
-  total: number
-  /** 当前页码 */
-  page: number
-  /** 每页条数 */
-  pageSize: number
-}
-
-// ==================== 认证相关类型 ====================
-
-/**
- * 登录请求参数
- */
-export interface LoginParams {
-  /** 用户名 */
-  username: string
-  /** 密码 */
-  password: string
-}
-
-/**
- * 登录响应数据
- */
-export interface LoginResult {
-  /** 认证令牌 */
-  token: string
-  /** 用户信息 */
-  userInfo: UserInfo
-}
-
-/**
- * 注册请求参数
- */
-export interface RegisterParams {
-  /** 用户名 */
-  username: string
-  /** 密码 */
-  password: string
-  /** 确认密码 */
-  confirmPassword: string
 }
 
 // ==================== UI 配置相关类型 ====================
@@ -297,10 +203,3 @@ export interface SaveUIConfigParams {
   /** Dock 配置 */
   dock?: DockConfig
 }
-
-// ==================== Store 相关类型 ====================
-
-/**
- * 主题类型（用于主题 store）
- */
-export type ThemeType = 'light' | 'dark'

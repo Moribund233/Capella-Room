@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 
 /**
  * 路由配置
+ * 用户客户端路由
  */
 export const routes: RouteRecordRaw[] = [
   {
@@ -32,29 +33,33 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'example',
-        name: 'Example',
-        component: () => import('@/views/ExampleView.vue'),
-        redirect: '/example/overview',
+        path: 'rooms',
+        name: 'Rooms',
+        component: () => import('@/views/RoomsView.vue'),
         meta: {
-          title: '示例',
+          title: '房间列表',
           requiresAuth: true,
         },
-        children: [
-          {
-            path: 'overview',
-            name: 'ExampleOverview',
-            component: () => import('@/pages/example/OverviewPanel.vue'),
-            meta: { title: '概览', requiresAuth: true },
-          },
-          {
-            path: 'icons',
-            name: 'ExampleIcons',
-            component: () => import('@/pages/example/IconPickerPanel.vue'),
-            meta: { title: '图标', requiresAuth: true },
-          },
-        ],
       },
+      {
+        path: 'room/:id',
+        name: 'Room',
+        component: () => import('@/views/RoomView.vue'),
+        meta: {
+          title: '聊天房间',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/ProfileView.vue'),
+        meta: {
+          title: '个人中心',
+          requiresAuth: true,
+        },
+      },
+      // 设置页面 - 主页面+子页面模式
       {
         path: 'setting',
         name: 'Setting',
@@ -63,13 +68,17 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '设置',
           requiresAuth: true,
+          hasDock: true,
         },
         children: [
           {
             path: 'ui',
             name: 'SettingUI',
             component: () => import('@/pages/setting/UISettingsPanel.vue'),
-            meta: { title: '界面设置', requiresAuth: true },
+            meta: {
+              title: '界面设置',
+              requiresAuth: true,
+            },
           },
         ],
       },

@@ -7,6 +7,7 @@ pub mod ip_security_service;
 pub mod message_service;
 pub mod notification_service;
 pub mod room_service;
+pub mod ui_config_service;
 pub mod user_service;
 
 // 业务逻辑服务层
@@ -18,6 +19,7 @@ pub mod user_service;
 // - notification_service: 消息通知系统（私信、@提及、房间邀请、系统通知、文件上传通知）
 // - audit_service: 安全审计系统（审计日志、告警管理、合规审计）
 // - ip_security_service: IP 白名单/黑名单安全系统
+// - ui_config_service: 用户 UI 配置服务（界面偏好设置云端同步）
 //
 // 服务层负责：
 // - 处理复杂的业务逻辑

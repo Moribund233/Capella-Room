@@ -1,16 +1,7 @@
-export { loadConfig, initConfig, getConfig, getDockPageConfig } from './config'
+/**
+ * 配置模块导出
+ */
 
-export { uiConfig } from './ui'
-
-// 从 config.ts 重新导出类型，保持向后兼容
-export type {
-  UIConfig,
-  AppConfig,
-  SidebarItemConfig,
-  ThemeConfig,
-  DockItemConfig,
-  DockPageConfig,
-  DockConfig,
-  QuickItemConfig,
-  QuickChildItemConfig,
-} from './config'
+export * from './websocketConfig'
+export * from './ui'
+export * from './config'

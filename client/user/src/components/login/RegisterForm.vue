@@ -2,111 +2,107 @@
   <n-form
     ref="formRef"
     :model="formData"
-    :rules="formRules"
-    class="register-form"
+    :rules="rules"
+    label-placement="left"
+    label-width="80"
     @submit.prevent="handleRegister"
   >
-    <n-form-item path="username">
+    <n-form-item label="用户名" path="username">
       <n-input
         v-model:value="formData.username"
         placeholder="请输入用户名"
-        size="large"
-        :input-props="{ autocomplete: 'username' }"
-      >
-        <template #prefix>
-          <User :size="18" />
-        </template>
-      </n-input>
+        @keyup.enter="handleRegister"
+      />
     </n-form-item>
-
-    <n-form-item path="password">
+    <n-form-item label="邮箱" path="email">
+      <n-input
+        v-model:value="formData.email"
+        placeholder="请输入邮箱"
+        @keyup.enter="handleRegister"
+      />
+    </n-form-item>
+    <n-form-item label="密码" path="password">
       <n-input
         v-model:value="formData.password"
         type="password"
         placeholder="请输入密码"
-        size="large"
         show-password-on="click"
-        :input-props="{ autocomplete: 'new-password' }"
-      >
-        <template #prefix>
-          <Lock :size="18" />
-        </template>
-      </n-input>
-    </n-form-item>
-
-    <n-form-item path="confirmPassword">
-      <n-input
-        v-model:value="formData.confirmPassword"
-        type="password"
-        placeholder="请再次输入密码"
-        size="large"
-        show-password-on="click"
-        :input-props="{ autocomplete: 'new-password' }"
-      >
-        <template #prefix>
-          <Lock :size="18" />
-        </template>
-      </n-input>
-    </n-form-item>
-
-    <n-form-item>
-      <n-button
-        type="primary"
-        size="large"
-        block
-        :loading="isLoading"
-        @click="handleRegister"
-      >
-        注 册
-      </n-button>
+        @keyup.enter="handleRegister"
+      />
     </n-form-item>
   </n-form>
+
+  <n-space vertical class="action-area">
+    <n-button
+      type="primary"
+      block
+      :loading="authStore.loading"
+      @click="handleRegister"
+    >
+      注册
+    </n-button>
+    <n-button block @click="emit('switch-to-login')">
+      已有账号？去登录
+    </n-button>
+  </n-space>
+
+  <n-alert
+    v-if="authStore.error"
+    type="error"
+    :show-icon="false"
+    class="error-alert"
+  >
+    {{ authStore.error }}
+  </n-alert>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { NForm, NFormItem, NInput, NButton } from 'naive-ui'
-import { User, Lock } from 'lucide-vue-next'
-import { authApi } from '@/api/auth'
-import type { FormInst, FormRules, FormItemRule } from 'naive-ui'
+import { ref, reactive } from 'vue'
+import {
+  NForm,
+  NFormItem,
+  NInput,
+  NButton,
+  NSpace,
+  NAlert,
+  type FormInst,
+  type FormRules,
+} from 'naive-ui'
+import { useAuthStore } from '@/store'
 
 const emit = defineEmits<{
-  switchToLogin: []
+  'switch-to-login': []
 }>()
+
+const authStore = useAuthStore()
 
 const formRef = ref<FormInst | null>(null)
 
-const formData = ref({
+const formData = reactive({
   username: '',
+  email: '',
   password: '',
-  confirmPassword: '',
 })
 
-const isLoading = ref(false)
-
-/**
- * 表单验证规则
- */
-const formRules: FormRules = {
+const rules: FormRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '用户名长度3-20位', trigger: 'blur' },
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入密码', trigger: 'blur' },
-    {
-      validator: (_rule: FormItemRule, value: string) => {
-        return value === formData.value.password
-      },
-      message: '两次输入的密码不一致',
-      trigger: 'blur',
-    },
+    { min: 6, message: '密码至少6位', trigger: 'blur' },
   ],
 }
 
-const handleRegister = async () => {
+/**
+ * 处理注册
+ */
+async function handleRegister() {
   if (!formRef.value) return
 
   try {
@@ -115,35 +111,25 @@ const handleRegister = async () => {
     return
   }
 
-  isLoading.value = true
+  authStore.clearError()
+  const success = await authStore.register({
+    username: formData.username,
+    email: formData.email,
+    password: formData.password,
+  })
 
-  try {
-    const result = await authApi.register({
-      username: formData.value.username,
-      password: formData.value.password,
-      confirmPassword: formData.value.confirmPassword,
-    })
-
-    if (result.success) {
-      window.$message?.success?.('注册成功，正在跳转到登录页...')
-      formData.value = { username: '', password: '', confirmPassword: '' }
-
-      setTimeout(() => {
-        emit('switchToLogin')
-      }, 1500)
-    } else {
-      window.$message?.error?.(result.message || '注册失败，请重试')
-    }
-  } catch {
-    window.$message?.error?.('网络错误，请检查网络连接后重试')
-  } finally {
-    isLoading.value = false
+  if (success) {
+    emit('switch-to-login')
   }
 }
 </script>
 
 <style scoped>
-.register-form {
-  padding: 24px;
+.action-area {
+  margin-top: 24px;
+}
+
+.error-alert {
+  margin-top: 16px;
 }
 </style>

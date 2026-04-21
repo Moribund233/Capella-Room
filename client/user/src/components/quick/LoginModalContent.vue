@@ -2,13 +2,13 @@
   <div class="login-modal-content">
     <div class="login-header">
       <h3 class="login-title">用户登录</h3>
-      <p class="login-subtitle">请输入您的账号和密码</p>
+      <p class="login-subtitle">请输入您的邮箱和密码</p>
     </div>
 
     <n-form ref="formRef" :model="formData" :rules="formRules" class="login-form" @submit.prevent="handleLogin">
-      <n-form-item path="username">
-        <n-input v-model:value="formData.username" placeholder="请输入用户名" size="large"
-          :input-props="{ autocomplete: 'username' }">
+      <n-form-item path="email">
+        <n-input v-model:value="formData.email" placeholder="请输入邮箱" size="large"
+          :input-props="{ autocomplete: 'email' }">
           <template #prefix>
             <User :size="18" />
           </template>
@@ -37,8 +37,7 @@
 import { ref } from 'vue'
 import { NForm, NFormItem, NInput, NButton } from 'naive-ui'
 import { User, Lock } from 'lucide-vue-next'
-import { authApi } from '@/api/auth'
-import { useAuthStore, useUIStore } from '@/store'
+import { useAuthStore } from '@/store'
 import type { FormInst, FormRules } from 'naive-ui'
 
 /**
@@ -60,7 +59,7 @@ const formRef = ref<FormInst | null>(null)
  * 表单数据
  */
 const formData = ref({
-  username: '',
+  email: '',
   password: '',
 })
 
@@ -70,17 +69,18 @@ const formData = ref({
 const isLoading = ref(false)
 
 const authStore = useAuthStore()
-const uiStore = useUIStore()
 
 /**
  * 表单验证规则
  */
 const formRules: FormRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' },
   ],
 }
 
@@ -99,19 +99,15 @@ const handleLogin = async () => {
   isLoading.value = true
 
   try {
-    const result = await authApi.login(formData.value)
+    const success = await authStore.login({
+      email: formData.value.email,
+      password: formData.value.password,
+    })
 
-    if (result.success && result.data) {
-      authStore.setToken(result.data.token)
-      authStore.setUserInfo(result.data.userInfo)
-
-      // 登录成功后加载云端 UI 配置
-      await uiStore.initAfterLogin()
-
-      // 触发成功事件，由父组件处理后续操作（如关闭弹窗）
+    if (success) {
       emit('success')
     } else {
-      const message = result.message || '登录失败，请重试'
+      const message = authStore.error || '登录失败，请重试'
       window.$message?.error?.(message)
       emit('error', message)
     }
@@ -146,16 +142,5 @@ const handleLogin = async () => {
   font-size: 14px;
   color: var(--text-color-secondary);
   margin: 0;
-}
-
-.login-form {
-  :deep(.n-form-item) {
-    margin-bottom: 16px;
-
-    &:last-child {
-      margin-bottom: 0;
-      margin-top: 24px;
-    }
-  }
 }
 </style>

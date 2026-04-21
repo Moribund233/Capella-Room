@@ -285,9 +285,9 @@ export const useUIStore = defineStore('ui', () => {
 
     isLoadingCloud.value = true
     try {
-      const response = await uiApi.getUserConfig()
-      if (response.success && response.data) {
-        cloudConfig.value = response.data as Partial<UIConfig>
+      const data = await uiApi.getUserConfig()
+      if (data) {
+        cloudConfig.value = data as Partial<UIConfig>
         lastSyncTime.value = new Date()
       }
     } catch (error) {
@@ -311,7 +311,7 @@ export const useUIStore = defineStore('ui', () => {
     try {
       if (!localConfig.value) return
 
-      const response = await uiApi.saveUserConfig({
+      await uiApi.saveUserConfig({
         app: localConfig.value.app,
         theme: localConfig.value.theme,
         sidebar: localConfig.value.sidebar,
@@ -319,9 +319,7 @@ export const useUIStore = defineStore('ui', () => {
         dock: localConfig.value.dock,
       })
 
-      if (response.success) {
-        lastSyncTime.value = new Date()
-      }
+      lastSyncTime.value = new Date()
     } catch (error) {
       console.error('Failed to save cloud config:', error)
       throw error

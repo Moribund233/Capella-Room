@@ -7,7 +7,7 @@ use chrono::Utc;
 use std::sync::Arc;
 
 use crate::{
-    handlers::{admin, audit, auth, config, file, message, room, security, user},
+    handlers::{admin, audit, auth, config, file, message, room, security, ui_config, user},
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
     middleware::auth_middleware,
@@ -53,6 +53,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // 文件路由
         .nest(&format!("/api/{}/files", API_VERSION), file_routes())
         .nest(&format!("/api/{}/upload", API_VERSION), upload_routes())
+        // UI 配置路由
+        .nest(&format!("/api/{}/ui", API_VERSION), ui_config_routes())
         // 添加审计中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -98,6 +100,14 @@ fn auth_routes() -> Router<Arc<AppState>> {
         .route("/register", post(auth::register))
         .route("/login", post(auth::login))
         .route("/refresh", post(auth::refresh_token))
+}
+
+/// UI 配置路由（需要认证）
+fn ui_config_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/config", get(ui_config::get_user_config))
+        .route("/config", post(ui_config::save_user_config))
+        .route("/config", delete(ui_config::reset_user_config))
 }
 
 /// 用户路由

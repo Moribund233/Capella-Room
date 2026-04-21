@@ -60,7 +60,7 @@ const showBrandText = computed(() => {
 
 /** 当前用户名 */
 const username = computed(() => {
-  return authStore.userInfo?.nickname || authStore.userInfo?.username || '访客'
+  return authStore.username || '访客'
 })
 </script>
 
@@ -117,6 +117,8 @@ const username = computed(() => {
   height: 32px;
   border-radius: 8px;
   object-fit: contain;
+  filter: var(--logo-filter, none);
+  transition: filter var(--transition-base);
 }
 
 .brand-text {

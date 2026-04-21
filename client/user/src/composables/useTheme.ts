@@ -1,6 +1,7 @@
 import { computed, onMounted } from 'vue'
 import { darkTheme } from 'naive-ui'
-import { useThemeStore, type ThemeType } from '@/store'
+import { useThemeStore } from '@/store'
+import type { ThemeType } from '@/types'
 import type { GlobalTheme } from 'naive-ui'
 
 /**

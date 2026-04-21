@@ -1,71 +1,142 @@
-import { defineStore } from 'pinia'
+/**
+ * 认证状态管理 Store
+ */
+
 import { ref, computed } from 'vue'
-import type { UserInfo } from '@/types'
+import { defineStore } from 'pinia'
+import type { User, LoginRequest, RegisterRequest } from '@/types/api'
+import {
+  login as loginApi,
+  register as registerApi,
+  logout as logoutApi,
+  getCurrentUser,
+  getStoredUser,
+  isAuthenticated as checkIsAuthenticated,
+} from '@/api/auth'
 
-/**
- * Token 存储键名
- */
-const TOKEN_KEY = 'auth_token'
-
-/**
- * 认证状态存储
- */
 export const useAuthStore = defineStore('auth', () => {
-  /**
-   * Token
-   */
-  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
+  // ========== State ==========
+  const user = ref<User | null>(getStoredUser())
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+
+  // ========== Getters ==========
+  const isAuthenticated = computed(() => checkIsAuthenticated())
+  const isLoggedIn = computed(() => !!user.value)
+  const username = computed(() => user.value?.username || '')
+  const userAvatar = computed(() => {
+    if (user.value?.username) {
+      return user.value.username.charAt(0).toUpperCase()
+    }
+    return '?'
+  })
+
+  // ========== Actions ==========
 
   /**
-   * 用户信息
+   * 用户登录
    */
-  const userInfo = ref<UserInfo | null>(null)
+  async function login(credentials: LoginRequest): Promise<boolean> {
+    loading.value = true
+    error.value = null
 
-  /**
-   * 是否已登录
-   */
-  const isLoggedIn = computed(() => !!token.value)
-
-  /**
-   * 设置 Token
-   * @param newToken 新的 Token
-   */
-  function setToken(newToken: string) {
-    token.value = newToken
-    localStorage.setItem(TOKEN_KEY, newToken)
+    try {
+      const response = await loginApi(credentials)
+      user.value = response.user
+      return true
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '登录失败'
+      return false
+    } finally {
+      loading.value = false
+    }
   }
 
   /**
-   * 清除 Token
+   * 用户注册
    */
-  function clearToken() {
-    token.value = null
-    userInfo.value = null
-    localStorage.removeItem(TOKEN_KEY)
+  async function register(data: RegisterRequest): Promise<boolean> {
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await registerApi(data)
+      user.value = response.user
+      return true
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '注册失败'
+      return false
+    } finally {
+      loading.value = false
+    }
   }
 
   /**
-   * 设置用户信息
-   * @param info 用户信息
+   * 用户登出
    */
-  function setUserInfo(info: UserInfo) {
-    userInfo.value = info
+  async function logout(): Promise<void> {
+    loading.value = true
+
+    try {
+      await logoutApi()
+    } finally {
+      user.value = null
+      loading.value = false
+    }
   }
 
   /**
-   * 退出登录
+   * 获取当前用户信息
    */
-  function logout() {
-    clearToken()
+  async function fetchCurrentUser(): Promise<boolean> {
+    if (!isAuthenticated.value) {
+      return false
+    }
+
+    loading.value = true
+
+    try {
+      const currentUser = await getCurrentUser()
+      user.value = currentUser
+      return true
+    } catch (err) {
+      console.error('获取用户信息失败:', err)
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 清除错误信息
+   */
+  function clearError(): void {
+    error.value = null
+  }
+
+  /**
+   * 处理 Token 过期
+   */
+  function handleTokenExpired(): void {
+    user.value = null
   }
 
   return {
-    token,
-    userInfo,
+    // State
+    user,
+    loading,
+    error,
+    // Getters
+    isAuthenticated,
     isLoggedIn,
-    setToken,
-    clearToken,
-    setUserInfo,
+    username,
+    userAvatar,
+    // Actions
+    login,
+    register,
     logout,
+    fetchCurrentUser,
+    clearError,
+    handleTokenExpired,
   }
 })

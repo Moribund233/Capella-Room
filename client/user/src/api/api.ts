@@ -1,4 +1,4 @@
-import type { ApiResponse, UserInfo, PaginationResult, PaginationParams } from '@/types'
+import type { ApiResponse, UserInfo, PaginatedResponse, PaginationParams } from '@/types'
 
 /**
  * 基础请求配置
@@ -75,8 +75,8 @@ export const dataApi = {
    * @returns 分页结果
    */
   getList<T>(params: PaginationParams) {
-    return request<ApiResponse<PaginationResult<T>>>(
-      `/data/list?page=${params.page}&pageSize=${params.pageSize}`,
+    return request<ApiResponse<PaginatedResponse<T>>>(
+      `/data/list?page=${params.page || 1}&page_size=${params.page_size || 20}`,
     )
   },
 

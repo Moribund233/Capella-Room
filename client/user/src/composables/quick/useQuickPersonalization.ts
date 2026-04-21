@@ -33,7 +33,7 @@ import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
  */
 export function useQuickPersonalization(
   config: QuickConfigItem,
-  context: QuickContext,
+  _context: QuickContext,
 ): UseQuickReturn {
   const layoutStore = useLayoutStore()
   const { open, close } = useGlobalModal()

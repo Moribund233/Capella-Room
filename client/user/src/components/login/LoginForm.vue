@@ -1,79 +1,100 @@
 <template>
-  <n-form ref="formRef" :model="formData" :rules="formRules" class="login-form" @submit.prevent="handleLogin">
-    <n-form-item path="username">
-      <n-input v-model:value="formData.username" placeholder="请输入用户名" size="large"
-        :input-props="{ autocomplete: 'username' }">
-        <template #prefix>
-          <User :size="18" />
-        </template>
-      </n-input>
+  <n-form
+    ref="formRef"
+    :model="formData"
+    :rules="rules"
+    label-placement="left"
+    label-width="80"
+    @submit.prevent="handleLogin"
+  >
+    <n-form-item label="邮箱" path="email">
+      <n-input
+        v-model:value="formData.email"
+        placeholder="请输入邮箱"
+        @keyup.enter="handleLogin"
+      />
     </n-form-item>
-
-    <n-form-item path="password">
-      <n-input v-model:value="formData.password" type="password" placeholder="请输入密码" size="large"
-        show-password-on="click" :input-props="{ autocomplete: 'current-password' }">
-        <template #prefix>
-          <Lock :size="18" />
-        </template>
-      </n-input>
-    </n-form-item>
-
-    <n-form-item>
-      <n-button type="primary" size="large" block :loading="isLoading" @click="handleLogin">
-        登 录
-      </n-button>
+    <n-form-item label="密码" path="password">
+      <n-input
+        v-model:value="formData.password"
+        type="password"
+        placeholder="请输入密码"
+        show-password-on="click"
+        @keyup.enter="handleLogin"
+      />
     </n-form-item>
   </n-form>
+
+  <n-space vertical class="action-area">
+    <n-button
+      type="primary"
+      block
+      :loading="authStore.loading"
+      @click="handleLogin"
+    >
+      登录
+    </n-button>
+    <n-button block @click="emit('register')">
+      注册账号
+    </n-button>
+  </n-space>
+
+  <n-alert
+    v-if="authStore.error"
+    type="error"
+    :show-icon="false"
+    class="error-alert"
+  >
+    {{ authStore.error }}
+  </n-alert>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { NForm, NFormItem, NInput, NButton } from 'naive-ui'
-import { User, Lock } from 'lucide-vue-next'
-import { authApi } from '@/api/auth'
+import {
+  NForm,
+  NFormItem,
+  NInput,
+  NButton,
+  NSpace,
+  NAlert,
+  type FormInst,
+  type FormRules,
+} from 'naive-ui'
 import { useAuthStore, useUIStore } from '@/store'
-import type { FormInst, FormRules } from 'naive-ui'
 
-/**
- * 表单引用
- */
-const formRef = ref<FormInst | null>(null)
-
-/**
- * 表单数据
- */
-const formData = ref({
-  username: '',
-  password: '',
-})
-
-/**
- * 加载状态
- */
-const isLoading = ref(false)
+const emit = defineEmits<{
+  register: []
+}>()
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
 
-/**
- * 表单验证规则
- */
-const formRules: FormRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
+const formRef = ref<FormInst | null>(null)
+
+const formData = reactive({
+  email: '',
+  password: '',
+})
+
+const rules: FormRules = {
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' },
   ],
 }
 
 /**
  * 处理登录
  */
-const handleLogin = async () => {
+async function handleLogin() {
   if (!formRef.value) return
 
   try {
@@ -82,33 +103,28 @@ const handleLogin = async () => {
     return
   }
 
-  isLoading.value = true
+  authStore.clearError()
+  const success = await authStore.login({
+    email: formData.email,
+    password: formData.password,
+  })
 
-  try {
-    const result = await authApi.login(formData.value)
+  if (success) {
+    // 登录成功后加载云端 UI 配置
+    await uiStore.initAfterLogin()
 
-    if (result.success && result.data) {
-      authStore.setToken(result.data.token)
-      authStore.setUserInfo(result.data.userInfo)
-
-      // 登录成功后加载云端 UI 配置
-      await uiStore.initAfterLogin()
-
-      const redirect = (route.query.redirect as string) || '/home'
-      router.push(redirect)
-    } else {
-      window.$message?.error?.(result.message || '登录失败，请重试')
-    }
-  } catch {
-    window.$message?.error?.('网络错误，请检查网络连接后重试')
-  } finally {
-    isLoading.value = false
+    const redirect = (route.query.redirect as string) || '/'
+    router.push(redirect)
   }
 }
 </script>
 
 <style scoped>
-.login-form {
-  padding: 24px;
+.action-area {
+  margin-top: 24px;
+}
+
+.error-alert {
+  margin-top: 16px;
 }
 </style>
