@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
 import { useWebSocketStore, type LogEntry } from '@/stores/websocket'
-import { FileText, Trash2, Download, AlertCircle, Info, AlertTriangle, XCircle } from 'lucide-vue-next'
+import { FileText, Trash2, Download, Info, AlertTriangle, XCircle } from 'lucide-vue-next'
 
 /**
  * 日志面板组件

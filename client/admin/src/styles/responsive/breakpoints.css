@@ -1,0 +1,123 @@
+/**
+ * 响应式断点定义
+ * 支持三种设备类型：桌面端、平板端、移动端
+ *
+ * 断点规则：
+ * - 桌面端 (Desktop): > 1024px
+ * - 平板端 (Tablet): 768px - 1024px
+ * - 移动端 (Mobile): < 768px
+ */
+
+:root {
+  /* ========== 断点值 ========== */
+  --breakpoint-mobile: 768px;
+  --breakpoint-tablet: 1024px;
+
+  /* ========== 布局尺寸变量 ========== */
+  /* 桌面端侧边栏 */
+  --sidebar-width-expanded: 240px;
+  --sidebar-width-collapsed: 64px;
+
+  /* 平板端侧边栏 */
+  --sidebar-width-tablet-expanded: 200px;
+  --sidebar-width-tablet-collapsed: 64px;
+
+  /* 头部高度 */
+  --header-height: 64px;
+  --header-height-mobile: 56px;
+
+  /* 底部高度 */
+  --footer-height: 48px;
+
+  /* DockBar 底部偏移（固定定位时避开 footer） */
+  --dock-bottom-offset: 80px;
+
+  /* 内容区内边距 */
+  --content-padding: 24px;
+  --content-padding-tablet: 16px;
+  --content-padding-mobile: 12px;
+}
+
+/* ========== 响应式工具类 ========== */
+
+/* 仅在桌面端显示 */
+.desktop-only {
+  display: none;
+}
+
+@media screen and (min-width: 1025px) {
+  .desktop-only {
+    display: flex;
+  }
+}
+
+/* 仅在平板端显示 */
+.tablet-only {
+  display: none;
+}
+
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  .tablet-only {
+    display: flex;
+  }
+}
+
+/* 仅在移动端显示 */
+.mobile-only {
+  display: none;
+}
+
+@media screen and (max-width: 767px) {
+  .mobile-only {
+    display: flex;
+  }
+}
+
+/* 桌面端和平板端显示 */
+.desktop-tablet {
+  display: none;
+}
+
+@media screen and (min-width: 768px) {
+  .desktop-tablet {
+    display: flex;
+  }
+}
+
+/* 平板端和移动端显示 */
+.tablet-mobile {
+  display: none;
+}
+
+@media screen and (max-width: 1024px) {
+  .tablet-mobile {
+    display: flex;
+  }
+}
+
+/* ========== 媒体查询快捷变量 ========== */
+
+/* 移动端媒体查询 */
+@media screen and (max-width: 767px) {
+  :root {
+    --sidebar-width: 0px;
+    --content-padding: var(--content-padding-mobile);
+    --header-height: var(--header-height-mobile);
+  }
+}
+
+/* 平板端媒体查询 */
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: var(--sidebar-width-tablet-expanded);
+    --content-padding: var(--content-padding-tablet);
+  }
+}
+
+/* 桌面端媒体查询 */
+@media screen and (min-width: 1025px) {
+  :root {
+    --sidebar-width: var(--sidebar-width-expanded);
+    --content-padding: var(--content-padding);
+  }
+}

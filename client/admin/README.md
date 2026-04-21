@@ -1,48 +1,73 @@
-# admin
+# SeredeliUI
 
-This template should help get you started developing with Vue 3 in Vite.
+一个基于 Naive UI、Lucide Vue 和 ECharts 的现代化 UI 框架，采用配置驱动的设计理念，快速构建移动端、平板端、桌面端三端通用的单页应用界面。
 
-## Recommended IDE Setup
+## 文档目录
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+1. [框架介绍](./docs/introduction.md) - 了解框架的设计理念与核心特性
+2. [快速开始](./docs/quickstart.md) - 5分钟上手框架
+3. [页面开发指南](./docs/page-development.md) - 学习如何开发新页面
+4. [配置系统](./docs/configuration.md) - 掌握配置驱动的UI系统
+5. [QuickBar 开发](./docs/quickbar-development.md) - 自定义快捷按钮
+6. [接入真实后端](./docs/backend-integration.md) - 从模拟数据切换到真实API
 
-## Recommended Browser Setup
+## 核心特性
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- **配置驱动** - 通过简单的配置对象定义侧边栏、Dock栏、快捷按钮等UI元素
+- **三端通用** - 内置移动端、平板端、桌面端三端适配
+- **主题系统** - 支持浅色/深色主题切换
+- **图表集成** - 内置 ECharts 图表组件，支持数据可视化
+- **模块化架构** - 清晰的代码结构，易于扩展和维护
+- **类型安全** - 完整的 TypeScript 类型支持
 
-## Type Support for `.vue` Imports in TS
+## 技术栈
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- Vue 3 + Composition API
+- TypeScript
+- Naive UI（组件库）
+- Lucide Vue Next（图标库）
+- ECharts（图表库）
+- Pinia（状态管理）
+- Vue Router（路由管理）
 
-## Customize configuration
+## 快速开始
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+```bash
+# 安装依赖
+npm install
 
-## Project Setup
-
-```sh
-pnpm install
+# 启动开发服务器
+npm run dev
 ```
 
-### Compile and Hot-Reload for Development
+访问 http://localhost:3000 查看应用。
 
-```sh
-pnpm dev
+## 项目结构
+
+```
+SeredeliUI/
+├── src/
+│   ├── api/           # API 接口层
+│   ├── components/    # 组件目录
+│   │   ├── common/    # 通用组件（QuickBar, DockBar, Chart等）
+│   │   ├── layout/    # 布局组件（Header, Sidebar, Footer）
+│   │   └── ...        # 业务组件
+│   ├── composables/   # 组合式函数
+│   ├── config/        # 配置文件
+│   ├── router/        # 路由配置
+│   ├── store/         # Pinia Store
+│   ├── types/         # 类型定义
+│   └── views/         # 页面视图
+├── docs/              # 文档目录
+└── ...
 ```
 
-### Type-Check, Compile and Minify for Production
+## 快速链接
 
-```sh
-pnpm build
-```
+- [查看示例页面](./src/views/ExampleView.vue)
+- [查看配置示例](./src/config/ui.ts)
+- [查看类型定义](./src/types/types.ts)
 
-### Lint with [ESLint](https://eslint.org/)
+## 许可证
 
-```sh
-pnpm lint
-```
+MIT
