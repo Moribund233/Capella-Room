@@ -29,8 +29,6 @@ async fn main() -> Result<()> {
         "Server will run on {}:{}",
         config.server.host, config.server.port
     );
-    let env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
-    info!("Environment: {}", env);
 
     let db_url = config
         .database

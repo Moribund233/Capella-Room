@@ -1,5 +1,5 @@
 # =============================================================================
-# Seredeli Room - 优化构建版本 Dockerfile
+# Seredeli Room - Production Dockerfile
 # 使用 cargo-chef + sparse 索引加速构建
 # 镜像源: 阿里云
 # =============================================================================
@@ -15,18 +15,9 @@ WORKDIR /app
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
-# 安装 cargo-chef（不使用 --locked 以避免版本兼容问题）
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    pkg-config \
-    libssl-dev \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/* && \
-    cargo install cargo-chef
-
-# 配置 Cargo 稀疏索引 + 阿里云镜像源
-RUN mkdir -p $HOME/.cargo && \
-    cat <<'EOF' > $HOME/.cargo/config.toml
+# 配置 Cargo 稀疏索引 + 阿里云镜像源（必须在安装 cargo-chef 之前）
+RUN mkdir -p /usr/local/cargo && \
+    cat <<'EOF' > /usr/local/cargo/config.toml
 [registries.crates-io]
 protocol = "sparse"
 
@@ -36,6 +27,18 @@ replace-with = "aliyun-sparse"
 [registries.aliyun-sparse]
 index = "sparse+https://mirrors.aliyun.com/crates.io-index/"
 EOF
+
+# 设置环境变量确保 Cargo 能读取配置
+ENV CARGO_HOME=/usr/local/cargo
+
+# 安装 cargo-chef（使用阿里云源加速）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* && \
+    cargo install cargo-chef
 
 # =============================================================================
 # 阶段 2: 生成依赖配方
@@ -50,15 +53,22 @@ RUN cargo chef prepare --recipe-path recipe.json
 # =============================================================================
 FROM chef AS builder
 
+# 确保 Cargo 配置在 builder 阶段也可用
+ENV CARGO_HOME=/usr/local/cargo
+
 # 从 planner 复制配方
 COPY --from=planner /app/recipe.json recipe.json
 
-# 编译依赖（这一步会被缓存，除非 recipe.json 变化）
-RUN cargo chef cook --release --recipe-path recipe.json
+# 编译依赖（使用 BuildKit 缓存）
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    cargo chef cook --release --recipe-path recipe.json
 
 # 复制源代码并编译
 COPY . .
-RUN cargo build --release --locked
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    cargo build --release --locked
 
 # =============================================================================
 # 阶段 4: 运行器
@@ -87,6 +97,9 @@ RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/target/release/seredeli-room /app/server
+
+# 复制配置文件
+COPY --from=builder /app/config.toml /app/config.toml
 
 # 设置权限
 RUN chown -R appuser:appuser /app

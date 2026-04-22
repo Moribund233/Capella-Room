@@ -1,0 +1,33 @@
+# =============================================================================
+# Seredeli Room - Docker Compose 配置 (生产环境)
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seredeli-room:latest
+    container_name: seredeli-room-prod
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+    volumes:
+      # 挂载上传目录持久化
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    networks:
+      - 1panel-network  # 使用 1Panel 的网络
+
+networks:
+  1panel-network:
+    external: true  # 使用外部已存在的网络

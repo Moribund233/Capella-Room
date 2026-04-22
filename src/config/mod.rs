@@ -153,28 +153,28 @@ pub struct RedisConfig {
     /// Redis 连接地址（通过环境变量 REDIS_URL 设置）
     #[serde(default)]
     pub url: String,
-    /// 是否启用 Redis（可通过环境变量 REDIS_ENABLED 覆盖）
+    /// 是否启用 Redis（通过环境变量 REDIS_ENABLED 设置，默认 false）
     #[serde(default)]
     pub enabled: bool,
-    /// 连接池大小
+    /// 连接池大小（通过环境变量 REDIS_POOL_SIZE 设置，默认 10）
     #[serde(default)]
     pub pool_size: usize,
-    /// 连接超时时间（秒）
+    /// 连接超时时间（秒）（通过环境变量 REDIS_TIMEOUT_SECS 设置，默认 5）
     #[serde(default)]
     pub timeout_secs: u64,
-    /// Pub/Sub 频道前缀
+    /// Pub/Sub 频道前缀（通过环境变量 REDIS_CHANNEL_PREFIX 设置，默认 "seredeli"）
     #[serde(default)]
     pub channel_prefix: String,
-    /// Stream 最大长度（防止无限增长）
+    /// Stream 最大长度（通过环境变量 REDIS_STREAM_MAX_LEN 设置，默认 100000）
     #[serde(default)]
     pub stream_max_len: u64,
-    /// Consumer 批量消费大小
+    /// Consumer 批量消费大小（通过环境变量 REDIS_CONSUMER_BATCH_SIZE 设置，默认 100）
     #[serde(default)]
     pub consumer_batch_size: usize,
-    /// Consumer 消费间隔（毫秒）
+    /// Consumer 消费间隔（毫秒）（通过环境变量 REDIS_CONSUMER_POLL_INTERVAL_MS 设置，默认 1000）
     #[serde(default)]
     pub consumer_poll_interval_ms: u64,
-    /// 是否启用配置同步
+    /// 是否启用配置同步（通过环境变量 REDIS_CONFIG_SYNC_ENABLED 设置，默认 true）
     #[serde(default)]
     pub config_sync_enabled: bool,
 }

@@ -1000,8 +1000,17 @@ CREATE TABLE system_configs (
 #### 任务清单
 
 - [✅] **8.5.1 Redis 配置管理**
-  - 创建 `RedisConfig` 配置结构体，支持环境变量配置
-  - 支持 `REDIS_ENABLED`、`REDIS_URL`、`REDIS_POOL_SIZE`、`REDIS_TIMEOUT_SECS`、`REDIS_CHANNEL_PREFIX` 等环境变量
+  - 创建 `RedisConfig` 配置结构体，**完全通过环境变量配置**
+  - 支持以下环境变量：
+    - `REDIS_ENABLED`：是否启用 Redis（默认 `false`）
+    - `REDIS_URL`：Redis 连接地址（启用时必须设置）
+    - `REDIS_POOL_SIZE`：连接池大小（默认 `10`）
+    - `REDIS_TIMEOUT_SECS`：连接超时时间（秒，默认 `5`）
+    - `REDIS_CHANNEL_PREFIX`：Pub/Sub 频道前缀（默认 `seredeli`）
+    - `REDIS_STREAM_MAX_LEN`：Stream 最大长度（默认 `100000`）
+    - `REDIS_CONSUMER_BATCH_SIZE`：Consumer 批量消费大小（默认 `100`）
+    - `REDIS_CONSUMER_POLL_INTERVAL_MS`：Consumer 消费间隔（毫秒，默认 `1000`）
+    - `REDIS_CONFIG_SYNC_ENABLED`：是否启用配置同步（默认 `true`）
   - 配置向后兼容：Redis 为可选组件，默认禁用
 
 - [✅] **8.5.2 Redis 连接管理**
@@ -1066,13 +1075,22 @@ CREATE TABLE system_configs (
 
 **环境变量配置**：
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `REDIS_ENABLED` | `false` | 是否启用 Redis |
-| `REDIS_URL` | `redis://127.0.0.1:6379` | Redis 连接地址 |
-| `REDIS_POOL_SIZE` | `10` | 连接池大小 |
-| `REDIS_TIMEOUT_SECS` | `5` | 连接超时时间（秒） |
-| `REDIS_CHANNEL_PREFIX` | `seredeli` | 频道前缀 |
+| 变量名 | 必填 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `REDIS_ENABLED` | 否 | `false` | 是否启用 Redis |
+| `REDIS_URL` | 启用时必填 | - | Redis 连接地址，启用 Redis 时必须设置 |
+| `REDIS_POOL_SIZE` | 否 | `10` | 连接池大小 |
+| `REDIS_TIMEOUT_SECS` | 否 | `5` | 连接超时时间（秒） |
+| `REDIS_CHANNEL_PREFIX` | 否 | `seredeli` | Pub/Sub 频道前缀 |
+| `REDIS_STREAM_MAX_LEN` | 否 | `100000` | Stream 最大长度（防止无限增长） |
+| `REDIS_CONSUMER_BATCH_SIZE` | 否 | `100` | Consumer 批量消费大小 |
+| `REDIS_CONSUMER_POLL_INTERVAL_MS` | 否 | `1000` | Consumer 消费间隔（毫秒） |
+| `REDIS_CONFIG_SYNC_ENABLED` | 否 | `true` | 是否启用配置同步（多节点部署时使用） |
+
+**配置说明**：
+- Redis 配置**完全通过环境变量**设置
+- `REDIS_URL` 包含敏感信息，建议通过环境变量或密钥管理系统设置
+- 所有配置项都有合理的默认值，只有启用 Redis 时才需要设置 `REDIS_URL`
 
 #### 核心代码结构
 
@@ -1101,7 +1119,7 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
 ```
 
 #### 验收标准
-- [✅] Redis 配置支持环境变量，向后兼容
+- [✅] Redis 配置**完全通过环境变量**
 - [✅] WebSocket 管理器支持分布式广播
 - [✅] 多节点部署时消息可以跨节点同步
 - [✅] Redis 为可选组件，不启用时系统正常工作
@@ -1110,7 +1128,7 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
 #### 完成情况
 
 **实现的功能模块**：
-- ✅ **Redis 配置**：`RedisConfig` 支持环境变量，默认禁用，向后兼容
+- ✅ **Redis 配置**：`RedisConfig` **完全通过环境变量配置**
 - ✅ **连接管理**：`RedisManager` 管理连接池，支持健康检查
 - ✅ **Pub/Sub 功能**：`RedisPubSub` 封装发布订阅，支持频道命名空间
 - ✅ **消息格式**：`RoomBroadcastMessage` 支持 JSON 序列化，包含节点标识
