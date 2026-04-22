@@ -5,6 +5,7 @@ use crate::{
     db::Database,
     error::{AppError, Result},
     models::message::{Message, MessageResponse, MessageType, ReplyToInfo, SenderInfo},
+    utils::logging::PerformanceTimer,
 };
 
 /// 消息服务
@@ -26,6 +27,7 @@ impl MessageService {
         message_type: MessageType,
         reply_to: Option<Uuid>,
     ) -> Result<Message> {
+        let mut timer = PerformanceTimer::new("db_create_message");
         let message = sqlx::query_as::<_, Message>(
             r#"
             INSERT INTO messages (room_id, sender_id, content, message_type, reply_to)
@@ -41,6 +43,7 @@ impl MessageService {
         .fetch_one(self.db.pool())
         .await?;
 
+        timer.finish();
         Ok(message)
     }
 
@@ -194,6 +197,7 @@ impl MessageService {
         limit: i64,
         before: Option<Uuid>,
     ) -> Result<Vec<MessageResponse>> {
+        let mut timer = PerformanceTimer::new("db_get_room_messages");
         let messages = if let Some(before_id) = before {
             // 使用 created_at 进行游标分页，而不是 UUID 比较
             sqlx::query_as::<_, Message>(
@@ -239,6 +243,7 @@ impl MessageService {
             responses.push(msg.to_response_with_reply(sender, reply_to_message));
         }
 
+        timer.finish();
         Ok(responses)
     }
 

@@ -1,0 +1,49 @@
+# =============================================================================
+# Docker 构建忽略文件
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Rust 构建输出
+target/
+**/*.rs.bk
+
+# 前端项目（单独构建部署）
+client/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 环境文件（敏感信息）
+.env
+.env.*
+!.env.example
+
+# 日志
+logs/
+*.log
+
+# 上传文件（开发时产生的）
+uploads/
+
+# 测试
+tests/
+
+# 文档
+*.md
+docs/
+
+# Docker 相关（避免循环复制）
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 其他
+.DS_Store
+Thumbs.db

@@ -5,6 +5,7 @@ use crate::{
     error::{AppError, Result},
     models::room::{MemberRole, Room, RoomMember, RoomResponse},
     models::user::UserInfo,
+    utils::logging::PerformanceTimer,
 };
 
 /// 聊天室服务
@@ -27,6 +28,7 @@ impl RoomService {
         is_private: bool,
         max_members: i32,
     ) -> Result<Room> {
+        let mut timer = PerformanceTimer::new("db_create_room");
         let mut tx = self.db.pool().begin().await?;
 
         // 创建聊天室
@@ -58,6 +60,7 @@ impl RoomService {
         .await?;
 
         tx.commit().await?;
+        timer.finish();
 
         Ok(room)
     }
@@ -71,6 +74,7 @@ impl RoomService {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<RoomResponse>> {
+        let mut timer = PerformanceTimer::new("db_list_rooms");
         let rows = if let Some(uid) = user_id {
             // 登录用户：可以看到所有公开房间 + 自己加入的私有房间
             if let Some(query) = search {
@@ -201,6 +205,7 @@ impl RoomService {
             }
         };
 
+        timer.finish();
         Ok(rows.into_iter().map(|r| r.into_response()).collect())
     }
 

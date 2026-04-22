@@ -148,28 +148,23 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
         .message_buffer_size;
     let (tx, mut rx) = mpsc::channel::<String>(buffer_size);
 
-    // 等待认证或重连消息（使用性能计时器测量认证耗时）
-    let mut auth_timer = PerformanceTimer::new("websocket_auth");
+    // 等待认证或重连消息
     let (user_id, username, rooms_to_rejoin, is_reconnect, token) =
         match wait_for_auth(&mut receiver, &state).await {
-            Ok(auth_result) => {
-                auth_timer.finish();
-                match auth_result {
-                    AuthResult::NewConnection {
-                        user_id,
-                        username,
-                        token,
-                    } => (user_id, username, Vec::new(), false, token),
-                    AuthResult::Reconnection {
-                        user_id,
-                        username,
-                        rooms_to_rejoin,
-                        token,
-                    } => (user_id, username, rooms_to_rejoin, true, token),
-                }
-            }
+            Ok(auth_result) => match auth_result {
+                AuthResult::NewConnection {
+                    user_id,
+                    username,
+                    token,
+                } => (user_id, username, Vec::new(), false, token),
+                AuthResult::Reconnection {
+                    user_id,
+                    username,
+                    rooms_to_rejoin,
+                    token,
+                } => (user_id, username, rooms_to_rejoin, true, token),
+            },
             Err(e) => {
-                auth_timer.finish();
                 warn!("WebSocket authentication failed: {}", e);
                 // 发送认证失败消息
                 let auth_fail = WebSocketMessage::auth_failed(&e.to_string());
@@ -549,7 +544,7 @@ async fn wait_for_auth(
 }
 
 /// 验证 Token 并返回用户信息
-/// 
+///
 /// 优化：优先从JWT claims中获取用户名，避免数据库查询
 async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uuid, String)> {
     debug!("Authenticating token");
@@ -564,15 +559,24 @@ async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uu
 
             // 优化：优先从JWT claims中获取用户名，避免数据库查询
             if let Some(username) = claims.username {
-                debug!("User authenticated from JWT claims: {} ({})", username, user_id);
+                debug!(
+                    "User authenticated from JWT claims: {} ({})",
+                    username, user_id
+                );
                 return Ok((user_id, username));
             }
 
             // 兼容旧token：如果claims中没有用户名，则查询数据库
-            warn!("JWT claims missing username, falling back to database query for user: {}", user_id);
+            warn!(
+                "JWT claims missing username, falling back to database query for user: {}",
+                user_id
+            );
             match state.user_service().get_user_by_id(user_id).await {
                 Ok(Some(user)) => {
-                    debug!("User authenticated from database: {} ({})", user.username, user_id);
+                    debug!(
+                        "User authenticated from database: {} ({})",
+                        user.username, user_id
+                    );
                     Ok((user_id, user.username))
                 }
                 Ok(None) => {
@@ -869,6 +873,7 @@ async fn handle_join_room(
     state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
+    let mut _timer = PerformanceTimer::new("handle_join_room");
     debug!("User {} joining room {}", user_id, room_id);
 
     // 检查房间是否存在
@@ -960,6 +965,7 @@ async fn handle_leave_room(
     state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
+    let mut _timer = PerformanceTimer::new("handle_leave_room");
     debug!("User {} leaving room {}", user_id, room_id);
 
     // 离开房间
@@ -1306,6 +1312,7 @@ async fn handle_get_missed_messages(
     state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
+    let mut _timer = PerformanceTimer::new("handle_get_missed_messages");
     // 检查用户是否在房间中
     if !state.ws_manager().is_user_in_room(room_id, user_id) {
         let error_msg = WebSocketMessage::error("NOT_IN_ROOM", "You are not in this room");
@@ -1388,6 +1395,7 @@ async fn handle_update_status(
     state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
+    let mut _timer = PerformanceTimer::new("handle_update_status");
     debug!("User {} updating status to {:?}", user_id, status);
 
     // 转换协议中的UserStatus为模型中的UserStatus

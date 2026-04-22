@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::models::room::MemberRole;
 use crate::redis::pubsub::RedisPubSub;
+use crate::utils::logging::PerformanceTimer;
 
 /// WebSocket 消息通道默认缓冲区大小
 pub const DEFAULT_WS_MESSAGE_BUFFER_SIZE: usize = 100;
@@ -235,6 +236,7 @@ impl WebSocketManager {
         message: String,
         exclude_user: Option<Uuid>,
     ) {
+        let mut timer = PerformanceTimer::new("ws_broadcast_to_room");
         // 1. 本地广播
         self.broadcast_local(room_id, message.clone(), exclude_user)
             .await;
@@ -248,6 +250,7 @@ impl WebSocketManager {
                 warn!("Failed to publish room message to Redis: {}", e);
             }
         }
+        timer.finish();
     }
 
     /// 本地广播消息到房间（仅当前节点）
