@@ -82,4 +82,9 @@
 
   /* ========== Logo 滤镜（亮色主题：黑色 Logo 正常显示）========== */
   --logo-filter: none;
+
+  /* ========== LoginView Logo 区域 ========== */
+  --login-logo-bg-start: #6366f1;
+  --login-logo-bg-end: #8b5cf6;
+  --login-logo-text-color: #ffffff;
 }

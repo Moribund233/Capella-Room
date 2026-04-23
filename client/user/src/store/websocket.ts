@@ -17,7 +17,7 @@ import type {
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
 
 export interface ChatMessage {
-  id: string
+  id?: string
   type: 'sent' | 'received' | 'system'
   content: string
   time: string
@@ -196,18 +196,32 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   /**
+   * 加载历史消息
+   */
+  function loadHistoryMessages(roomId: string, messages: ChatMessage[]) {
+    // 过滤掉已存在的消息（避免重复）
+    const existingIds = new Set(chatMessages.value.map(m => m.id))
+    const newMessages = messages.filter(m => !existingIds.has(m.id))
+    // 按时间排序后添加到消息列表
+    chatMessages.value.push(...newMessages)
+    // 按时间排序
+    chatMessages.value.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+  }
+
+  /**
    * 处理收到的消息
    */
   function handleMessage(message: WebSocketMessage) {
     switch (message.type) {
       case 'Chat':
-      case 'ChatMessage': {
+      case 'ChatMessage':
+      case 'NewMessage': {
         const data = message.payload as ChatMessageData
         chatMessages.value.push({
-          id: data.id,
+          id: data.id || data.message_id,
           type: 'received',
           content: data.content,
-          time: data.created_at,
+          time: data.created_at || new Date().toISOString(),
           sender: data.sender,
           roomId: data.room_id
         })
@@ -226,11 +240,18 @@ export const useWebSocketStore = defineStore('websocket', () => {
       }
 
       case 'RoomJoined': {
-        const data = message.payload as { room_id: string; members: WebSocketUserInfo[] }
+        const data = message.payload as { room_id: string; user_id: string; username: string }
         if (!joinedRooms.value.includes(data.room_id)) {
           joinedRooms.value.push(data.room_id)
         }
-        onlineUsers.value = data.members
+        currentRoom.value = data.room_id
+        // RoomJoined only contains current user info, online users come from OnlineUsers message
+        break
+      }
+
+      case 'OnlineUsers': {
+        const data = message.payload as { room_id: string; users: WebSocketUserInfo[] }
+        onlineUsers.value = data.users
         break
       }
 
@@ -294,6 +315,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     joinRoom,
     leaveRoom,
     sendMessage,
-    setUserStatus
+    setUserStatus,
+    loadHistoryMessages
   }
 })

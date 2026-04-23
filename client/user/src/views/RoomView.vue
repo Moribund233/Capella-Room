@@ -22,6 +22,11 @@
         </n-space>
       </template>
 
+      <!-- 错误提示 -->
+      <n-alert v-if="wsStore.lastError" type="error" :show-icon="false" style="margin-bottom: 16px;">
+        {{ wsStore.lastError }}
+      </n-alert>
+
       <!-- 消息列表 -->
       <div ref="messagesContainer" class="messages-container">
         <n-empty v-if="messages.length === 0" description="暂无消息，开始聊天吧！" />
@@ -109,12 +114,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Users } from 'lucide-vue-next'
-import { NCard, NSpace, NTag, NButton, NEmpty, NAvatar, NList, NListItem, NThing, NBadge, NInputGroup, NInput, NDrawer, NDrawerContent } from 'naive-ui'
+import { NCard, NSpace, NTag, NButton, NEmpty, NAvatar, NList, NListItem, NThing, NBadge, NInputGroup, NInput, NDrawer, NDrawerContent, NAlert } from 'naive-ui'
 import { useAuthStore, useWebSocketStore } from '@/store'
-import { getRoom } from '@/api/room'
+import { getRoom, getRoomMessages } from '@/api/room'
 import type { UserStatus } from '@/types/websocket'
 import { useResponsive } from '@/composables/useResponsive'
 
@@ -178,6 +183,13 @@ function scrollToBottom() {
 // 监听消息变化，自动滚动
 watch(() => wsStore.chatMessages.length, scrollToBottom)
 
+// 监听 WebSocket 连接状态，连接成功后自动加入房间
+const unwatchConnected = watchEffect(() => {
+  if (wsStore.isConnected && roomId.value) {
+    wsStore.joinRoom(roomId.value)
+  }
+})
+
 onMounted(async () => {
   // 获取房间信息
   try {
@@ -187,16 +199,40 @@ onMounted(async () => {
     console.error('获取房间信息失败:', error)
   }
 
-  // 连接 WebSocket
+  // 加载历史消息
+  try {
+    const response = await getRoomMessages(roomId.value, { page: 1, per_page: 50 })
+    const historyMessages = response.messages.map(msg => {
+      const messageType: 'sent' | 'received' = msg.sender?.id === currentUserId.value ? 'sent' : 'received'
+      return {
+        id: msg.id,
+        type: messageType,
+        content: msg.content,
+        time: msg.created_at,
+        sender: msg.sender ? {
+          id: msg.sender.id,
+          username: msg.sender.username,
+          status: 'online' as const,
+          avatar_url: msg.sender.avatar_url
+        } : undefined,
+        roomId: roomId.value
+      }
+    })
+    // 将历史消息添加到 store
+    wsStore.loadHistoryMessages(roomId.value, historyMessages)
+  } catch (error) {
+    console.error('加载历史消息失败:', error)
+  }
+
+  // 连接 WebSocket（如果未连接）
   if (!wsStore.isConnected) {
     wsStore.connect()
   }
-
-  // 加入房间
-  wsStore.joinRoom(roomId.value)
 })
 
 onUnmounted(() => {
+  // 停止监听
+  unwatchConnected()
   // 离开房间
   wsStore.leaveRoom(roomId.value)
 })
@@ -276,7 +312,7 @@ onUnmounted(() => {
 
 .message-item.is-self .message-content {
   background: var(--primary-color);
-  color: white;
+  color: var(--n-text-color, white);
 }
 
 .system-message {

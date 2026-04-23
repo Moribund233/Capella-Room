@@ -6,7 +6,7 @@ import type { ApiResponse } from '@/types/api'
 import { getAccessToken } from './token'
 
 // API 基础配置
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || ''
 
 // Token 过期事件名称
 export const TOKEN_EXPIRED_EVENT = 'token_expired'
@@ -18,17 +18,32 @@ interface RequestConfig extends RequestInit {
 
 /**
  * 构建 URL
+ * 支持绝对路径和相对路径
  */
 function buildUrl(endpoint: string, params?: Record<string, string>): string {
-  const url = new URL(endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`)
+  let urlString: string
 
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      url.searchParams.append(key, value)
-    })
+  if (endpoint.startsWith('http')) {
+    // 绝对 URL
+    urlString = endpoint
+  } else if (API_BASE_URL) {
+    // 使用配置的 API 基础 URL
+    urlString = `${API_BASE_URL}${endpoint}`
+  } else {
+    // 使用相对路径（让浏览器自动处理为当前域名）
+    urlString = endpoint
   }
 
-  return url.toString()
+  // 添加查询参数
+  if (params && Object.keys(params).length > 0) {
+    const separator = urlString.includes('?') ? '&' : '?'
+    const queryString = Object.entries(params)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&')
+    urlString = `${urlString}${separator}${queryString}`
+  }
+
+  return urlString
 }
 
 /**

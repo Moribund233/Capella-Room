@@ -27,9 +27,7 @@ import type {
  * @returns 登录响应
  */
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', {
-    body: JSON.stringify(credentials),
-  })
+  const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', credentials)
 
   // 保存 token 和用户信息
   if (response.data.access_token && response.data.refresh_token) {
@@ -46,9 +44,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
  * @returns 注册响应
  */
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
-  const response = await apiClient.post<RegisterResponse>('/api/v1/auth/register', {
-    body: JSON.stringify(data),
-  })
+  const response = await apiClient.post<RegisterResponse>('/api/v1/auth/register', data)
 
   // 保存 token 和用户信息
   if (response.data.access_token && response.data.refresh_token) {

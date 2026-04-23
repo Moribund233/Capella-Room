@@ -13,6 +13,7 @@ import {
   getStoredUser,
   isAuthenticated as checkIsAuthenticated,
 } from '@/api/auth'
+import { useWebSocketStore } from './websocket'
 
 export const useAuthStore = defineStore('auth', () => {
   // ========== State ==========
@@ -78,6 +79,10 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
 
     try {
+      // Disconnect WebSocket before logout to ensure clean state
+      const wsStore = useWebSocketStore()
+      wsStore.disconnect()
+
       await logoutApi()
     } finally {
       user.value = null

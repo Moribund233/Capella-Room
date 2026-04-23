@@ -212,7 +212,7 @@ const handleLogout = () => {
       }
 
       // 清除登录状态
-      authStore.logout()
+      await authStore.logout()
 
       // 跳转到登录页（使用 replace 避免返回按钮回到需要登录的页面）
       await router.replace({ name: 'Login' })

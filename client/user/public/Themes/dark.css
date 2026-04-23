@@ -81,4 +81,9 @@
 
   /* ========== Logo 滤镜（暗色主题：黑色 Logo 反转为白色）========== */
   --logo-filter: invert(1);
+
+  /* ========== LoginView Logo 区域 ========== */
+  --login-logo-bg-start: #4f46e5;
+  --login-logo-bg-end: #7c3aed;
+  --login-logo-text-color: #ffffff;
 }

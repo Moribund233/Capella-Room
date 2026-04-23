@@ -12,8 +12,7 @@ import type {
   WebSocketEventHandlers,
 } from '@/types/websocket'
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
-
+const WS_BASE_URL = import.meta.env.VITE_WS_URL
 class WebSocketClient {
   private ws: WebSocket | null = null
   private config: Required<WebSocketConfig>

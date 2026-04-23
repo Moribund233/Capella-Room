@@ -878,64 +878,33 @@ async fn handle_join_room(
 
     // 检查房间是否存在
     match state.room_service().get_room_by_id(room_id).await {
-        Ok(Some(_room)) => {
+        Ok(Some(room)) => {
             // 检查用户是否是房间成员
             match state.room_service().get_room_member(room_id, user_id).await {
                 Ok(Some(_member)) => {
-                    // 加入房间
-                    state.ws_manager().join_room(room_id, user_id);
-
-                    // 发送加入成功消息
-                    let joined_msg = WebSocketMessage::RoomJoined {
-                        room_id,
-                        user_id,
-                        username: username.to_string(),
-                    };
-                    if let Ok(json) = joined_msg.to_json() {
-                        let _ = tx.send(json).await;
-                    }
-
-                    // 广播用户加入消息给其他成员
-                    let user_joined = WebSocketMessage::UserJoined {
-                        room_id,
-                        user_id,
-                        username: username.to_string(),
-                    };
-                    if let Ok(json) = user_joined.to_json() {
-                        state
-                            .ws_manager()
-                            .broadcast_to_room(room_id, json, Some(user_id))
-                            .await;
-                    }
-
-                    // 发送在线用户列表
-                    let online_users: Vec<UserInfo> = state
-                        .ws_manager()
-                        .get_room_users(room_id)
-                        .into_iter()
-                        .map(|(id, name)| UserInfo {
-                            id,
-                            username: name,
-                            avatar_url: None,
-                            status: UserStatus::Online,
-                        })
-                        .collect();
-
-                    let online_users_msg = WebSocketMessage::OnlineUsers {
-                        room_id,
-                        users: online_users,
-                    };
-                    if let Ok(json) = online_users_msg.to_json() {
-                        let _ = tx.send(json).await;
-                    }
-
-                    StructuredLogger::room_join(user_id, username, room_id);
+                    // 已经是成员，直接加入
+                    do_join_room(room_id, user_id, username, state, tx).await;
                 }
                 Ok(None) => {
-                    let error_msg =
-                        WebSocketMessage::error("NOT_MEMBER", "You are not a member of this room");
-                    if let Ok(json) = error_msg.to_json() {
-                        let _ = tx.send(json).await;
+                    // 不是成员，检查房间是否公开
+                    if room.is_private {
+                        // 私有房间，需要邀请
+                        let error_msg =
+                            WebSocketMessage::error("NOT_MEMBER", "You are not a member of this room");
+                        if let Ok(json) = error_msg.to_json() {
+                            let _ = tx.send(json).await;
+                        }
+                    } else {
+                        // 公开房间，自动加入
+                        if let Err(e) = state.room_service().join_room(room_id, user_id).await {
+                            let error_msg =
+                                WebSocketMessage::error("JOIN_FAILED", &format!("Failed to join room: {}", e));
+                            if let Ok(json) = error_msg.to_json() {
+                                let _ = tx.send(json).await;
+                            }
+                            return Err(e.into());
+                        }
+                        do_join_room(room_id, user_id, username, state, tx).await;
                     }
                 }
                 Err(e) => {
@@ -955,6 +924,64 @@ async fn handle_join_room(
     }
 
     Ok(())
+}
+
+/// 执行加入房间操作（提取公共逻辑）
+async fn do_join_room(
+    room_id: Uuid,
+    user_id: Uuid,
+    username: &str,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) {
+    // 加入房间
+    state.ws_manager().join_room(room_id, user_id);
+
+    // 发送加入成功消息
+    let joined_msg = WebSocketMessage::RoomJoined {
+        room_id,
+        user_id,
+        username: username.to_string(),
+    };
+    if let Ok(json) = joined_msg.to_json() {
+        let _ = tx.send(json).await;
+    }
+
+    // 广播用户加入消息给其他成员
+    let user_joined = WebSocketMessage::UserJoined {
+        room_id,
+        user_id,
+        username: username.to_string(),
+    };
+    if let Ok(json) = user_joined.to_json() {
+        state
+            .ws_manager()
+            .broadcast_to_room(room_id, json, Some(user_id))
+            .await;
+    }
+
+    // 发送在线用户列表
+    let online_users: Vec<UserInfo> = state
+        .ws_manager()
+        .get_room_users(room_id)
+        .into_iter()
+        .map(|(id, name)| UserInfo {
+            id,
+            username: name,
+            avatar_url: None,
+            status: UserStatus::Online,
+        })
+        .collect();
+
+    let online_users_msg = WebSocketMessage::OnlineUsers {
+        room_id,
+        users: online_users,
+    };
+    if let Ok(json) = online_users_msg.to_json() {
+        let _ = tx.send(json).await;
+    }
+
+    StructuredLogger::room_join(user_id, username, room_id);
 }
 
 /// 处理离开房间

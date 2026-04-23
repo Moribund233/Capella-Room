@@ -2,7 +2,7 @@
 import { RouterView } from 'vue-router'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { useTheme } from '@/composables'
-import { initConfig } from '@/config'
+import { initConfig, initWebSocketConfig } from '@/config'
 
 /**
  * 主题配置
@@ -15,6 +15,14 @@ const { naiveTheme } = useTheme()
  * 确保在应用启动时加载配置，避免各组件独立加载导致的时序问题
  */
 initConfig()
+
+/**
+ * 初始化 WebSocket 配置
+ * 从服务器获取 WebSocket 心跳等配置，确保前后端配置一致
+ */
+initWebSocketConfig().catch(err => {
+  console.warn('[App] WebSocket 配置初始化失败，使用默认配置:', err)
+})
 </script>
 
 <template>

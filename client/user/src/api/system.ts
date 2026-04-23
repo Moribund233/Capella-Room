@@ -9,7 +9,7 @@ import type { ClientConfig } from '@/types/api'
  * 获取客户端配置
  */
 export async function getClientConfig(): Promise<ClientConfig> {
-  const response = await apiClient.get<ClientConfig>('/api/v1/config')
+  const response = await apiClient.get<ClientConfig>('/api/config/client')
   return response.data
 }
 

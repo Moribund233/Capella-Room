@@ -3,6 +3,13 @@
  * 用户客户端 API 类型
  */
 
+// 消息列表响应（后端实际返回格式）
+export interface MessageListResponse {
+  messages: Message[]
+  total: number
+  has_more: boolean
+}
+
 // 通用响应格式
 export interface ApiResponse<T> {
   success: boolean

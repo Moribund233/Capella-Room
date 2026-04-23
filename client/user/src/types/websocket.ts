@@ -101,12 +101,15 @@ export interface AuthResult {
 
 // 聊天消息
 export interface ChatMessageData {
-  id: string
+  id?: string
+  message_id?: string
   content: string
-  sender: WebSocketUserInfo
+  sender?: WebSocketUserInfo
+  sender_id?: string
+  sender_name?: string
   room_id: string
-  created_at: string
-  type: 'text' | 'image' | 'file'
+  created_at?: string
+  type?: 'text' | 'image' | 'file'
   reply_to?: {
     id: string
     sender_id: string

@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client'
-import type { Room, Message, PaginatedResponse, PaginationParams } from '@/types/api'
+import type { Room, Message, MessageListResponse, PaginationParams } from '@/types/api'
 
 // 房间列表响应（兼容直接返回数组或包装对象）
 export interface RoomListResponse {
@@ -93,13 +93,13 @@ export async function deleteRoom(roomId: string): Promise<void> {
 export async function getRoomMessages(
   roomId: string,
   params?: PaginationParams
-): Promise<PaginatedResponse<Message>> {
+): Promise<MessageListResponse> {
   const queryParams: Record<string, string> = {}
   if (params?.page) queryParams.page = params.page.toString()
   if (params?.per_page) queryParams.per_page = params.per_page.toString()
   if (params?.page_size) queryParams.page_size = params.page_size.toString()
 
-  const response = await apiClient.get<PaginatedResponse<Message>>(
+  const response = await apiClient.get<MessageListResponse>(
     `/api/v1/rooms/${roomId}/messages`,
     queryParams
   )

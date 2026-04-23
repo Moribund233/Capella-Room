@@ -126,6 +126,7 @@ const { version } = useAppConfig()
     height: auto;
     padding: 12px;
     text-align: center;
+    border: none;
   }
 
   .footer-left,
