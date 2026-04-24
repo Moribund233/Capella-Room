@@ -146,6 +146,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   /**
    * 发送消息
+   * 注意：消息不会立即显示在本地，而是等待服务器广播 NewMessage
    */
   function sendMessage(roomId: string, content: string) {
     if (!isConnected.value) {
@@ -160,22 +161,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
         content
       }
     })
-
-    // 本地添加消息
-    const authStore = useAuthStore()
-    chatMessages.value.push({
-      id: Date.now().toString(),
-      type: 'sent',
-      content,
-      time: new Date().toISOString(),
-      sender: authStore.user ? {
-        id: authStore.user.id,
-        username: authStore.user.username,
-        avatar_url: authStore.user.avatar_url || undefined,
-        status: 'online'
-      } : undefined,
-      roomId
-    })
+    // 不本地添加消息，等待服务器广播 NewMessage
   }
 
   /**
@@ -213,16 +199,34 @@ export const useWebSocketStore = defineStore('websocket', () => {
    */
   function handleMessage(message: WebSocketMessage) {
     switch (message.type) {
-      case 'Chat':
-      case 'ChatMessage':
       case 'NewMessage': {
         const data = message.payload as ChatMessageData
+        const authStore = useAuthStore()
+
+        // 检查是否是自己发送的消息
+        const isOwnMessage = data.sender_id === authStore.user?.id ||
+                            data.sender?.id === authStore.user?.id
+
+        // 如果消息已存在（通过ID检查），则跳过
+        const messageId = data.message_id || data.id
+        const exists = chatMessages.value.some(m => m.id === messageId)
+        if (exists) {
+          break
+        }
+
+        // 构建 sender 信息（优先使用 sender 对象，否则用 sender_id/sender_name）
+        const sender = data.sender || {
+          id: data.sender_id || '',
+          username: data.sender_name || '未知用户',
+          status: 'online' as UserStatus
+        }
+
         chatMessages.value.push({
-          id: data.id || data.message_id,
-          type: 'received',
+          id: messageId || Date.now().toString(),
+          type: isOwnMessage ? 'sent' : 'received',
           content: data.content,
           time: data.created_at || new Date().toISOString(),
-          sender: data.sender,
+          sender,
           roomId: data.room_id
         })
         break

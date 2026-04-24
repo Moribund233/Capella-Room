@@ -1,8 +1,10 @@
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store'
 import { useGlobalModal } from '@/composables/useGlobalModal'
 import AboutModal from '@/components/quick/AboutModal.vue'
 import LoginModalContent from '@/components/quick/LoginModalContent.vue'
+import UserProfileModal from '@/components/quick/UserProfileModal.vue'
 import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
 
 /**
@@ -35,20 +37,10 @@ import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
  *     { key: 'logout', label: '登出', icon: 'LogOut' }
  *   ]
  * }
- *
- * @example
- * // ui.ts 配置 - 直接点击模式
- * {
- *   key: 'user',
- *   display: 'visible',
- *   type: 'action',
- *   icon: 'UserCircle',
- *   iconAlt: 'User',
- *   label: '用户中心',
- * }
  */
 export function useQuickUser(config: QuickConfigItem, context: QuickContext): UseQuickReturn {
   const authStore = useAuthStore()
+  const router = useRouter()
   const { open, close, warning } = useGlobalModal()
 
   /**
@@ -73,6 +65,21 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
       componentProps: {},
       preset: 'card',
       width: 400,
+      closable: true,
+      maskClosable: true,
+    })
+  }
+
+  /**
+   * 显示用户资料弹窗
+   */
+  function showUserProfileModal(): void {
+    open({
+      title: '用户详情',
+      component: UserProfileModal,
+      componentProps: {},
+      preset: 'card',
+      width: 300,
       closable: true,
       maskClosable: true,
     })
@@ -154,15 +161,24 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
           content: '确定要退出登录吗？',
           positiveText: '确认退出',
           negativeText: '取消',
-          onPositiveClick: () => {
-            authStore.logout()
+          onPositiveClick: async () => {
+            await authStore.logout()
+            // 触发外部动作
             context.emitAction(config.key, childKey)
+            // 跳转到登录页
+            await router.replace({ name: 'Login' })
           },
         })
         return
       }
 
-      // profile 等已登录操作
+      // profile：打开用户资料弹窗
+      if (childKey === 'profile') {
+        showUserProfileModal()
+        return
+      }
+
+      // 其他已登录操作
       context.emitAction(config.key, childKey)
     }
   }

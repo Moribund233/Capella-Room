@@ -4,9 +4,6 @@
     'is-mobile-open': isMobileMenuOpen && isMobile,
     'is-tablet': isTablet,
   }" :style="sidebarStyle">
-    <!-- 移动端遮罩层 -->
-    <div v-if="isMobile && isMobileMenuOpen" class="sidebar-overlay" @click="closeMobileMenu"></div>
-
     <!-- 侧边栏内容 -->
     <div class="sidebar-content">
       <!-- 导航菜单 -->
@@ -165,13 +162,6 @@ const showMenuText = computed(() => {
 })
 
 /**
- * 关闭移动端菜单
- */
-const closeMobileMenu = () => {
-  emit('update:isMobileMenuOpen', false)
-}
-
-/**
  * 处理菜单点击
  */
 const handleMenuClick = (item: MenuItem) => {
@@ -240,7 +230,7 @@ const handleLogout = () => {
 
 /* 移动端样式 */
 .app-sidebar.is-mobile-open {
-  z-index: 9999;
+  z-index: 100;
 }
 
 .app-sidebar.is-mobile-open .sidebar-content {
@@ -254,16 +244,10 @@ const handleLogout = () => {
     width: 100%;
     background: transparent;
     pointer-events: none;
+    z-index: 100;
   }
 
   .app-sidebar.is-mobile-open {
-    pointer-events: auto;
-  }
-
-  .sidebar-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
     pointer-events: auto;
   }
 
@@ -467,6 +451,15 @@ const handleLogout = () => {
 
 /* 移动端适配 */
 @media screen and (max-width: 767px) {
+
+  .app-sidebar {
+    top: var(--header-height-mobile);
+    width: 100%;
+    background: transparent;
+    pointer-events: none;
+    border: none;
+  }
+
   .sidebar-nav {
     padding: 8px 0;
   }
