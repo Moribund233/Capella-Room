@@ -1,0 +1,7 @@
+export { default as HomeWelcome } from './HomeWelcome.vue'
+export { default as QuickActions } from './QuickActions.vue'
+export { default as StatCards } from './StatCards.vue'
+export { default as OnlineTrendChart } from './OnlineTrendChart.vue'
+export { default as RoomActivityChart } from './RoomActivityChart.vue'
+export { default as HotRoomsList } from './HotRoomsList.vue'
+export { default as SystemTimeline } from './SystemTimeline.vue'

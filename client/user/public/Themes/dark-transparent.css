@@ -1,0 +1,90 @@
+/**
+ * 暗色透明主题 CSS 变量
+ * 适用于图片背景场景，降低背景色不透明度
+ */
+
+[data-theme='dark-transparent'] {
+  /* ========== 主题色 - 保持不变 ========== */
+  --color-primary: #177ddc;
+  --color-primary-hover: #3c9ae8;
+  --color-primary-active: #0958d9;
+  --color-primary-light: rgba(17, 27, 38, 0.7);
+
+  /* ========== 成功/警告/错误 - 降低深色背景透明度 ========== */
+  --color-success: #49aa19;
+  --color-success-hover: #6abe39;
+  --color-success-active: #306516;
+  --color-success-light: rgba(22, 35, 18, 0.6);
+
+  --color-warning: #d89614;
+  --color-warning-hover: #e4b53c;
+  --color-warning-active: #aa7714;
+  --color-warning-light: rgba(43, 33, 17, 0.6);
+
+  --color-error: #d32029;
+  --color-error-hover: #e84749;
+  --color-error-active: #9e1c23;
+  --color-error-light: rgba(42, 18, 21, 0.6);
+
+  /* ========== 信息提示 ========== */
+  --color-info: #177ddc;
+  --color-info-hover: #3c9ae8;
+  --color-info-active: #0958d9;
+  --color-info-light: rgba(17, 27, 38, 0.7);
+
+  /* ========== 中性色 - 文字（提高亮度确保可读性）========== */
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.8);
+  --text-tertiary: rgba(255, 255, 255, 0.6);
+  --text-disabled: rgba(255, 255, 255, 0.4);
+
+  /* ========== 中性色 - 边框/背景（降低透明度）========== */
+  --border-color-base: rgba(67, 67, 67, 0.5);
+  --border-color-split: rgba(48, 48, 48, 0.4);
+  --border-color-inverse: rgba(20, 20, 20, 0.9);
+
+  /* 背景色使用半透明 */
+  --bg-base: rgba(0, 0, 0, 0.3);
+  --bg-container: rgba(20, 20, 20, 0.75);
+  --bg-elevated: rgba(31, 31, 31, 0.85);
+  --bg-layout: rgba(20, 20, 20, 0.4);
+
+  /* ========== 侧边栏 - 半透明 ========== */
+  --sidebar-bg: rgba(0, 0, 0, 0.6);
+  --sidebar-text: rgba(255, 255, 255, 0.8);
+  --sidebar-text-active: #fff;
+  --sidebar-bg-hover: rgba(255, 255, 255, 0.12);
+  --sidebar-bg-active: rgba(23, 125, 220, 0.8);
+
+  /* ========== 头部 - 半透明 ========== */
+  --header-bg: rgba(20, 20, 20, 0.75);
+  --header-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+
+  /* ========== DockBar - 半透明 ========== */
+  --dock-bg: rgba(44, 44, 50, 0.7);
+  --dock-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+  /* ========== Layout 边框 ========== */
+  --layout-border-color: rgba(67, 67, 67, 0.5);
+  --layout-border-width: 1px;
+  --layout-border-style: solid;
+
+  /* ========== 阴影（加深以适应透明背景）========== */
+  --shadow-1:
+    0 1px 2px -2px rgba(0, 0, 0, 0.4), 0 3px 6px 0 rgba(0, 0, 0, 0.32),
+    0 5px 12px 4px rgba(0, 0, 0, 0.26);
+  --shadow-2:
+    0 3px 6px -4px rgba(0, 0, 0, 0.4), 0 6px 16px 0 rgba(0, 0, 0, 0.28),
+    0 9px 28px 8px rgba(0, 0, 0, 0.2);
+  --shadow-3:
+    0 6px 16px -8px rgba(0, 0, 0, 0.4), 0 9px 28px 0 rgba(0, 0, 0, 0.28),
+    0 12px 48px 16px rgba(0, 0, 0, 0.2);
+
+  /* ========== Logo 滤镜（暗色主题：黑色 Logo 反转为白色）========== */
+  --logo-filter: invert(1);
+
+  /* ========== LoginView Logo 区域 ========== */
+  --login-logo-bg-start: rgba(79, 70, 229, 0.9);
+  --login-logo-bg-end: rgba(124, 58, 237, 0.9);
+  --login-logo-text-color: #ffffff;
+}

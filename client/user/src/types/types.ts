@@ -18,8 +18,9 @@ export type Breakpoint = 'mobile' | 'tablet' | 'desktop'
 
 /**
  * 主题类型
+ * 支持标准主题和透明主题（适用于图片背景）
  */
-export type ThemeType = 'light' | 'dark'
+export type ThemeType = 'light' | 'dark' | 'light-transparent' | 'dark-transparent'
 
 // ==================== 菜单相关类型 ====================
 

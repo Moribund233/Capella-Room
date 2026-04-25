@@ -13,13 +13,18 @@ const THEME_KEY = 'app_theme'
 const THEME_LINK_ID = 'theme-style-link'
 
 /**
+ * 有效的主题类型
+ */
+const VALID_THEMES: ThemeType[] = ['light', 'dark', 'light-transparent', 'dark-transparent']
+
+/**
  * 获取本地存储的主题
  * @returns 主题类型或 null
  */
 function getStoredTheme(): ThemeType | null {
   const stored = localStorage.getItem(THEME_KEY)
-  if (stored === 'light' || stored === 'dark') {
-    return stored
+  if (stored && VALID_THEMES.includes(stored as ThemeType)) {
+    return stored as ThemeType
   }
   return null
 }
@@ -72,14 +77,14 @@ export const useThemeStore = defineStore('theme', () => {
   const currentTheme = ref<ThemeType>(getStoredTheme() || getSystemTheme())
 
   /**
-   * 是否为暗色主题
+   * 是否为暗色主题（包括暗色透明主题）
    */
-  const isDark = computed(() => currentTheme.value === 'dark')
+  const isDark = computed(() => currentTheme.value === 'dark' || currentTheme.value === 'dark-transparent')
 
   /**
-   * 是否为亮色主题
+   * 是否为亮色主题（包括亮色透明主题）
    */
-  const isLight = computed(() => currentTheme.value === 'light')
+  const isLight = computed(() => currentTheme.value === 'light' || currentTheme.value === 'light-transparent')
 
   /**
    * 初始化主题

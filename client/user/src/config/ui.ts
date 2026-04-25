@@ -53,12 +53,13 @@ export const themeConfig: ThemeConfig = {
 /**
  * 布局外观配置
  * 用户可自定义的布局样式设置
+ * 使用 CSS 变量确保与主题一致
  */
 export const layoutConfig = {
   backgroundType: 'solid' as const,
-  backgroundColor: '#f5f5f5',
-  gradientFrom: '#667eea',
-  gradientTo: '#764ba2',
+  backgroundColor: 'var(--bg-base)',
+  gradientFrom: 'var(--color-primary)',
+  gradientTo: 'var(--color-primary-hover)',
   backgroundImage: '',
   backgroundOpacity: 1,
   contentOpacity: 1,
@@ -103,6 +104,16 @@ export const quickBarConfig: QuickItemConfig[] = [
         key: 'dark',
         label: '夜间模式',
         icon: 'Moon',
+      },
+      {
+        key: 'light-transparent',
+        label: '浅色透明',
+        icon: 'Image',
+      },
+      {
+        key: 'dark-transparent',
+        label: '暗色透明',
+        icon: 'ImagePlus',
       },
     ],
   },

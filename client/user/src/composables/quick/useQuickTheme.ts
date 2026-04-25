@@ -51,10 +51,9 @@ export function useQuickTheme(config: QuickConfigItem, context: QuickContext): U
    * 当 type 为 menu 时通过子菜单选择主题
    */
   function onSelect(childKey: string): void {
-    if (childKey === 'light') {
-      setTheme('light')
-    } else if (childKey === 'dark') {
-      setTheme('dark')
+    const validThemes = ['light', 'dark', 'light-transparent', 'dark-transparent']
+    if (validThemes.includes(childKey)) {
+      setTheme(childKey as 'light' | 'dark' | 'light-transparent' | 'dark-transparent')
     } else {
       // 其他 key 通过 action 事件交由外部处理
       context.emitAction(config.key, childKey)

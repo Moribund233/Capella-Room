@@ -15,8 +15,13 @@
 
       <!-- 用户头像 -->
       <div class="user-profile">
-        <div class="avatar">
-          <User class="avatar-icon" :size="18" />
+        <div class="avatar-wrapper">
+          <img v-if="userAvatar" :src="userAvatar" class="avatar-img" :alt="username" />
+          <div v-else class="avatar">
+            <span v-if="usernameFirstChar" class="avatar-text">{{ usernameFirstChar }}</span>
+            <User v-else class="avatar-icon" :size="18" />
+          </div>
+          <div class="status-indicator" :class="onlineStatusClass"></div>
         </div>
         <span v-if="layoutStore.isDesktop" class="username">{{ username }}</span>
       </div>
@@ -28,7 +33,7 @@
 import { computed } from 'vue'
 import { User } from 'lucide-vue-next'
 import { useAppConfig, useQuickBarConfig } from '@/composables'
-import { useLayoutStore, useAuthStore } from '@/store'
+import { useLayoutStore, useAuthStore, useWebSocketStore } from '@/store'
 import QuickBar from '@/components/common/QuickBar.vue'
 
 /**
@@ -48,6 +53,9 @@ const layoutStore = useLayoutStore()
 /** Auth Store */
 const authStore = useAuthStore()
 
+/** WebSocket Store */
+const wsStore = useWebSocketStore()
+
 /** 应用名称首字符（用于默认 Logo） */
 const appNameFirstChar = computed(() => {
   return appConfig.name.charAt(0).toUpperCase()
@@ -61,6 +69,29 @@ const showBrandText = computed(() => {
 /** 当前用户名 */
 const username = computed(() => {
   return authStore.username || '访客'
+})
+
+/** 用户头像 */
+const userAvatar = computed(() => {
+  return authStore.userInfo?.avatar || null
+})
+
+/** 用户名字首字符（用于默认头像） */
+const usernameFirstChar = computed(() => {
+  return username.value.charAt(0).toUpperCase()
+})
+
+/** 在线状态样式类 */
+const onlineStatusClass = computed(() => {
+  switch (wsStore.status) {
+    case 'connected':
+      return 'status-online'
+    case 'connecting':
+    case 'reconnecting':
+      return 'status-busy'
+    default:
+      return 'status-offline'
+  }
 })
 </script>
 
@@ -142,18 +173,64 @@ const username = computed(() => {
   margin-left: 8px;
 }
 
+.avatar-wrapper {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
 .avatar {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--color-primary-light);
+  background: var(--header-bg);
   border-radius: 50%;
+  border: 2px solid var(--border-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+  background: var(--header-bg);
+}
+
+.avatar-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
 }
 
 .avatar-icon {
   color: var(--color-primary);
+}
+
+.status-indicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--header-bg);
+  transition: background-color 0.3s ease;
+}
+
+.status-online {
+  background-color: var(--success-color, #18a058);
+}
+
+.status-busy {
+  background-color: var(--warning-color, #f0a020);
+}
+
+.status-offline {
+  background-color: var(--error-color, #d03050);
 }
 
 .username {

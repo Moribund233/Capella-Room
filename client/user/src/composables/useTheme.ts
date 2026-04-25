@@ -7,10 +7,13 @@ import type { GlobalTheme } from 'naive-ui'
 /**
  * 主题映射表
  * 将项目主题类型映射到 Naive UI 主题对象
+ * 透明主题使用与标准主题相同的 Naive UI 主题
  */
 const themeMap: Record<ThemeType, GlobalTheme | null> = {
   light: null, // Naive UI 默认就是亮色主题，传入 null
   dark: darkTheme, // Naive UI 暗色主题
+  'light-transparent': null, // 透明亮色主题使用默认亮色
+  'dark-transparent': darkTheme, // 透明暗色主题使用暗色
 }
 
 /**

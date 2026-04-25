@@ -120,8 +120,14 @@ export const useUIStore = defineStore('ui', () => {
    * 合并后的 QuickBar 配置
    */
   const quickBarConfig = computed<QuickItemConfig[]>({
-    get: () =>
-      localConfig.value?.quickBar ?? cloudConfig.value?.quickBar ?? defaultUiConfig.quickBar ?? [],
+    get: () => {
+      const localQuickBar = localConfig.value?.quickBar
+      const cloudQuickBar = cloudConfig.value?.quickBar
+      // 检查数组是否有实际内容，空数组也视为无效配置
+      if (localQuickBar && localQuickBar.length > 0) return localQuickBar
+      if (cloudQuickBar && cloudQuickBar.length > 0) return cloudQuickBar
+      return defaultUiConfig.quickBar ?? []
+    },
     set: (value) => {
       localConfig.value = {
         ...localConfig.value,
