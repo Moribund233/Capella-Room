@@ -4,7 +4,7 @@
  */
 
 // 连接状态
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'auth_failed'
 
 // 用户状态
 export type UserStatus = 'online' | 'away' | 'busy' | 'offline'
@@ -18,6 +18,7 @@ export interface WebSocketUserInfo {
 }
 
 // 消息类型
+// 对应后端 WebSocketMessage 枚举，使用 #[serde(tag = "type", content = "payload")] 格式
 export type MessageType =
   // 连接管理
   | 'Auth'
@@ -34,7 +35,6 @@ export type MessageType =
   | 'UserLeft'
   | 'OnlineUsers'
   // 消息通信
-  | 'Chat'
   | 'ChatMessage'
   | 'NewMessage'
   | 'Typing'
@@ -46,14 +46,11 @@ export type MessageType =
   | 'DeleteMessage'
   | 'MessageDeleted'
   // 系统消息
-  | 'System'
   | 'SystemMessage'
   | 'RoomUpdated'
   // 用户状态
-  | 'StatusUpdate'
   | 'UpdateStatus'
   | 'UserStatusChanged'
-  | 'UserStatusUpdate'
   | 'GetOnlineUsers'
   | 'GlobalOnlineUsers'
   // 断线重连
@@ -178,6 +175,7 @@ export interface WebSocketEventHandlers {
   onDisconnect?: () => void
   onError?: (error: Error) => void
   onMessage?: (message: WebSocketMessage) => void
+  onAuthFailed?: (error: Error) => void
 }
 
 // 通知

@@ -201,14 +201,25 @@ impl WebSocketManager {
     pub fn join_room(&self, room_id: Uuid, user_id: Uuid) {
         debug!("User {} joined room {}", user_id, room_id);
 
-        // 添加到房间订阅列表
+        // 添加到房间订阅列表（避免重复）
         self.room_subscribers
             .entry(room_id)
             .or_default()
+            .retain(|&id| id != user_id); // 先移除已存在的相同用户ID
+        self.room_subscribers
+            .get_mut(&room_id)
+            .unwrap()
             .push(user_id);
 
-        // 添加到用户的房间列表
-        self.user_rooms.entry(user_id).or_default().push(room_id);
+        // 添加到用户的房间列表（避免重复）
+        self.user_rooms
+            .entry(user_id)
+            .or_default()
+            .retain(|&id| id != room_id); // 先移除已存在的相同房间ID
+        self.user_rooms
+            .get_mut(&user_id)
+            .unwrap()
+            .push(room_id);
     }
 
     /// 离开房间

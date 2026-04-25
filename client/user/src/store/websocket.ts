@@ -5,7 +5,7 @@
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { getAccessToken, getWebSocketClient } from '@/api'
+import { getAccessToken, getWebSocketClient, resetWebSocketClient } from '@/api'
 import { useAuthStore } from './auth'
 import type {
   WebSocketMessage,
@@ -82,6 +82,16 @@ export const useWebSocketStore = defineStore('websocket', () => {
         console.error('[WebSocket] 错误:', error)
         lastError.value = '连接错误'
       },
+      onAuthFailed: (error: Error) => {
+        console.error('[WebSocket] 认证失败，需要重新登录:', error)
+        status.value = 'disconnected'
+        lastError.value = '登录已过期，请重新登录'
+        // Token 过期，完全重置 WebSocket 客户端，阻止自动重连
+        resetWebSocketClient()
+        // 清除认证状态并跳转到登录页
+        const authStore = useAuthStore()
+        authStore.logout()
+      },
       onMessage: (message: WebSocketMessage) => {
         handleMessage(message)
       }
@@ -109,11 +119,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
    * 加入房间
    */
   function joinRoom(roomId: string) {
-    if (!isConnected.value) {
-      console.warn('WebSocket 未连接，无法加入房间')
+    if (!isConnected.value || !roomId) {
+      console.warn('WebSocket 未连接或房间ID无效，无法加入房间')
       return
     }
 
+    // 后端期望邻接标签格式: { type: "JoinRoom", payload: { room_id: "..." } }
     wsClient.send({
       type: 'JoinRoom',
       payload: { room_id: roomId }
@@ -129,10 +140,11 @@ export const useWebSocketStore = defineStore('websocket', () => {
    * 离开房间
    */
   function leaveRoom(roomId: string) {
-    if (!isConnected.value) {
+    if (!isConnected.value || !roomId) {
       return
     }
 
+    // 后端期望邻接标签格式: { type: "LeaveRoom", payload: { room_id: "..." } }
     wsClient.send({
       type: 'LeaveRoom',
       payload: { room_id: roomId }
@@ -149,11 +161,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
    * 注意：消息不会立即显示在本地，而是等待服务器广播 NewMessage
    */
   function sendMessage(roomId: string, content: string) {
-    if (!isConnected.value) {
-      console.warn('WebSocket 未连接，无法发送消息')
+    if (!isConnected.value || !roomId) {
+      console.warn('WebSocket 未连接或房间ID无效，无法发送消息')
       return
     }
 
+    // 后端期望邻接标签格式: { type: "ChatMessage", payload: { room_id: "...", content: "..." } }
     wsClient.send({
       type: 'ChatMessage',
       payload: {
@@ -168,13 +181,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
    * 设置用户状态
    */
   function setUserStatus(newStatus: UserStatus) {
-    if (!isConnected.value) {
-      console.warn('WebSocket 未连接，无法设置状态')
+    if (!isConnected.value || !newStatus) {
+      console.warn('WebSocket 未连接或状态无效，无法设置状态')
       return
     }
 
+    // 后端期望邻接标签格式: { type: "UpdateStatus", payload: { status: "..." } }
     wsClient.send({
-      type: 'StatusUpdate',
+      type: 'UpdateStatus',
       payload: { status: newStatus }
     })
 
@@ -232,12 +246,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
         break
       }
 
-      case 'System': {
-        const data = message.payload as { message: string }
+      case 'SystemMessage': {
+        const data = message.payload as { content: string }
         chatMessages.value.push({
           id: Date.now().toString(),
           type: 'system',
-          content: data.message,
+          content: data.content,
           time: new Date().toISOString()
         })
         break
@@ -269,9 +283,13 @@ export const useWebSocketStore = defineStore('websocket', () => {
       }
 
       case 'UserJoined': {
-        const data = message.payload as { user: WebSocketUserInfo }
-        if (!onlineUsers.value.find(u => u.id === data.user.id)) {
-          onlineUsers.value.push(data.user)
+        const data = message.payload as { room_id: string; user_id: string; username: string }
+        if (!onlineUsers.value.find(u => u.id === data.user_id)) {
+          onlineUsers.value.push({
+            id: data.user_id,
+            username: data.username,
+            status: 'online'
+          })
         }
         break
       }
@@ -282,7 +300,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
         break
       }
 
-      case 'UserStatusUpdate': {
+      case 'UserStatusChanged': {
         const data = message.payload as { user_id: string; status: UserStatus }
         const user = onlineUsers.value.find(u => u.id === data.user_id)
         if (user) {

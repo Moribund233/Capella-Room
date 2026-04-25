@@ -32,23 +32,46 @@ export const routes: RouteRecordRaw[] = [
           requiresAuth: true,
         },
       },
+      // 房间模块 - 主页面+子页面模式
       {
-        path: 'rooms',
-        name: 'Rooms',
-        component: () => import('@/views/RoomsView.vue'),
-        meta: {
-          title: '房间列表',
-          requiresAuth: true,
-        },
-      },
-      {
-        path: 'room/:id',
+        path: 'room',
         name: 'Room',
         component: () => import('@/views/RoomView.vue'),
+        redirect: '/room/list',
         meta: {
-          title: '聊天房间',
+          title: '房间',
           requiresAuth: true,
+          hasDock: true,
         },
+        children: [
+          {
+            path: 'list',
+            name: 'RoomList',
+            component: () => import('@/pages/room/RoomListPage.vue'),
+            meta: {
+              title: '房间列表',
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'chat/:id',
+            name: 'RoomChat',
+            component: () => import('@/pages/room/ChatPage.vue'),
+            meta: {
+              title: '聊天室',
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'users/:id',
+            name: 'RoomUsers',
+            component: () => import('@/pages/room/UserListPage.vue'),
+            meta: {
+              title: '在线用户',
+              requiresAuth: true,
+            },
+          },
+        ],
       },
       {
         path: 'profile',

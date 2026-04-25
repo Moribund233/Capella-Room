@@ -29,15 +29,26 @@ class WebSocketClient {
   private connectingPromise: Promise<void> | null = null
   private authSent = false
 
+  private customConfig: WebSocketConfig
+
   constructor(config: WebSocketConfig = {}, handlers: WebSocketEventHandlers = {}) {
-    const defaultConfig = getConnectionConfig()
-    this.config = {
-      maxReconnectAttempts: config.maxReconnectAttempts ?? defaultConfig.maxReconnectAttempts,
-      reconnectInterval: config.reconnectInterval ?? defaultConfig.reconnectInterval,
-      heartbeatInterval: config.heartbeatInterval ?? defaultConfig.heartbeatInterval,
-      connectTimeout: config.connectTimeout ?? defaultConfig.connectTimeout,
-    }
+    this.customConfig = config
     this.handlers = handlers
+    // 初始配置会在 connect() 中重新获取，确保使用最新的服务端配置
+    this.config = this.getMergedConfig()
+  }
+
+  /**
+   * 获取合并后的配置（自定义配置 + 服务端配置）
+   */
+  private getMergedConfig(): Required<WebSocketConfig> {
+    const serverConfig = getConnectionConfig()
+    return {
+      maxReconnectAttempts: this.customConfig.maxReconnectAttempts ?? serverConfig.maxReconnectAttempts,
+      reconnectInterval: this.customConfig.reconnectInterval ?? serverConfig.reconnectInterval,
+      heartbeatInterval: this.customConfig.heartbeatInterval ?? serverConfig.heartbeatInterval,
+      connectTimeout: this.customConfig.connectTimeout ?? serverConfig.connectTimeout,
+    }
   }
 
   /**
@@ -74,6 +85,10 @@ class WebSocketClient {
     if (!token) {
       return Promise.reject(new Error('未登录'))
     }
+
+    // 连接前刷新配置，确保使用最新的服务端配置
+    this.config = this.getMergedConfig()
+    console.log(`[WebSocket] 使用配置: heartbeatInterval=${this.config.heartbeatInterval}ms, reconnectInterval=${this.config.reconnectInterval}ms`)
 
     this.connectionStatus = 'connecting'
     this.isAuthenticated = false
@@ -159,15 +174,31 @@ class WebSocketClient {
           this.flushMessageQueue()
         } else {
           console.error('[WebSocket] 认证失败:', result.message)
+          // 标记为认证失败，阻止自动重连
+          this.connectionStatus = 'auth_failed'
           this.cleanup()
-          this.connectionStatus = 'disconnected'
-          this.authReject?.(new Error(result.message || '认证失败'))
+          // 关闭连接，但不触发重连
+          if (this.ws) {
+            this.ws.onclose = null
+            this.ws.close()
+            this.ws = null
+          }
+          const error = new Error(result.message || '认证失败')
+          // 通知上层认证失败（token 过期等）
+          this.handlers.onAuthFailed?.(error)
+          this.authReject?.(error)
         }
         return
       }
 
-      // 处理心跳响应
+      // 处理心跳响应（后端回复的 Pong）
       if (message.type === 'Pong') {
+        return
+      }
+
+      // 处理后端发送的心跳 Ping，需要回复 Pong
+      if (message.type === 'Ping') {
+        this.sendInternal({ type: 'Pong' })
         return
       }
 
@@ -184,7 +215,7 @@ class WebSocketClient {
   }
 
   /**
-   * 发送消息
+   * 发送消息（使用嵌套 payload 结构）
    */
   send(message: WebSocketMessage): boolean {
     // 未认证时不允许发送业务消息（除了认证相关消息）
@@ -202,7 +233,26 @@ class WebSocketClient {
   }
 
   /**
-   * 内部发送方法
+   * 发送原始消息（扁平结构，直接发送给后端）
+   * 用于发送后端期望的扁平格式消息，如: { type: "JoinRoom", room_id: "..." }
+   */
+  sendRaw(message: { type: string; [key: string]: unknown }): boolean {
+    // 未认证时不允许发送业务消息（除了认证相关消息）
+    if (!this.isAuthenticated && !this.isAuthMessage(message as unknown as WebSocketMessage)) {
+      console.error('[WebSocket] 认证前无法发送消息')
+      return false
+    }
+
+    if (!this.isConnected()) {
+      this.messageQueue.push(message as unknown as WebSocketMessage)
+      return false
+    }
+
+    return this.sendInternalRaw(message)
+  }
+
+  /**
+   * 内部发送方法（用于 WebSocketMessage）
    */
   private sendInternal(message: WebSocketMessage): boolean {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -211,11 +261,32 @@ class WebSocketClient {
     }
 
     try {
-      this.ws.send(JSON.stringify(message))
+      const json = JSON.stringify(message)
+      console.log('[WebSocket] 发送消息:', json)
+      this.ws.send(json)
       return true
     } catch (error) {
       console.error('[WebSocket] 发送消息失败:', error)
       this.messageQueue.push(message)
+      return false
+    }
+  }
+
+  /**
+   * 内部发送方法（用于原始扁平结构消息）
+   */
+  private sendInternalRaw(message: { type: string; [key: string]: unknown }): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.messageQueue.push(message as unknown as WebSocketMessage)
+      return false
+    }
+
+    try {
+      this.ws.send(JSON.stringify(message))
+      return true
+    } catch (error) {
+      console.error('[WebSocket] 发送消息失败:', error)
+      this.messageQueue.push(message as unknown as WebSocketMessage)
       return false
     }
   }

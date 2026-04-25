@@ -33,7 +33,7 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
     {
       name: '房间',
       icon: 'MessageSquare',
-      path: '/rooms',
+      path: '/room/list',
     },
     {
       name: '设置',
@@ -152,6 +152,38 @@ export const quickBarConfig: QuickItemConfig[] = [
  * 键名为路由的第一级路径（如 'setting' 对应 /setting）
  */
 export const dockConfig: DockConfig = {
+  // 房间模块 - 支持动态房间ID
+  room: {
+    enabled: true,
+    position: 'bottom',
+    offset: 24,
+    items: [
+      {
+        key: 'list',
+        label: '房间列表',
+        icon: 'List',
+        path: '/room/list',
+      },
+      {
+        key: 'chat',
+        label: '聊天室',
+        icon: 'MessageSquare',
+        path: '/room/chat/:id',
+        requiresParams: true,
+        paramKeys: ['id'],
+        missingParamsMessage: '请先选择一个房间',
+      },
+      {
+        key: 'users',
+        label: '在线用户',
+        icon: 'Users',
+        path: '/room/users/:id',
+        requiresParams: true,
+        paramKeys: ['id'],
+        missingParamsMessage: '请先选择一个房间',
+      },
+    ],
+  },
   // 设置页 - 子页面通过 DockBar 导航
   setting: {
     enabled: true,

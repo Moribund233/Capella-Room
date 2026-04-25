@@ -1,5 +1,5 @@
 <template>
-  <div class="rooms-view">
+  <div class="room-list-page">
     <n-card title="房间列表">
       <template #header-extra>
         <n-button type="primary" @click="showCreateModal = true">
@@ -88,7 +88,26 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { MessageSquare } from 'lucide-vue-next'
-import { NCard, NButton, NSpin, NEmpty, NList, NListItem, NThing, NAvatar, NIcon, NTag, NSpace, NText, NModal, NForm, NFormItem, NInput, NSwitch, NInputNumber } from 'naive-ui'
+import {
+  NCard,
+  NButton,
+  NSpin,
+  NEmpty,
+  NList,
+  NListItem,
+  NThing,
+  NAvatar,
+  NIcon,
+  NTag,
+  NSpace,
+  NText,
+  NModal,
+  NForm,
+  NFormItem,
+  NInput,
+  NSwitch,
+  NInputNumber,
+} from 'naive-ui'
 import { getRooms, createRoom as createRoomApi } from '@/api/room'
 import type { Room } from '@/types/api'
 
@@ -159,7 +178,7 @@ async function handleCreateRoom() {
 }
 
 function enterRoom(roomId: string) {
-  router.push(`/room/${roomId}`)
+  router.push(`/room/chat/${roomId}`)
 }
 
 onMounted(() => {
@@ -172,7 +191,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.rooms-view {
+.room-list-page {
   padding: 24px;
   max-width: 800px;
   margin: 0 auto;

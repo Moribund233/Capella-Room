@@ -18,7 +18,7 @@
         </div>
 
         <!-- 页面级 DockBar -->
-        <DockBar :config="currentPageDockConfig" :sidebar-width="layoutStore.sidebarWidth" />
+        <DockBar :config="currentPageDockConfig" :sidebar-width="layoutStore.sidebarWidth" @missing-params="handleMissingParams" />
       </div>
     </main>
 
@@ -47,6 +47,7 @@ import GlobalModal from '@/components/common/GlobalModal.vue'
 import { useLayoutStore } from '@/store/layout'
 import { useConfig } from '@/composables'
 import { useGlobalModal } from '@/composables/useGlobalModal'
+import { useMessage } from 'naive-ui'
 
 
 /**
@@ -60,6 +61,14 @@ const route = useRoute()
 const layoutStore = useLayoutStore()
 const { config: uiConfig } = useConfig()
 const { state: modalState, handlePositiveClick: handleModalPositiveClick, handleNegativeClick: handleModalNegativeClick, handleClose: handleModalClose } = useGlobalModal()
+const message = useMessage()
+
+/**
+ * 处理 DockBar 缺少参数事件
+ */
+function handleMissingParams(msg: string) {
+  message.warning(msg)
+}
 
 // 从 store 获取响应式状态
 const { isMobile } = storeToRefs(layoutStore)

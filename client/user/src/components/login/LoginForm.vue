@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   NForm,
@@ -59,6 +59,7 @@ import {
   NButton,
   NSpace,
   NAlert,
+  useMessage,
   type FormInst,
   type FormRules,
 } from 'naive-ui'
@@ -72,6 +73,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+const message = useMessage()
 
 const formRef = ref<FormInst | null>(null)
 
@@ -110,13 +112,38 @@ async function handleLogin() {
   })
 
   if (success) {
+    message.success('登录成功！')
     // 登录成功后加载云端 UI 配置
     await uiStore.initAfterLogin()
 
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
+  } else {
+    message.error(authStore.error || '登录失败')
   }
 }
+
+/**
+ * 组件挂载时检查是否有重定向消息
+ */
+onMounted(() => {
+  const reason = route.query.reason as string
+  if (reason) {
+    switch (reason) {
+      case 'session_expired':
+        message.warning('登录已过期，请重新登录')
+        break
+      case 'account_disabled':
+        message.error('账号已被禁用，请联系管理员')
+        break
+      case 'unauthorized':
+        message.warning('请先登录以访问该页面')
+        break
+      default:
+        message.info('请登录以继续')
+    }
+  }
+})
 </script>
 
 <style scoped>

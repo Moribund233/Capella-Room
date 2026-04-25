@@ -41,7 +41,8 @@ import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
 export function useQuickUser(config: QuickConfigItem, context: QuickContext): UseQuickReturn {
   const authStore = useAuthStore()
   const router = useRouter()
-  const { open, close, warning } = useGlobalModal()
+  // 提前捕获 useGlobalModal 返回的方法，避免在异步回调中调用
+  const globalModal = useGlobalModal()
 
   /**
    * 是否已登录
@@ -59,7 +60,7 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
    * 显示关于弹窗
    */
   function showAboutModal(): void {
-    open({
+    globalModal.open({
       title: '',
       component: AboutModal,
       componentProps: {},
@@ -74,7 +75,7 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
    * 显示用户资料弹窗
    */
   function showUserProfileModal(): void {
-    open({
+    globalModal.open({
       title: '用户详情',
       component: UserProfileModal,
       componentProps: {},
@@ -89,13 +90,13 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
    * 显示登录弹窗
    */
   function showLoginModal(): void {
-    open({
+    globalModal.open({
       title: '',
       component: LoginModalContent,
       componentProps: {
         onSuccess: () => {
           // 登录成功，关闭弹窗
-          close()
+          globalModal.close()
         },
       },
       preset: 'card',
@@ -156,7 +157,9 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
       // 已登录，处理具体逻辑
       if (childKey === 'logout') {
         // 登出操作：显示确认弹窗
-        warning({
+        // 提前捕获 router 实例，避免在异步回调中调用 useRouter()
+        const currentRouter = router
+        globalModal.warning({
           title: '确认退出',
           content: '确定要退出登录吗？',
           positiveText: '确认退出',
@@ -165,8 +168,8 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
             await authStore.logout()
             // 触发外部动作
             context.emitAction(config.key, childKey)
-            // 跳转到登录页
-            await router.replace({ name: 'Login' })
+            // 跳转到登录页（使用已捕获的 router 实例）
+            await currentRouter.replace({ name: 'Login' })
           },
         })
         return

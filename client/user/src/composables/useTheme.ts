@@ -1,4 +1,4 @@
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, getCurrentInstance } from 'vue'
 import { darkTheme } from 'naive-ui'
 import { useThemeStore } from '@/store'
 import type { ThemeType } from '@/types'
@@ -83,10 +83,13 @@ export function useTheme() {
   /**
    * 初始化主题
    * 在组件挂载时自动调用，加载保存的主题
+   * 仅在组件上下文中执行，避免在非组件环境调用
    */
-  onMounted(() => {
-    themeStore.initTheme()
-  })
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      themeStore.initTheme()
+    })
+  }
 
   return {
     currentTheme,

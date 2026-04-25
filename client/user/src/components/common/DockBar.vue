@@ -44,10 +44,16 @@ export interface DockItem {
   label: string
   /** 图标组件 */
   icon: FunctionalComponent<LucideProps>
-  /** 路由路径 */
+  /** 路由路径（可以是模板，如 /room/chat/:id） */
   path: string
   /** 是否禁用 */
   disabled?: boolean
+  /** 是否需要路由参数 */
+  requiresParams?: boolean
+  /** 参数名列表 */
+  paramKeys?: string[]
+  /** 缺少参数时的提示消息 */
+  missingParamsMessage?: string
 }
 
 /**
@@ -86,6 +92,8 @@ const props = withDefaults(defineProps<Props>(), {
 interface Emits {
   /** 展开/收起状态变化 */
   (e: 'update:expanded', value: boolean): void
+  /** 缺少必要参数时触发，传递提示消息 */
+  (e: 'missingParams', message: string): void
 }
 
 const emit = defineEmits<Emits>()
@@ -96,6 +104,9 @@ const dockRef = ref<HTMLElement | null>(null)
 
 /** 展开状态 */
 const isExpanded = ref(false)
+
+/** 缓存的路由参数 - 用于在参数缺失时保留上一个有效值 */
+const cachedParams = ref<Record<string, string>>({})
 
 /** 是否显示 */
 const visible = computed(() => props.config?.enabled ?? false)
@@ -122,13 +133,55 @@ const items = computed<DockItem[]>(() => {
     icon: getIconComponent(item.icon),
     path: item.path,
     disabled: item.disabled,
+    requiresParams: item.requiresParams,
+    paramKeys: item.paramKeys,
+    missingParamsMessage: item.missingParamsMessage,
   }))
 })
+
+/**
+ * 解析路径模板，替换参数
+ * 优先使用当前路由参数，如果缺失则使用缓存的参数
+ * @param path 路径模板（如 /room/chat/:id）
+ * @returns 解析后的实际路径
+ */
+function resolvePath(path: string): string {
+  // 从当前路由获取参数，并更新缓存
+  const params = route.params
+  const mergedParams: Record<string, string> = { ...cachedParams.value }
+
+  // 更新缓存：使用当前路由的有效参数
+  Object.keys(params).forEach(key => {
+    const value = params[key]
+    if (value) {
+      const replacement = Array.isArray(value) ? value[0] : value
+      if (replacement) {
+        mergedParams[key] = replacement
+        cachedParams.value[key] = replacement
+      }
+    }
+  })
+
+  // 替换路径中的参数占位符
+  let resolvedPath = path
+  Object.keys(mergedParams).forEach(key => {
+    const value = mergedParams[key]
+    if (value) {
+      resolvedPath = resolvedPath.replace(`:${key}`, value)
+    }
+  })
+
+  return resolvedPath
+}
 
 /** 当前激活的 key */
 const activeKey = computed(() => {
   const currentPath = route.path
-  const matched = items.value.find((item) => item.path === currentPath)
+  const matched = items.value.find((item) => {
+    // 解析路径模板后比较
+    const resolvedPath = resolvePath(item.path)
+    return resolvedPath === currentPath
+  })
   return matched?.key || ''
 })
 
@@ -197,8 +250,19 @@ const handleBlur = () => {
 const handleItemClick = (item: DockItem) => {
   if (item.disabled) return
 
+  // 解析路径模板，替换参数（优先使用当前路由参数，缺失时使用缓存）
+  const resolvedPath = resolvePath(item.path)
+
+  // 如果解析后的路径仍然缺少必要参数，则触发事件并返回
+  if (item.requiresParams && resolvedPath.includes(':')) {
+    console.warn(`[DockBar] 无法跳转，缺少必要参数: ${item.path}`)
+    const message = item.missingParamsMessage || '缺少必要参数，无法跳转'
+    emit('missingParams', message)
+    return
+  }
+
   // 路由跳转
-  router.push(item.path)
+  router.push(resolvedPath)
 
   // 点击后收起面板
   setTimeout(() => {

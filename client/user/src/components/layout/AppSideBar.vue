@@ -190,6 +190,11 @@ const handleMenuClick = (item: MenuItem) => {
  * 处理退出登录
  */
 const handleLogout = () => {
+  // 提前捕获 router 实例和 emit 函数，避免在异步回调中调用
+  const currentRouter = router
+  const currentEmit = emit
+  const currentIsMobile = isMobile.value
+
   dialog.warning({
     title: '确认退出',
     content: '确定要退出登录吗？',
@@ -197,15 +202,15 @@ const handleLogout = () => {
     negativeText: '取消',
     onPositiveClick: async () => {
       // 移动端关闭菜单
-      if (isMobile.value) {
-        emit('update:isMobileMenuOpen', false)
+      if (currentIsMobile) {
+        currentEmit('update:isMobileMenuOpen', false)
       }
 
       // 清除登录状态
       await authStore.logout()
 
       // 跳转到登录页（使用 replace 避免返回按钮回到需要登录的页面）
-      await router.replace({ name: 'Login' })
+      await currentRouter.replace({ name: 'Login' })
     },
   })
 }

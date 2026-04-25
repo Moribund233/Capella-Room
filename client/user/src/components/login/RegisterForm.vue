@@ -55,32 +55,12 @@
     {{ authStore.error }}
   </n-alert>
 
-  <!-- 注册成功提示弹窗 -->
-  <n-modal
-    v-model:show="showSuccessModal"
-    :mask-closable="false"
-    preset="card"
-    title="🎉 注册成功"
-    style="width: 400px"
-  >
-    <n-card :bordered="false">
-      <p>恭喜您，账号注册成功！</p>
-      <p style="margin-top: 8px; color: #666;">
-        现在可以使用您的邮箱 <strong>{{ formData.email }}</strong> 登录了。
-      </p>
-    </n-card>
-    <template #footer>
-      <n-space justify="end">
-        <n-button type="primary" @click="handleModalConfirm">
-          去登录
-        </n-button>
-      </n-space>
-    </template>
-  </n-modal>
+
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
+
 import {
   NForm,
   NFormItem,
@@ -88,8 +68,7 @@ import {
   NButton,
   NSpace,
   NAlert,
-  NModal,
-  NCard,
+  useMessage,
   type FormInst,
   type FormRules,
 } from 'naive-ui'
@@ -100,9 +79,9 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const message = useMessage()
 
 const formRef = ref<FormInst | null>(null)
-const showSuccessModal = ref(false)
 
 const formData = reactive({
   username: '',
@@ -145,16 +124,11 @@ async function handleRegister() {
   })
 
   if (success) {
-    showSuccessModal.value = true
+    message.success('注册成功！请登录')
+    emit('switch-to-login')
+  } else {
+    message.error(authStore.error || '注册失败')
   }
-}
-
-/**
- * 处理弹窗确认，跳转到登录页
- */
-function handleModalConfirm() {
-  showSuccessModal.value = false
-  emit('switch-to-login')
 }
 </script>
 
