@@ -1,40 +1,37 @@
 <template>
-  <footer class="app-footer">
-    <div class="footer-left">
-      <span class="copyright">© 2026 SeredeliUI. All rights reserved.</span>
-    </div>
-    <div class="footer-center">
-      <nav class="footer-links">
-        <a href="#" class="footer-link">关于我们</a>
-        <span class="divider">|</span>
-        <a href="#" class="footer-link">隐私政策</a>
-        <span class="divider">|</span>
-        <a href="#" class="footer-link">使用条款</a>
-        <span class="divider">|</span>
-        <a href="#" class="footer-link">帮助中心</a>
-      </nav>
-    </div>
-    <div class="footer-right">
-      <span class="version">v{{ version }}</span>
-    </div>
+  <footer v-if="shouldShowFooter" class="app-footer">
+    <StatusBar class="footer-status-bar" />
   </footer>
 </template>
 
 <script setup lang="ts">
-import { useAppConfig } from '@/composables'
+import { computed } from 'vue'
+import { StatusBar } from '@/components/common'
+import { useStatusBar } from '@/composables/useStatusBar'
+import { useLayoutStore } from '@/store'
 
 /**
  * AppFooter 组件
- * 页面底部布局组件，显示版权信息、链接和版本号
+ * 页面底部布局组件，使用 StatusBar 显示状态信息
+ * 当 StatusBar 没有内容时自动隐藏
  */
-const { version } = useAppConfig()
+
+const layoutStore = useLayoutStore()
+const { hasContent, visible } = useStatusBar()
+
+/** 是否应该显示 footer */
+const shouldShowFooter = computed(() => {
+  if (!layoutStore.isFooterVisible) return false
+  if (!visible.value) return false
+  return hasContent.value
+})
 </script>
 
 <style scoped>
 .app-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   height: var(--footer-height);
   width: var(--footer-compact-width, 100vw);
   margin: 0 var(--footer-margin, 0);
@@ -53,57 +50,10 @@ const { version } = useAppConfig()
   border-bottom: none;
 }
 
-/* 左侧区域 */
-.footer-left {
-  display: flex;
-  align-items: center;
-}
-
-.copyright {
-  white-space: nowrap;
-}
-
-/* 中间区域 */
-.footer-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  padding: 0 16px;
-}
-
-.footer-links {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.footer-link {
-  color: var(--text-tertiary);
-  text-decoration: none;
-  transition: var(--transition-fast);
-  white-space: nowrap;
-}
-
-.footer-link:hover {
-  color: var(--color-primary);
-}
-
-.divider {
-  color: var(--border-color-base);
-}
-
-/* 右侧区域 */
-.footer-right {
-  display: flex;
-  align-items: center;
-}
-
-.version {
-  padding: 2px 8px;
-  background: var(--bg-layout);
-  border-radius: 4px;
-  font-family: monospace;
+/* StatusBar 样式 */
+.footer-status-bar {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* 平板端适配 */
@@ -111,39 +61,12 @@ const { version } = useAppConfig()
   .app-footer {
     padding: 0 16px;
   }
-
-  .footer-center {
-    display: none;
-  }
 }
 
 /* 移动端适配 */
 @media screen and (max-width: 767px) {
   .app-footer {
-    flex-direction: column;
-    justify-content: center;
-    gap: 8px;
-    height: auto;
-    padding: 12px;
-    text-align: center;
-    border: none;
-  }
-
-  .footer-left,
-  .footer-center,
-  .footer-right {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .footer-center {
-    padding: 0;
-    order: -1;
-  }
-
-  .footer-links {
-    flex-wrap: wrap;
-    justify-content: center;
+    padding: 0 12px;
   }
 }
 </style>

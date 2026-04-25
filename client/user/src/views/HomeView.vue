@@ -37,14 +37,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { NCard, NSpace, NText, NButton, NTag } from 'naive-ui'
+import { Users, MessageSquare, Zap, Clock, Wifi } from 'lucide-vue-next'
 import { useAuthStore, useWebSocketStore } from '@/store'
+import { useStatusBar, useSystemStatus } from '@/composables'
+import type { StatusItem } from '@/composables'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const wsStore = useWebSocketStore()
+const statusBar = useStatusBar()
+
+// 使用真实系统状态数据
+const { status: systemStatus } = useSystemStatus({
+  interval: 5000,
+  autoStart: true,
+})
 
 const connectionStatusType = computed(() => {
   switch (wsStore.status) {
@@ -71,6 +81,50 @@ const connectionStatusText = computed(() => {
   }
 })
 
+/** 当前时间 */
+const currentTime = computed(() => {
+  const now = new Date()
+  return now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+})
+
+/** 状态栏项目 - 使用真实数据 */
+const statusBarItems = computed<StatusItem[]>(() => [
+  {
+    icon: Users,
+    label: '在线用户',
+    value: systemStatus.value.onlineUsers,
+    valueClass: 'text-primary',
+  },
+  {
+    icon: MessageSquare,
+    label: '活跃房间',
+    value: systemStatus.value.activeRooms || '-',
+    valueClass: 'text-success',
+  },
+  {
+    icon: Zap,
+    label: '延迟',
+    value: `${systemStatus.value.latency}ms`,
+    valueClass: systemStatus.value.latency < 50 ? 'text-success' : systemStatus.value.latency < 100 ? 'text-warning' : 'text-error',
+  },
+  {
+    icon: Wifi,
+    label: '连接状态',
+    value: connectionStatusText.value,
+    valueClass: wsStore.isConnected ? 'text-success' : 'text-error',
+  },
+  {
+    icon: Clock,
+    label: '当前时间',
+    value: currentTime.value,
+  },
+])
+
+// 监听状态变化，更新状态栏
+watch(() => statusBarItems.value, (items) => {
+  statusBar.setItems(items)
+}, { immediate: true, deep: true })
+
 function goToRooms() {
   router.push('/rooms')
 }
@@ -89,6 +143,11 @@ onMounted(() => {
     wsStore.connect()
   }
 })
+
+onUnmounted(() => {
+  // 清除状态栏内容
+  statusBar.clear()
+})
 </script>
 
 <style scoped>
@@ -100,5 +159,22 @@ onMounted(() => {
 
 .status-card {
   margin-top: 24px;
+}
+
+/* 状态栏值的颜色类 */
+:global(.text-primary) {
+  color: var(--color-primary);
+}
+
+:global(.text-success) {
+  color: var(--color-success);
+}
+
+:global(.text-warning) {
+  color: var(--color-warning);
+}
+
+:global(.text-error) {
+  color: var(--color-error);
 }
 </style>

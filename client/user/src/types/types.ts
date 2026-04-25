@@ -119,6 +119,31 @@ export interface ThemeConfig {
 }
 
 /**
+ * 布局外观配置
+ * 用户可自定义的布局样式设置
+ */
+export interface LayoutConfig {
+  /** 背景类型 */
+  backgroundType: 'solid' | 'gradient' | 'image'
+  /** 背景颜色（纯色模式） */
+  backgroundColor?: string
+  /** 背景渐变起始色 */
+  gradientFrom?: string
+  /** 背景渐变结束色 */
+  gradientTo?: string
+  /** 背景图片URL */
+  backgroundImage?: string
+  /** 背景图片透明度（0-1） */
+  backgroundOpacity?: number
+  /** 内容区域透明度（0-1） */
+  contentOpacity?: number
+  /** 背景模糊程度（px） */
+  backgroundBlur?: number
+  /** 圆角大小（px） */
+  borderRadius?: number
+}
+
+/**
  * QuickBar 子菜单项配置
  */
 export interface QuickChildItemConfig {
@@ -170,6 +195,8 @@ export interface UIConfig {
   dock: DockConfig
   /** QuickBar 配置 */
   quickBar?: QuickItemConfig[]
+  /** 布局外观配置 */
+  layout?: LayoutConfig
 }
 
 // ==================== API 请求/响应类型 ====================

@@ -9,6 +9,7 @@ import type {
   QuickItemConfig,
   ThemeConfig,
   DockConfig,
+  LayoutConfig,
 } from '@/types'
 
 /**
@@ -149,6 +150,24 @@ export const useUIStore = defineStore('ui', () => {
   })
 
   /**
+   * 合并后的布局配置
+   */
+  const layoutConfig = computed<LayoutConfig>({
+    get: () => ({
+      ...defaultUiConfig.layout,
+      ...cloudConfig.value?.layout,
+      ...localConfig.value?.layout,
+    }),
+    set: (value) => {
+      localConfig.value = {
+        ...localConfig.value,
+        layout: value,
+      }
+      saveToLocalStorage()
+    },
+  })
+
+  /**
    * 完整的合并配置
    */
   const mergedConfig = computed<UIConfig>(() => ({
@@ -157,6 +176,7 @@ export const useUIStore = defineStore('ui', () => {
     sidebar: sidebarConfig.value,
     quickBar: quickBarConfig.value,
     dock: dockConfig.value,
+    layout: layoutConfig.value,
   }))
 
   /**
@@ -249,6 +269,14 @@ export const useUIStore = defineStore('ui', () => {
    */
   function updateDockConfig(config: DockConfig): void {
     dockConfig.value = config
+  }
+
+  /**
+   * 更新布局配置
+   * @param config 部分布局配置
+   */
+  function updateLayoutConfig(config: Partial<LayoutConfig>): void {
+    layoutConfig.value = { ...layoutConfig.value, ...config }
   }
 
   /**
@@ -377,6 +405,7 @@ export const useUIStore = defineStore('ui', () => {
     sidebarConfig,
     quickBarConfig,
     dockConfig,
+    layoutConfig,
     mergedConfig,
     hasLocalConfig,
     hasCloudConfig,
@@ -388,6 +417,7 @@ export const useUIStore = defineStore('ui', () => {
     updateSidebarItems,
     updateQuickBarItems,
     updateDockConfig,
+    updateLayoutConfig,
     resetToDefault,
     resetModule,
     loadCloudConfig,

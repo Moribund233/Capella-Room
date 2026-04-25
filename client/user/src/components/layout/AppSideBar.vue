@@ -122,17 +122,35 @@ window.addEventListener('resize', updateBreakpoint)
 const { menuItems } = useSidebarConfig()
 
 /**
+ * 更新当前激活的菜单项
+ * 根据当前路由路径匹配对应的菜单项
+ */
+function updateActiveMenu(): void {
+  const currentPath = route.path
+
+  // 首先尝试精确匹配
+  const exactMatch = menuItems.value.find((item) => item.path === currentPath)
+  if (exactMatch) {
+    activeKey.value = exactMatch.key
+    return
+  }
+
+  // 如果没有精确匹配，尝试前缀匹配（用于子路由）
+  // 例如 /room/list 应该匹配 /room 菜单
+  const prefixMatch = menuItems.value.find((item) => {
+    if (item.path === '/') return false
+    return currentPath.startsWith(item.path + '/') || currentPath === item.path
+  })
+
+  if (prefixMatch) {
+    activeKey.value = prefixMatch.key
+  }
+}
+
+/**
  * 监听路由变化，更新激活菜单项
  */
-watch(
-  () => route.path,
-  (newPath) => {
-    const matched = menuItems.value.find((item) => item.path === newPath)
-    if (matched) {
-      activeKey.value = matched.key
-    }
-  },
-)
+watch(() => route.path, updateActiveMenu, { immediate: true })
 
 /**
  * 计算侧边栏样式

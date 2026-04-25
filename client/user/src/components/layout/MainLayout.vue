@@ -1,5 +1,7 @@
 <template>
-  <div class="main-layout" :style="layoutStore.cssVariables">
+  <div class="main-layout" :style="[layoutStore.cssVariables, layoutStyle]">
+    <!-- 背景层 -->
+    <div v-if="layoutConfig.backgroundType !== 'solid' || layoutConfig.backgroundImage" class="background-layer" :style="backgroundStyle" />
     <!-- 头部导航 -->
     <AppHeader />
 
@@ -45,6 +47,7 @@ import AppFooter from './AppFooter.vue'
 import DockBar from '@/components/common/DockBar.vue'
 import GlobalModal from '@/components/common/GlobalModal.vue'
 import { useLayoutStore } from '@/store/layout'
+import { useUIStore } from '@/store'
 import { useConfig } from '@/composables'
 import { useGlobalModal } from '@/composables/useGlobalModal'
 import { useMessage } from 'naive-ui'
@@ -59,9 +62,59 @@ import { useMessage } from 'naive-ui'
 
 const route = useRoute()
 const layoutStore = useLayoutStore()
+const uiStore = useUIStore()
 const { config: uiConfig } = useConfig()
 const { state: modalState, handlePositiveClick: handleModalPositiveClick, handleNegativeClick: handleModalNegativeClick, handleClose: handleModalClose } = useGlobalModal()
 const message = useMessage()
+
+// 布局配置
+const { layoutConfig } = storeToRefs(uiStore)
+
+/**
+ * 计算布局样式
+ */
+const layoutStyle = computed(() => {
+  const config = layoutConfig.value
+  const styles: Record<string, string> = {}
+
+  // 纯色背景
+  if (config.backgroundType === 'solid' && !config.backgroundImage) {
+    styles.backgroundColor = config.backgroundColor || '#f5f5f5'
+  }
+
+  return styles
+})
+
+/**
+ * 计算背景层样式（渐变或图片）
+ */
+const backgroundStyle = computed(() => {
+  const config = layoutConfig.value
+  const styles: Record<string, string> = {}
+
+  if (config.backgroundType === 'gradient') {
+    // 渐变背景
+    styles.background = `linear-gradient(135deg, ${config.gradientFrom || '#667eea'}, ${config.gradientTo || '#764ba2'})`
+  } else if (config.backgroundImage) {
+    // 图片背景
+    styles.backgroundImage = `url(${config.backgroundImage})`
+    styles.backgroundSize = 'cover'
+    styles.backgroundPosition = 'center'
+    styles.backgroundRepeat = 'no-repeat'
+  }
+
+  // 透明度
+  if (config.backgroundOpacity !== undefined) {
+    styles.opacity = String(config.backgroundOpacity)
+  }
+
+  // 模糊效果
+  if (config.backgroundBlur && config.backgroundBlur > 0) {
+    styles.filter = `blur(${config.backgroundBlur}px)`
+  }
+
+  return styles
+})
 
 /**
  * 处理 DockBar 缺少参数事件
@@ -136,6 +189,17 @@ const currentPageDockConfig = computed(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.background-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .main-content {

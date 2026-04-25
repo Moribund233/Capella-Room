@@ -51,6 +51,22 @@ export const themeConfig: ThemeConfig = {
 }
 
 /**
+ * 布局外观配置
+ * 用户可自定义的布局样式设置
+ */
+export const layoutConfig = {
+  backgroundType: 'solid' as const,
+  backgroundColor: '#f5f5f5',
+  gradientFrom: '#667eea',
+  gradientTo: '#764ba2',
+  backgroundImage: '',
+  backgroundOpacity: 1,
+  contentOpacity: 1,
+  backgroundBlur: 0,
+  borderRadius: 8,
+}
+
+/**
  * QuickBar 快捷栏配置
  */
 export const quickBarConfig: QuickItemConfig[] = [
@@ -210,6 +226,7 @@ export const uiConfig = {
   theme: themeConfig,
   quickBar: quickBarConfig,
   dock: dockConfig,
+  layout: layoutConfig,
 }
 
 export default uiConfig

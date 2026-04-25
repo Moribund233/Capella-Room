@@ -2,17 +2,57 @@
   <div class="ui-settings-panel">
     <n-card title="界面设置" class="settings-card">
       <n-tabs type="line" animated>
-        <!-- 应用信息 -->
-        <n-tab-pane name="app" tab="应用信息">
-          <n-form :model="config.app" label-placement="left" label-width="120px">
-            <n-form-item label="应用名称">
-              <n-input v-model:value="config.app.name" placeholder="输入应用名称" />
+        <!-- 布局外观 -->
+        <n-tab-pane name="layout" tab="布局外观">
+          <n-form :model="config.layout" label-placement="left" label-width="140px">
+            <n-form-item label="背景类型">
+              <n-radio-group v-model:value="config.layout.backgroundType">
+                <n-radio-button value="solid">纯色</n-radio-button>
+                <n-radio-button value="gradient">渐变</n-radio-button>
+                <n-radio-button value="image">图片</n-radio-button>
+              </n-radio-group>
             </n-form-item>
-            <n-form-item label="Logo">
-              <n-input v-model:value="config.app.logo" placeholder="输入Logo路径" />
+
+            <!-- 纯色背景设置 -->
+            <template v-if="config.layout.backgroundType === 'solid'">
+              <n-form-item label="背景颜色">
+                <n-color-picker v-model:value="config.layout.backgroundColor" :show-alpha="false" />
+              </n-form-item>
+            </template>
+
+            <!-- 渐变背景设置 -->
+            <template v-if="config.layout.backgroundType === 'gradient'">
+              <n-form-item label="渐变起始色">
+                <n-color-picker v-model:value="config.layout.gradientFrom" :show-alpha="false" />
+              </n-form-item>
+              <n-form-item label="渐变结束色">
+                <n-color-picker v-model:value="config.layout.gradientTo" :show-alpha="false" />
+              </n-form-item>
+            </template>
+
+            <!-- 图片背景设置 -->
+            <template v-if="config.layout.backgroundType === 'image'">
+              <n-form-item label="背景图片URL">
+                <n-input v-model:value="config.layout.backgroundImage" placeholder="输入图片URL" />
+              </n-form-item>
+            </template>
+
+            <n-divider />
+
+            <n-form-item label="背景透明度">
+              <n-slider v-model:value="config.layout.backgroundOpacity" :min="0" :max="1" :step="0.05" :marks="{0: '0', 0.5: '0.5', 1: '1'}" />
             </n-form-item>
-            <n-form-item label="版本">
-              <n-input v-model:value="config.app.version" placeholder="输入版本号" disabled />
+
+            <n-form-item label="内容透明度">
+              <n-slider v-model:value="config.layout.contentOpacity" :min="0.5" :max="1" :step="0.05" :marks="{0.5: '0.5', 0.75: '0.75', 1: '1'}" />
+            </n-form-item>
+
+            <n-form-item label="背景模糊">
+              <n-slider v-model:value="config.layout.backgroundBlur" :min="0" :max="20" :step="1" :marks="{0: '0', 10: '10', 20: '20'}" />
+            </n-form-item>
+
+            <n-form-item label="圆角大小">
+              <n-slider v-model:value="config.layout.borderRadius" :min="0" :max="24" :step="2" :marks="{0: '0', 12: '12', 24: '24'}" />
             </n-form-item>
           </n-form>
         </n-tab-pane>
@@ -126,6 +166,9 @@ import {
   NButtonGroup,
   NTag,
   NModal,
+  NColorPicker,
+  NSlider,
+  NDivider,
   useMessage,
   useDialog,
 } from 'naive-ui'
@@ -146,7 +189,7 @@ const uiStore = useUIStore()
 const defaultConfig = defaultUiConfig
 
 /** 当前编辑的配置（副本） */
-const config = reactive<UIConfig>({
+const config = reactive<UIConfig & { layout: NonNullable<UIConfig['layout']> }>({
   app: { ...uiStore.appConfig },
   sidebar: {
     items: uiStore.sidebarConfig.items.map(item => ({ ...item })),
@@ -157,6 +200,7 @@ const config = reactive<UIConfig>({
     ...item,
     children: item.children?.map(c => ({ ...c })) ?? undefined,
   })),
+  layout: { ...uiStore.layoutConfig },
 })
 
 /** 类型安全的 quickBar 数组 */
@@ -253,12 +297,12 @@ async function saveConfig(): Promise<void> {
   saving.value = true
   try {
     // 更新到 UI Store
-    uiStore.updateAppConfig(config.app)
     uiStore.updateThemeConfig(config.theme)
     uiStore.updateSidebarItems(config.sidebar.items)
     uiStore.updateQuickBarItems(config.quickBar ?? [])
+    uiStore.updateLayoutConfig(config.layout!)
 
-    message.success('配置已保存，刷新页面后生效')
+    message.success('配置已保存')
   } catch (error) {
     message.error('保存失败')
     console.error(error)
@@ -281,13 +325,13 @@ function resetConfig(): void {
       uiStore.resetToDefault()
 
       // 重置本地编辑状态为默认值
-      config.app = { ...defaultConfig.app }
       config.theme = { ...defaultConfig.theme }
       config.sidebar.items = defaultConfig.sidebar.items.map(item => ({ ...item }))
       config.quickBar = defaultConfig.quickBar?.map(item => ({
         ...item,
         children: item.children?.map(c => ({ ...c })) ?? undefined,
       })) ?? []
+      config.layout = { ...defaultConfig.layout }
 
       message.success('配置已重置为默认值')
     },
