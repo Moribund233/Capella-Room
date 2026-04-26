@@ -201,11 +201,9 @@ SeredeliRoom/
 - [✅] **消息编辑功能** - 支持编辑消息并记录编辑历史
 - [✅] **消息全文搜索** - PostgreSQL tsvector 全文搜索优化
 
-**待开发：**
+- [✅] **消息回复功能** - 支持回复特定消息并显示引用上下文
 
-- [ ] **消息回复功能** - 支持回复特定消息并显示引用上下文
-
-**测试覆盖**：16 个阶段 6 扩展功能测试全部通过（`tests/phase6_extra_features_test.rs`）
+**测试覆盖**：16 个阶段 6 扩展功能测试全部通过（`tests/phase6_extra_features_test.rs`），13 个消息回复测试全部通过（`tests/phase6_reply_message_test.rs`）
 
 ---
 
@@ -301,49 +299,49 @@ SeredeliRoom/
 
 **测试覆盖**：8 个 Redis 集成测试全部通过（`tests/redis_integration_test.rs`）
 
-### 阶段 8.6：基于 Redis 的数据库写入优化与配置热更新同步 ✅ 已完成
+### 阶段 8.6：基于 Redis 的数据库写入优化与配置热更新同步 ⚠️ 部分完成
 
 - [✅] **8.6.1 Redis Stream 异步写入架构** - 审计日志先写入 Redis Stream，Consumer 批量写入 PostgreSQL
 - [✅] **8.6.2 Redis Pub/Sub 配置热更新同步** - 配置变更通过 Redis 同步到所有节点
 - [✅] **8.6.3 代码架构实现** - `stream.rs`、`config_sync.rs` 模块实现
 - [✅] **8.6.4 降级与容错机制** - Redis 故障时自动降级，系统可用性不受影响
-- [✅] **8.6.5 性能测试与验证** - 代码通过检查，测试覆盖率达标
+- [⚠️] **8.6.5 性能测试与验证** - 架构实现✅，性能指标待生产环境验证
 
 **验收标准**：
-- ✅ Redis Stream 异步写入吞吐量 ≥ 10 万条/秒
-- ✅ Consumer 批量写入 DB 延迟 < 1 秒
-- ✅ 配置变更在多节点间同步延迟 < 100ms
+- ⚠️ Redis Stream 异步写入吞吐量 ≥ 10 万条/秒（架构实现✅，待生产环境验证）
+- ⚠️ Consumer 批量写入 DB 延迟 < 1 秒（架构实现✅，待生产环境验证）
+- ⚠️ 配置变更在多节点间同步延迟 < 100ms（架构实现✅，待生产环境验证）
 - ✅ Redis 故障时自动降级，系统可用性不受影响
 
-### 阶段九：实际应用场景测试与细节修复 ⏸️ 规划中
+### 阶段九：实际应用场景测试与细节修复 ⚠️ 部分完成
 
-- [ ] **9.1 端到端测试** - 模拟完整用户场景（注册→创建房间→发送消息→离开）
-- [ ] **9.2 边界场景测试** - 大量消息（10万+）、大量用户（1000+）、长连接稳定性
-- [ ] **9.3 异常场景处理** - 数据库断开重连、磁盘空间不足、恶意用户行为防护
-- [ ] **9.4 用户体验优化** - 错误提示、加载状态、消息通知、离线消息处理
-- [ ] **9.5 性能细节优化** - 慢查询分析、WebSocket 连接优化、缓存策略
-
-**验收标准**：
-- [ ] 端到端测试覆盖所有核心功能
-- [ ] 边界场景测试通过，系统稳定
-- [ ] 异常场景有适当的处理和提示
-- [ ] 用户体验流畅，无明显卡顿
-
-### 阶段十：生产部署与文档 ⏸️ 规划中
-
-- [ ] **10.1 容器化部署** - Dockerfile、docker-compose、健康检查
-- [ ] **10.2 CI/CD 流程** - GitHub Actions 自动化测试、构建、部署
-- [ ] **10.3 监控与告警** - Prometheus + Grafana 监控面板
-- [ ] **10.4 API 文档** - OpenAPI/Swagger 规范、在线文档
-- [ ] **10.5 部署文档** - 生产环境部署指南、配置说明
-- [ ] **10.6 运维手册** - 管理员操作指南、故障排查
-- [ ] **10.7 用户手册** - 用户使用指南、FAQ
+- [✅] **9.1 端到端场景测试** - 模拟完整用户场景（注册→创建房间→发送消息→离开）、多用户并发、用户重连、房间管理员操作
+- [⏸️] **9.2 边界场景测试** - 大量消息（10万+）、大量用户（1000+）、长连接稳定性（待实施）
+- [⏸️] **9.3 异常场景处理** - 数据库断开重连、磁盘空间不足、恶意用户行为防护（待实施）
+- [⏸️] **9.4 用户体验优化** - 错误提示、加载状态、消息通知、离线消息处理（待实施）
+- [⏸️] **9.5 性能细节优化** - 慢查询分析、WebSocket 连接优化、缓存策略（待实施）
 
 **验收标准**：
-- [ ] 应用可以通过 Docker Compose 一键启动
-- [ ] CI/CD 流程自动化运行
-- [ ] 监控面板正常展示系统指标
-- [ ] API 文档完整且可在线访问
+- ✅ 端到端场景测试覆盖所有核心功能
+- [⏸️] 边界场景测试通过，系统稳定（待实施）
+- [⏸️] 异常场景有适当的处理和提示（待实施）
+- [⏸️] 用户体验流畅，无明显卡顿（待实施）
+
+### 阶段十：生产部署与文档 ⚠️ 部分完成
+
+- [✅] **10.1 容器化部署** - Dockerfile、docker-compose、健康检查
+- [⏸️] **10.2 CI/CD 流程** - GitHub Actions 自动化测试、构建、部署（待阶段9完成后实施）
+- [⏸️] **10.3 监控与告警** - Prometheus + Grafana 监控面板（待阶段9完成后实施）
+- [✅] **10.4 API 文档** - Markdown 完整文档✅、OpenAPI/Swagger 在线文档（待集成）
+- [✅] **10.5 部署文档** - 生产环境部署指南、配置说明
+- [⏸️] **10.6 运维手册** - 管理员操作指南、故障排查（待阶段9完成后实施）
+- [⏸️] **10.7 用户手册** - 用户使用指南、FAQ（待阶段9完成后实施）
+
+**验收标准**：
+- ✅ 应用可以通过 Docker Compose 一键启动
+- [⏸️] CI/CD 流程自动化运行（待阶段9完成后实施）
+- [⏸️] 监控面板正常展示系统指标（待阶段9完成后实施）
+- ✅ API 文档完整（Markdown 版本✅，在线 Swagger 版本待集成）
 
 ## 快速开始
 
@@ -352,17 +350,6 @@ SeredeliRoom/
 - Rust 1.70+
 - PostgreSQL 14+
 - sqlx-cli
-
-### 安装依赖
-
-```bash
-# 安装 sqlx-cli
-cargo install sqlx-cli --no-default-features --features native-tls,postgres
-
-# 克隆项目
-git clone <repository-url>
-cd SeredeliRoom
-```
 
 ### 数据库设置
 
@@ -374,103 +361,12 @@ sqlx database create
 sqlx migrate run
 ```
 
-### 配置环境变量
+### 配置与运行
 
-复制 `.env.example` 为 `.env.development` 并修改配置：
-
-```bash
-cp .env.example .env.development
-```
-
-编辑 `.env.development`：
-
-```env
-# =============================================================================
-# Seredeli Room 环境变量配置
-# =============================================================================
-# 【重要】配置优先级（从高到低）：
-# 1. 环境变量（本文件 - 仅用于敏感配置）
-# 2. 配置文件（config.toml - 非敏感配置默认值）
-#
-# 【安全提示】敏感配置请勿写入 config.toml，应通过本文件设置
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# 应用环境（敏感）
-# -----------------------------------------------------------------------------
-APP_ENV=development
-
-# -----------------------------------------------------------------------------
-# 数据库配置（敏感）
-# -----------------------------------------------------------------------------
-DATABASE_URL=postgres://username:password@localhost:5432/seredeli_room
-
-# -----------------------------------------------------------------------------
-# JWT 配置（敏感）
-# -----------------------------------------------------------------------------
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-
-# -----------------------------------------------------------------------------
-# 文件上传配置（敏感）
-# -----------------------------------------------------------------------------
-UPLOAD_DIR=./uploads
-
-# -----------------------------------------------------------------------------
-# 管理员配置（敏感）
-# -----------------------------------------------------------------------------
-ADMIN_INITIAL_PASSWORD=admin123456
-
-# -----------------------------------------------------------------------------
-# Redis 配置（可选，用于分布式部署）
-# -----------------------------------------------------------------------------
-# REDIS_ENABLED=false
-# REDIS_URL=redis://127.0.0.1:6379
-```
-
-### 配置文件
-
-`config.toml` 包含所有非敏感配置的默认值：
-
-```toml
-# 服务器配置
-[server]
-host = "0.0.0.0"
-port = 3000
-
-# 数据库配置
-[database]
-max_connections = 10
-acquire_timeout_secs = 30
-idle_timeout_secs = 600
-
-# JWT 配置
-[jwt]
-expiration_hours = 24
-
-# 文件上传配置
-[upload]
-max_file_size = 10485760  # 10MB
-base_url = "/uploads"
-
-# WebSocket 配置
-[websocket]
-heartbeat_interval_secs = 30
-heartbeat_timeout_secs = 90
-auth_timeout_secs = 30
-message_buffer_size = 100
-
-# Redis 配置（非敏感部分）
-[redis]
-pool_size = 10
-timeout_secs = 5
-channel_prefix = "seredeli"
-stream_max_len = 100000
-consumer_batch_size = 100
-consumer_poll_interval_ms = 1000
-config_sync_enabled = true
-```
-
-### 运行应用
+1. 复制 `.env.example` 为 `.env` 并配置数据库连接等敏感信息
+2. 根据需要修改 `config.toml` 中的非敏感配置
+3. 运行数据库迁移：`sqlx migrate run`
+4. 启动应用：
 
 ```bash
 cargo run
@@ -478,78 +374,30 @@ cargo run
 
 应用将启动在 `http://localhost:3000`
 
-### 验证运行状态
+```bash
+cargo run
+```
+
+验证运行状态：
 
 ```bash
 curl http://localhost:3000/health
-# 应返回: OK
 ```
 
-## API 端点
+## API 文档
 
-### 健康检查
-- `GET /health` - 健康检查
+详细的 API 文档请参考 [docs/api](docs/api) 目录：
 
-### WebSocket
-- `GET /ws` - WebSocket 连接端点
+- [HTTP API 文档](docs/api/v1/http/) - RESTful API 接口说明
+- [WebSocket API 文档](docs/api/v1/websocket/) - 实时通信协议说明
 
-### 认证
-- `POST /api/auth/register` - 用户注册
-- `POST /api/auth/login` - 用户登录
-- `POST /api/auth/refresh` - 刷新 Token
-
-### 用户
-- `GET /api/users/me` - 获取当前用户信息
-- `PUT /api/users/me` - 更新用户信息
-- `GET /api/users/` - 获取用户列表（支持搜索、分页）
-- `GET /api/users/:user_id` - 获取指定用户信息
-
-### 聊天室
-- `GET /api/rooms/` - 获取聊天室列表（支持分页、搜索）
-- `GET /api/rooms/recent` - 获取最近更新的聊天室列表
-- `POST /api/rooms/` - 创建聊天室
-- `GET /api/rooms/:room_id` - 获取聊天室详情
-- `PUT /api/rooms/:room_id` - 更新聊天室信息
-- `DELETE /api/rooms/:room_id` - 删除聊天室
-- `POST /api/rooms/:room_id/join` - 加入聊天室
-- `POST /api/rooms/:room_id/leave` - 离开聊天室
-- `GET /api/rooms/:room_id/members` - 获取成员列表
-- `POST /api/rooms/:room_id/kick` - 踢出成员
-- `PUT /api/rooms/:room_id/members/:user_id/role` - 设置成员角色
-
-### 消息
-- `GET /api/rooms/:room_id/messages` - 获取聊天室消息历史（支持游标分页）
-- `GET /api/messages/search` - 搜索消息（支持关键词、聊天室筛选）
-- `GET /api/messages/search/fulltext` - 全文搜索消息（PostgreSQL tsvector）
-- `PUT /api/messages/:message_id` - 编辑消息
-- `GET /api/messages/:message_id/history` - 获取消息编辑历史
-- `DELETE /api/messages/:message_id` - 删除消息（软删除）
-
-### 文件上传
-- `POST /api/v1/files/upload` - 通用文件上传
-- `POST /api/v1/files/upload/image` - 图片上传
-- `POST /api/v1/files/upload/avatar` - 头像上传（自动更新用户头像）
-- `GET /api/v1/files` - 获取当前用户文件列表
-- `GET /api/v1/files/:id` - 获取文件信息
-- `DELETE /api/v1/files/:id` - 删除文件
-
-### 管理员（需要 Admin 或 SuperAdmin 角色）
-- `GET /api/v1/admin/users` - 获取用户列表（支持分页、搜索）
-- `PUT /api/v1/admin/users/:id/status` - 禁用/启用用户
-- `DELETE /api/v1/admin/users/:id` - 删除用户
-- `PUT /api/v1/admin/users/:id/role` - 修改用户角色（仅 SuperAdmin 可管理 Admin）
-- `GET /api/v1/admin/configs` - 获取所有配置项
-- `GET /api/v1/admin/configs/:key` - 获取指定配置
-- `PUT /api/v1/admin/configs/:key` - 修改配置项（仅 SuperAdmin）
-- `POST /api/v1/admin/configs/reset` - 重置配置到默认值
-- `GET /api/v1/admin/rooms` - 获取所有房间列表
-- `DELETE /api/v1/admin/rooms/:id` - 强制删除房间
-- `GET /api/v1/admin/rooms/:id/messages` - 查看房间消息记录
-- `GET /api/v1/admin/messages` - 查看所有消息（支持关键词搜索）
-- `DELETE /api/v1/admin/messages/:id` - 删除违规消息
-- `GET /api/v1/admin/stats` - 系统统计（用户数、房间数、消息数、在线用户数）
-- `GET /api/v1/admin/stats/activity` - 活跃度统计（日活、周活、月活）
-- `WebSocket SubscribeLogs` - 订阅系统日志流（支持级别过滤、模块过滤）
+主要接口概览：
+- **认证**: 注册、登录、Token 刷新
+- **用户**: 用户信息管理、状态更新
+- **聊天室**: 房间 CRUD、成员管理、权限控制
+- **消息**: 发送/接收、历史查询、搜索、编辑删除
+- **文件**: 上传、下载、管理
+- **管理员**: 用户/房间/消息管理、系统配置、审计日志
 
 ## 开发指南
 
@@ -578,11 +426,6 @@ sqlx migrate run
 # 回滚迁移
 sqlx migrate revert
 ```
-
-### 环境变量
-
-- `APP_ENV` - 应用环境（development/production）
-- `RUST_LOG` - 日志级别（info/debug/trace）
 
 ## 贡献指南
 

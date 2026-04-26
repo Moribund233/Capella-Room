@@ -223,6 +223,13 @@ fn admin_router() -> Router<Arc<AppState>> {
         .nest("/audit", audit_routes())
         // IP 安全路由
         .nest("/security", security_routes())
+        // Redis 管理路由
+        .route("/redis/status", get(admin::get_redis_status))
+        .route("/redis/stats", get(admin::get_redis_stats))
+        .route("/redis/refresh", post(admin::refresh_redis))
+        // 配置同步路由
+        .route("/config/sync", post(admin::trigger_config_sync))
+        .route("/config/sync/status", get(admin::get_config_sync_status))
 }
 
 /// 审计系统路由

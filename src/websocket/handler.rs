@@ -739,6 +739,12 @@ async fn handle_message(
             handle_mark_all_notifications_read(user_id, state, tx).await?;
         }
 
+        // ========== 待办通知系统 ==========
+        // 获取待办列表
+        WebSocketMessage::GetPendingActions { action_type } => {
+            handle_get_pending_actions(user_id, action_type, state, tx).await?;
+        }
+
         // ========== 系统日志流 ==========
         // 订阅系统日志
         WebSocketMessage::SubscribeLogs { level, module } => {
@@ -753,6 +759,46 @@ async fn handle_message(
         // 其他消息类型
         _ => {
             warn!("Unhandled message type from user {}: {:?}", user_id, msg);
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理获取待办列表
+async fn handle_get_pending_actions(
+    user_id: Uuid,
+    action_type: Option<String>,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!(
+        "Getting pending actions for user {}, action_type={:?}",
+        user_id, action_type
+    );
+
+    match state
+        .notification_service()
+        .get_pending_actions(user_id, action_type)
+        .await
+    {
+        Ok(actions) => {
+            let total = actions.len();
+            let pending_actions_list = WebSocketMessage::PendingActionsList { actions, total };
+
+            if let Ok(json) = pending_actions_list.to_json() {
+                let _ = tx.send(json).await;
+            }
+
+            debug!("Sent {} pending actions to user {}", total, user_id);
+        }
+        Err(e) => {
+            warn!("Failed to get pending actions: {}", e);
+            let error_msg =
+                WebSocketMessage::error("FETCH_FAILED", "Failed to fetch pending actions");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
         }
     }
 
@@ -1449,6 +1495,10 @@ async fn handle_update_status(
             };
 
             if let Ok(json) = status_changed_msg.to_json() {
+                // 发送给发送者自己（确认）
+                let _ = tx.send(json.clone()).await;
+
+                // 广播给房间成员
                 for room_id in user_rooms {
                     state
                         .ws_manager()

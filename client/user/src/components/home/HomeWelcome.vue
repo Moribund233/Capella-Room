@@ -42,7 +42,7 @@ const usernameFirstChar = computed(() => {
 })
 
 const userAvatar = computed(() => {
-  return authStore.userInfo?.avatar || null
+  return authStore.user?.avatar_url || null
 })
 
 const connectionStatusClass = computed(() => {

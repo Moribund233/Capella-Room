@@ -73,7 +73,7 @@ const username = computed(() => {
 
 /** 用户头像 */
 const userAvatar = computed(() => {
-  return authStore.userInfo?.avatar || null
+  return authStore.user?.avatar_url || null
 })
 
 /** 用户名字首字符（用于默认头像） */

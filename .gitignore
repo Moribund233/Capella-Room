@@ -43,3 +43,6 @@ doc/
 
 # template
 temp/
+
+# Uploads
+uploads/
