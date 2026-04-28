@@ -1,5 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getSystemStats, type SystemStats } from '@/api/system'
+import { getSystemStats } from '@/api/system'
 
 /**
  * 系统状态数据

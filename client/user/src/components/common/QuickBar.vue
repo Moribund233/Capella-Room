@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref, watchEffect } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { NDropdown, NTooltip } from 'naive-ui'
 import { MoreVertical } from 'lucide-vue-next'
 import * as LucideIcons from 'lucide-vue-next'
@@ -48,6 +48,7 @@ import {
   type QuickConfigItem,
   type QuickRuntimeItem,
   type QuickContext,
+  type UseQuickReturn,
 } from '@/composables/quick'
 
 /**
@@ -95,18 +96,6 @@ const emit = defineEmits<{
 }>()
 
 /**
- * Quick 组合式函数映射表
- * 注册所有可用的 Quick 组合式函数
- */
-const quickFactories: Record<string, typeof useQuickTheme> = {
-  theme: useQuickTheme,
-  sidebar: useQuickLayout,
-  footer: useQuickLayout,
-  user: useQuickUser,
-  personalization: useQuickPersonalization,
-}
-
-/**
  * Quick 上下文
  * 使用 emit 触发 action 事件给父组件处理
  */
@@ -116,6 +105,44 @@ const quickContext: QuickContext = {
   },
 }
 
+// ==================== 在 setup 同步期间创建所有 Quick 实例 ====================
+
+/**
+ * 主题 Quick
+ */
+const themeQuick = useQuickTheme({ key: 'theme', type: 'action', icon: 'Sun', iconAlt: 'Moon', label: '主题', display: 'visible' }, quickContext)
+
+/**
+ * 侧边栏 Quick
+ */
+const sidebarQuick = useQuickLayout({ key: 'sidebar', type: 'action', icon: 'PanelLeft', label: '侧边栏', display: 'visible' }, quickContext)
+
+/**
+ * 页脚 Quick
+ */
+const footerQuick = useQuickLayout({ key: 'footer', type: 'action', icon: 'PanelBottom', label: '页脚', display: 'visible' }, quickContext)
+
+/**
+ * 用户 Quick
+ */
+const userQuick = useQuickUser({ key: 'user', type: 'menu', icon: 'UserCircle', iconAlt: 'User', label: '用户中心', display: 'visible', children: [] }, quickContext)
+
+/**
+ * 个性化 Quick
+ */
+const personalizationQuick = useQuickPersonalization({ key: 'personalization', type: 'action', icon: 'Palette', label: '个性化', display: 'visible' }, quickContext)
+
+/**
+ * Quick 实例映射表
+ */
+const quickInstances: Record<string, UseQuickReturn> = {
+  theme: themeQuick,
+  sidebar: sidebarQuick,
+  footer: footerQuick,
+  user: userQuick,
+  personalization: personalizationQuick,
+}
+
 /**
  * 运行时 Quick 项列表
  */
@@ -123,12 +150,13 @@ const runtimeItems = ref<QuickRuntimeItem[]>([])
 
 /**
  * 根据配置生成运行时项
+ * 在 setup 同步期间执行，确保 inject() 在正确上下文中
  */
-watchEffect(() => {
-  runtimeItems.value = props.items.map((config): QuickRuntimeItem => {
-    const factory = quickFactories[config.key]
+const generateRuntimeItems = (items: QuickConfigItem[]): QuickRuntimeItem[] => {
+  return items.map((config): QuickRuntimeItem => {
+    const quickInstance = quickInstances[config.key]
 
-    if (!factory) {
+    if (!quickInstance) {
       // 未注册的 Quick，使用默认行为（直接触发 action 事件）
       return {
         ...config,
@@ -141,18 +169,31 @@ watchEffect(() => {
       }
     }
 
-    // 调用对应的 Quick 组合式函数
-    const quickReturn = factory(config, quickContext)
-
+    // 使用已创建的 Quick 实例
     return {
       ...config,
-      isActive: quickReturn.isActive.value,
-      currentIcon: quickReturn.currentIcon.value,
-      onClick: quickReturn.onClick,
-      onSelect: quickReturn.onSelect,
+      isActive: quickInstance.isActive.value,
+      currentIcon: quickInstance.currentIcon.value,
+      onClick: quickInstance.onClick,
+      onSelect: quickInstance.onSelect,
     }
   })
-})
+}
+
+// 初始化运行时项
+runtimeItems.value = generateRuntimeItems(props.items)
+
+/**
+ * 监听配置变化，更新运行时项
+ * 注意：这里只更新值，不重新创建 Quick 实例
+ */
+watch(
+  () => props.items,
+  (newItems) => {
+    runtimeItems.value = generateRuntimeItems(newItems)
+  },
+  { deep: true }
+)
 
 /**
  * 外显按钮列表
@@ -299,13 +340,12 @@ function handleAggregatedSelect(key: string) {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  background: var(--color-error);
-  color: white;
   font-size: 10px;
   font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  color: white;
+  background: var(--color-error);
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>

@@ -22,7 +22,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { NButton, NIcon } from 'naive-ui'
-import { MessageSquare, User, Settings, PlusCircle } from 'lucide-vue-next'
+import { MessageSquare, User, Settings } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
 interface Action {

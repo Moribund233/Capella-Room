@@ -6,6 +6,17 @@
 2. 每个用户发送多条消息
 3. 监控内存使用、响应时间、错误率
 4. 找出系统的性能拐点
+
+使用方式:
+    python stress_test.py [端口]
+    
+示例:
+    python stress_test.py              # 使用默认端口8765
+    python stress_test.py 8080         # 使用端口8080
+
+环境变量配置 (script/.env):
+    TEST_HOST=localhost
+    TEST_PORT=8765
 """
 
 import asyncio
@@ -24,8 +35,19 @@ import os
 # 加载环境变量
 load_dotenv('../.env')
 
-BASE_URL = os.getenv('TEST_BASE_URL', 'http://localhost:8765')
-WS_URL = os.getenv('TEST_WS_URL', 'ws://localhost:8765/ws')
+# 配置
+TEST_HOST = os.getenv('TEST_HOST', 'localhost')
+TEST_PORT = int(os.getenv('TEST_PORT', '8765'))
+
+
+def get_base_url(port: int) -> str:
+    """获取基础URL"""
+    return f"http://{TEST_HOST}:{port}"
+
+
+def get_ws_url(port: int) -> str:
+    """获取WebSocket URL"""
+    return f"ws://{TEST_HOST}:{port}/ws"
 
 
 @dataclass
@@ -56,9 +78,9 @@ class UserMetrics:
 class StressTestClient:
     """压力测试客户端"""
     
-    def __init__(self):
-        self.base_url = BASE_URL
-        self.ws_url = WS_URL
+    def __init__(self, base_url: str, ws_url: str):
+        self.base_url = base_url
+        self.ws_url = ws_url
         self.session: Optional[aiohttp.ClientSession] = None
         
     async def __aenter__(self):
@@ -218,7 +240,9 @@ class StressTestClient:
 class StressTester:
     """压力测试执行器"""
     
-    def __init__(self):
+    def __init__(self, base_url: str, ws_url: str):
+        self.base_url = base_url
+        self.ws_url = ws_url
         self.results: List[StressTestResult] = []
         self.test_users = [
             {'email': f'TestUser{i}@test.com', 'password': 'Test12345'}
@@ -264,7 +288,7 @@ class StressTester:
         
         try:
             async with client.session.post(
-                f"{BASE_URL}/api/rooms",
+                f"{self.base_url}/api/rooms",
                 headers={"Authorization": f"Bearer {token}"},
                 json={
                     "name": room_name,
@@ -305,7 +329,7 @@ class StressTester:
         
         # 创建多个房间
         room_ids = []
-        async with StressTestClient() as client:
+        async with StressTestClient(self.base_url, self.ws_url) as client:
             for i in range(num_rooms):
                 room_id = await self.create_room_for_test(
                     client, 
@@ -353,7 +377,7 @@ class StressTester:
         # 执行并发测试
         start_time = time.time()
         
-        async with StressTestClient() as client:
+        async with StressTestClient(self.base_url, self.ws_url) as client:
             tasks = []
             for i in range(concurrent_users):
                 user_idx = user_index_map[i]
@@ -517,7 +541,29 @@ class StressTester:
 
 async def main():
     """主函数"""
-    tester = StressTester()
+    # 解析命令行参数
+    port = TEST_PORT
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+        except ValueError:
+            pass
+    
+    base_url = get_base_url(port)
+    ws_url = get_ws_url(port)
+    
+    print("=" * 60)
+    print("压力测试脚本")
+    print("=" * 60)
+    print(f"用法: python stress_test.py [端口]")
+    print(f"示例: python stress_test.py 8080")
+    print(f"当前配置: 端口={port}")
+    print("=" * 60)
+    print(f"基础URL: {base_url}")
+    print(f"WebSocket: {ws_url}")
+    print("=" * 60)
+    
+    tester = StressTester(base_url, ws_url)
     await tester.run_full_stress_test()
 
 

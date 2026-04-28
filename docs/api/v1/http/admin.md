@@ -612,6 +612,90 @@ GET /api/v1/admin/rooms/:room_id/messages?limit=50&before=message_id
 
 ---
 
+### 踢出房间成员
+
+管理员强制将指定用户踢出房间。
+
+#### 请求
+
+```http
+DELETE /api/v1/admin/rooms/:room_id/members/:user_id
+```
+
+#### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| room_id | string (UUID) | 房间ID |
+| user_id | string (UUID) | 要踢出的用户ID |
+
+#### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "message": "成员已被踢出"
+}
+```
+
+**错误响应**
+
+- `401 Unauthorized`: 未登录或Token无效
+- `403 Forbidden`: 非管理员身份
+- `404 Not Found`: 房间不存在或成员不存在
+
+---
+
+### 设置房间成员角色
+
+管理员设置指定用户在房间中的角色（包括转让房主权限）。
+
+#### 请求
+
+```http
+PUT /api/v1/admin/rooms/:room_id/members/:user_id/role
+Content-Type: application/json
+
+{
+  "role": "admin"
+}
+```
+
+#### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| room_id | string (UUID) | 房间ID |
+| user_id | string (UUID) | 目标用户ID |
+
+#### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| role | string | 是 | 角色类型：`owner`、`admin`、`member` |
+
+#### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "message": "成员角色已更新"
+}
+```
+
+**错误响应**
+
+- `400 Bad Request`: 无效的角色类型
+- `401 Unauthorized`: 未登录或Token无效
+- `403 Forbidden`: 非管理员身份
+- `404 Not Found`: 房间不存在或成员不存在
+
+---
+
 ## 消息审核接口
 
 ### 获取所有消息

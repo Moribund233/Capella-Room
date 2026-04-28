@@ -16,10 +16,11 @@ use crate::{
     models::{
         message::MessageResponse,
         response::ApiResponse,
-        room::RoomResponse,
+        room::{MemberRole, RoomResponse},
         user::{UserResponse, UserRole},
     },
     state::AppState,
+    websocket::protocol::WebSocketMessage,
 };
 
 #[derive(Debug, Deserialize)]
@@ -506,10 +507,30 @@ pub async fn delete_message(
         .await?
         .ok_or(AppError::NotFound)?;
 
+    let room_id = message.room_id;
+    let sender_id = message.sender_id;
+
+    // 获取发送者信息（用于通知）
+    let sender = state.user_service().get_user_by_id(sender_id).await?;
+    let sender_username = sender
+        .map(|u| u.username)
+        .unwrap_or_else(|| "未知用户".to_string());
+
     state
         .message_service()
         .admin_delete_message(message.id)
         .await?;
+
+    // 向房间广播系统通知
+    let ws_manager = Arc::clone(&state.ws_manager);
+    let system_message = format!("系统管理员撤回了用户 {} 的消息", sender_username);
+    let broadcast_message = serde_json::to_string(&WebSocketMessage::SystemMessage {
+        content: system_message,
+    })
+    .unwrap_or_default();
+    ws_manager
+        .broadcast_to_room_all(room_id, broadcast_message)
+        .await;
 
     // 记录管理员操作审计日志
     let ip = addr.ip();
@@ -521,6 +542,116 @@ pub async fn delete_message(
     });
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ==================== 房间成员管理接口 ====================
+
+#[derive(Debug, Deserialize)]
+pub struct SetMemberRoleRequest {
+    pub role: String,
+}
+
+/// 管理员踢出房间成员
+pub async fn kick_room_member(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Path((room_id, user_id)): Path<(Uuid, Uuid)>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
+    Extension(CurrentUserRole(admin_role)): Extension<CurrentUserRole>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    // 获取被踢出用户信息（用于通知）
+    let target_user = state.user_service().get_user_by_id(user_id).await?;
+    let target_username = target_user
+        .map(|u| u.username)
+        .unwrap_or_else(|| "未知用户".to_string());
+
+    state
+        .room_service()
+        .admin_kick_member(room_id, user_id, &admin_role)
+        .await?;
+
+    // 向房间广播系统通知
+    let ws_manager = Arc::clone(&state.ws_manager);
+    let system_message = format!("系统管理员已将用户 {} 移出房间", target_username);
+    let broadcast_message = serde_json::to_string(&WebSocketMessage::SystemMessage {
+        content: system_message,
+    })
+    .unwrap_or_default();
+    ws_manager
+        .broadcast_to_room_all(room_id, broadcast_message)
+        .await;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(admin_id, "room_member_kick", "room_member", room_id, ip)
+            .await;
+    });
+
+    Ok(Json(ApiResponse::success_with_message("成员已被踢出")))
+}
+
+/// 管理员设置房间成员角色
+pub async fn set_room_member_role(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Path((room_id, user_id)): Path<(Uuid, Uuid)>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
+    Extension(CurrentUserRole(admin_role)): Extension<CurrentUserRole>,
+    Json(request): Json<SetMemberRoleRequest>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let new_role = match request.role.as_str() {
+        "owner" => MemberRole::Owner,
+        "admin" => MemberRole::Admin,
+        "member" => MemberRole::Member,
+        _ => return Err(AppError::Validation("无效的角色".to_string())),
+    };
+
+    // 获取目标用户信息（用于通知）
+    let target_user = state.user_service().get_user_by_id(user_id).await?;
+    let target_username = target_user
+        .map(|u| u.username)
+        .unwrap_or_else(|| "未知用户".to_string());
+
+    state
+        .room_service()
+        .admin_set_member_role(room_id, user_id, new_role.clone(), &admin_role)
+        .await?;
+
+    // 向房间广播系统通知
+    let ws_manager = Arc::clone(&state.ws_manager);
+    let role_text = match new_role {
+        MemberRole::Owner => "房主",
+        MemberRole::Admin => "管理员",
+        MemberRole::Member => "普通成员",
+    };
+    let system_message = format!("系统管理员已将用户 {} 设置为{}", target_username, role_text);
+    let broadcast_message = serde_json::to_string(&WebSocketMessage::SystemMessage {
+        content: system_message,
+    })
+    .unwrap_or_default();
+    ws_manager
+        .broadcast_to_room_all(room_id, broadcast_message)
+        .await;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_admin_action(
+                admin_id,
+                "room_member_role_change",
+                "room_member",
+                room_id,
+                ip,
+            )
+            .await;
+    });
+
+    Ok(Json(ApiResponse::success_with_message("成员角色已更新")))
 }
 
 // ==================== 系统统计接口 ====================
@@ -698,9 +829,7 @@ pub async fn get_redis_stats(
                     for line in info.lines() {
                         if let Some((key, value)) = line.split_once(':') {
                             match key {
-                                "used_memory" => {
-                                    stats.memory_used = value.parse().unwrap_or(0)
-                                }
+                                "used_memory" => stats.memory_used = value.parse().unwrap_or(0),
                                 "used_memory_peak" => {
                                     stats.memory_peak = value.parse().unwrap_or(0)
                                 }

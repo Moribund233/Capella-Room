@@ -126,11 +126,23 @@ const { menuItems } = useSidebarConfig()
 
 /**
  * 监听路由变化，更新激活菜单项
+ * 支持子路由匹配：当前路由以菜单项 path 开头即视为匹配
  */
 watch(
   () => route.path,
   (newPath) => {
-    const matched = menuItems.value.find((item) => item.path === newPath)
+    // 优先精确匹配
+    const exactMatch = menuItems.value.find((item) => item.path === newPath)
+    if (exactMatch) {
+      activeKey.value = exactMatch.key
+      return
+    }
+
+    // 子路由匹配：找到最长匹配的父路径
+    const matched = menuItems.value
+      .filter((item) => newPath.startsWith(item.path) && item.path !== '/')
+      .sort((a, b) => b.path.length - a.path.length)[0]
+
     if (matched) {
       activeKey.value = matched.key
     }

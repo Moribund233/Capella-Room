@@ -21,7 +21,6 @@
 import { ref } from 'vue'
 import { NCard, NTimeline, NTimelineItem, NIcon } from 'naive-ui'
 import {
-  Info,
   CheckCircle2,
   AlertCircle,
   MessageSquare,

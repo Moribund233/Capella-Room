@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { NCard, NGrid, NGridItem, NText, NIcon } from 'naive-ui'
-import { Users, Home, Zap, MessageCircle, TrendingUp, TrendingDown } from 'lucide-vue-next'
+import { Users, Home, Zap, MessageCircle } from 'lucide-vue-next'
 import { useSystemStatus } from '@/composables'
 import type { Component } from 'vue'
 

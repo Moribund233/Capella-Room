@@ -4,7 +4,7 @@ use crate::{
     db::Database,
     error::{AppError, Result},
     models::room::{MemberRole, Room, RoomMember, RoomResponse},
-    models::user::UserInfo,
+    models::user::{UserInfo, UserRole},
     utils::logging::PerformanceTimer,
 };
 
@@ -508,6 +508,72 @@ impl RoomService {
         if target_user_id == operator_id {
             return Err(AppError::Forbidden);
         }
+
+        // 更新角色
+        let result = sqlx::query(
+            r#"
+            UPDATE room_members
+            SET role = $1
+            WHERE room_id = $2 AND user_id = $3
+            "#,
+        )
+        .bind(new_role)
+        .bind(room_id)
+        .bind(target_user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 管理员踢出成员（不检查房间成员身份）
+    pub async fn admin_kick_member(
+        &self,
+        room_id: Uuid,
+        target_user_id: Uuid,
+        _admin_role: &UserRole,
+    ) -> Result<()> {
+        // 验证房间存在
+        let _room = self
+            .get_room_by_id(room_id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+
+        // 删除成员记录
+        let result = sqlx::query(
+            r#"
+            DELETE FROM room_members WHERE room_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(room_id)
+        .bind(target_user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 管理员设置成员角色（不检查房间成员身份）
+    pub async fn admin_set_member_role(
+        &self,
+        room_id: Uuid,
+        target_user_id: Uuid,
+        new_role: MemberRole,
+        _admin_role: &UserRole,
+    ) -> Result<()> {
+        // 验证房间存在
+        let _room = self
+            .get_room_by_id(room_id)
+            .await?
+            .ok_or(AppError::NotFound)?;
 
         // 更新角色
         let result = sqlx::query(

@@ -188,10 +188,16 @@ export interface DockItemConfig {
   label: string
   /** 图标名称 */
   icon: string
-  /** 路由路径 */
+  /** 路由路径（可以是模板，如 /rooms/:id/messages） */
   path: string
   /** 是否禁用 */
   disabled?: boolean
+  /** 是否需要路由参数 */
+  requiresParams?: boolean
+  /** 参数名列表 */
+  paramKeys?: string[]
+  /** 缺少参数时的提示消息 */
+  missingParamsMessage?: string
 }
 
 /**

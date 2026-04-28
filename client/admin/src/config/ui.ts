@@ -41,11 +41,6 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
       path: '/rooms',
     },
     {
-      name: '消息管理',
-      icon: 'Mail',
-      path: '/messages',
-    },
-    {
       name: '系统设置',
       icon: 'Settings',
       path: '/setting',

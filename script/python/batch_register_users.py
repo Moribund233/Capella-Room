@@ -2,7 +2,16 @@
 批量注册测试用户脚本
 
 使用方式:
-    python batch_register_users.py
+    python batch_register_users.py [数量] [起始编号] [端口]
+    
+示例:
+    python batch_register_users.py              # 注册10个用户，从1开始，端口8765
+    python batch_register_users.py 20           # 注册20个用户，从1开始，端口8765
+    python batch_register_users.py 20 1         # 注册20个用户，从1开始，端口8765
+    python batch_register_users.py 20 1 8080    # 注册20个用户，从1开始，端口8080
+    
+环境变量:
+    TEST_PORT: 服务器端口 (默认8765)
 
 注册格式: TestUser{n}@test.com (n从1开始，跳过已存在的)
 默认密码: Test12345
@@ -11,18 +20,26 @@
 import requests
 import json
 import time
+import sys
+import os
 from typing import List, Dict
 
 # 配置
-BASE_URL = "http://localhost:8765"
+DEFAULT_PORT = int(os.getenv('TEST_PORT', '8765'))
 DEFAULT_PASSWORD = "Test12345"
 
 
-def register_user(email: str, password: str, username: str) -> Dict:
+def get_base_url(port: int) -> str:
+    """获取基础URL"""
+    return f"http://localhost:{port}"
+
+
+def register_user(base_url: str, email: str, password: str, username: str) -> Dict:
     """
     注册单个用户
     
     Args:
+        base_url: 基础URL
         email: 邮箱
         password: 密码
         username: 用户名
@@ -30,7 +47,7 @@ def register_user(email: str, password: str, username: str) -> Dict:
     Returns:
         注册结果
     """
-    url = f"{BASE_URL}/api/v1/auth/register"
+    url = f"{base_url}/api/v1/auth/register"
     data = {
         'email': email,
         'password': password,
@@ -44,11 +61,12 @@ def register_user(email: str, password: str, username: str) -> Dict:
         return {'success': False, 'message': str(e)}
 
 
-def batch_register_users(start_num: int = 1, count: int = 10, skip_list: List[int] = None) -> Dict:
+def batch_register_users(base_url: str, start_num: int = 1, count: int = 10, skip_list: List[int] = None) -> Dict:
     """
     批量注册测试用户
     
     Args:
+        base_url: 基础URL
         start_num: 起始编号
         count: 注册数量
         skip_list: 需要跳过的编号列表
@@ -73,7 +91,7 @@ def batch_register_users(start_num: int = 1, count: int = 10, skip_list: List[in
     print("=" * 60)
     print(f"目标数量: {count} 个用户")
     print(f"跳过编号: {skip_list}")
-    print(f"基础URL: {BASE_URL}")
+    print(f"基础URL: {base_url}")
     print("=" * 60)
     
     current_num = start_num
@@ -92,7 +110,7 @@ def batch_register_users(start_num: int = 1, count: int = 10, skip_list: List[in
         
         print(f"\n[{registered_count + 1}/{count}] 正在注册: {email} ...", end=" ")
         
-        result = register_user(email, DEFAULT_PASSWORD, username)
+        result = register_user(base_url, email, DEFAULT_PASSWORD, username)
         results['total_attempted'] += 1
         
         if result.get('success'):
@@ -159,11 +177,10 @@ def print_summary(results: Dict):
 
 def main():
     """主函数"""
-    import sys
-    
     # 默认参数
     start_num = 1
     count = 10
+    port = DEFAULT_PORT
     skip_list = []  # 不跳过任何用户，已存在的用户会在注册时自动跳过
     
     # 解析命令行参数
@@ -179,14 +196,23 @@ def main():
         except ValueError:
             pass
     
+    if len(sys.argv) > 3:
+        try:
+            port = int(sys.argv[3])
+        except ValueError:
+            pass
+    
+    base_url = get_base_url(port)
+    
     print("批量注册测试用户脚本")
-    print(f"用法: python batch_register_users.py [数量] [起始编号]")
-    print(f"示例: python batch_register_users.py 20 1  # 注册20个用户，从TestUser1开始")
+    print(f"用法: python batch_register_users.py [数量] [起始编号] [端口]")
+    print(f"示例: python batch_register_users.py 20 1 8080  # 注册20个用户，从TestUser1开始，端口8080")
+    print(f"当前配置: 数量={count}, 起始编号={start_num}, 端口={port}")
     print()
     
     # 检查服务器连接
     try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
+        response = requests.get(f"{base_url}/health", timeout=5)
         print(f"服务器健康检查: {'正常' if response.status_code == 200 else '异常'}")
     except Exception as e:
         print(f"⚠️ 无法连接到服务器: {e}")
@@ -194,7 +220,7 @@ def main():
         return
     
     # 执行批量注册
-    results = batch_register_users(start_num=start_num, count=count, skip_list=skip_list)
+    results = batch_register_users(base_url, start_num=start_num, count=count, skip_list=skip_list)
     
     # 打印结果
     print_summary(results)

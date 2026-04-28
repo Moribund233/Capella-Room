@@ -40,7 +40,36 @@ export const routes: RouteRecordRaw[] = [
           requiresAuth: true,
         },
       },
-
+      {
+        path: 'rooms',
+        name: 'RoomManagement',
+        component: () => import('@/views/RoomManagementView.vue'),
+        redirect: '/rooms/list',
+        meta: {
+          title: '房间管理',
+          requiresAuth: true,
+        },
+        children: [
+          {
+            path: 'list',
+            name: 'RoomList',
+            component: () => import('@/pages/RoomListPage.vue'),
+            meta: { title: '房间列表', requiresAuth: true },
+          },
+          {
+            path: ':id/messages',
+            name: 'RoomMessages',
+            component: () => import('@/pages/RoomMessagesPage.vue'),
+            meta: { title: '消息管理', requiresAuth: true },
+          },
+          {
+            path: ':id/analytics',
+            name: 'RoomAnalytics',
+            component: () => import('@/pages/RoomAnalyticsPage.vue'),
+            meta: { title: '数据分析', requiresAuth: true },
+          },
+        ],
+      },
       {
         path: 'setting',
         name: 'Setting',

@@ -203,6 +203,15 @@ fn admin_router() -> Router<Arc<AppState>> {
             get(admin::get_room).delete(admin::delete_room),
         )
         .route("/rooms/:room_id/messages", get(admin::get_room_messages))
+        // 房间成员管理（管理员专用）
+        .route(
+            "/rooms/:room_id/members/:user_id",
+            delete(admin::kick_room_member),
+        )
+        .route(
+            "/rooms/:room_id/members/:user_id/role",
+            put(admin::set_room_member_role),
+        )
         // 消息审核
         .route("/messages", get(admin::list_messages))
         .route("/messages/:message_id", delete(admin::delete_message))

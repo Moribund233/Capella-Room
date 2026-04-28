@@ -1,148 +1,174 @@
 <script setup lang="ts">
-/**
- * UserManagementView - 用户管理页面
- *
- * 用户管理主视图，负责数据流管理和组件协调
- *
- */
-import { ref, computed, h, onMounted } from 'vue'
-import { NCard, useMessage } from 'naive-ui'
-import { Users } from 'lucide-vue-next'
-import { UserSearchForm, UserTableToolbar, UserTable } from '@/components/user'
+import { ref, h, onMounted } from 'vue'
+import { NCard, NPagination, useMessage, useDialog } from 'naive-ui'
+import { Users, Eye, Edit, Trash2 } from 'lucide-vue-next'
+import type { MobileAction } from '@/components/common/MobileTableCard.vue'
+import { UserSearchForm, UserTableToolbar, UserTable, UserDetailModal } from '@/components/user'
+import { MobileTableCard } from '@/components/common'
 import { useStatusBar } from '@/composables'
 import { adminApi } from '@/api/admin'
-import type { UserInfo, UserRole, UserStatus } from '@/types'
+import type { UserInfo } from '@/types'
 
-/**
- * 消息提示
- */
 const message = useMessage()
-
-/**
- * 状态栏
- */
+const dialog = useDialog()
 const { setContent } = useStatusBar()
 
-/**
- * 加载状态
- */
+// ==================== 数据状态 ====================
+
+/** 用户列表数据 */
+const data = ref<UserInfo[]>([])
+/** 加载状态 */
 const loading = ref(false)
-
-/**
- * 搜索关键词
- */
-const searchKeyword = ref('')
-
-/**
- * 状态筛选
- */
-const statusFilter = ref('')
-
-/**
- * 角色筛选
- */
-const roleFilter = ref('')
-
-/**
- * 选中的用户 keys
- */
+/** 总用户数 */
+const total = ref(0)
+/** 当前页码 */
+const page = ref(1)
+/** 每页数量 */
+const pageSize = ref(10)
+/** 选中的用户 keys */
 const selectedKeys = ref<(string | number)[]>([])
 
-/**
- * 用户数据
- */
-const userData = ref<UserInfo[]>([])
-
-/**
- * 总用户数（用于分页）
- */
-const totalUsers = ref(0)
-
-/**
- * 当前页码
- */
-const currentPage = ref(1)
-
-/**
- * 每页数量
- */
-const pageSize = ref(10)
-
-/**
- * 筛选后的用户数据（前端筛选）
- */
-const filteredData = computed(() => {
-  let result = userData.value
-
-  // 状态筛选（前端筛选）
-  if (statusFilter.value) {
-    result = result.filter((user) => user.status === (statusFilter.value as UserStatus))
-  }
-
-  // 角色筛选（前端筛选）
-  if (roleFilter.value) {
-    result = result.filter((user) => user.role === (roleFilter.value as UserRole))
-  }
-
-  return result
+/** 搜索参数 */
+const searchParams = ref({
+  keyword: '',
+  status: '',
+  role: '',
 })
+
+/** 当前搜索参数缓存（用于刷新） */
+const currentSearchParams = ref({
+  keyword: '',
+  status: '',
+  role: '',
+})
+
+// ==================== 数据获取 ====================
 
 /**
  * 获取用户列表
+ * @param params 搜索参数
  */
-const fetchUserList = async () => {
+const fetchUserList = async (params: {
+  keyword?: string
+  status?: string
+  role?: string
+  page?: number
+  pageSize?: number
+} = {}) => {
   loading.value = true
+
   try {
     const response = await adminApi.getUserList({
-      page: currentPage.value,
-      page_size: pageSize.value,
-      search: searchKeyword.value || undefined,
+      page: params.page ?? page.value,
+      page_size: params.pageSize ?? pageSize.value,
+      search: params.keyword || undefined,
     })
 
     if (response.success && response.data) {
-      userData.value = response.data.users
-      totalUsers.value = response.data.total
-      // 更新状态栏
-      setContent([
-        h(Users, { size: 14, style: { marginRight: '6px' } }),
-        ` 共 ${totalUsers.value} 位用户`,
-      ])
-    } else {
-      message.error(response.message || '获取用户列表失败')
+      data.value = response.data.users
+      total.value = response.data.total
+      page.value = params.page ?? page.value
+      pageSize.value = params.pageSize ?? pageSize.value
+      return true
     }
+    return false
   } catch (error) {
-    message.error('获取用户列表失败，请检查网络连接')
     console.error('获取用户列表失败:', error)
+    message.error('获取用户列表失败')
+    return false
   } finally {
     loading.value = false
   }
 }
 
 /**
+ * 刷新当前列表
+ */
+const refresh = async () => {
+  return fetchUserList({
+    keyword: currentSearchParams.value.keyword,
+    status: currentSearchParams.value.status,
+    role: currentSearchParams.value.role,
+    page: page.value,
+    pageSize: pageSize.value,
+  })
+}
+
+// ==================== 事件处理 ====================
+
+/**
+ * 更新状态栏
+ */
+const updateStatusBar = () => {
+  setContent([
+    h(Users, { size: 14, style: { marginRight: '6px' } }),
+    ` 共 ${total.value} 位用户`,
+  ])
+}
+
+/**
  * 处理搜索
  */
-const handleSearch = () => {
-  currentPage.value = 1
-  fetchUserList()
+const handleSearch = async (params: { keyword: string; status: string; role: string }) => {
+  searchParams.value = params
+  currentSearchParams.value = { ...params }
+  selectedKeys.value = []
+
+  const success = await fetchUserList({
+    keyword: params.keyword,
+    status: params.status,
+    role: params.role,
+    page: 1,
+    pageSize: pageSize.value,
+  })
+
+  if (success) updateStatusBar()
 }
 
 /**
- * 重置筛选
+ * 重置搜索
  */
-const handleReset = () => {
-  searchKeyword.value = ''
-  statusFilter.value = ''
-  roleFilter.value = ''
-  currentPage.value = 1
-  fetchUserList()
-  message.success('已重置筛选条件')
+const handleReset = async () => {
+  searchParams.value = { keyword: '', status: '', role: '' }
+  currentSearchParams.value = { keyword: '', status: '', role: '' }
+  selectedKeys.value = []
+  page.value = 1
+
+  const success = await fetchUserList({ page: 1, pageSize: pageSize.value })
+
+  if (success) {
+    updateStatusBar()
+    message.success('已重置筛选条件')
+  }
 }
 
 /**
- * 刷新数据
+ * 刷新
  */
-const handleRefresh = () => {
-  fetchUserList()
+const handleRefresh = async () => {
+  const success = await refresh()
+
+  if (success) {
+    updateStatusBar()
+    message.success('刷新成功')
+  }
+}
+
+/**
+ * 分页变化
+ */
+const handlePageChange = async (newPage: number, newPageSize: number) => {
+  selectedKeys.value = []
+
+  const success = await fetchUserList({
+    keyword: currentSearchParams.value.keyword,
+    status: currentSearchParams.value.status,
+    role: currentSearchParams.value.role,
+    page: newPage,
+    pageSize: newPageSize,
+  })
+
+  if (success) updateStatusBar()
 }
 
 /**
@@ -150,44 +176,48 @@ const handleRefresh = () => {
  */
 const handleAdd = () => {
   message.info('打开新增用户弹窗')
-  // TODO: 打开新增用户弹窗
 }
 
 /**
- * 查看用户详情
- * @param user - 用户数据
+ * 查看用户
  */
 const handleView = (user: UserInfo) => {
-  message.info(`查看用户: ${user.nickname || user.username}`)
-  // TODO: 打开用户详情弹窗
+  dialog.info({
+    title: '用户详情',
+    content: () => h(UserDetailModal, { user }),
+    showIcon: false,
+    closable: true,
+    maskClosable: true,
+    positiveText: '',
+    style: {
+      width: 'auto',
+      maxWidth: 'calc(100vw - 32px)',
+    },
+  })
 }
 
 /**
  * 编辑用户
- * @param user - 用户数据
  */
 const handleEdit = (user: UserInfo) => {
   message.info(`编辑用户: ${user.nickname || user.username}`)
-  // TODO: 打开编辑用户弹窗
 }
 
 /**
  * 删除用户
- * @param user - 用户数据
  */
 const handleDelete = async (user: UserInfo) => {
   try {
     const response = await adminApi.deleteUser(user.id)
     if (response.success) {
       message.success(`用户 "${user.nickname || user.username}" 已删除`)
-      // 刷新列表
-      await fetchUserList()
+      await refresh()
+      updateStatusBar()
     } else {
       message.error(response.message || '删除失败')
     }
-  } catch (error) {
-    message.error('删除用户失败，请检查网络连接')
-    console.error('删除用户失败:', error)
+  } catch {
+    message.error('删除用户失败')
   }
 }
 
@@ -202,13 +232,9 @@ const handleBatchDelete = async () => {
 
   loading.value = true
   try {
-    // 逐个删除选中的用户
-    const deletePromises = selectedKeys.value.map((userId) =>
-      adminApi.deleteUser(String(userId))
+    const results = await Promise.all(
+      selectedKeys.value.map((id) => adminApi.deleteUser(String(id)))
     )
-    const results = await Promise.all(deletePromises)
-
-    // 检查是否有失败的删除
     const failedCount = results.filter((r) => !r.success).length
     const successCount = selectedKeys.value.length - failedCount
 
@@ -218,58 +244,81 @@ const handleBatchDelete = async () => {
       message.warning(`删除完成：成功 ${successCount} 个，失败 ${failedCount} 个`)
     }
 
-    // 清空选中并刷新列表
     selectedKeys.value = []
-    await fetchUserList()
-  } catch (error) {
-    message.error('批量删除失败，请检查网络连接')
-    console.error('批量删除失败:', error)
+    await refresh()
+    updateStatusBar()
+  } catch {
+    message.error('批量删除失败')
   } finally {
     loading.value = false
   }
 }
 
 /**
- * 处理选择变化
- * @param keys - 选中的 keys
+ * 处理移动端行点击
  */
-const handleSelectionChange = (keys: (string | number)[]) => {
-  selectedKeys.value = keys
+const handleMobileRowClick = (row: unknown) => {
+  handleView(row as UserInfo)
 }
 
-/**
- * 处理分页变化
- * @param page - 页码
- * @param size - 每页数量
- */
-const handlePageChange = (page: number, size: number) => {
-  currentPage.value = page
-  pageSize.value = size
-  fetchUserList()
-}
+// ==================== 移动端配置 ====================
 
-/**
- * 页面挂载时获取数据
- */
-onMounted(() => {
-  fetchUserList()
+/** 移动端列配置 */
+const mobileColumns = [
+  { key: 'role', title: '角色' },
+  { key: 'is_active', title: '账号状态' },
+  { key: 'status', title: '在线状态' },
+  { key: 'created_at', title: '创建时间' },
+]
+
+/** 移动端操作按钮配置 */
+const mobileActions: MobileAction<UserInfo>[] = [
+  {
+    label: '查看',
+    icon: Eye,
+    type: 'default',
+    onClick: (user: UserInfo) => handleView(user),
+  },
+  {
+    label: '编辑',
+    icon: Edit,
+    type: 'primary',
+    onClick: (user: UserInfo) => handleEdit(user),
+  },
+  {
+    label: '删除',
+    icon: Trash2,
+    type: 'error',
+    onClick: (user: UserInfo) => {
+      dialog.warning({
+        title: '确认删除',
+        content: `确定要删除用户 "${user.nickname || user.username}" 吗？`,
+        positiveText: '删除',
+        negativeText: '取消',
+        onPositiveClick: () => handleDelete(user),
+      })
+    },
+  },
+]
+
+// ==================== 生命周期 ====================
+
+onMounted(async () => {
+  const success = await fetchUserList({ page: 1, pageSize: 10 })
+  if (success) updateStatusBar()
 })
 </script>
 
 <template>
   <div class="user-management-view">
-    <!-- 页面标题 -->
     <div class="page-header">
       <h1 class="page-title">用户管理</h1>
       <p class="page-description">管理系统用户，包括查看、编辑、删除用户等操作</p>
     </div>
 
-    <!-- 搜索筛选区域 -->
     <NCard class="search-card" :bordered="false">
       <UserSearchForm
-        v-model:keyword="searchKeyword"
-        v-model:status="statusFilter"
-        v-model:role="roleFilter"
+        v-bind="searchParams"
         :loading="loading"
         @search="handleSearch"
         @reset="handleReset"
@@ -277,32 +326,59 @@ onMounted(() => {
       />
     </NCard>
 
-    <!-- 操作栏 -->
     <NCard class="toolbar-card" :bordered="false">
       <UserTableToolbar
         :selected-count="selectedKeys.length"
-        :total="filteredData.length"
+        :total="total"
         :loading="loading"
         @add="handleAdd"
         @batch-delete="handleBatchDelete"
       />
     </NCard>
 
-    <!-- 数据表格 -->
     <NCard class="table-card" :bordered="false">
-      <UserTable
-        :data="filteredData"
-        :loading="loading"
-        :selected-keys="selectedKeys"
-        :total="totalUsers"
-        :current-page="currentPage"
-        :page-size="pageSize"
-        @selection-change="handleSelectionChange"
-        @view="handleView"
-        @edit="handleEdit"
-        @delete="handleDelete"
-        @page-change="handlePageChange"
-      />
+      <!-- 桌面端：UserTable 组件 -->
+      <div class="desktop-view">
+        <UserTable
+          v-model:selected-keys="selectedKeys"
+          :data="data"
+          :loading="loading"
+          @view="handleView"
+          @edit="handleEdit"
+          @delete="handleDelete"
+        />
+        <div v-if="total > 0" class="pagination-wrapper">
+          <NPagination
+            :page="page"
+            :page-size="pageSize"
+            :item-count="total"
+            :page-sizes="[10, 20, 50, 100]"
+            show-size-picker
+            show-quick-jumper
+            @update:page="handlePageChange($event, pageSize)"
+            @update:page-size="handlePageChange(1, $event)"
+          />
+        </div>
+      </div>
+
+      <!-- 移动端：卡片视图 -->
+      <div class="mobile-view">
+        <MobileTableCard
+          :data="data"
+          :columns="mobileColumns"
+          title-column="username"
+          :actions="mobileActions as MobileAction[]"
+          @row-click="handleMobileRowClick"
+        />
+        <div v-if="total > 0" class="mobile-pagination">
+          <NPagination
+            :page="page"
+            :page-count="Math.ceil(total / pageSize)"
+            :simple="true"
+            @update:page="handlePageChange($event, pageSize)"
+          />
+        </div>
+      </div>
     </NCard>
   </div>
 </template>
@@ -330,10 +406,7 @@ onMounted(() => {
   margin: 0;
 }
 
-.search-card {
-  margin-bottom: 16px;
-}
-
+.search-card,
 .toolbar-card {
   margin-bottom: 16px;
 }
@@ -342,14 +415,44 @@ onMounted(() => {
   min-height: 400px;
 }
 
-/* 响应式调整 */
-@media (max-width: 768px) {
+/* 桌面端视图 */
+.desktop-view {
+  display: block;
+}
+
+/* 移动端视图 */
+.mobile-view {
+  display: none;
+}
+
+.pagination-wrapper {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mobile-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* 移动端断点：768px */
+@media screen and (max-width: 768px) {
   .user-management-view {
     padding: 16px;
   }
 
   .page-title {
     font-size: 24px;
+  }
+
+  .desktop-view {
+    display: none;
+  }
+
+  .mobile-view {
+    display: block;
   }
 }
 </style>

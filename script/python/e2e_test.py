@@ -8,7 +8,11 @@
 4. 模拟房间管理员操作：踢出成员、设置管理员、删除房间
 
 使用方式:
-    python e2e_test.py
+    python e2e_test.py [端口]
+    
+示例:
+    python e2e_test.py              # 使用默认端口8765
+    python e2e_test.py 8080         # 使用端口8080
 
 环境变量配置 (script/.env):
     TEST_HOST=localhost
@@ -35,14 +39,21 @@ from dotenv import load_dotenv
 # 加载环境变量
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-# 配置
+# 配置（可以通过命令行参数覆盖）
 TEST_HOST = os.getenv('TEST_HOST', 'localhost')
 TEST_PORT = int(os.getenv('TEST_PORT', '8765'))
 TEST_ACCOUNT = os.getenv('TEST_ACCOUNT', 'test@example.com')
 TEST_PASSWORD = os.getenv('TEST_PASSWORD', 'password123')
 
-BASE_URL = f"http://{TEST_HOST}:{TEST_PORT}"
-WS_URL = f"ws://{TEST_HOST}:{TEST_PORT}/ws"
+
+def get_base_url(port: int) -> str:
+    """获取基础URL"""
+    return f"http://{TEST_HOST}:{port}"
+
+
+def get_ws_url(port: int) -> str:
+    """获取WebSocket URL"""
+    return f"ws://{TEST_HOST}:{port}/ws"
 
 
 @dataclass
@@ -70,7 +81,7 @@ class UserSession:
 class ChatClient:
     """聊天室客户端，封装HTTP和WebSocket操作"""
     
-    def __init__(self, base_url: str = BASE_URL, ws_url: str = WS_URL):
+    def __init__(self, base_url: str, ws_url: str):
         self.base_url = base_url
         self.ws_url = ws_url
         self.session = requests.Session()
@@ -484,8 +495,8 @@ class ChatClient:
 class E2ETestRunner:
     """端到端测试执行器"""
     
-    def __init__(self):
-        self.client = ChatClient()
+    def __init__(self, base_url: str, ws_url: str):
+        self.client = ChatClient(base_url, ws_url)
         self.sessions: Dict[str, UserSession] = {}
         self.test_results: List[Dict] = []
     
@@ -1019,17 +1030,32 @@ class E2ETestRunner:
 
 async def main():
     """主函数"""
+    # 解析命令行参数
+    port = TEST_PORT
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+        except ValueError:
+            pass
+    
+    base_url = get_base_url(port)
+    ws_url = get_ws_url(port)
+    
     print("=" * 60)
     print("聊天室端到端测试")
     print("=" * 60)
-    print(f"测试服务器: {BASE_URL}")
-    print(f"WebSocket: {WS_URL}")
+    print(f"用法: python e2e_test.py [端口]")
+    print(f"示例: python e2e_test.py 8080")
+    print(f"当前配置: 端口={port}")
+    print("=" * 60)
+    print(f"测试服务器: {base_url}")
+    print(f"WebSocket: {ws_url}")
     print(f"测试账号: {TEST_ACCOUNT}")
     print("=" * 60)
     
     # 检查服务器是否可连接
     try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
+        response = requests.get(f"{base_url}/health", timeout=5)
         print(f"\n服务器健康检查: {'正常' if response.status_code == 200 else '异常'}")
     except Exception as e:
         print(f"\n⚠️ 无法连接到服务器: {e}")
@@ -1037,7 +1063,7 @@ async def main():
         return
     
     # 运行测试
-    runner = E2ETestRunner()
+    runner = E2ETestRunner(base_url, ws_url)
     await runner.run_all_tests()
 
 
