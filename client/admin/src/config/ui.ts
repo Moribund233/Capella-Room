@@ -41,6 +41,26 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
       path: '/rooms',
     },
     {
+      name: '消息审核',
+      icon: 'Shield',
+      path: '/messages',
+    },
+    {
+      name: '系统统计',
+      icon: 'BarChart3',
+      path: '/statistics',
+    },
+    {
+      name: '审计系统',
+      icon: 'ClipboardList',
+      path: '/audit',
+    },
+    {
+      name: 'IP安全',
+      icon: 'ShieldCheck',
+      path: '/security',
+    },
+    {
       name: '系统设置',
       icon: 'Settings',
       path: '/setting',
@@ -155,6 +175,53 @@ export const quickBarConfig: QuickItemConfig[] = [
  * DockBar 页面级配置
  */
 export const dockConfig: DockConfig = {
+  // 房间管理页面 - 子页面导航
+  rooms: {
+    enabled: true,
+    position: 'bottom',
+    offset: 24,
+    items: [
+      {
+        key: 'list',
+        label: '房间列表',
+        icon: 'List',
+        path: '/rooms',
+      },
+      {
+        key: 'analytics',
+        label: '房间分析',
+        icon: 'BarChart3',
+        path: '/rooms/analytics',
+      },
+    ],
+  },
+  // 审计系统页面 - 子页面导航
+  audit: {
+    enabled: true,
+    position: 'bottom',
+    offset: 24,
+    items: [
+      {
+        key: 'logs',
+        label: '审计日志',
+        icon: 'ClipboardList',
+        path: '/audit',
+      },
+      {
+        key: 'alerts',
+        label: '安全告警',
+        icon: 'AlertTriangle',
+        path: '/audit/alerts',
+      },
+      {
+        key: 'rules',
+        label: '告警规则',
+        icon: 'Rule',
+        path: '/audit/rules',
+      },
+    ],
+  },
+  // 系统设置页面
   setting: {
     enabled: true,
     position: 'bottom',
@@ -165,6 +232,18 @@ export const dockConfig: DockConfig = {
         label: '界面设置',
         icon: 'Palette',
         path: '/setting/ui',
+      },
+      {
+        key: 'config',
+        label: '系统配置',
+        icon: 'Settings',
+        path: '/setting/config',
+      },
+      {
+        key: 'redis',
+        label: 'Redis状态',
+        icon: 'Database',
+        path: '/setting/redis',
       },
     ],
   },

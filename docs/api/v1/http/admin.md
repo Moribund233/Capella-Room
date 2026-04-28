@@ -1519,11 +1519,158 @@ Content-Type: application/json
 |------|------|------|------|
 | name | string | 否 | 规则名称 |
 | description | string | 否 | 规则描述 |
-| condition | object | 否 | 触发条件 |
+| condition | object | 否 | 触发条件，详见下方说明 |
 | severity | string | 否 | 严重级别 |
 | enabled | boolean | 否 | 是否启用 |
 | cooldown_minutes | integer | 否 | 冷却时间（分钟） |
 | notify_admins | boolean | 否 | 是否通知管理员 |
+
+#### 告警规则 Condition 格式
+
+`condition` 字段定义告警触发条件，支持以下类型：
+
+**1. 阈值类型（threshold）**
+
+用于检测事件在指定时间窗口内发生次数超过阈值：
+
+```json
+{
+  "type": "threshold",
+  "threshold": 5,
+  "time_window_minutes": 10,
+  "group_by": ["source_ip"]
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 是 | 条件类型：`threshold` |
+| threshold | integer | 是 | 触发阈值（事件次数） |
+| time_window_minutes | integer | 是 | 时间窗口（分钟） |
+| group_by | array | 否 | 分组字段，如 `["source_ip"]` 按IP分组统计 |
+
+**2. 频率类型（frequency）**
+
+用于检测事件频率异常：
+
+```json
+{
+  "type": "frequency",
+  "min_count": 10,
+  "max_count": 100,
+  "time_window_minutes": 60
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 是 | 条件类型：`frequency` |
+| min_count | integer | 否 | 最小次数（低于此值触发） |
+| max_count | integer | 否 | 最大次数（超过此值触发） |
+| time_window_minutes | integer | 是 | 时间窗口（分钟） |
+
+**3. 模式匹配类型（pattern）**
+
+用于检测特定模式：
+
+```json
+{
+  "type": "pattern",
+  "pattern": "regex_pattern",
+  "field": "description"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 是 | 条件类型：`pattern` |
+| pattern | string | 是 | 正则表达式模式 |
+| field | string | 是 | 匹配的字段名 |
+
+---
+
+### 告警类型说明
+
+系统支持以下告警类型：
+
+| 告警类型 | 说明 | 默认触发条件 | 严重级别 |
+|----------|------|-------------|----------|
+| `brute_force_attack` | 暴力破解攻击 | 5分钟内同一IP登录失败超过5次 | critical |
+| `unusual_login_pattern` | 异常登录模式 | 用户从不常用IP登录 | warning |
+| `privilege_escalation` | 权限提升 | 用户角色被提升为管理员 | warning |
+| `data_exfiltration` | 数据泄露风险 | 短时间内大量数据导出 | error |
+| `system_anomaly` | 系统异常 | 系统错误率超过阈值 | error |
+| `rate_limit_triggered` | 触发限流 | 同一IP频繁触发限流 | warning |
+| `unauthorized_access` | 未授权访问 | 多次尝试访问无权限资源 | warning |
+
+---
+
+### 审计日志 Metadata 结构
+
+审计日志的 `metadata` 字段包含以下结构化信息：
+
+```json
+{
+  "ip_address": "192.168.1.100",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  "request_path": "/api/v1/auth/login",
+  "request_method": "POST",
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "session_id": "sess_abc123",
+  "device_info": {
+    "os": "Windows 10",
+    "browser": "Chrome 120.0",
+    "device_type": "desktop"
+  },
+  "location": {
+    "country": "CN",
+    "city": "Beijing",
+    "coordinates": [116.4074, 39.9042]
+  }
+}
+```
+
+**Metadata 字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| ip_address | string | 客户端IP地址 |
+| user_agent | string | 用户代理字符串 |
+| request_path | string | 请求路径 |
+| request_method | string | HTTP方法：GET/POST/PUT/DELETE等 |
+| request_id | string | 请求唯一标识 |
+| session_id | string | 会话标识 |
+| device_info | object | 设备信息 |
+| device_info.os | string | 操作系统 |
+| device_info.browser | string | 浏览器信息 |
+| device_info.device_type | string | 设备类型：desktop/mobile/tablet |
+| location | object | 地理位置信息（如启用GeoIP） |
+| location.country | string | 国家代码 |
+| location.city | string | 城市 |
+| location.coordinates | array | 经纬度坐标 [lng, lat] |
+
+---
+
+### 审计日志存储机制
+
+审计日志支持以下存储机制：
+
+**1. Redis Stream 异步写入（阶段 8.6）**
+- 审计日志先写入 Redis Stream
+- 后台 Consumer Group 异步消费写入 PostgreSQL
+- 支持多节点负载均衡
+- Redis 不可用时自动降级为直接写入
+
+**2. 本地 Buffer 降级**
+- Redis 不可用时，日志暂存内存 Buffer
+- Buffer 满或定时刷新时批量写入数据库
+- 默认 Buffer 大小：1000条
+- 默认刷新间隔：30秒
+
+**3. 自动清理策略**
+- 支持按时间自动清理过期日志
+- 支持归档后再清理
+- 可配置保留天数（默认：90天）
 
 #### 响应
 

@@ -53,19 +53,19 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'list',
             name: 'RoomList',
-            component: () => import('@/pages/RoomListPage.vue'),
+            component: () => import('@/pages/rooms/RoomListPage.vue'),
             meta: { title: '房间列表', requiresAuth: true },
           },
           {
             path: ':id/messages',
             name: 'RoomMessages',
-            component: () => import('@/pages/RoomMessagesPage.vue'),
+            component: () => import('@/pages/rooms/RoomMessagesPage.vue'),
             meta: { title: '消息管理', requiresAuth: true },
           },
           {
             path: ':id/analytics',
             name: 'RoomAnalytics',
-            component: () => import('@/pages/RoomAnalyticsPage.vue'),
+            component: () => import('@/pages/rooms/RoomAnalyticsPage.vue'),
             meta: { title: '数据分析', requiresAuth: true },
           },
         ],
