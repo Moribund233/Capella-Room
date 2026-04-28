@@ -237,6 +237,403 @@ export const dockConfig = {
 }
 ```
 
+## StatusBar 状态栏使用
+
+StatusBar 组件用于在页面底部显示单行状态信息，支持动态内容，移动端自动滚动显示。
+
+### 基本用法
+
+```vue
+<script setup lang="ts">
+import { h, onUnmounted } from 'vue'
+import { useStatusBar } from '@/composables'
+
+const { setContent, clearContent } = useStatusBar()
+
+// 设置简单文本
+setContent('系统状态: 正常运行')
+
+// 设置带链接的内容
+setContent(['发现新版本 ', h('a', { href: '#', onClick: handleUpdate }, '立即更新')])
+
+// 页面卸载时清除
+onUnmounted(() => {
+  clearContent()
+})
+
+function handleUpdate() {
+  // 处理更新逻辑
+}
+</script>
+```
+
+### 在页面中使用
+
+```vue
+<!-- src/views/DashboardView.vue -->
+<template>
+  <div class="dashboard-view">
+    <h1>仪表盘</h1>
+    <!-- 页面内容 -->
+  </div>
+</template>
+
+<script setup lang="ts">
+import { h, onMounted, onUnmounted } from 'vue'
+import { useStatusBar } from '@/composables'
+
+const { setContent, clearContent } = useStatusBar()
+
+onMounted(() => {
+  // 设置状态栏内容
+  setContent([
+    h('span', { class: 'status-indicator' }, [h('span', { class: 'status-dot' }), ' 系统正常运行']),
+    ' | ',
+    h('a', { href: '#' }, '查看日志'),
+  ])
+})
+
+onUnmounted(() => {
+  // 清除状态栏内容
+  clearContent()
+})
+</script>
+```
+
+### StatusBar 支持的样式类
+
+```vue
+<!-- 状态指示器 -->
+<span class="status-indicator">
+  <span class="status-dot"></span> 正常
+</span>
+
+<!-- 警告状态 -->
+<span class="status-indicator">
+  <span class="status-dot warning"></span> 警告
+</span>
+
+<!-- 错误状态 -->
+<span class="status-indicator">
+  <span class="status-dot error"></span> 错误
+</span>
+```
+
+### 注意事项
+
+1. **页面级管理**：每个页面应该独立管理自己的 StatusBar 内容
+2. **及时清除**：在页面卸载时调用 `clearContent()` 清除内容
+3. **内容类型**：支持字符串和 VNode，不支持组件类型
+4. **自动滚动**：当内容宽度超过容器时，移动端会自动滚动显示
+
+## ECharts 图表组件使用
+
+SeredeliUI 提供了基于 ECharts 的图表组件，支持自动主题适配。
+
+### 导入图表组件
+
+```vue
+<script setup lang="ts">
+import { ChartCard, LineChart, BarChart, PieChart, AreaChart } from '@/components/common/charts'
+</script>
+```
+
+### ChartCard 图表卡片
+
+ChartCard 是图表的容器组件，提供标题、加载状态、空状态等功能。
+
+```vue
+<template>
+  <chart-card
+    title="访问趋势"
+    subtitle="近7日访问量变化"
+    :loading="loading"
+    :empty="isEmpty"
+    empty-text="暂无数据"
+    min-height="300px"
+  >
+    <!-- 图表内容 -->
+    <line-chart :x-axis="xAxis" :series="series" />
+  </chart-card>
+</template>
+```
+
+**ChartCard 属性：**
+
+| 属性      | 类型                           | 默认值     | 说明             |
+| --------- | ------------------------------ | ---------- | ---------------- |
+| title     | string                         | ''         | 卡片标题         |
+| subtitle  | string                         | ''         | 副标题           |
+| bordered  | boolean                        | false      | 是否显示边框     |
+| segmented | boolean                        | false      | 是否显示分段线   |
+| loading   | boolean                        | false      | 是否加载中       |
+| spinSize  | 'small' \| 'medium' \| 'large' | 'medium'   | 加载指示器大小   |
+| empty     | boolean                        | false      | 是否数据为空     |
+| emptyText | string                         | '暂无数据' | 空状态提示文本   |
+| minHeight | string \| number               | '280px'    | 内容区域最小高度 |
+
+### LineChart 折线图
+
+```vue
+<template>
+  <line-chart
+    :x-axis="['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
+    :series="[
+      { name: '访问量', data: [120, 200, 150, 80, 70, 110, 130], smooth: true },
+      { name: '用户数', data: [60, 140, 100, 40, 50, 80, 90], smooth: true, area: true },
+    ]"
+    title="访问趋势"
+    y-axis-name="次数"
+    :show-legend="true"
+    :show-tooltip="true"
+  />
+</template>
+```
+
+**LineChart 属性：**
+
+| 属性           | 类型              | 默认值 | 说明           |
+| -------------- | ----------------- | ------ | -------------- |
+| xAxis          | string[]          | 必填   | X 轴数据       |
+| series         | LineSeries[]      | 必填   | 系列数据       |
+| title          | string            | ''     | 图表标题       |
+| showLegend     | boolean           | true   | 是否显示图例   |
+| legendPosition | 'top' \| 'bottom' | 'top'  | 图例位置       |
+| showTooltip    | boolean           | true   | 是否显示提示框 |
+| showZoom       | boolean           | false  | 是否显示缩放   |
+| yAxisName      | string            | ''     | Y 轴名称       |
+| showGrid       | boolean           | true   | 是否显示网格线 |
+| loading        | boolean           | false  | 是否加载中     |
+
+**LineSeries 类型：**
+
+```typescript
+interface LineSeries {
+  name: string // 系列名称
+  data: number[] // 数据数组
+  smooth?: boolean // 是否平滑曲线
+  area?: boolean // 是否显示面积填充
+  lineStyle?: object // 线条样式
+  markPoint?: object // 标记点配置
+  markLine?: object // 标记线配置
+}
+```
+
+### BarChart 柱状图
+
+```vue
+<template>
+  <bar-chart
+    :x-axis="['产品A', '产品B', '产品C', '产品D']"
+    :series="[
+      { name: '销量', data: [120, 200, 150, 80], barWidth: '40%' },
+      { name: '库存', data: [60, 140, 100, 40] },
+    ]"
+    title="产品销售统计"
+    :horizontal="false"
+  />
+</template>
+```
+
+**BarChart 属性：**
+
+| 属性        | 类型        | 默认值 | 说明           |
+| ----------- | ----------- | ------ | -------------- |
+| xAxis       | string[]    | 必填   | X 轴数据       |
+| series      | BarSeries[] | 必填   | 系列数据       |
+| title       | string      | ''     | 图表标题       |
+| horizontal  | boolean     | false  | 是否横向展示   |
+| showLegend  | boolean     | true   | 是否显示图例   |
+| showTooltip | boolean     | true   | 是否显示提示框 |
+| yAxisName   | string      | ''     | Y 轴名称       |
+
+**BarSeries 类型：**
+
+```typescript
+interface BarSeries {
+  name: string                    // 系列名称
+  data: number[]                 // 数据数组
+  barWidth?: string \| number     // 柱子宽度
+  barBorderRadius?: number       // 柱子圆角
+  showBackground?: boolean       // 是否显示背景
+  backgroundStyle?: object       // 背景样式
+  label?: object                 // 标签配置
+  itemStyle?: object             // 数据项样式
+}
+```
+
+### PieChart 饼图
+
+```vue
+<template>
+  <pie-chart
+    :data="[
+      { name: '直接访问', value: 335 },
+      { name: '邮件营销', value: 310 },
+      { name: '联盟广告', value: 234 },
+      { name: '视频广告', value: 135 },
+      { name: '搜索引擎', value: 1548 },
+    ]"
+    type="doughnut"
+    title="访问来源"
+    :show-label="true"
+    legend-position="bottom"
+  />
+</template>
+```
+
+**PieChart 属性：**
+
+| 属性            | 类型                                   | 默认值   | 说明           |
+| --------------- | -------------------------------------- | -------- | -------------- |
+| data            | PieDataItem[]                          | 必填     | 饼图数据       |
+| type            | 'pie' \| 'doughnut' \| 'rose'          | 'pie'    | 饼图类型       |
+| title           | string                                 | ''       | 图表标题       |
+| showLegend      | boolean                                | true     | 是否显示图例   |
+| legendPosition  | 'top' \| 'bottom' \| 'left' \| 'right' | 'bottom' | 图例位置       |
+| showTooltip     | boolean                                | true     | 是否显示提示框 |
+| showLabel       | boolean                                | true     | 是否显示标签   |
+| labelLineLength | number                                 | 15       | 标签引导线长度 |
+
+**PieDataItem 类型：**
+
+```typescript
+interface PieDataItem {
+  name: string // 数据名称
+  value: number // 数据值
+  itemStyle?: object // 自定义样式
+  label?: object // 自定义标签
+}
+```
+
+### AreaChart 面积图
+
+```vue
+<template>
+  <area-chart
+    :x-axis="['1月', '2月', '3月', '4月', '5月', '6月']"
+    :series="[
+      { name: '收入', data: [820, 932, 901, 934, 1290, 1330], areaOpacity: 0.3 },
+      { name: '支出', data: [620, 732, 701, 734, 1090, 1130], areaOpacity: 0.3 },
+    ]"
+    title="财务收支"
+    :stack="true"
+    y-axis-name="金额（万元）"
+  />
+</template>
+```
+
+**AreaChart 属性：**
+
+| 属性        | 类型         | 默认值 | 说明           |
+| ----------- | ------------ | ------ | -------------- |
+| xAxis       | string[]     | 必填   | X 轴数据       |
+| series      | AreaSeries[] | 必填   | 系列数据       |
+| title       | string       | ''     | 图表标题       |
+| stack       | boolean      | false  | 是否堆叠       |
+| showLegend  | boolean      | true   | 是否显示图例   |
+| showTooltip | boolean      | true   | 是否显示提示框 |
+| yAxisName   | string       | ''     | Y 轴名称       |
+
+**AreaSeries 类型：**
+
+```typescript
+interface AreaSeries {
+  name: string // 系列名称
+  data: number[] // 数据数组
+  smooth?: boolean // 是否平滑曲线
+  areaOpacity?: number // 填充透明度
+  lineStyle?: object // 线条样式
+  markPoint?: object // 标记点配置
+  markLine?: object // 标记线配置
+}
+```
+
+### 完整图表示例
+
+```vue
+<!-- src/views/StatisticsView.vue -->
+<template>
+  <div class="statistics-view">
+    <h1>数据统计</h1>
+
+    <div class="charts-grid">
+      <!-- 折线图 -->
+      <chart-card title="访问趋势" subtitle="近7日数据">
+        <line-chart :x-axis="weekDays" :series="visitSeries" :loading="loading" />
+      </chart-card>
+
+      <!-- 柱状图 -->
+      <chart-card title="产品销售">
+        <bar-chart :x-axis="products" :series="salesSeries" />
+      </chart-card>
+
+      <!-- 饼图 -->
+      <chart-card title="访问来源">
+        <pie-chart :data="sourceData" type="doughnut" />
+      </chart-card>
+
+      <!-- 面积图 -->
+      <chart-card title="财务收支">
+        <area-chart :x-axis="months" :series="financeSeries" :stack="true" />
+      </chart-card>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { ChartCard, LineChart, BarChart, PieChart, AreaChart } from '@/components/common/charts'
+
+const loading = ref(true)
+const weekDays = ref(['周一', '周二', '周三', '周四', '周五', '周六', '周日'])
+const visitSeries = ref([{ name: '访问量', data: [120, 200, 150, 80, 70, 110, 130], smooth: true }])
+
+const products = ref(['产品A', '产品B', '产品C', '产品D'])
+const salesSeries = ref([{ name: '销量', data: [120, 200, 150, 80] }])
+
+const sourceData = ref([
+  { name: '直接访问', value: 335 },
+  { name: '邮件营销', value: 310 },
+  { name: '联盟广告', value: 234 },
+  { name: '视频广告', value: 135 },
+  { name: '搜索引擎', value: 1548 },
+])
+
+const months = ref(['1月', '2月', '3月', '4月', '5月', '6月'])
+const financeSeries = ref([
+  { name: '收入', data: [820, 932, 901, 934, 1290, 1330] },
+  { name: '支出', data: [620, 732, 701, 734, 1090, 1130] },
+])
+
+onMounted(() => {
+  // 模拟数据加载
+  setTimeout(() => {
+    loading.value = false
+  }, 1000)
+})
+</script>
+
+<style scoped>
+.statistics-view {
+  padding: 24px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+```
+
 ## 页面开发最佳实践
 
 ### 1. 组件组织
@@ -297,230 +694,21 @@ const dataStore = useDataStore()
 const list = computed(() => dataStore.list)
 
 // 调用 action
-dataStore.fetchList()
-```
-
-### 4. 路由跳转
-
-```typescript
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-// 编程式导航
-router.push('/data/list')
-router.push({ name: 'DataSettings' })
-```
-
-## 常用模式
-
-### 带加载状态的页面
-
-```vue
-<template>
-  <div class="page">
-    <n-spin :show="loading">
-      <div v-if="!loading">
-        <!-- 内容 -->
-      </div>
-    </n-spin>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { NSpin } from 'naive-ui'
-
-const loading = ref(true)
-
-onMounted(async () => {
-  await fetchData()
-  loading.value = false
+onMounted(() => {
+  dataStore.fetchList()
 })
-</script>
 ```
 
-### 带错误处理的页面
+### 4. 图表使用建议
 
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
+- **自动主题适配**：图表组件会自动适配当前主题，无需手动配置
+- **响应式**：所有图表组件默认启用 `autoresize`，会自动适应容器大小
+- **加载状态**：使用 `loading` 属性显示加载状态
+- **空状态**：使用 ChartCard 的 `empty` 属性处理无数据情况
 
-const error = ref<string | null>(null)
+### 5. StatusBar 使用建议
 
-async function fetchData() {
-  try {
-    error.value = null
-    // 请求数据
-  } catch (e) {
-    error.value = '加载失败，请重试'
-  }
-}
-</script>
-```
-
-## 调试技巧
-
-### 查看当前路由
-
-```typescript
-import { useRoute } from 'vue-router'
-
-const route = useRoute()
-console.log('当前路由:', route.path)
-console.log('路由参数:', route.params)
-console.log('查询参数:', route.query)
-```
-
-### 查看 UI 配置
-
-```typescript
-import { useUIStore } from '@/store'
-
-const uiStore = useUIStore()
-console.log('合并配置:', uiStore.mergedConfig)
-console.log('侧边栏:', uiStore.sidebarConfig)
-console.log('Dock:', uiStore.dockConfig)
-```
-
-## 图表组件使用
-
-SeredeliUI 封装了基于 ECharts 的图表组件，位于 `src/components/common/charts/`，支持自动主题适配。
-
-### 支持的图表类型
-
-| 组件      | 说明   | 导入路径                     |
-| --------- | ------ | ---------------------------- |
-| LineChart | 折线图 | `@/components/common/charts` |
-| BarChart  | 柱状图 | `@/components/common/charts` |
-| PieChart  | 饼图   | `@/components/common/charts` |
-| AreaChart | 面积图 | `@/components/common/charts` |
-
-### 折线图示例
-
-```vue
-<template>
-  <n-card title="访问趋势">
-    <line-chart :x-axis="weekDays" :series="visitSeries" :show-legend="true" :show-grid="true" />
-  </n-card>
-</template>
-
-<script setup lang="ts">
-import { LineChart } from '@/components/common/charts'
-
-const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const visitSeries = [
-  {
-    name: '本周',
-    data: [820, 932, 901, 934, 1290, 1330, 1320],
-    smooth: true,
-  },
-  {
-    name: '上周',
-    data: [720, 832, 801, 834, 1190, 1230, 1220],
-    smooth: true,
-  },
-]
-</script>
-
-<style scoped>
-/* 图表需要固定高度容器 */
-.n-card :deep(.line-chart) {
-  height: 300px;
-}
-</style>
-```
-
-### 柱状图示例
-
-```vue
-<template>
-  <n-card title="用户来源">
-    <bar-chart :x-axis="sourceLabels" :series="sourceSeries" :show-legend="false" />
-  </n-card>
-</template>
-
-<script setup lang="ts">
-import { BarChart } from '@/components/common/charts'
-
-const sourceLabels = ['直接访问', '邮件营销', '联盟广告', '视频广告', '搜索引擎']
-const sourceSeries = [
-  {
-    name: '用户数',
-    data: [320, 302, 301, 334, 390],
-  },
-]
-</script>
-```
-
-### 饼图示例
-
-```vue
-<template>
-  <n-card title="设备分布">
-    <pie-chart :data="deviceData" :show-legend="true" :radius="['40%', '70%']" />
-  </n-card>
-</template>
-
-<script setup lang="ts">
-import { PieChart } from '@/components/common/charts'
-
-const deviceData = [
-  { name: '桌面端', value: 1048 },
-  { name: '移动端', value: 735 },
-  { name: '平板', value: 580 },
-  { name: '其他', value: 300 },
-]
-</script>
-```
-
-### 面积图示例
-
-```vue
-<template>
-  <n-card title="销售趋势">
-    <area-chart :labels="months" :series="salesSeries" />
-  </n-card>
-</template>
-
-<script setup lang="ts">
-import { AreaChart } from '@/components/common/charts'
-
-const months = ['1月', '2月', '3月', '4月', '5月', '6月']
-const salesSeries = [
-  {
-    name: '线上销售',
-    data: [120, 132, 101, 134, 90, 230],
-    areaOpacity: 0.3,
-  },
-  {
-    name: '线下销售',
-    data: [220, 182, 191, 234, 290, 330],
-    areaOpacity: 0.3,
-  },
-]
-</script>
-```
-
-### 图表通用属性
-
-| 属性           | 类型       | 默认值  | 说明         |
-| -------------- | ---------- | ------- | ------------ |
-| xAxis / labels | `string[]` | -       | X 轴数据     |
-| series         | `Series[]` | -       | 系列数据     |
-| title          | `string`   | `''`    | 图表标题     |
-| showLegend     | `boolean`  | `true`  | 显示图例     |
-| showTooltip    | `boolean`  | `true`  | 显示提示框   |
-| showGrid       | `boolean`  | `true`  | 显示网格线   |
-| autoresize     | `boolean`  | `true`  | 自动调整大小 |
-| loading        | `boolean`  | `false` | 加载状态     |
-
-### 主题适配
-
-图表组件自动跟随系统明暗主题切换，无需额外配置。主题颜色通过 CSS 变量和 `useChartTheme` 组合式函数统一管理。
-
-## 下一步
-
-- [配置系统](./configuration.md) - 深入了解配置系统
-- [QuickBar 开发](./quickbar-development.md) - 添加自定义快捷按钮
-- [接入真实后端](./backend-integration.md) - 连接真实 API
+- **页面级管理**：每个页面独立管理自己的 StatusBar 内容
+- **及时清理**：页面卸载时务必调用 `clearContent()`
+- **内容简洁**：StatusBar 适合显示简短的状态信息，不宜过长
+- **链接支持**：可以使用 VNode 添加链接，实现交互功能

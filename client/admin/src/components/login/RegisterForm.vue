@@ -65,7 +65,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NForm, NFormItem, NInput, NButton } from 'naive-ui'
+import { NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
 import { User, Lock } from 'lucide-vue-next'
 import { authApi } from '@/api/auth'
 import type { FormInst, FormRules, FormItemRule } from 'naive-ui'
@@ -75,6 +75,7 @@ const emit = defineEmits<{
 }>()
 
 const formRef = ref<FormInst | null>(null)
+const message = useMessage()
 
 const formData = ref({
   username: '',
@@ -90,9 +91,13 @@ const isLoading = ref(false)
 const formRules: FormRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, message: '用户名至少3个字符', trigger: 'blur' },
+    { max: 20, message: '用户名最多20个字符', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6个字符', trigger: 'blur' },
+    { max: 32, message: '密码最多32个字符', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请再次输入密码', trigger: 'blur' },
@@ -106,6 +111,9 @@ const formRules: FormRules = {
   ],
 }
 
+/**
+ * 处理注册
+ */
 const handleRegister = async () => {
   if (!formRef.value) return
 
@@ -120,22 +128,24 @@ const handleRegister = async () => {
   try {
     const result = await authApi.register({
       username: formData.value.username,
+      email: '',
       password: formData.value.password,
-      confirmPassword: formData.value.confirmPassword,
     })
 
     if (result.success) {
-      window.$message?.success?.('注册成功，正在跳转到登录页...')
+      message.success('注册成功，正在跳转到登录页...')
       formData.value = { username: '', password: '', confirmPassword: '' }
 
       setTimeout(() => {
         emit('switchToLogin')
       }, 1500)
     } else {
-      window.$message?.error?.(result.message || '注册失败，请重试')
+      message.error(result.message || '注册失败，请检查输入信息')
     }
-  } catch {
-    window.$message?.error?.('网络错误，请检查网络连接后重试')
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    const errorMsg = err?.response?.data?.message || err?.message || '网络错误，请检查网络连接后重试'
+    message.error(`注册失败：${errorMsg}`)
   } finally {
     isLoading.value = false
   }

@@ -7,7 +7,7 @@
 -- ============================================
 
 -- 用户状态枚举
-CREATE TYPE user_status AS ENUM ('online', 'offline', 'away', 'disabled');
+CREATE TYPE user_status AS ENUM ('online', 'offline', 'away');
 
 -- 成员角色枚举
 CREATE TYPE member_role AS ENUM ('owner', 'admin', 'member');
@@ -95,6 +95,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     avatar_url TEXT,
     status user_status DEFAULT 'offline',
+    is_active BOOLEAN DEFAULT TRUE,
     role user_role DEFAULT 'user',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

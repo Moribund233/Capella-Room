@@ -32,29 +32,15 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'example',
-        name: 'Example',
-        component: () => import('@/views/ExampleView.vue'),
-        redirect: '/example/overview',
+        path: 'users',
+        name: 'UserManagement',
+        component: () => import('@/views/UserManagementView.vue'),
         meta: {
-          title: '示例',
+          title: '用户管理',
           requiresAuth: true,
         },
-        children: [
-          {
-            path: 'overview',
-            name: 'ExampleOverview',
-            component: () => import('@/pages/example/OverviewPanel.vue'),
-            meta: { title: '概览', requiresAuth: true },
-          },
-          {
-            path: 'icons',
-            name: 'ExampleIcons',
-            component: () => import('@/pages/example/IconPickerPanel.vue'),
-            meta: { title: '图标', requiresAuth: true },
-          },
-        ],
       },
+
       {
         path: 'setting',
         name: 'Setting',

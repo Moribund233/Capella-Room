@@ -1,8 +1,10 @@
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store'
 import { useGlobalModal } from '@/composables/useGlobalModal'
 import AboutModal from '@/components/quick/AboutModal.vue'
 import LoginModalContent from '@/components/quick/LoginModalContent.vue'
+import UserProfileModal from '@/components/quick/UserProfileModal.vue'
 import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
 
 /**
@@ -49,6 +51,7 @@ import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
  */
 export function useQuickUser(config: QuickConfigItem, context: QuickContext): UseQuickReturn {
   const authStore = useAuthStore()
+  const router = useRouter()
   const { open, close, warning } = useGlobalModal()
 
   /**
@@ -95,6 +98,23 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
       width: 400,
       closable: true,
       maskClosable: false,
+    })
+  }
+
+  /**
+   * 显示用户详情弹窗
+   */
+  function showUserProfileModal(): void {
+    open({
+      title: '用户详情',
+      component: UserProfileModal,
+      componentProps: {
+        userInfo: authStore.userInfo,
+      },
+      preset: 'card',
+      width: 400,
+      closable: true,
+      maskClosable: true,
     })
   }
 
@@ -147,6 +167,12 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
       }
 
       // 已登录，处理具体逻辑
+      if (childKey === 'profile') {
+        // 用户详情：显示用户详情弹窗
+        showUserProfileModal()
+        return
+      }
+
       if (childKey === 'logout') {
         // 登出操作：显示确认弹窗
         warning({
@@ -154,9 +180,13 @@ export function useQuickUser(config: QuickConfigItem, context: QuickContext): Us
           content: '确定要退出登录吗？',
           positiveText: '确认退出',
           negativeText: '取消',
-          onPositiveClick: () => {
+          onPositiveClick: async () => {
+            // 执行登出操作
             authStore.logout()
+            // 触发外部事件
             context.emitAction(config.key, childKey)
+            // 主动跳转到登录页
+            await router.push({ name: 'Login' })
           },
         })
         return

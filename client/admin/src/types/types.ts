@@ -21,6 +21,21 @@ export type Breakpoint = 'mobile' | 'tablet' | 'desktop'
  */
 export type Theme = 'light' | 'dark'
 
+/**
+ * 用户角色类型
+ */
+export type UserRole = 'user' | 'admin' | 'super_admin'
+
+/**
+ * 用户在线状态类型
+ */
+export type UserStatus = 'online' | 'offline' | 'away'
+
+/**
+ * 用户账号状态类型
+ */
+export type UserAccountStatus = 'active' | 'disabled'
+
 // ==================== 菜单相关类型 ====================
 
 /**
@@ -54,11 +69,55 @@ export interface UserInfo {
   /** 昵称 */
   nickname?: string
   /** 头像URL */
-  avatar?: string
+  avatar_url?: string | null
   /** 邮箱 */
   email?: string
-  /** 角色 */
-  roles?: string[]
+  /** 在线状态：online/offline/away */
+  status?: UserStatus
+  /** 账号状态：true=启用, false=禁用 */
+  is_active?: boolean
+  /** 用户角色 */
+  role?: UserRole
+  /** 创建时间 */
+  created_at?: string
+}
+
+/**
+ * 登录参数
+ */
+export interface LoginParams {
+  /** 邮箱 */
+  email: string
+  /** 密码 */
+  password: string
+}
+
+/**
+ * 登录结果
+ */
+export interface LoginResult {
+  /** 访问令牌 */
+  access_token: string
+  /** 刷新令牌 */
+  refresh_token: string
+  /** 过期时间（秒） */
+  expires_in: number
+  /** 令牌类型 */
+  token_type: string
+  /** 用户信息 */
+  user: UserInfo
+}
+
+/**
+ * 注册参数
+ */
+export interface RegisterParams {
+  /** 用户名 */
+  username: string
+  /** 邮箱 */
+  email: string
+  /** 密码 */
+  password: string
 }
 
 // ==================== API 相关类型 ====================
@@ -67,14 +126,16 @@ export interface UserInfo {
  * API响应类型
  */
 export interface ApiResponse<T = unknown> {
-  /** 状态码 */
-  code: number
-  /** 响应数据 */
-  data: T
-  /** 响应消息 */
-  message: string
   /** 是否成功 */
   success: boolean
+  /** 状态码 */
+  code?: string | number
+  /** 错误类型 */
+  error?: string
+  /** 响应消息 */
+  message?: string
+  /** 响应数据 */
+  data?: T
 }
 
 /**
@@ -82,9 +143,11 @@ export interface ApiResponse<T = unknown> {
  */
 export interface PaginationParams {
   /** 当前页码 */
-  page: number
+  page?: number
   /** 每页条数 */
-  pageSize: number
+  page_size?: number
+  /** 搜索关键词 */
+  search?: string
 }
 
 /**
@@ -98,44 +161,10 @@ export interface PaginationResult<T> {
   /** 当前页码 */
   page: number
   /** 每页条数 */
-  pageSize: number
+  page_size: number
 }
 
-// ==================== 认证相关类型 ====================
-
-/**
- * 登录请求参数
- */
-export interface LoginParams {
-  /** 用户名 */
-  username: string
-  /** 密码 */
-  password: string
-}
-
-/**
- * 登录响应数据
- */
-export interface LoginResult {
-  /** 认证令牌 */
-  token: string
-  /** 用户信息 */
-  userInfo: UserInfo
-}
-
-/**
- * 注册请求参数
- */
-export interface RegisterParams {
-  /** 用户名 */
-  username: string
-  /** 密码 */
-  password: string
-  /** 确认密码 */
-  confirmPassword: string
-}
-
-// ==================== UI 配置相关类型 ====================
+// ==================== UI 配置类型 ====================
 
 /**
  * 侧边栏菜单项配置
@@ -143,14 +172,14 @@ export interface RegisterParams {
 export interface SidebarItemConfig {
   /** 菜单名称 */
   name: string
-  /** 图标名称 */
+  /** 图标名称（Lucide图标） */
   icon: string
   /** 路由路径 */
   path: string
 }
 
 /**
- * DockBar 项目配置
+ * Dock 菜单项配置
  */
 export interface DockItemConfig {
   /** 唯一标识 */
@@ -166,25 +195,23 @@ export interface DockItemConfig {
 }
 
 /**
- * DockBar 页面级配置
+ * 页面 Dock 配置
  */
 export interface DockPageConfig {
   /** 是否启用 */
-  enabled?: boolean
+  enabled: boolean
   /** 位置 */
-  position?: 'bottom' | 'left' | 'right'
+  position: 'bottom' | 'top' | 'left' | 'right'
   /** 偏移量 */
-  offset?: number
-  /** 项目列表 */
-  items?: DockItemConfig[]
+  offset: number
+  /** 菜单项 */
+  items: DockItemConfig[]
 }
 
 /**
- * DockBar 配置
+ * Dock 配置
  */
-export interface DockConfig {
-  [pagePath: string]: DockPageConfig
-}
+export type DockConfig = Record<string, DockPageConfig>
 
 /**
  * 应用配置
@@ -203,11 +230,11 @@ export interface AppConfig {
  */
 export interface ThemeConfig {
   /** 主题名称 */
-  name: string
+  name: Theme
 }
 
 /**
- * QuickBar 子菜单项配置
+ * QuickBar 子项配置
  */
 export interface QuickChildItemConfig {
   /** 唯一标识 */
@@ -215,13 +242,11 @@ export interface QuickChildItemConfig {
   /** 显示标签 */
   label: string
   /** 图标名称 */
-  icon?: string
-  /** 是否禁用 */
-  disabled?: boolean
+  icon: string
 }
 
 /**
- * QuickBar 项目配置
+ * QuickBar 项配置
  */
 export interface QuickItemConfig {
   /** 唯一标识 */
@@ -232,15 +257,18 @@ export interface QuickItemConfig {
   type: 'action' | 'menu'
   /** 图标名称 */
   icon: string
-  /** 替代图标名称 */
+  /** 替代图标（状态切换时使用） */
   iconAlt?: string
-  /** 显示标签 */
+  /** 提示文本 */
   label: string
-  /** 徽章 */
-  badge?: string | number
   /** 子菜单 */
   children?: QuickChildItemConfig[]
 }
+
+/**
+ * 主题类型
+ */
+export type ThemeType = 'light' | 'dark'
 
 /**
  * UI 配置
@@ -259,8 +287,6 @@ export interface UIConfig {
   /** QuickBar 配置 */
   quickBar?: QuickItemConfig[]
 }
-
-// ==================== API 请求/响应类型 ====================
 
 /**
  * UI 配置 API 响应数据
@@ -298,9 +324,62 @@ export interface SaveUIConfigParams {
   dock?: DockConfig
 }
 
-// ==================== Store 相关类型 ====================
+// ==================== WebSocket 类型 ====================
 
 /**
- * 主题类型（用于主题 store）
+ * WebSocket 消息类型
  */
-export type ThemeType = 'light' | 'dark'
+export type WsMessageType =
+  | 'Auth'
+  | 'AuthResult'
+  | 'Ping'
+  | 'Pong'
+  | 'Reconnect'
+  | 'ReconnectResult'
+  | 'Error'
+  | 'JoinRoom'
+  | 'LeaveRoom'
+  | 'RoomJoined'
+  | 'RoomLeft'
+  | 'UserJoined'
+  | 'UserLeft'
+  | 'OnlineUsers'
+  | 'ChatMessage'
+  | 'NewMessage'
+  | 'Typing'
+  | 'StopTyping'
+
+/**
+ * WebSocket 消息基础接口
+ */
+export interface WsMessage<T = unknown> {
+  /** 消息类型 */
+  type: WsMessageType
+  /** 消息载荷 */
+  payload?: T
+}
+
+/**
+ * WebSocket 认证消息
+ */
+export interface WsAuthMessage {
+  /** 访问令牌 */
+  token: string
+}
+
+/**
+ * WebSocket 认证结果
+ */
+export interface WsAuthResult {
+  /** 是否成功 */
+  success: boolean
+  /** 错误信息 */
+  error?: string
+  /** 用户ID */
+  user_id?: string
+}
+
+/**
+ * WebSocket 连接状态
+ */
+export type WsConnectionState = 'connecting' | 'connected' | 'authenticated' | 'disconnected' | 'reconnecting'

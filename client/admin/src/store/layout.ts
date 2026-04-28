@@ -66,7 +66,13 @@ export const useLayoutStore = defineStore('layout', () => {
   const isMobileMenuOpen = ref(false)
 
   /** Footer 显示状态 */
-  const isFooterVisible = ref(true)
+  const isFooterVisible = ref(false)
+
+  /** StatusBar 显示状态 */
+  const isStatusBarVisible = ref(false)
+
+  /** StatusBar 是否有内容 */
+  const hasStatusBarContent = ref(false)
 
   /** 响应式断点 */
   const isDesktop = ref(window.innerWidth > 1024)
@@ -180,6 +186,35 @@ export const useLayoutStore = defineStore('layout', () => {
   }
 
   /**
+   * 设置 StatusBar 内容状态
+   * @param hasContent 是否有内容
+   */
+  function setStatusBarContent(hasContent: boolean): void {
+    hasStatusBarContent.value = hasContent
+    // 如果没有内容，自动隐藏 StatusBar
+    if (!hasContent) {
+      isStatusBarVisible.value = false
+    }
+  }
+
+  /**
+   * 设置 StatusBar 显示状态
+   * @param visible 是否显示
+   */
+  function setStatusBarVisible(visible: boolean): void {
+    isStatusBarVisible.value = visible && hasStatusBarContent.value
+  }
+
+  /**
+   * 切换 StatusBar 显示状态
+   */
+  function toggleStatusBar(): void {
+    if (hasStatusBarContent.value) {
+      isStatusBarVisible.value = !isStatusBarVisible.value
+    }
+  }
+
+  /**
    * 更新响应式断点
    */
   function updateBreakpoint(): void {
@@ -235,6 +270,8 @@ export const useLayoutStore = defineStore('layout', () => {
     isSidebarCollapsed,
     isMobileMenuOpen,
     isFooterVisible,
+    isStatusBarVisible,
+    hasStatusBarContent,
     isDesktop,
     isTablet,
     isMobile,
@@ -247,6 +284,9 @@ export const useLayoutStore = defineStore('layout', () => {
     toggleSidebar,
     closeMobileMenu,
     toggleFooter,
+    setStatusBarContent,
+    setStatusBarVisible,
+    toggleStatusBar,
     updateBreakpoint,
     updateLayoutStyles,
     resetLayoutStyles,

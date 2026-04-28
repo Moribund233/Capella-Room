@@ -1,44 +1,99 @@
 <template>
-  <footer class="app-footer">
-    <div class="footer-left">
-      <span class="copyright">© 2026 SeredeliUI. All rights reserved.</span>
-    </div>
-    <div class="footer-center">
-      <nav class="footer-links">
-        <a href="#" class="footer-link">关于我们</a>
-        <span class="divider">|</span>
-        <a href="#" class="footer-link">隐私政策</a>
-        <span class="divider">|</span>
-        <a href="#" class="footer-link">使用条款</a>
-        <span class="divider">|</span>
-        <a href="#" class="footer-link">帮助中心</a>
-      </nav>
-    </div>
-    <div class="footer-right">
-      <span class="version">v{{ version }}</span>
+  <footer v-if="shouldShowFooter" class="app-footer" :class="{ 'has-status-bar': showStatusBar }">
+    <!-- StatusBar 区域 -->
+    <status-bar v-if="showStatusBar" @update:has-content="handleStatusBarContentChange">
+      <template v-if="isVNodeContent">
+        <component :is="statusBarContentVNode" />
+      </template>
+      <template v-else>{{ statusBarContent }}</template>
+    </status-bar>
+
+    <!-- Footer 主内容 -->
+    <div v-if="showFooterContent" class="footer-content">
+      <!-- 自定义 Footer 内容区域 -->
+      <slot />
     </div>
   </footer>
 </template>
 
 <script setup lang="ts">
-import { useAppConfig } from '@/composables'
+import { computed, h } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useLayoutStore } from '@/store'
+import StatusBar from '@/components/common/StatusBar.vue'
+import { getStatusBarState } from '@/composables/useStatusBar'
 
 /**
  * AppFooter 组件
- * 页面底部布局组件，显示版权信息、链接和版本号
+ * 页面底部布局组件，支持自定义内容和 StatusBar 状态栏显示
  */
-const { version } = useAppConfig()
+const layoutStore = useLayoutStore()
+
+/**
+ * 从 store 获取状态
+ */
+const { isFooterVisible, isStatusBarVisible, hasStatusBarContent } = storeToRefs(layoutStore)
+
+/**
+ * 获取 StatusBar 全局状态
+ */
+const { content: statusBarContent } = getStatusBarState()
+
+/**
+ * 是否显示 StatusBar
+ */
+const showStatusBar = computed(() => isStatusBarVisible.value && hasStatusBarContent.value)
+
+/**
+ * 是否显示 Footer 内容
+ */
+const showFooterContent = computed(() => isFooterVisible.value)
+
+/**
+ * 是否应该显示整个 Footer 组件
+ * 当 StatusBar 有内容或 Footer 内容可见时显示
+ */
+const shouldShowFooter = computed(() => showStatusBar.value || showFooterContent.value)
+
+/**
+ * 是否为 VNode 类型内容
+ */
+const isVNodeContent = computed(() => {
+  const content = statusBarContent.value
+  return typeof content === 'object' && content !== null
+})
+
+/**
+ * StatusBar 内容（VNode 形式）
+ */
+const statusBarContentVNode = computed(() => {
+  const content = statusBarContent.value
+  if (typeof content === 'object' && content !== null) {
+    // 如果是 VNode 或 VNode 数组，包装在 div 中
+    return {
+      render() {
+        return h('div', {}, content)
+      }
+    }
+  }
+  return null
+})
+
+/**
+ * 处理 StatusBar 内容变化
+ * @param hasContent 是否有内容
+ */
+function handleStatusBarContentChange(hasContent: boolean): void {
+  layoutStore.setStatusBarContent(hasContent)
+}
 </script>
 
 <style scoped>
 .app-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--footer-height);
+  flex-direction: column;
   width: var(--footer-compact-width, 100vw);
   margin: 0 var(--footer-margin, 0);
-  padding: 0 24px;
   background: var(--bg-container);
   color: var(--text-tertiary);
   font-size: 12px;
@@ -51,98 +106,39 @@ const { version } = useAppConfig()
   transition: var(--transition-base);
   border: var(--layout-border-width) var(--layout-border-style) var(--layout-border-color);
   border-bottom: none;
+  overflow: hidden;
 }
 
-/* 左侧区域 */
-.footer-left {
+/* Footer 主内容 */
+.footer-content {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  height: var(--footer-height);
+  padding: 0 24px;
 }
 
-.copyright {
-  white-space: nowrap;
-}
-
-/* 中间区域 */
-.footer-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  padding: 0 16px;
-}
-
-.footer-links {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.footer-link {
-  color: var(--text-tertiary);
-  text-decoration: none;
-  transition: var(--transition-fast);
-  white-space: nowrap;
-}
-
-.footer-link:hover {
-  color: var(--color-primary);
-}
-
-.divider {
-  color: var(--border-color-base);
-}
-
-/* 右侧区域 */
-.footer-right {
-  display: flex;
-  align-items: center;
-}
-
-.version {
-  padding: 2px 8px;
-  background: var(--bg-layout);
-  border-radius: 4px;
-  font-family: monospace;
+/* 有 StatusBar 时的样式 */
+.app-footer.has-status-bar .footer-content {
+  border-top: 1px solid var(--border-color-base);
 }
 
 /* 平板端适配 */
 @media screen and (min-width: 768px) and (max-width: 1024px) {
-  .app-footer {
+  .footer-content {
     padding: 0 16px;
-  }
-
-  .footer-center {
-    display: none;
   }
 }
 
 /* 移动端适配 */
 @media screen and (max-width: 767px) {
-  .app-footer {
+  .footer-content {
     flex-direction: column;
     justify-content: center;
     gap: 8px;
     height: auto;
     padding: 12px;
     text-align: center;
-  }
-
-  .footer-left,
-  .footer-center,
-  .footer-right {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .footer-center {
-    padding: 0;
-    order: -1;
-  }
-
-  .footer-links {
-    flex-wrap: wrap;
-    justify-content: center;
   }
 }
 </style>

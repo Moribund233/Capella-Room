@@ -58,13 +58,16 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub avatar_url: Option<String>,
+    /// 在线状态：online/offline/away
     pub status: UserStatus,
+    /// 账号状态：true=启用, false=禁用
+    pub is_active: bool,
     pub role: UserRole,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// 用户状态
+/// 用户在线状态
 #[derive(Debug, Clone, Serialize, sqlx::Type, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "user_status", rename_all = "lowercase")]
@@ -72,18 +75,12 @@ pub enum UserStatus {
     Online,
     Offline,
     Away,
-    Disabled,
 }
 
 impl UserStatus {
-    /// 检查用户是否被禁用
-    pub fn is_disabled(&self) -> bool {
-        matches!(self, UserStatus::Disabled)
-    }
-
-    /// 检查用户是否可用（未被禁用）
-    pub fn is_active(&self) -> bool {
-        !self.is_disabled()
+    /// 检查用户是否在线
+    pub fn is_online(&self) -> bool {
+        matches!(self, UserStatus::Online)
     }
 }
 
@@ -139,7 +136,10 @@ pub struct UserResponse {
     pub username: String,
     pub email: String,
     pub avatar_url: Option<String>,
+    /// 在线状态：online/offline/away
     pub status: UserStatus,
+    /// 账号状态：true=启用, false=禁用
+    pub is_active: bool,
     pub role: UserRole,
     pub created_at: DateTime<Utc>,
 }
@@ -181,9 +181,20 @@ impl User {
             email: self.email.clone(),
             avatar_url: self.avatar_url.clone(),
             status: self.status.clone(),
+            is_active: self.is_active,
             role: self.role.clone(),
             created_at: self.created_at,
         }
+    }
+
+    /// 检查用户账号是否可用（未被禁用）
+    pub fn is_account_active(&self) -> bool {
+        self.is_active
+    }
+
+    /// 检查用户账号是否被禁用
+    pub fn is_account_disabled(&self) -> bool {
+        !self.is_active
     }
 }
 

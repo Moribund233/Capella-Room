@@ -104,7 +104,8 @@ Content-Type: application/json
 | `data.username` | string | 用户名 |
 | `data.email` | string | 邮箱地址 |
 | `data.avatar_url` | string \| null | 头像 URL |
-| `data.status` | string | 用户状态：`online` / `offline` / `away` / `disabled` |
+| `data.status` | string | 在线状态：`online` / `offline` / `away` |
+| `data.is_active` | boolean | 账号状态：`true` 启用 / `false` 禁用 |
 | `data.role` | string | 用户角色：`user` / `admin` / `super_admin` |
 | `data.created_at` | string (ISO 8601) | 创建时间 |
 

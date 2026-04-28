@@ -151,18 +151,20 @@ GET /api/v1/admin/users?page=1&page_size=20&search=keyword
         "email": "admin@example.com",
         "avatar_url": null,
         "status": "online",
-        "role": "super_admin",
-        "created_at": "2024-01-15T08:30:00+00:00"
-      },
-      {
-        "id": "550e8400-e29b-41d4-a716-446655440001",
-        "username": "testuser",
-        "email": "user@example.com",
-        "avatar_url": "https://example.com/avatar.jpg",
-        "status": "offline",
-        "role": "user",
-        "created_at": "2024-01-15T09:00:00+00:00"
-      }
+    "is_active": true,
+    "role": "super_admin",
+    "created_at": "2024-01-15T08:30:00+00:00"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "username": "testuser",
+    "email": "user@example.com",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "status": "offline",
+    "is_active": true,
+    "role": "user",
+    "created_at": "2024-01-15T09:00:00+00:00"
+  }
     ],
     "total": 100,
     "page": 1,
@@ -180,7 +182,8 @@ GET /api/v1/admin/users?page=1&page_size=20&search=keyword
 | users[].username | string | 用户名 |
 | users[].email | string | 邮箱地址 |
 | users[].avatar_url | string/null | 头像URL |
-| users[].status | string | 用户状态：`online`/`offline`/`away`/`disabled` |
+| users[].status | string | 在线状态：`online`/`offline`/`away` |
+| users[].is_active | boolean | 账号状态：`true` 启用，`false` 禁用 |
 | users[].role | string | 用户角色：`user`/`admin`/`super_admin` |
 | users[].created_at | string | 创建时间（ISO 8601格式） |
 | total | integer | 总用户数 |
@@ -218,6 +221,7 @@ GET /api/v1/admin/users/:user_id
     "email": "user@example.com",
     "avatar_url": null,
     "status": "online",
+    "is_active": true,
     "role": "user",
     "created_at": "2024-01-15T08:30:00+00:00"
   }
@@ -272,6 +276,7 @@ Content-Type: application/json
     "email": "user@example.com",
     "avatar_url": null,
     "status": "online",
+    "is_active": true,
     "role": "admin",
     "created_at": "2024-01-15T08:30:00+00:00"
   }
@@ -326,12 +331,19 @@ Content-Type: application/json
     "username": "testuser",
     "email": "user@example.com",
     "avatar_url": null,
-    "status": "disabled",
+    "status": "offline",
+    "is_active": false,
     "role": "user",
     "created_at": "2024-01-15T08:30:00+00:00"
   }
 }
 ```
+
+**说明**
+
+- 禁用用户时，`is_active` 设置为 `false`，`status` 保持不变
+- 启用用户时，`is_active` 设置为 `true`，`status` 保持不变
+- 被禁用的用户无法登录系统
 
 **错误响应**
 

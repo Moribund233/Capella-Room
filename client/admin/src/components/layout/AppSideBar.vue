@@ -135,6 +135,7 @@ watch(
       activeKey.value = matched.key
     }
   },
+  { immediate: true },
 )
 
 /**
@@ -254,6 +255,8 @@ const handleLogout = () => {
     width: 100%;
     background: transparent;
     pointer-events: none;
+    border: none;
+    border-radius: 0;
   }
 
   .app-sidebar.is-mobile-open {

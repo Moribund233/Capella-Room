@@ -49,7 +49,7 @@ export const userApi = {
    * @returns 用户信息
    */
   getCurrentUser() {
-    return request<ApiResponse<UserInfo>>('/user/current')
+    return request<ApiResponse<UserInfo>>('/users/me')
   },
 
   /**
@@ -76,7 +76,7 @@ export const dataApi = {
    */
   getList<T>(params: PaginationParams) {
     return request<ApiResponse<PaginationResult<T>>>(
-      `/data/list?page=${params.page}&pageSize=${params.pageSize}`,
+      `/data/list?page=${params.page}&pageSize=${params.page_size}`,
     )
   },
 

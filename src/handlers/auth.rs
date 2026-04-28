@@ -125,8 +125,8 @@ pub async fn login(
         }
     };
 
-    // 检查用户是否被禁用
-    if user.status.is_disabled() {
+    // 检查用户账号是否被禁用
+    if user.is_account_disabled() {
         // 记录登录失败审计日志
         let email = request.email.clone();
         let audit_service = Arc::clone(&state.audit_service);

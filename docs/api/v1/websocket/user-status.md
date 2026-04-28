@@ -2,7 +2,11 @@
 
 ## 概述
 
-用户状态管理允许用户设置自己的在线状态，并查看其他用户的状态。系统支持四种状态：在线、离开、忙碌、离线。
+用户状态管理允许用户设置自己的在线状态，并查看其他用户的状态。系统支持四种在线状态：在线、离开、忙碌、离线。
+
+> **注意**：用户状态与账号状态是独立的两个概念：
+> - **在线状态**（`status`）：表示用户当前的在线状态，包括 `online`/`away`/`busy`/`offline`
+> - **账号状态**（`is_active`）：表示账号是否被启用，由管理员控制。被禁用的账号（`is_active: false`）无法登录系统
 
 ## 用户状态类型
 
@@ -30,7 +34,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| status | string | 是 | 用户状态：`online`/`away`/`busy`/`offline` |
+| status | string | 是 | 在线状态：`online`/`away`/`busy`/`offline` |
 
 ### 成功响应
 
@@ -112,7 +116,7 @@
 | users[].id | string (UUID) | 用户 ID |
 | users[].username | string | 用户名 |
 | users[].avatar_url | string \| null | 头像 URL |
-| users[].status | string | 用户状态 |
+| users[].status | string | 在线状态 |
 | total | number | 在线用户总数 |
 
 > **注意**: 返回的在线用户数量限制为 100 个

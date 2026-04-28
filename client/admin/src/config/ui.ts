@@ -15,7 +15,7 @@ import type {
  * 应用基础配置
  */
 export const appConfig: AppConfig = {
-  name: 'SeredeliUI',
+  name: '聊天室管理后台',
   logo: '/favicon.svg',
   version: '1.0.0',
 }
@@ -31,12 +31,22 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
       path: '/home',
     },
     {
-      name: '示例',
-      icon: 'FileText',
-      path: '/example',
+      name: '用户管理',
+      icon: 'Users',
+      path: '/users',
     },
     {
-      name: '设置',
+      name: '房间管理',
+      icon: 'MessageSquare',
+      path: '/rooms',
+    },
+    {
+      name: '消息管理',
+      icon: 'Mail',
+      path: '/messages',
+    },
+    {
+      name: '系统设置',
       icon: 'Settings',
       path: '/setting',
     },
@@ -150,25 +160,6 @@ export const quickBarConfig: QuickItemConfig[] = [
  * DockBar 页面级配置
  */
 export const dockConfig: DockConfig = {
-  example: {
-    enabled: true,
-    position: 'bottom',
-    offset: 24,
-    items: [
-      {
-        key: 'overview',
-        label: '概览',
-        icon: 'Layout',
-        path: '/example/overview',
-      },
-      {
-        key: 'icons',
-        label: '图标',
-        icon: 'Smile',
-        path: '/example/icons',
-      },
-    ],
-  },
   setting: {
     enabled: true,
     position: 'bottom',

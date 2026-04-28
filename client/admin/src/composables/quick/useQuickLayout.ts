@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { useLayoutStore } from '@/store/layout'
+import { getStatusBarState } from '@/composables/useStatusBar'
 import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
 
 /**
@@ -36,6 +37,7 @@ import type { QuickConfigItem, QuickContext, UseQuickReturn } from './types'
  */
 export function useQuickLayout(config: QuickConfigItem, context: QuickContext): UseQuickReturn {
   const layoutStore = useLayoutStore()
+  const { hasContent: hasStatusBarContent } = getStatusBarState()
 
   /**
    * 判断是否为 Footer 模式
@@ -60,6 +62,18 @@ export function useQuickLayout(config: QuickConfigItem, context: QuickContext): 
   })
 
   /**
+   * 是否禁用
+   * Footer 模式下，当 StatusBar 无内容时禁用
+   */
+  const disabled = computed(() => {
+    if (isFooterMode.value) {
+      // Footer 按钮：当 StatusBar 无内容时禁用
+      return !hasStatusBarContent.value && !layoutStore.isFooterVisible
+    }
+    return false
+  })
+
+  /**
    * 当前图标
    * 根据状态动态切换
    * - Footer 模式：显示时 icon，隐藏时 iconAlt
@@ -78,6 +92,11 @@ export function useQuickLayout(config: QuickConfigItem, context: QuickContext): 
    * 点击处理
    */
   function onClick(): void {
+    // 如果禁用，不执行任何操作
+    if (disabled.value) {
+      return
+    }
+
     const stateKey = config.layoutKey || (isFooterMode.value ? 'footer' : 'sidebar')
 
     // 检查是否是已知的 layout key
@@ -99,6 +118,7 @@ export function useQuickLayout(config: QuickConfigItem, context: QuickContext): 
   return {
     isActive,
     currentIcon,
+    disabled,
     onClick,
     onSelect: config.type === 'menu' ? onSelect : undefined,
   }

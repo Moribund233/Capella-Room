@@ -64,6 +64,8 @@ export interface QuickRuntimeItem extends QuickConfigItem {
   isActive: boolean
   /** 当前显示的图标（根据状态动态切换） */
   currentIcon: string
+  /** 是否禁用 */
+  disabled?: boolean
   /** 点击处理函数 */
   onClick: () => void
   /** 子菜单选择处理函数 */
@@ -79,6 +81,8 @@ export interface UseQuickReturn {
   isActive: Ref<boolean>
   /** 当前显示的图标（用于状态切换） */
   currentIcon: Ref<string>
+  /** 是否禁用（可选） */
+  disabled?: Ref<boolean>
   /** 点击主按钮的处理函数 */
   onClick: () => void
   /** 选择子菜单项的处理函数（可选，仅 menu 类型需要） */

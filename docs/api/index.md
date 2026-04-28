@@ -357,7 +357,8 @@ ws://localhost:8080/ws
   "username": "string",
   "email": "string",
   "avatar_url": "string?",
-  "status": "online | offline | away | disabled",
+  "status": "online | offline | away",
+  "is_active": "boolean",
   "role": "user | admin | super_admin",
   "created_at": "2024-01-01T00:00:00Z",
   "updated_at": "2024-01-01T00:00:00Z"

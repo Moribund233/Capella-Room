@@ -39,6 +39,7 @@ Authorization: Bearer {access_token}
     "email": "test@example.com",
     "avatar_url": null,
     "status": "online",
+    "is_active": true,
     "role": "user",
     "created_at": "2024-01-15T08:30:00Z"
   }
@@ -75,7 +76,8 @@ Authorization: Bearer {access_token}
 | `username` | string | 用户名 |
 | `email` | string | 邮箱地址 |
 | `avatar_url` | string \| null | 头像 URL |
-| `status` | string | 用户状态：`online` / `offline` / `away` / `disabled` |
+| `status` | string | 在线状态：`online` / `offline` / `away` |
+| `is_active` | boolean | 账号状态：`true` 启用 / `false` 禁用 |
 | `role` | string | 用户角色：`user` / `admin` / `super_admin` |
 | `created_at` | string (ISO 8601) | 创建时间 |
 
@@ -120,6 +122,7 @@ Content-Type: application/json
     "email": "test@example.com",
     "avatar_url": "https://example.com/avatar.jpg",
     "status": "online",
+    "is_active": true,
     "role": "user",
     "created_at": "2024-01-15T08:30:00Z"
   }
@@ -382,7 +385,8 @@ Authorization: Bearer {access_token}
 | `username` | string | 用户名 |
 | `email` | string | 邮箱地址 |
 | `avatar_url` | string \| null | 头像 URL |
-| `status` | string | 用户状态 |
+| `status` | string | 在线状态：`online` / `offline` / `away` |
+| `is_active` | boolean | 账号状态：`true` 启用 / `false` 禁用 |
 | `role` | string | 用户角色 |
 | `created_at` | string (ISO 8601) | 创建时间 |
 
@@ -422,11 +426,11 @@ Authorization: Bearer {access_token}
     "email": "test@example.com",
     "avatar_url": null,
     "status": "online",
+    "is_active": true,
     "role": "user",
     "created_at": "2024-01-15T08:30:00Z"
   }
 }
-```
 
 **失败 - 用户不存在 (404 Not Found)**
 

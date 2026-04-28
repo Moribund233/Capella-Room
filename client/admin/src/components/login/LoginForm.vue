@@ -1,10 +1,10 @@
 <template>
   <n-form ref="formRef" :model="formData" :rules="formRules" class="login-form" @submit.prevent="handleLogin">
-    <n-form-item path="username">
-      <n-input v-model:value="formData.username" placeholder="请输入用户名" size="large"
-        :input-props="{ autocomplete: 'username' }">
+    <n-form-item path="email">
+      <n-input v-model:value="formData.email" placeholder="请输入邮箱" size="large"
+        :input-props="{ autocomplete: 'email' }">
         <template #prefix>
-          <User :size="18" />
+          <Mail :size="18" />
         </template>
       </n-input>
     </n-form-item>
@@ -23,15 +23,18 @@
         登 录
       </n-button>
     </n-form-item>
+
+    <div class="login-tips">
+      <n-text depth="3">仅管理员可登录管理后台</n-text>
+    </div>
   </n-form>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { NForm, NFormItem, NInput, NButton } from 'naive-ui'
-import { User, Lock } from 'lucide-vue-next'
-import { authApi } from '@/api/auth'
+import { NForm, NFormItem, NInput, NButton, NText, useMessage } from 'naive-ui'
+import { Mail, Lock } from 'lucide-vue-next'
 import { useAuthStore, useUIStore } from '@/store'
 import type { FormInst, FormRules } from 'naive-ui'
 
@@ -44,7 +47,7 @@ const formRef = ref<FormInst | null>(null)
  * 表单数据
  */
 const formData = ref({
-  username: '',
+  email: '',
   password: '',
 })
 
@@ -57,16 +60,19 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+const message = useMessage()
 
 /**
  * 表单验证规则
  */
 const formRules: FormRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6个字符', trigger: 'blur' },
   ],
 }
 
@@ -85,11 +91,10 @@ const handleLogin = async () => {
   isLoading.value = true
 
   try {
-    const result = await authApi.login(formData.value)
+    const result = await authStore.login(formData.value.email, formData.value.password)
 
-    if (result.success && result.data) {
-      authStore.setToken(result.data.token)
-      authStore.setUserInfo(result.data.userInfo)
+    if (result.success) {
+      message.success('登录成功，正在跳转...')
 
       // 登录成功后加载云端 UI 配置
       await uiStore.initAfterLogin()
@@ -97,10 +102,12 @@ const handleLogin = async () => {
       const redirect = (route.query.redirect as string) || '/home'
       router.push(redirect)
     } else {
-      window.$message?.error?.(result.message || '登录失败，请重试')
+      message.error(result.message)
     }
-  } catch {
-    window.$message?.error?.('网络错误，请检查网络连接后重试')
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    const errorMsg = err?.response?.data?.message || err?.message || '网络错误，请检查网络连接后重试'
+    message.error(`登录失败：${errorMsg}`)
   } finally {
     isLoading.value = false
   }
@@ -110,5 +117,10 @@ const handleLogin = async () => {
 <style scoped>
 .login-form {
   padding: 24px;
+}
+
+.login-tips {
+  text-align: center;
+  margin-top: 16px;
 }
 </style>

@@ -3,20 +3,22 @@
     <!-- 外显按钮区域 -->
     <template v-for="item in visibleItems" :key="item.key">
       <!-- Action 类型：直接点击执行 -->
-      <n-tooltip v-if="item.type === 'action'" :show-arrow="false" placement="bottom">
+      <n-tooltip v-if="item.type === 'action'" :show-arrow="false" placement="bottom" :disabled="item.disabled">
         <template #trigger>
-          <button class="action-btn" @click="item.onClick" :aria-label="item.label">
+          <button class="action-btn" :class="{ 'is-disabled': item.disabled }" @click="item.onClick"
+            :aria-label="item.label" :disabled="item.disabled">
             <component :is="getIconComponent(item.currentIcon)" class="icon" :size="18" />
             <span v-if="item.badge" class="badge">{{ item.badge }}</span>
           </button>
         </template>
-        {{ item.label }}
+        {{ item.disabled ? '暂不可用' : item.label }}
       </n-tooltip>
 
       <!-- Menu 类型：带下拉菜单 -->
       <n-dropdown v-else :options="getDropdownOptions(item)" placement="bottom" trigger="click"
-        @select="(key: string) => handleMenuSelect(item, key)">
-        <button class="action-btn" :aria-label="item.label">
+        @select="(key: string) => handleMenuSelect(item, key)" :disabled="item.disabled">
+        <button class="action-btn" :class="{ 'is-disabled': item.disabled }" :aria-label="item.label"
+          :disabled="item.disabled">
           <component :is="getIconComponent(item.currentIcon)" class="icon" :size="18" />
           <span v-if="item.badge" class="badge">{{ item.badge }}</span>
         </button>
@@ -148,6 +150,7 @@ watchEffect(() => {
       ...config,
       isActive: quickReturn.isActive.value,
       currentIcon: quickReturn.currentIcon.value,
+      disabled: quickReturn.disabled?.value ?? false,
       onClick: quickReturn.onClick,
       onSelect: quickReturn.onSelect,
     }
@@ -286,6 +289,16 @@ function handleAggregatedSelect(key: string) {
 .action-btn:hover {
   background: var(--bg-layout);
   color: var(--color-primary);
+}
+
+.action-btn.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-btn.is-disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .action-btn .icon {
