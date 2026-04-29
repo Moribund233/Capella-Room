@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 use crate::{
-    config::JwtConfig,
+    config::{JwtConfig, SharedConfig},
     error::{AppError, Result},
 };
 
@@ -31,19 +31,51 @@ pub struct TokenPair {
 
 #[derive(Clone)]
 pub struct AuthService {
-    pub jwt_config: JwtConfig,
+    jwt_config: JwtConfig,
+    shared_config: Option<SharedConfig>,
 }
 
 impl AuthService {
     pub fn new(jwt_config: JwtConfig) -> Self {
-        Self { jwt_config }
+        Self {
+            jwt_config,
+            shared_config: None,
+        }
     }
 
-    fn get_secret(&self) -> Result<&str> {
-        self.jwt_config
-            .secret
-            .as_deref()
-            .ok_or_else(|| AppError::Auth("JWT secret is not configured".to_string()))
+    pub fn with_shared_config(config: SharedConfig) -> Self {
+        let jwt_config = JwtConfig {
+            secret: config.blocking_read().jwt.secret.clone(),
+            expiration_hours: config.blocking_read().jwt.expiration_hours,
+        };
+        Self {
+            jwt_config,
+            shared_config: Some(config),
+        }
+    }
+
+    fn get_secret(&self) -> Result<String> {
+        if let Some(config) = &self.shared_config {
+            config
+                .blocking_read()
+                .jwt
+                .secret
+                .clone()
+                .ok_or_else(|| AppError::Auth("JWT secret is not configured".to_string()))
+        } else {
+            self.jwt_config
+                .secret
+                .clone()
+                .ok_or_else(|| AppError::Auth("JWT secret is not configured".to_string()))
+        }
+    }
+
+    fn get_expiration_hours(&self) -> i64 {
+        if let Some(config) = &self.shared_config {
+            config.blocking_read().jwt.expiration_hours
+        } else {
+            self.jwt_config.expiration_hours
+        }
     }
 
     pub fn hash_password(&self, password: &str) -> Result<String> {
@@ -83,7 +115,7 @@ impl AuthService {
         Ok(TokenPair {
             access_token,
             refresh_token,
-            expires_in: self.jwt_config.expiration_hours * 3600,
+            expires_in: self.get_expiration_hours() * 3600,
         })
     }
 
@@ -98,7 +130,7 @@ impl AuthService {
             .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
 
         let iat = now.as_secs() as usize;
-        let exp = iat + (self.jwt_config.expiration_hours as usize * 3600);
+        let exp = iat + (self.get_expiration_hours() as usize * 3600);
 
         let claims = Claims {
             sub: user_id.to_string(),
@@ -130,7 +162,7 @@ impl AuthService {
             .map_err(|_| AppError::Auth("系统时间错误".to_string()))?;
 
         let iat = now.as_secs() as usize;
-        let exp = iat + (self.jwt_config.expiration_hours as usize * 3600 * 7);
+        let exp = iat + (self.get_expiration_hours() as usize * 3600 * 7);
 
         let claims = Claims {
             sub: user_id.to_string(),

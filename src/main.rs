@@ -85,6 +85,7 @@ async fn main() -> Result<()> {
         config.clone(),
         Arc::clone(&metrics_collector),
         Arc::clone(&shared_config_manager),
+        redis_manager.clone(),
     )
     .await?;
 

@@ -100,6 +100,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         config,
         metrics_collector,
         Arc::new(config_manager),
+        None,
     )
     .await
     .expect("Failed to create app state");
@@ -492,4 +493,112 @@ async fn test_super_admin_initialization() {
         has_super_admin_after,
         "Super admin should exist after creation"
     );
+}
+
+#[tokio::test]
+async fn test_activity_stats_single_query() {
+    let (_app, state) = create_test_app().await;
+
+    // 创建测试用户
+    let (user1_id, _) = create_test_user(&state, "statsuser1", "stats1@test.com").await;
+    let (user2_id, _) = create_test_user(&state, "statsuser2", "stats2@test.com").await;
+
+    // 创建测试房间
+    let room = state
+        .room_service()
+        .create_room("Stats Test Room", None, user1_id, false, 100)
+        .await
+        .unwrap();
+
+    // 用户加入房间
+    state.room_service().join_room(room.id, user2_id).await.ok();
+
+    // 发送多条消息
+    for i in 0..5 {
+        state
+            .message_service()
+            .create_text_message(
+                room.id,
+                user1_id,
+                &format!("Message {} from user1", i),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    for i in 0..3 {
+        state
+            .message_service()
+            .create_text_message(
+                room.id,
+                user2_id,
+                &format!("Message {} from user2", i),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+
+    // 调用活动统计（使用优化后的单次查询）
+    let stats = state.message_service().get_activity_stats().await.unwrap();
+
+    // 验证统计结果
+    assert!(
+        stats.daily_messages >= 8,
+        "Daily messages should be at least 8"
+    );
+    assert!(
+        stats.daily_active_users >= 2,
+        "Daily active users should be at least 2"
+    );
+    assert!(
+        stats.weekly_messages >= 8,
+        "Weekly messages should be at least 8"
+    );
+    assert!(
+        stats.weekly_active_users >= 2,
+        "Weekly active users should be at least 2"
+    );
+    assert!(
+        stats.monthly_messages >= 8,
+        "Monthly messages should be at least 8"
+    );
+    assert!(
+        stats.monthly_active_users >= 2,
+        "Monthly active users should be at least 2"
+    );
+
+    // 验证统计一致性（日 <= 周 <= 月）
+    assert!(
+        stats.daily_messages <= stats.weekly_messages,
+        "Daily messages should be <= weekly messages"
+    );
+    assert!(
+        stats.weekly_messages <= stats.monthly_messages,
+        "Weekly messages should be <= monthly messages"
+    );
+    assert!(
+        stats.daily_active_users <= stats.weekly_active_users,
+        "Daily active users should be <= weekly active users"
+    );
+    assert!(
+        stats.weekly_active_users <= stats.monthly_active_users,
+        "Weekly active users should be <= monthly active users"
+    );
+}
+
+#[tokio::test]
+async fn test_activity_stats_empty_database() {
+    let (_app, state) = create_test_app().await;
+
+    // 清理数据库后查询
+    let stats = state.message_service().get_activity_stats().await.unwrap();
+
+    // 空数据库应该返回全0
+    assert_eq!(stats.daily_messages, 0);
+    assert_eq!(stats.daily_active_users, 0);
+    assert_eq!(stats.weekly_messages, 0);
+    assert_eq!(stats.weekly_active_users, 0);
+    assert_eq!(stats.monthly_messages, 0);
+    assert_eq!(stats.monthly_active_users, 0);
 }

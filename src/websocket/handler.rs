@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{interval, timeout};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -806,6 +807,8 @@ async fn handle_get_pending_actions(
 }
 
 /// 处理订阅系统日志
+///
+/// 注意：此函数会阻塞直到连接断开，因为需要保持日志订阅活跃
 async fn handle_subscribe_logs(
     user_id: Uuid,
     level: Option<String>,
@@ -833,12 +836,22 @@ async fn handle_subscribe_logs(
         let _ = tx.send(json).await;
     }
 
-    // 启动日志转发任务
+    // 创建取消令牌，用于在连接断开时终止任务
+    let cancel_token = CancellationToken::new();
+    let cancel_token_clone = cancel_token.clone();
     let tx_for_logs = tx.clone();
-    tokio::spawn(async move {
+
+    // 启动日志转发任务
+    let log_task = tokio::spawn(async move {
         loop {
             tokio::select! {
                 biased;
+
+                // 检查取消信号
+                _ = cancel_token_clone.cancelled() => {
+                    debug!("Log subscription cancelled for user {}", user_id);
+                    break;
+                }
 
                 // 接收日志条目
                 entry = log_receiver.recv() => {
@@ -879,15 +892,31 @@ async fn handle_subscribe_logs(
                         }
                     }
                 }
-
-                // 如果发送者关闭，停止接收
-                _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                    debug!("Log subscription timeout for user, stopping");
-                    break;
-                }
             }
         }
     });
+
+    // 等待日志任务完成或连接断开
+    // 使用 tokio::select 来同时监听两个事件
+    tokio::select! {
+        _ = log_task => {
+            debug!("Log task completed for user {}", user_id);
+        }
+        _ = async {
+            // 定期检查 tx 是否关闭
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            loop {
+                interval.tick().await;
+                // 检查 tx 是否关闭 - 使用 is_closed() 方法
+                if tx.is_closed() {
+                    break;
+                }
+            }
+        } => {
+            debug!("Connection closed, cancelling log subscription for user {}", user_id);
+            cancel_token.cancel();
+        }
+    }
 
     Ok(())
 }
@@ -895,7 +924,7 @@ async fn handle_subscribe_logs(
 /// 处理取消订阅系统日志
 async fn handle_unsubscribe_logs(
     user_id: Uuid,
-    _state: &AppState,
+    #[allow(unused_variables)] state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
     debug!("User {} unsubscribing from logs", user_id);
@@ -935,16 +964,20 @@ async fn handle_join_room(
                     // 不是成员，检查房间是否公开
                     if room.is_private {
                         // 私有房间，需要邀请
-                        let error_msg =
-                            WebSocketMessage::error("NOT_MEMBER", "You are not a member of this room");
+                        let error_msg = WebSocketMessage::error(
+                            "NOT_MEMBER",
+                            "You are not a member of this room",
+                        );
                         if let Ok(json) = error_msg.to_json() {
                             let _ = tx.send(json).await;
                         }
                     } else {
                         // 公开房间，自动加入
                         if let Err(e) = state.room_service().join_room(room_id, user_id).await {
-                            let error_msg =
-                                WebSocketMessage::error("JOIN_FAILED", &format!("Failed to join room: {}", e));
+                            let error_msg = WebSocketMessage::error(
+                                "JOIN_FAILED",
+                                &format!("Failed to join room: {}", e),
+                            );
                             if let Ok(json) = error_msg.to_json() {
                                 let _ = tx.send(json).await;
                             }
@@ -1316,43 +1349,123 @@ async fn handle_stop_typing(
 async fn handle_message_read(
     message_id: Uuid,
     user_id: Uuid,
-    _state: &AppState,
+    state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
-    // 这里可以实现消息已读逻辑
-    // 例如：更新数据库中的已读状态，然后广播已读回执
+    debug!("User {} marking message {} as read", user_id, message_id);
+
+    // 获取消息以确定房间 ID
+    let room_id = match state.message_service().get_message_by_id(message_id).await {
+        Ok(Some(msg)) => msg.room_id,
+        Ok(None) => {
+            let error_msg = WebSocketMessage::error("NOT_FOUND", "Message not found");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("Failed to get message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to get message");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+    };
 
     let receipt = WebSocketMessage::MessageReadReceipt {
         message_id,
         user_id,
     };
 
+    // 广播已读回执给房间其他成员
+    if let Ok(json) = receipt.to_json() {
+        state
+            .ws_manager()
+            .broadcast_to_room(room_id, json, Some(user_id))
+            .await;
+    }
+
+    // 确认已读给发送者自己
     if let Ok(json) = receipt.to_json() {
         let _ = tx.send(json).await;
     }
 
+    debug!(
+        "Message {} marked as read by user {} in room {}",
+        message_id, user_id, room_id
+    );
     Ok(())
 }
 
 /// 处理编辑消息
 async fn handle_edit_message(
     message_id: Uuid,
-    _user_id: Uuid,
+    user_id: Uuid,
     new_content: String,
-    _state: &AppState,
+    state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
-    // 这里可以实现消息编辑逻辑
-    // 需要检查用户是否有权限编辑该消息
+    debug!("User {} editing message {}", user_id, message_id);
 
-    let edited_msg = WebSocketMessage::MessageEdited {
-        message_id,
-        new_content,
-        edited_at: chrono::Utc::now(),
+    // 获取原始消息以确定房间 ID
+    let orig_msg = match state.message_service().get_message_by_id(message_id).await {
+        Ok(Some(msg)) => msg,
+        Ok(None) => {
+            let error_msg = WebSocketMessage::error("NOT_FOUND", "Message not found");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("Failed to get message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to get message");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
     };
+    let room_id = orig_msg.room_id;
 
-    if let Ok(json) = edited_msg.to_json() {
-        let _ = tx.send(json).await;
+    // 调用 service 层编辑（内部验证发送者身份）
+    match state
+        .message_service()
+        .edit_message(message_id, user_id, &new_content)
+        .await
+    {
+        Ok(updated) => {
+            let edited_at = updated
+                .edited_at
+                .expect("edited_at should be set after successful edit");
+            let edited_msg = WebSocketMessage::MessageEdited {
+                message_id,
+                new_content: updated.content.clone(),
+                edited_at,
+            };
+
+            // 广播编辑结果给房间所有成员
+            if let Ok(json) = edited_msg.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_to_room_all(room_id, json)
+                    .await;
+            }
+
+            info!(
+                "Message {} edited by user {} in room {}",
+                message_id, user_id, room_id
+            );
+        }
+        Err(e) => {
+            warn!("Failed to edit message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("EDIT_FAILED", &e.to_string());
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
     }
 
     Ok(())
@@ -1361,17 +1474,62 @@ async fn handle_edit_message(
 /// 处理删除消息
 async fn handle_delete_message(
     message_id: Uuid,
-    _user_id: Uuid,
-    _state: &AppState,
+    user_id: Uuid,
+    state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
-    // 这里可以实现消息删除逻辑
-    // 需要检查用户是否有权限删除该消息
+    debug!("User {} deleting message {}", user_id, message_id);
 
-    let deleted_msg = WebSocketMessage::MessageDeleted { message_id };
+    // 获取原始消息以确定房间 ID
+    let orig_msg = match state.message_service().get_message_by_id(message_id).await {
+        Ok(Some(msg)) => msg,
+        Ok(None) => {
+            let error_msg = WebSocketMessage::error("NOT_FOUND", "Message not found");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("Failed to get message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to get message");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+    };
+    let room_id = orig_msg.room_id;
 
-    if let Ok(json) = deleted_msg.to_json() {
-        let _ = tx.send(json).await;
+    // 调用 service 层删除（内部验证发送者身份）
+    match state
+        .message_service()
+        .delete_message(message_id, user_id)
+        .await
+    {
+        Ok(_) => {
+            let deleted_msg = WebSocketMessage::MessageDeleted { message_id };
+
+            // 广播删除结果给房间所有成员
+            if let Ok(json) = deleted_msg.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_to_room_all(room_id, json)
+                    .await;
+            }
+
+            info!(
+                "Message {} deleted by user {} in room {}",
+                message_id, user_id, room_id
+            );
+        }
+        Err(e) => {
+            warn!("Failed to delete message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("DELETE_FAILED", &e.to_string());
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
     }
 
     Ok(())
@@ -1569,7 +1727,7 @@ async fn handle_get_online_users(
 /// 处理获取离线通知
 async fn handle_get_offline_notifications(
     user_id: Uuid,
-    _last_notification_id: Option<Uuid>,
+    #[allow(unused_variables)] last_notification_id: Option<Uuid>,
     limit: Option<i64>,
     state: &AppState,
     tx: &mpsc::Sender<String>,

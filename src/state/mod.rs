@@ -27,7 +27,7 @@ pub struct AppState {
     pub user_service: UserService,
     pub room_service: RoomService,
     pub message_service: MessageService,
-    pub file_service: FileService,
+    pub file_service: Arc<FileService>,
     pub notification_service: Arc<NotificationService>,
     pub audit_service: Arc<AuditService>,
     pub ip_security_service: Arc<IpSecurityService>,
@@ -64,26 +64,21 @@ impl AppState {
         config: AppConfig,
         metrics_collector: Arc<MetricsCollector>,
         config_manager: Arc<ConfigManager>,
+        redis_manager: Option<Arc<RedisManager>>,
     ) -> anyhow::Result<Arc<Self>> {
         let log_broadcaster = Arc::new(LogBroadcaster::new(1000));
         // 初始化全局日志广播器
         init_global_log_broadcaster((*log_broadcaster).clone());
         let logger = Arc::new(StructuredLogger);
 
-        let jwt_config = crate::config::JwtConfig {
-            secret: config.jwt.secret.clone(),
-            expiration_hours: config.jwt.expiration_hours,
-        };
+        let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
-        let auth_service = AuthService::new(jwt_config);
+        let auth_service = AuthService::with_shared_config(shared_config.clone());
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
         let notification_service =
             Arc::new(NotificationService::new(db.clone(), ws_manager.clone()));
-
-        // 初始化 Redis 连接
-        let redis_manager = RedisManager::new(config.redis.clone()).await?;
 
         // 初始化 Stream 管理器（如果 Redis 可用）
         let stream_manager = if let Some(ref redis_mgr) = redis_manager {
@@ -105,11 +100,7 @@ impl AppState {
         let ip_security_service =
             Arc::new(IpSecurityService::new(db.clone(), audit_service.clone()).await);
 
-        let upload_config = crate::config::UploadConfig {
-            max_file_size: config.upload.max_file_size,
-            base_url: config.upload.base_url.clone(),
-        };
-        let file_service = FileService::from_config(db.clone(), &upload_config)?;
+        let file_service = Arc::new(FileService::with_shared_config(db.clone(), shared_config.clone())?);
 
         // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
         if let Some(ref redis_mgr) = redis_manager {
@@ -117,8 +108,6 @@ impl AppState {
                 ws_manager.set_redis_pubsub(redis_pubsub).await;
             }
         }
-
-        let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
         let state = Arc::new(Self {
             db,
@@ -212,28 +201,17 @@ impl AppState {
 
 impl Clone for AppState {
     fn clone(&self) -> Self {
-        let upload_config = crate::config::UploadConfig {
-            max_file_size: self.file_service.max_file_size(),
-            base_url: self.file_service.get_base_url(),
-        };
-
-        let jwt_config = crate::config::JwtConfig {
-            secret: self.auth_service.jwt_config.secret.clone(),
-            expiration_hours: self.auth_service.jwt_config.expiration_hours,
-        };
-
         Self {
             db: self.db.clone(),
             ws_manager: Arc::clone(&self.ws_manager),
             metrics_collector: Arc::clone(&self.metrics_collector),
             log_broadcaster: Arc::clone(&self.log_broadcaster),
             logger: Arc::clone(&self.logger),
-            auth_service: AuthService::new(jwt_config),
+            auth_service: AuthService::with_shared_config(self.config.clone()),
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),
             message_service: MessageService::new(self.db.clone()),
-            file_service: FileService::from_config(self.db.clone(), &upload_config)
-                .expect("Failed to clone file service"),
+            file_service: Arc::clone(&self.file_service),
             notification_service: Arc::clone(&self.notification_service),
             audit_service: Arc::clone(&self.audit_service),
             ip_security_service: Arc::clone(&self.ip_security_service),

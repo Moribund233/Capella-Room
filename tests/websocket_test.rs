@@ -168,6 +168,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         config,
         Arc::clone(&metrics_collector),
         Arc::new(config_manager),
+        None,
     )
     .await
     .expect("Failed to create app state");

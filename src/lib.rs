@@ -13,6 +13,5 @@ pub mod redis;
 pub mod routes;
 pub mod services;
 pub mod state;
-pub mod traits;
 pub mod utils;
 pub mod websocket;

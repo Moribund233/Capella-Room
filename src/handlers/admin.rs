@@ -758,21 +758,34 @@ pub async fn get_redis_status(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ApiResponse<RedisStatusResponse>>> {
     let response = if let Some(ref redis_mgr) = state.redis_manager {
+        // 测量连接延迟
+        let start = std::time::Instant::now();
         let connected = redis_mgr.is_connected().await;
+        let latency_ms = if connected {
+            Some(start.elapsed().as_secs_f64() * 1000.0)
+        } else {
+            None
+        };
+
         let node_id = redis_mgr.node_id().to_string();
+
+        // 从配置获取地址
+        let config = state.config.read().await;
+        let address = config.redis.url.clone();
+        drop(config);
 
         RedisStatusResponse {
             enabled: true,
             connected,
-            pool_size: 10, // 从配置获取
+            pool_size: 1, // MultiplexedConnection 是单连接
             active_connections: if connected { 1 } else { 0 },
-            idle_connections: if connected { 9 } else { 0 },
+            idle_connections: 0,
             cluster_mode: false,
             nodes: vec![RedisNodeInfo {
                 id: node_id,
-                address: "redis://localhost:6379".to_string(),
+                address,
                 connected,
-                latency_ms: if connected { Some(0.5) } else { None },
+                latency_ms,
             }],
         }
     } else {
@@ -998,15 +1011,26 @@ pub struct ConfigSyncStatusResponse {
 pub async fn get_config_sync_status(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ApiResponse<ConfigSyncStatusResponse>>> {
-    let response = if let Some(ref _redis_mgr) = state.redis_manager {
-        // 从 ConfigManager 获取同步状态
+    let response = if let Some(ref redis_mgr) = state.redis_manager {
+        // 尝试获取实际的同步状态
+        let start = std::time::Instant::now();
+        let connected = redis_mgr.is_connected().await;
+        let sync_latency_ms = if connected {
+            Some(start.elapsed().as_secs_f64() * 1000.0)
+        } else {
+            None
+        };
+
+        // 最后同步时间（当前简化实现，实际应从 ConfigManager 获取）
+        let last_sync_at = None;
+
         ConfigSyncStatusResponse {
             sync_enabled: true,
-            last_sync_at: None, // 实际应从 ConfigManager 获取
-            nodes_total: 1,
-            nodes_synced: 1,
-            pending_changes: 0,
-            sync_latency_ms: None,
+            last_sync_at,
+            nodes_total: if connected { 1 } else { 0 },
+            nodes_synced: if connected { 1 } else { 0 },
+            pending_changes: 0, // TODO: 实现待处理变更计数
+            sync_latency_ms,
         }
     } else {
         ConfigSyncStatusResponse {

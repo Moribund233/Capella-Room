@@ -646,4 +646,132 @@ mod tests {
             _ => panic!("Expected AuthResult"),
         }
     }
+
+    #[test]
+    fn test_message_edited_roundtrip() {
+        let message_id = Uuid::new_v4();
+        let now = chrono::Utc::now();
+
+        let msg = WebSocketMessage::MessageEdited {
+            message_id,
+            new_content: "Edited content".to_string(),
+            edited_at: now,
+        };
+
+        let json = msg.to_json().unwrap();
+        let decoded = WebSocketMessage::from_json(&json).unwrap();
+
+        match decoded {
+            WebSocketMessage::MessageEdited {
+                message_id: id,
+                new_content,
+                edited_at,
+            } => {
+                assert_eq!(id, message_id);
+                assert_eq!(new_content, "Edited content");
+                assert!((edited_at - now).num_seconds().abs() <= 1);
+            }
+            _ => panic!("Expected MessageEdited"),
+        }
+    }
+
+    #[test]
+    fn test_message_deleted_roundtrip() {
+        let message_id = Uuid::new_v4();
+
+        let msg = WebSocketMessage::MessageDeleted { message_id };
+
+        let json = msg.to_json().unwrap();
+        let decoded = WebSocketMessage::from_json(&json).unwrap();
+
+        match decoded {
+            WebSocketMessage::MessageDeleted { message_id: id } => {
+                assert_eq!(id, message_id);
+            }
+            _ => panic!("Expected MessageDeleted"),
+        }
+    }
+
+    #[test]
+    fn test_message_read_receipt_roundtrip() {
+        let message_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        let msg = WebSocketMessage::MessageReadReceipt {
+            message_id,
+            user_id,
+        };
+
+        let json = msg.to_json().unwrap();
+        let decoded = WebSocketMessage::from_json(&json).unwrap();
+
+        match decoded {
+            WebSocketMessage::MessageReadReceipt {
+                message_id: mid,
+                user_id: uid,
+            } => {
+                assert_eq!(mid, message_id);
+                assert_eq!(uid, user_id);
+            }
+            _ => panic!("Expected MessageReadReceipt"),
+        }
+    }
+
+    #[test]
+    fn test_edit_message_request_roundtrip() {
+        let message_id = Uuid::new_v4();
+
+        let msg = WebSocketMessage::EditMessage {
+            message_id,
+            new_content: "Updated content".to_string(),
+        };
+
+        let json = msg.to_json().unwrap();
+        let decoded = WebSocketMessage::from_json(&json).unwrap();
+
+        match decoded {
+            WebSocketMessage::EditMessage {
+                message_id: id,
+                new_content,
+            } => {
+                assert_eq!(id, message_id);
+                assert_eq!(new_content, "Updated content");
+            }
+            _ => panic!("Expected EditMessage"),
+        }
+    }
+
+    #[test]
+    fn test_delete_message_request_roundtrip() {
+        let message_id = Uuid::new_v4();
+
+        let msg = WebSocketMessage::DeleteMessage { message_id };
+
+        let json = msg.to_json().unwrap();
+        let decoded = WebSocketMessage::from_json(&json).unwrap();
+
+        match decoded {
+            WebSocketMessage::DeleteMessage { message_id: id } => {
+                assert_eq!(id, message_id);
+            }
+            _ => panic!("Expected DeleteMessage"),
+        }
+    }
+
+    #[test]
+    fn test_message_read_request_roundtrip() {
+        let message_id = Uuid::new_v4();
+
+        let msg = WebSocketMessage::MessageRead { message_id };
+
+        let json = msg.to_json().unwrap();
+        let decoded = WebSocketMessage::from_json(&json).unwrap();
+
+        match decoded {
+            WebSocketMessage::MessageRead { message_id: id } => {
+                assert_eq!(id, message_id);
+            }
+            _ => panic!("Expected MessageRead"),
+        }
+    }
 }

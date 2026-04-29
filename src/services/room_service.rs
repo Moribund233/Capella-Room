@@ -363,21 +363,46 @@ impl RoomService {
         Ok(room)
     }
 
-    /// 删除聊天室
+    /// 删除聊天室（级联删除相关数据）
     pub async fn delete_room(&self, room_id: Uuid) -> Result<()> {
+        let mut tx = self.db.pool().begin().await?;
+
+        // 1. 删除房间成员关联
+        sqlx::query(
+            r#"
+            DELETE FROM room_members WHERE room_id = $1
+            "#,
+        )
+        .bind(room_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // 2. 删除房间消息
+        sqlx::query(
+            r#"
+            DELETE FROM messages WHERE room_id = $1
+            "#,
+        )
+        .bind(room_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // 3. 删除房间
         let result = sqlx::query(
             r#"
             DELETE FROM rooms WHERE id = $1
             "#,
         )
         .bind(room_id)
-        .execute(self.db.pool())
+        .execute(&mut *tx)
         .await?;
 
         if result.rows_affected() == 0 {
+            tx.rollback().await?;
             return Err(AppError::NotFound);
         }
 
+        tx.commit().await?;
         Ok(())
     }
 

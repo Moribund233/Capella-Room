@@ -6,9 +6,9 @@
 
 管理后台采用**配置驱动**的设计理念，页面开发遵循以下规范：
 
-- **简单单页**：直接编辑主视图
-- **复杂单页**：主视图 + 组件模式
-- **带子路由**：主视图 + 子页面（复杂子页面再使用组件）
+- **简单单页**：直接编辑主视图（`/views`）
+- **复杂单页**：主视图（`/views`）+ 组件模式
+- **带子路由**：主视图（`/views`）+ 子页面（`/pages`）（复杂子页面再使用组件）
 
 ## 已完成功能
 
@@ -29,9 +29,8 @@
 **页面结构**：
 ```
 src/
-├── pages/
-│   └── messages/
-│       └── MessageListPage.vue          # 消息审核主页面
+├── views/
+│   └── MessageManagementView.vue        # 消息审核主视图
 ├── components/
 │   └── messages/
 │       ├── MessageTable.vue             # 消息表格
@@ -70,9 +69,8 @@ src/
 **页面结构**：
 ```
 src/
-├── pages/
-│   └── statistics/
-│       └── StatisticsDashboard.vue      # 统计仪表盘
+├── views/
+│   └── StatisticsView.vue               # 统计仪表盘主视图
 └── api/
     └── statistics.ts                    # 统计API
 ```
@@ -107,6 +105,8 @@ src/
 **页面结构**：
 ```
 src/
+├── views/
+│   └── AuditView.vue                    # 审计系统主视图
 ├── pages/
 │   └── audit/
 │       ├── AuditLogPage.vue             # 审计日志（默认）
@@ -192,9 +192,8 @@ audit: {
 **页面结构**：
 ```
 src/
-├── pages/
-│   └── security/
-│       └── IPSecurityPage.vue           # IP安全管理主页面
+├── views/
+│   └── IPSecurityView.vue               # IP安全管理主视图
 ├── components/
 │   └── security/
 │       ├── IPTable.vue                  # IP列表表格
@@ -234,14 +233,18 @@ src/
 
 ### 5. 系统配置
 
-**设计模式**：简单单页
+**设计模式**：简单单页（作为 SettingView 的子页面）
 
 **页面结构**：
 ```
 src/
+├── views/
+│   └── SettingView.vue                  # 设置主视图（已存在）
 ├── pages/
 │   └── setting/
-│       └── ConfigSettingsPage.vue       # 系统配置页面
+│       ├── UISettingsPanel.vue          # 界面设置（已存在）
+│       ├── ConfigSettingsPage.vue       # 系统配置页面
+│       └── RedisStatusPage.vue          # Redis状态页面
 └── api/
     └── config.ts                        # 配置API
 ```
@@ -276,11 +279,13 @@ setting: {
 
 ### 6. Redis状态
 
-**设计模式**：简单单页
+**设计模式**：简单单页（作为 SettingView 的子页面）
 
 **页面结构**：
 ```
 src/
+├── views/
+│   └── SettingView.vue                  # 设置主视图（已存在）
 ├── pages/
 │   └── setting/
 │       └── RedisStatusPage.vue          # Redis状态页面
@@ -352,7 +357,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: 'security',
     name: 'Security',
-    component: () => import('@/views/SecurityView.vue'),
+    component: () => import('@/views/IPSecurityView.vue'),
     meta: { title: 'IP安全', requiresAuth: true },
   },
   {

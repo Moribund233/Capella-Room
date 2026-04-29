@@ -21,11 +21,7 @@ use seredeli_room::{
     db::Database,
     error::AppError,
     models::room::{CreateRoomRequest, MemberRole},
-    services::{
-        auth_service::{AuthService},
-        room_service::RoomService,
-        user_service::UserService,
-    },
+    services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
 };
 use uuid::Uuid;
 
@@ -45,8 +41,8 @@ async fn setup_test_db() -> Database {
     load_test_env();
 
     // 使用 .env.test 中的 DATABASE_URL
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in .env.test or environment");
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env.test or environment");
 
     let max_connections = env::var("APP_DATABASE__MAX_CONNECTIONS")
         .ok()
@@ -60,16 +56,25 @@ async fn setup_test_db() -> Database {
         idle_timeout_secs: 600,
     };
 
-    let db = Database::new(&db_config).await.expect("Failed to connect to test database");
-    
+    let db = Database::new(&db_config)
+        .await
+        .expect("Failed to connect to test database");
+
     // 运行数据库迁移
     db.migrate().await.expect("Failed to run migrations");
-    
+
     db
 }
 
 /// 测试辅助函数：创建测试用户
-async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, String, seredeli_room::services::auth_service::TokenPair) {
+async fn create_test_user(
+    user_service: &UserService,
+    username: &str,
+) -> (
+    Uuid,
+    String,
+    seredeli_room::services::auth_service::TokenPair,
+) {
     let email = format!("{}@test.com", username);
     let password = "TestPassword123";
 
@@ -81,7 +86,9 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
             expiration_hours: 24,
         };
         let auth_service = AuthService::new(jwt_config);
-        let tokens = auth_service.generate_token_pair(user.id, &user.username, user.role.clone()).unwrap();
+        let tokens = auth_service
+            .generate_token_pair(user.id, &user.username, user.role.clone())
+            .unwrap();
         return (user.id, password.to_string(), tokens);
     }
 
@@ -92,8 +99,13 @@ async fn create_test_user(user_service: &UserService, username: &str) -> (Uuid, 
 
     let password_hash = auth_service.hash_password(password).unwrap();
 
-    let user = user_service.create_user(username, &email, &password_hash).await.unwrap();
-    let tokens = auth_service.generate_token_pair(user.id, &user.username, user.role.clone()).unwrap();
+    let user = user_service
+        .create_user(username, &email, &password_hash)
+        .await
+        .unwrap();
+    let tokens = auth_service
+        .generate_token_pair(user.id, &user.username, user.role.clone())
+        .unwrap();
 
     (user.id, password.to_string(), tokens)
 }
@@ -252,13 +264,7 @@ mod room_service_tests {
         let (user_id, _, _) = create_test_user(&user_service, "test_create_room").await;
 
         let room = room_service
-            .create_room(
-                "Test Room",
-                Some("Test Description"),
-                user_id,
-                false,
-                100,
-            )
+            .create_room("Test Room", Some("Test Description"), user_id, false, 100)
             .await
             .unwrap();
 
@@ -367,7 +373,13 @@ mod room_service_tests {
             .unwrap();
 
         let updated = room_service
-            .update_room(room.id, Some("Updated Name"), Some("Updated Description"), None, None)
+            .update_room(
+                room.id,
+                Some("Updated Name"),
+                Some("Updated Description"),
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -420,7 +432,10 @@ mod room_service_tests {
         assert_eq!(member_count, 2);
 
         // 验证新成员的角色是 Member
-        let member = room_service.get_room_member(room.id, joiner_id).await.unwrap();
+        let member = room_service
+            .get_room_member(room.id, joiner_id)
+            .await
+            .unwrap();
         assert!(member.is_some());
         assert!(matches!(member.unwrap().role, MemberRole::Member));
     }
@@ -465,7 +480,10 @@ mod room_service_tests {
         room_service.leave_room(room.id, member_id).await.unwrap();
 
         // 验证成员已离开
-        let is_member = room_service.is_user_in_room(room.id, member_id).await.unwrap();
+        let is_member = room_service
+            .is_user_in_room(room.id, member_id)
+            .await
+            .unwrap();
         assert!(!is_member);
     }
 
@@ -511,10 +529,16 @@ mod room_service_tests {
         room_service.join_room(room.id, member_id).await.unwrap();
 
         // Owner踢出成员
-        room_service.kick_member(room.id, member_id, owner_id).await.unwrap();
+        room_service
+            .kick_member(room.id, member_id, owner_id)
+            .await
+            .unwrap();
 
         // 验证成员已被踢出
-        let is_member = room_service.is_user_in_room(room.id, member_id).await.unwrap();
+        let is_member = room_service
+            .is_user_in_room(room.id, member_id)
+            .await
+            .unwrap();
         assert!(!is_member);
     }
 
@@ -538,7 +562,9 @@ mod room_service_tests {
         room_service.join_room(room.id, member2_id).await.unwrap();
 
         // 普通成员尝试踢人应该失败
-        let result = room_service.kick_member(room.id, member2_id, member1_id).await;
+        let result = room_service
+            .kick_member(room.id, member2_id, member1_id)
+            .await;
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -602,7 +628,10 @@ mod room_service_tests {
             .unwrap();
 
         // 验证角色已更新
-        let role = room_service.get_member_role(room.id, member_id).await.unwrap();
+        let role = room_service
+            .get_member_role(room.id, member_id)
+            .await
+            .unwrap();
         assert!(matches!(role, Some(MemberRole::Admin)));
     }
 
@@ -693,15 +722,27 @@ mod room_service_tests {
 
         // 检查Owner权限
         assert!(room_service.is_room_owner(room.id, owner_id).await.unwrap());
-        assert!(room_service.can_manage_room(room.id, owner_id).await.unwrap());
+        assert!(room_service
+            .can_manage_room(room.id, owner_id)
+            .await
+            .unwrap());
 
         // 检查Admin权限
         assert!(!room_service.is_room_owner(room.id, admin_id).await.unwrap());
-        assert!(room_service.can_manage_room(room.id, admin_id).await.unwrap());
+        assert!(room_service
+            .can_manage_room(room.id, admin_id)
+            .await
+            .unwrap());
 
         // 检查普通成员权限
-        assert!(!room_service.is_room_owner(room.id, member_id).await.unwrap());
-        assert!(!room_service.can_manage_room(room.id, member_id).await.unwrap());
+        assert!(!room_service
+            .is_room_owner(room.id, member_id)
+            .await
+            .unwrap());
+        assert!(!room_service
+            .can_manage_room(room.id, member_id)
+            .await
+            .unwrap());
     }
 
     /// 测试私有房间权限
@@ -777,7 +818,10 @@ mod room_service_tests {
         room_service.join_room(room.id, member_id).await.unwrap();
 
         // 获取带用户信息的成员列表
-        let members = room_service.get_room_members_with_users(room.id).await.unwrap();
+        let members = room_service
+            .get_room_members_with_users(room.id)
+            .await
+            .unwrap();
         assert_eq!(members.len(), 2);
 
         // 验证包含用户信息
@@ -788,5 +832,67 @@ mod room_service_tests {
         let normal_member = members.iter().find(|m| m.user_id == member_id).unwrap();
         assert_eq!(normal_member.username, "test_members_member");
         assert!(matches!(normal_member.role, MemberRole::Member));
+    }
+
+    /// 测试删除房间级联清理（W1修复）
+    /// 验证删除房间时同时清理房间成员和消息
+    #[tokio::test]
+    async fn test_delete_room_cascading_cleanup() {
+        use seredeli_room::services::message_service::MessageService;
+
+        let db = setup_test_db().await;
+        let room_service = RoomService::new(db.clone());
+        let user_service = UserService::new(db.clone());
+        let message_service = MessageService::new(db.clone());
+
+        let (owner_id, _, _) = create_test_user(&user_service, "test_cascade_owner").await;
+        let (member_id, _, _) = create_test_user(&user_service, "test_cascade_member").await;
+
+        // 创建房间
+        let room = room_service
+            .create_room("Cascade Test Room", None, owner_id, false, 100)
+            .await
+            .unwrap();
+
+        // 添加成员
+        room_service.join_room(room.id, member_id).await.unwrap();
+
+        // 发送消息
+        message_service
+            .create_text_message(room.id, owner_id, "Test message 1", None)
+            .await
+            .unwrap();
+        message_service
+            .create_text_message(room.id, member_id, "Test message 2", None)
+            .await
+            .unwrap();
+
+        // 验证房间存在且有成员和消息
+        let members = room_service.get_room_members(room.id).await.unwrap();
+        assert_eq!(members.len(), 2, "房间应该有2个成员");
+
+        let messages = message_service
+            .get_room_messages(room.id, 10, None)
+            .await
+            .unwrap();
+        assert_eq!(messages.len(), 2, "房间应该有2条消息");
+
+        // 删除房间
+        room_service.delete_room(room.id).await.unwrap();
+
+        // 验证房间已删除
+        let room_result = room_service.get_room_by_id(room.id).await.unwrap();
+        assert!(room_result.is_none(), "房间应该已被删除");
+
+        // 验证成员已被清理
+        let members_result = room_service.get_room_members(room.id).await.unwrap();
+        assert!(members_result.is_empty(), "房间成员应该已被清理");
+
+        // 验证消息已被清理
+        let messages_result = message_service
+            .get_room_messages(room.id, 10, None)
+            .await
+            .unwrap();
+        assert!(messages_result.is_empty(), "房间消息应该已被清理");
     }
 }

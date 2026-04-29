@@ -174,6 +174,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         config,
         metrics_collector,
         Arc::new(config_manager),
+        None,
     )
     .await
     .expect("Failed to create app state");
@@ -653,9 +654,284 @@ mod websocket_message_tests {
             }
         }
     }
-}
 
-/// WebSocket 心跳测试
+    /// 测试 WebSocket 编辑消息
+    #[tokio::test]
+    async fn test_websocket_edit_message() {
+        let (server, db) = setup_test_server().await;
+
+        let (user_id, _, token) = create_test_user_with_token(&db, "testuser_edit").await;
+        let room_id = create_test_room(&db, user_id, "Test Room Edit").await;
+
+        let url = server.url();
+        let (ws_stream, _) = connect_async(&url).await.expect("Failed to connect");
+        let (mut write, mut read) = ws_stream.split();
+
+        // 认证
+        let auth_msg = WebSocketMessage::Auth { token };
+        write
+            .send(Message::Text(auth_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
+
+        // 加入房间
+        let join_msg = WebSocketMessage::JoinRoom { room_id };
+        write
+            .send(Message::Text(join_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
+
+        // 发送聊天消息
+        let chat_msg = WebSocketMessage::ChatMessage {
+            room_id,
+            content: "Original content".to_string(),
+            reply_to: None,
+        };
+        write
+            .send(Message::Text(chat_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+
+        // 等待发送的消息（获取 message_id）
+        let response = timeout(Duration::from_secs(5), read_next_message(&mut read))
+            .await
+            .expect("Timeout")
+            .expect("No response")
+            .expect("Failed to read");
+
+        let message_id = if let Message::Text(ref text) = response {
+            let msg: WebSocketMessage = serde_json::from_str(text).unwrap();
+            match msg {
+                WebSocketMessage::NewMessage { message_id, .. } => message_id,
+                _ => panic!("Expected NewMessage, got {:?}", msg),
+            }
+        } else {
+            panic!("Expected Text message");
+        };
+
+        // 编辑消息
+        let edit_msg = WebSocketMessage::EditMessage {
+            message_id,
+            new_content: "Edited content".to_string(),
+        };
+        write
+            .send(Message::Text(edit_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+
+        // 验证编辑广播
+        let edit_response = timeout(Duration::from_secs(5), read_next_message(&mut read))
+            .await
+            .expect("Timeout")
+            .expect("No response")
+            .expect("Failed to read");
+
+        if let Message::Text(text) = edit_response {
+            let msg: WebSocketMessage = serde_json::from_str(&text).unwrap();
+            match msg {
+                WebSocketMessage::MessageEdited {
+                    message_id: mid,
+                    new_content,
+                    ..
+                } => {
+                    assert_eq!(mid, message_id);
+                    assert_eq!(new_content, "Edited content");
+                }
+                other => panic!("Expected MessageEdited, got {:?}", other),
+            }
+        }
+    }
+
+    /// 测试 WebSocket 删除消息
+    #[tokio::test]
+    async fn test_websocket_delete_message() {
+        let (server, db) = setup_test_server().await;
+
+        let (user_id, _, token) = create_test_user_with_token(&db, "testuser_delete").await;
+        let room_id = create_test_room(&db, user_id, "Test Room Delete").await;
+
+        let url = server.url();
+        let (ws_stream, _) = connect_async(&url).await.expect("Failed to connect");
+        let (mut write, mut read) = ws_stream.split();
+
+        // 认证
+        let auth_msg = WebSocketMessage::Auth { token };
+        write
+            .send(Message::Text(auth_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
+
+        // 加入房间
+        let join_msg = WebSocketMessage::JoinRoom { room_id };
+        write
+            .send(Message::Text(join_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read)).await;
+
+        // 发送聊天消息
+        let chat_msg = WebSocketMessage::ChatMessage {
+            room_id,
+            content: "To be deleted".to_string(),
+            reply_to: None,
+        };
+        write
+            .send(Message::Text(chat_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+
+        // 等待发送的消息
+        let response = timeout(Duration::from_secs(5), read_next_message(&mut read))
+            .await
+            .expect("Timeout")
+            .expect("No response")
+            .expect("Failed to read");
+
+        let message_id = if let Message::Text(ref text) = response {
+            let msg: WebSocketMessage = serde_json::from_str(text).unwrap();
+            match msg {
+                WebSocketMessage::NewMessage { message_id, .. } => message_id,
+                _ => panic!("Expected NewMessage, got {:?}", msg),
+            }
+        } else {
+            panic!("Expected Text message");
+        };
+
+        // 删除消息
+        let delete_msg = WebSocketMessage::DeleteMessage { message_id };
+        write
+            .send(Message::Text(delete_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+
+        // 验证删除广播
+        let delete_response = timeout(Duration::from_secs(5), read_next_message(&mut read))
+            .await
+            .expect("Timeout")
+            .expect("No response")
+            .expect("Failed to read");
+
+        if let Message::Text(text) = delete_response {
+            let msg: WebSocketMessage = serde_json::from_str(&text).unwrap();
+            match msg {
+                WebSocketMessage::MessageDeleted { message_id: mid } => {
+                    assert_eq!(mid, message_id);
+                }
+                other => panic!("Expected MessageDeleted, got {:?}", other),
+            }
+        }
+    }
+
+    /// 测试不能编辑其他用户的消息
+    #[tokio::test]
+    async fn test_websocket_edit_other_user_message_forbidden() {
+        let (server, db) = setup_test_server().await;
+
+        let (user1_id, _, token1) =
+            create_test_user_with_token(&db, "testuser_edit_forbid1").await;
+        let (_, _, token2) =
+            create_test_user_with_token(&db, "testuser_edit_forbid2").await;
+        let room_id = create_test_room(&db, user1_id, "Test Room Edit Other").await;
+
+        let url = server.url();
+
+        // 用户1 发送消息
+        let (ws1, _) = connect_async(&url).await.expect("Failed to connect");
+        let (mut write1, mut read1) = ws1.split();
+
+        let auth_msg1 = WebSocketMessage::Auth { token: token1 };
+        write1
+            .send(Message::Text(auth_msg1.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read1)).await;
+
+        let join_msg1 = WebSocketMessage::JoinRoom { room_id };
+        write1
+            .send(Message::Text(join_msg1.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read1)).await;
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read1)).await;
+
+        let chat_msg = WebSocketMessage::ChatMessage {
+            room_id,
+            content: "User1 message".to_string(),
+            reply_to: None,
+        };
+        write1
+            .send(Message::Text(chat_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+
+        let response = timeout(Duration::from_secs(5), read_next_message(&mut read1))
+            .await
+            .expect("Timeout")
+            .expect("No response")
+            .expect("Failed to read");
+
+        let message_id = if let Message::Text(ref text) = response {
+            let msg: WebSocketMessage = serde_json::from_str(text).unwrap();
+            match msg {
+                WebSocketMessage::NewMessage { message_id, .. } => message_id,
+                _ => panic!("Expected NewMessage"),
+            }
+        } else {
+            panic!("Expected Text");
+        };
+
+        // 用户2 尝试编辑用户1的消息（通过第二个连接）
+        let (ws2, _) = connect_async(&url).await.expect("Failed to connect");
+        let (mut write2, mut read2) = ws2.split();
+
+        let auth_msg2 = WebSocketMessage::Auth { token: token2 };
+        write2
+            .send(Message::Text(auth_msg2.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read2)).await;
+
+        let join_msg2 = WebSocketMessage::JoinRoom { room_id };
+        write2
+            .send(Message::Text(join_msg2.to_json().unwrap()))
+            .await
+            .unwrap();
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read2)).await;
+        let _ = timeout(Duration::from_secs(5), read_next_message(&mut read2)).await;
+
+        // 用户2 尝试编辑用户1的消息
+        let edit_msg = WebSocketMessage::EditMessage {
+            message_id,
+            new_content: "Hacked content".to_string(),
+        };
+        write2
+            .send(Message::Text(edit_msg.to_json().unwrap()))
+            .await
+            .unwrap();
+
+        // 应收到错误
+        let edit_response = timeout(Duration::from_secs(5), read_next_message(&mut read2))
+            .await
+            .expect("Timeout")
+            .expect("No response")
+            .expect("Failed to read");
+
+        if let Message::Text(text) = edit_response {
+            let msg: WebSocketMessage = serde_json::from_str(&text).unwrap();
+            match msg {
+                WebSocketMessage::Error { code, .. } => {
+                    assert_eq!(code, "EDIT_FAILED", "Expected edit to be forbidden");
+                }
+                other => panic!("Expected Error, got {:?}", other),
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod websocket_heartbeat_tests {
     use super::*;

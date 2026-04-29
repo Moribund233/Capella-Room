@@ -100,6 +100,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         config,
         metrics_collector,
         Arc::new(config_manager),
+        None,
     )
     .await
     .expect("Failed to create app state");

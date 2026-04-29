@@ -235,12 +235,16 @@ impl MessageService {
         // 批量获取被引用消息的信息
         let reply_to_infos = self.get_reply_to_infos(&reply_to_ids).await?;
 
-        // 获取发送者信息并转换为响应
+        // 批量获取发送者信息
+        let sender_ids: Vec<Uuid> = messages.iter().map(|msg| msg.sender_id).collect();
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
-            let sender = self.get_sender_info(msg.sender_id).await?;
-            let reply_to_message = msg.reply_to.and_then(|id| reply_to_infos.get(&id).cloned());
-            responses.push(msg.to_response_with_reply(sender, reply_to_message));
+            if let Some(sender) = sender_infos.get(&msg.sender_id).cloned() {
+                let reply_to_message = msg.reply_to.and_then(|id| reply_to_infos.get(&id).cloned());
+                responses.push(msg.to_response_with_reply(sender, reply_to_message));
+            }
         }
 
         timer.finish();
@@ -254,17 +258,24 @@ impl MessageService {
         query: &str,
         limit: i64,
     ) -> Result<Vec<MessageResponse>> {
+        // 使用 tsvector 全文搜索替代 ILIKE，以利用索引并提升性能
+        let search_query = query
+            .split_whitespace()
+            .map(|word| format!("{}:*", word))
+            .collect::<Vec<_>>()
+            .join(" | ");
+
         let messages = if let Some(rid) = room_id {
             sqlx::query_as::<_, Message>(
                 r#"
                 SELECT * FROM messages
-                WHERE room_id = $1 AND content ILIKE $2 AND is_deleted = false
+                WHERE room_id = $1 AND content_tsv @@ to_tsquery('simple', $2) AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT $3
                 "#,
             )
             .bind(rid)
-            .bind(format!("%{}%", query))
+            .bind(&search_query)
             .bind(limit)
             .fetch_all(self.db.pool())
             .await?
@@ -272,12 +283,12 @@ impl MessageService {
             sqlx::query_as::<_, Message>(
                 r#"
                 SELECT * FROM messages
-                WHERE content ILIKE $1 AND is_deleted = false
+                WHERE content_tsv @@ to_tsquery('simple', $1) AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT $2
                 "#,
             )
-            .bind(format!("%{}%", query))
+            .bind(&search_query)
             .bind(limit)
             .fetch_all(self.db.pool())
             .await?
@@ -289,11 +300,16 @@ impl MessageService {
         // 批量获取被引用消息的信息
         let reply_to_infos = self.get_reply_to_infos(&reply_to_ids).await?;
 
+        // 批量获取发送者信息
+        let sender_ids: Vec<Uuid> = messages.iter().map(|msg| msg.sender_id).collect();
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
-            let sender = self.get_sender_info(msg.sender_id).await?;
-            let reply_to_message = msg.reply_to.and_then(|id| reply_to_infos.get(&id).cloned());
-            responses.push(msg.to_response_with_reply(sender, reply_to_message));
+            if let Some(sender) = sender_infos.get(&msg.sender_id).cloned() {
+                let reply_to_message = msg.reply_to.and_then(|id| reply_to_infos.get(&id).cloned());
+                responses.push(msg.to_response_with_reply(sender, reply_to_message));
+            }
         }
 
         Ok(responses)
@@ -350,10 +366,14 @@ impl MessageService {
         .fetch_all(self.db.pool())
         .await?;
 
+        let sender_ids: Vec<Uuid> = messages.iter().map(|msg| msg.sender_id).collect();
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
-            let sender = self.get_sender_info(msg.sender_id).await?;
-            responses.push(msg.to_response(sender));
+            if let Some(sender) = sender_infos.get(&msg.sender_id).cloned() {
+                responses.push(msg.to_response(sender));
+            }
         }
 
         Ok(responses)
@@ -430,11 +450,15 @@ impl MessageService {
             .await?
         };
 
-        // 获取发送者信息并转换为响应
+        // 批量获取发送者信息
+        let sender_ids: Vec<Uuid> = messages.iter().map(|msg| msg.sender_id).collect();
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
-            let sender = self.get_sender_info(msg.sender_id).await?;
-            responses.push(msg.to_response(sender));
+            if let Some(sender) = sender_infos.get(&msg.sender_id).cloned() {
+                responses.push(msg.to_response(sender));
+            }
         }
 
         Ok(responses)
@@ -546,18 +570,22 @@ impl MessageService {
         .fetch_all(self.db.pool())
         .await?;
 
-        // 转换为响应格式
+        // 批量获取编辑者信息
+        let editor_ids: Vec<Uuid> = edits.iter().map(|edit| edit.editor_id).collect();
+        let sender_infos = self.get_sender_infos(&editor_ids).await?;
+
         let mut responses = Vec::new();
         for edit in edits {
-            let editor = self.get_sender_info(edit.editor_id).await?;
-            responses.push(crate::models::message::MessageEditResponse {
-                id: edit.id,
-                message_id: edit.message_id,
-                editor,
-                old_content: edit.old_content,
-                new_content: edit.new_content,
-                created_at: edit.created_at,
-            });
+            if let Some(editor) = sender_infos.get(&edit.editor_id).cloned() {
+                responses.push(crate::models::message::MessageEditResponse {
+                    id: edit.id,
+                    message_id: edit.message_id,
+                    editor,
+                    old_content: edit.old_content,
+                    new_content: edit.new_content,
+                    created_at: edit.created_at,
+                });
+            }
         }
 
         Ok(responses)
@@ -609,10 +637,14 @@ impl MessageService {
             .await?
         };
 
+        let sender_ids: Vec<Uuid> = messages.iter().map(|msg| msg.sender_id).collect();
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
-            let sender = self.get_sender_info(msg.sender_id).await?;
-            responses.push(msg.to_response(sender));
+            if let Some(sender) = sender_infos.get(&msg.sender_id).cloned() {
+                responses.push(msg.to_response(sender));
+            }
         }
 
         Ok(responses)
@@ -687,10 +719,14 @@ impl MessageService {
 
         let total = self.count_all_messages().await?;
 
+        let sender_ids: Vec<Uuid> = messages.iter().map(|msg| msg.sender_id).collect();
+        let sender_infos = self.get_sender_infos(&sender_ids).await?;
+
         let mut responses = Vec::new();
         for msg in messages {
-            let sender = self.get_sender_info(msg.sender_id).await?;
-            responses.push(msg.to_response(sender));
+            if let Some(sender) = sender_infos.get(&msg.sender_id).cloned() {
+                responses.push(msg.to_response(sender));
+            }
         }
 
         Ok((responses, total))
@@ -728,70 +764,44 @@ impl MessageService {
     }
 
     /// 获取活跃度统计
+    /// 使用单个SQL查询获取所有统计数据，减少数据库往返
     pub async fn get_activity_stats(&self) -> Result<ActivityStats> {
-        let daily_active_users: (i64,) = sqlx::query_as(
+        let stats: ActivityStatsRow = sqlx::query_as(
             r#"
-            SELECT COUNT(DISTINCT sender_id) FROM messages 
-            WHERE created_at > NOW() - INTERVAL '1 day' AND is_deleted = false
-            "#,
-        )
-        .fetch_one(self.db.pool())
-        .await?;
-
-        let weekly_active_users: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(DISTINCT sender_id) FROM messages 
-            WHERE created_at > NOW() - INTERVAL '7 days' AND is_deleted = false
-            "#,
-        )
-        .fetch_one(self.db.pool())
-        .await?;
-
-        let monthly_active_users: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(DISTINCT sender_id) FROM messages 
-            WHERE created_at > NOW() - INTERVAL '30 days' AND is_deleted = false
-            "#,
-        )
-        .fetch_one(self.db.pool())
-        .await?;
-
-        let daily_messages: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM messages 
-            WHERE created_at > NOW() - INTERVAL '1 day' AND is_deleted = false
-            "#,
-        )
-        .fetch_one(self.db.pool())
-        .await?;
-
-        let weekly_messages: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM messages 
-            WHERE created_at > NOW() - INTERVAL '7 days' AND is_deleted = false
-            "#,
-        )
-        .fetch_one(self.db.pool())
-        .await?;
-
-        let monthly_messages: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM messages 
-            WHERE created_at > NOW() - INTERVAL '30 days' AND is_deleted = false
+            SELECT
+                COUNT(DISTINCT sender_id) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') AS daily_active_users,
+                COUNT(DISTINCT sender_id) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS weekly_active_users,
+                COUNT(DISTINCT sender_id) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') AS monthly_active_users,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') AS daily_messages,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS weekly_messages,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') AS monthly_messages
+            FROM messages
+            WHERE is_deleted = false
             "#,
         )
         .fetch_one(self.db.pool())
         .await?;
 
         Ok(ActivityStats {
-            daily_active_users: daily_active_users.0,
-            weekly_active_users: weekly_active_users.0,
-            monthly_active_users: monthly_active_users.0,
-            daily_messages: daily_messages.0,
-            weekly_messages: weekly_messages.0,
-            monthly_messages: monthly_messages.0,
+            daily_active_users: stats.daily_active_users.unwrap_or(0),
+            weekly_active_users: stats.weekly_active_users.unwrap_or(0),
+            monthly_active_users: stats.monthly_active_users.unwrap_or(0),
+            daily_messages: stats.daily_messages.unwrap_or(0),
+            weekly_messages: stats.weekly_messages.unwrap_or(0),
+            monthly_messages: stats.monthly_messages.unwrap_or(0),
         })
     }
+}
+
+/// 活跃度统计数据（数据库查询行映射）
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct ActivityStatsRow {
+    daily_active_users: Option<i64>,
+    weekly_active_users: Option<i64>,
+    monthly_active_users: Option<i64>,
+    daily_messages: Option<i64>,
+    weekly_messages: Option<i64>,
+    monthly_messages: Option<i64>,
 }
 
 /// 活跃度统计数据

@@ -83,6 +83,7 @@ async fn start_test_server() -> TestServer {
         config,
         metrics_collector,
         Arc::new(config_manager),
+        None,
     )
     .await
     .expect("Failed to create app state");

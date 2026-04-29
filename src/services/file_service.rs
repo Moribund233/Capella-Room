@@ -7,6 +7,7 @@ use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::{
+    config::SharedConfig,
     db::Database,
     error::{AppError, Result},
     models::file::{
@@ -22,6 +23,7 @@ pub struct FileService {
     upload_dir: String,
     base_url: String,
     max_file_size: usize,
+    shared_config: Option<SharedConfig>,
 }
 
 impl FileService {
@@ -32,6 +34,7 @@ impl FileService {
             upload_dir,
             base_url,
             max_file_size,
+            shared_config: None,
         }
     }
 
@@ -46,6 +49,36 @@ impl FileService {
         ))
     }
 
+    /// 使用共享配置创建文件服务（支持热加载）
+    pub fn with_shared_config(db: Database, config: SharedConfig) -> anyhow::Result<Self> {
+        let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+        let (base_url, max_file_size) = {
+            let cfg = config.blocking_read();
+            (cfg.upload.base_url.clone(), cfg.upload.max_file_size)
+        };
+        Ok(Self {
+            db,
+            upload_dir,
+            base_url,
+            max_file_size,
+            shared_config: Some(config),
+        })
+    }
+
+    fn effective_max_file_size(&self) -> usize {
+        self.shared_config
+            .as_ref()
+            .map(|c| c.blocking_read().upload.max_file_size)
+            .unwrap_or(self.max_file_size)
+    }
+
+    fn effective_base_url(&self) -> String {
+        self.shared_config
+            .as_ref()
+            .map(|c| c.blocking_read().upload.base_url.clone())
+            .unwrap_or_else(|| self.base_url.clone())
+    }
+
     /// 上传文件
     pub async fn upload_file(
         &self,
@@ -57,7 +90,7 @@ impl FileService {
         room_id: Option<Uuid>,
     ) -> Result<FileUploadResponse> {
         // 验证文件大小
-        if file_data.len() > self.max_file_size {
+        if file_data.len() > self.effective_max_file_size() {
             return Err(AppError::Validation(format!(
                 "文件大小超过限制，最大允许 {} 字节",
                 self.max_file_size
@@ -122,7 +155,7 @@ impl FileService {
         }
 
         // 构建访问 URL
-        let file_url = format!("{}/{}", self.base_url, file_path.replace('\\', "/"));
+        let file_url = format!("{}/{}", self.effective_base_url(), file_path.replace('\\', "/"));
 
         // 保存到数据库
         let file_resource = sqlx::query_as::<_, FileResource>(
@@ -435,11 +468,11 @@ impl FileService {
 
     /// 获取最大文件大小
     pub fn max_file_size(&self) -> usize {
-        self.max_file_size
+        self.effective_max_file_size()
     }
 
     /// 获取基础URL
     pub fn get_base_url(&self) -> String {
-        self.base_url.clone()
+        self.effective_base_url()
     }
 }
