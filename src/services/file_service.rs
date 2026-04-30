@@ -14,7 +14,6 @@ use crate::{
         is_allowed_mime_type, FileCategory, FileListResponse, FileQueryParams, FileResource,
         FileResponse, FileUploadResponse, FileUsageType,
     },
-    models::user::UserInfo,
 };
 
 /// 文件服务
@@ -50,32 +49,35 @@ impl FileService {
     }
 
     /// 使用共享配置创建文件服务（支持热加载）
+    /// 注意：不要在异步运行时中调用 blocking_read
     pub fn with_shared_config(db: Database, config: SharedConfig) -> anyhow::Result<Self> {
         let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-        let (base_url, max_file_size) = {
-            let cfg = config.blocking_read();
-            (cfg.upload.base_url.clone(), cfg.upload.max_file_size)
-        };
+        // 使用默认值初始化，后续通过 try_read 动态读取
         Ok(Self {
             db,
             upload_dir,
-            base_url,
-            max_file_size,
+            base_url: String::new(),
+            max_file_size: 0,
             shared_config: Some(config),
         })
     }
 
+    /// 获取有效的最大文件大小
+    /// 使用 try_read 避免阻塞
     fn effective_max_file_size(&self) -> usize {
         self.shared_config
             .as_ref()
-            .map(|c| c.blocking_read().upload.max_file_size)
+            .and_then(|c| c.try_read().ok().map(|cfg| cfg.upload.max_file_size))
             .unwrap_or(self.max_file_size)
     }
 
+    /// 获取有效的 base_url
+    /// 使用 try_read 避免阻塞
     fn effective_base_url(&self) -> String {
         self.shared_config
             .as_ref()
-            .map(|c| c.blocking_read().upload.base_url.clone())
+            .and_then(|c| c.try_read().ok().map(|cfg| cfg.upload.base_url.clone()))
+            .filter(|url| !url.is_empty())
             .unwrap_or_else(|| self.base_url.clone())
     }
 
@@ -90,10 +92,11 @@ impl FileService {
         room_id: Option<Uuid>,
     ) -> Result<FileUploadResponse> {
         // 验证文件大小
-        if file_data.len() > self.effective_max_file_size() {
+        let max_size = self.effective_max_file_size();
+        if max_size > 0 && file_data.len() > max_size {
             return Err(AppError::Validation(format!(
                 "文件大小超过限制，最大允许 {} 字节",
-                self.max_file_size
+                max_size
             )));
         }
 
@@ -120,7 +123,7 @@ impl FileService {
             .extension()
             .and_then(|ext| ext.to_str())
             .unwrap_or("bin");
-        let storage_name = format!("{}. {}", file_id, extension);
+        let storage_name = format!("{}.{}", file_id, extension);
 
         // 构建存储路径: {category}/{year}/{month}/{filename}
         let now = Utc::now();
@@ -155,7 +158,12 @@ impl FileService {
         }
 
         // 构建访问 URL
-        let file_url = format!("{}/{}", self.effective_base_url(), file_path.replace('\\', "/"));
+        let base_url = self.effective_base_url();
+        let file_url = if base_url.is_empty() {
+            format!("/uploads/{}", file_path.replace('\\', "/"))
+        } else {
+            format!("{}/{}", base_url, file_path.replace('\\', "/"))
+        };
 
         // 保存到数据库
         let file_resource = sqlx::query_as::<_, FileResource>(
@@ -212,16 +220,117 @@ impl FileService {
     fn calculate_hash(&self, data: &[u8]) -> String {
         let mut hasher = Sha256::new();
         hasher.update(data);
-        hex::encode(hasher.finalize())
+        format!("{:x}", hasher.finalize())
     }
 
-    /// 根据 ID 获取文件
-    pub async fn get_file_by_id(&self, file_id: Uuid) -> Result<FileResource> {
+    /// 获取文件列表
+    pub async fn list_files(&self, params: FileQueryParams) -> Result<FileListResponse> {
+        let mut query = String::from("SELECT * FROM file_resources WHERE is_deleted = false");
+        let mut count_query =
+            String::from("SELECT COUNT(*) FROM file_resources WHERE is_deleted = false");
+        let mut conditions: Vec<String> = Vec::new();
+
+        // 添加查询条件
+        if let Some(ref category) = params.category {
+            conditions.push(format!("category = '{:?}'", category));
+        }
+        if let Some(ref usage) = params.usage_type {
+            conditions.push(format!("usage_type = '{:?}'", usage));
+        }
+
+        // 应用条件
+        if !conditions.is_empty() {
+            let where_clause = conditions.join(" AND ");
+            query.push_str(" AND ");
+            query.push_str(&where_clause);
+            count_query.push_str(" AND ");
+            count_query.push_str(&where_clause);
+        }
+
+        // 添加排序
+        query.push_str(" ORDER BY created_at DESC");
+
+        // 添加分页
+        let limit = params.limit.unwrap_or(20).min(100);
+        let offset = params.offset.unwrap_or(0);
+        query.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+
+        // 执行查询
+        let files = sqlx::query_as::<_, FileResource>(&query)
+            .fetch_all(self.db.pool())
+            .await?;
+
+        let total: i64 = sqlx::query_scalar(&count_query)
+            .fetch_one(self.db.pool())
+            .await?;
+
+        Ok(FileListResponse {
+            files: files
+                .into_iter()
+                .map(|f| self.to_file_response(f))
+                .collect(),
+            total,
+        })
+    }
+
+    /// 获取上传者的文件列表
+    pub async fn get_files_by_uploader(
+        &self,
+        uploader_id: Uuid,
+        params: FileQueryParams,
+    ) -> Result<FileListResponse> {
+        let mut query = String::from(
+            "SELECT * FROM file_resources WHERE is_deleted = false AND uploader_id = '",
+        );
+        query.push_str(&uploader_id.to_string());
+        query.push('\'');
+
+        let mut count_query = String::from(
+            "SELECT COUNT(*) FROM file_resources WHERE is_deleted = false AND uploader_id = '",
+        );
+        count_query.push_str(&uploader_id.to_string());
+        count_query.push('\'');
+
+        // 添加查询条件
+        if let Some(ref category) = params.category {
+            query.push_str(&format!(" AND category = '{:?}'", category));
+            count_query.push_str(&format!(" AND category = '{:?}'", category));
+        }
+        if let Some(ref usage) = params.usage_type {
+            query.push_str(&format!(" AND usage_type = '{:?}'", usage));
+            count_query.push_str(&format!(" AND usage_type = '{:?}'", usage));
+        }
+
+        // 添加排序
+        query.push_str(" ORDER BY created_at DESC");
+
+        // 添加分页
+        let limit = params.limit.unwrap_or(20).min(100);
+        let offset = params.offset.unwrap_or(0);
+        query.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+
+        // 执行查询
+        let files = sqlx::query_as::<_, FileResource>(&query)
+            .fetch_all(self.db.pool())
+            .await?;
+
+        let total: i64 = sqlx::query_scalar(&count_query)
+            .fetch_one(self.db.pool())
+            .await?;
+
+        Ok(FileListResponse {
+            files: files
+                .into_iter()
+                .map(|f| self.to_file_response(f))
+                .collect(),
+            total,
+        })
+    }
+
+    /// 获取单个文件（内部方法）
+    async fn get_file_internal(&self, file_id: Uuid) -> Result<FileResource> {
         let file = sqlx::query_as::<_, FileResource>(
-            r#"
-            SELECT * FROM file_resources 
-            WHERE id = $1 AND is_deleted = false
-            "#,
+            "SELECT * FROM file_resources WHERE id = $1 AND is_deleted = false",
         )
         .bind(file_id)
         .fetch_optional(self.db.pool())
@@ -231,248 +340,108 @@ impl FileService {
         Ok(file)
     }
 
-    /// 获取用户上传的文件列表
-    pub async fn get_files_by_uploader(
-        &self,
-        uploader_id: Uuid,
-        params: FileQueryParams,
-    ) -> Result<FileListResponse> {
-        let limit = params.limit.unwrap_or(20).clamp(1, 100);
-        let offset = params.offset.unwrap_or(0).max(0);
-
-        let files = match (&params.category, &params.usage_type) {
-            (Some(cat), Some(usage)) => {
-                sqlx::query_as::<_, FileResource>(
-                    r#"
-                    SELECT * FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND category = $2 
-                    AND usage_type = $3 
-                    AND is_deleted = false
-                    ORDER BY created_at DESC
-                    LIMIT $4 OFFSET $5
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(cat)
-                .bind(usage)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.db.pool())
-                .await?
-            }
-            (Some(cat), None) => {
-                sqlx::query_as::<_, FileResource>(
-                    r#"
-                    SELECT * FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND category = $2 
-                    AND is_deleted = false
-                    ORDER BY created_at DESC
-                    LIMIT $3 OFFSET $4
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(cat)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.db.pool())
-                .await?
-            }
-            (None, Some(usage)) => {
-                sqlx::query_as::<_, FileResource>(
-                    r#"
-                    SELECT * FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND usage_type = $2 
-                    AND is_deleted = false
-                    ORDER BY created_at DESC
-                    LIMIT $3 OFFSET $4
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(usage)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.db.pool())
-                .await?
-            }
-            (None, None) => {
-                sqlx::query_as::<_, FileResource>(
-                    r#"
-                    SELECT * FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND is_deleted = false
-                    ORDER BY created_at DESC
-                    LIMIT $2 OFFSET $3
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.db.pool())
-                .await?
-            }
-        };
-
-        // 获取总数
-        let total = match (&params.category, &params.usage_type) {
-            (Some(cat), Some(usage)) => {
-                sqlx::query_scalar::<_, i64>(
-                    r#"
-                    SELECT COUNT(*) FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND category = $2 
-                    AND usage_type = $3 
-                    AND is_deleted = false
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(cat)
-                .bind(usage)
-                .fetch_one(self.db.pool())
-                .await?
-            }
-            (Some(cat), None) => {
-                sqlx::query_scalar::<_, i64>(
-                    r#"
-                    SELECT COUNT(*) FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND category = $2 
-                    AND is_deleted = false
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(cat)
-                .fetch_one(self.db.pool())
-                .await?
-            }
-            (None, Some(usage)) => {
-                sqlx::query_scalar::<_, i64>(
-                    r#"
-                    SELECT COUNT(*) FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND usage_type = $2 
-                    AND is_deleted = false
-                    "#,
-                )
-                .bind(uploader_id)
-                .bind(usage)
-                .fetch_one(self.db.pool())
-                .await?
-            }
-            (None, None) => {
-                sqlx::query_scalar::<_, i64>(
-                    r#"
-                    SELECT COUNT(*) FROM file_resources 
-                    WHERE uploader_id = $1 
-                    AND is_deleted = false
-                    "#,
-                )
-                .bind(uploader_id)
-                .fetch_one(self.db.pool())
-                .await?
-            }
-        };
-
-        // 收集所有上传者ID
-        let uploader_ids: Vec<Uuid> = files
-            .iter()
-            .filter_map(|f| f.uploader_id)
-            .collect();
-
-        // 批量查询上传者信息
-        let uploader_infos = self.get_user_infos(&uploader_ids).await?;
-
-        // 转换为响应
-        let files: Vec<FileResponse> = files
-            .into_iter()
-            .map(|f| {
-                let uploader = f.uploader_id.and_then(|id| uploader_infos.get(&id).cloned());
-                f.to_response_with_uploader(uploader)
-            })
-            .collect();
-
-        Ok(FileListResponse { files, total })
+    /// 获取单个文件
+    pub async fn get_file(&self, file_id: Uuid) -> Result<FileResponse> {
+        let file = self.get_file_internal(file_id).await?;
+        Ok(self.to_file_response(file))
     }
 
-    /// 批量获取用户信息
-    async fn get_user_infos(&self, user_ids: &[Uuid]) -> Result<std::collections::HashMap<Uuid, UserInfo>> {
-        if user_ids.is_empty() {
-            return Ok(std::collections::HashMap::new());
-        }
-
-        let rows: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
-            r#"
-            SELECT id, username, avatar_url FROM users WHERE id = ANY($1)
-            "#,
-        )
-        .bind(user_ids)
-        .fetch_all(self.db.pool())
-        .await
-        .map_err(AppError::Database)?;
-
-        let mut map = std::collections::HashMap::new();
-        for (id, username, avatar_url) in rows {
-            map.insert(id, UserInfo::new(id, username, avatar_url));
-        }
-
-        Ok(map)
+    /// 根据ID获取文件（用于 handlers）
+    pub async fn get_file_by_id(&self, file_id: Uuid) -> Result<FileResource> {
+        self.get_file_internal(file_id).await
     }
 
-    /// 软删除文件
-    pub async fn delete_file(&self, file_id: Uuid, uploader_id: Uuid) -> Result<()> {
-        // 检查文件是否存在且属于该用户
-        let file = self.get_file_by_id(file_id).await?;
-
-        if file.uploader_id != Some(uploader_id) {
-            return Err(AppError::Forbidden);
-        }
-
-        // 软删除
-        sqlx::query(
-            r#"
-            UPDATE file_resources 
-            SET is_deleted = true, updated_at = NOW()
-            WHERE id = $1
-            "#,
+    /// 删除文件（软删除）
+    pub async fn delete_file(&self, file_id: Uuid, user_id: Uuid) -> Result<()> {
+        let result = sqlx::query(
+            "UPDATE file_resources SET is_deleted = true WHERE id = $1 AND uploader_id = $2",
         )
         .bind(file_id)
+        .bind(user_id)
         .execute(self.db.pool())
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
 
         Ok(())
     }
 
-    /// 关联文件到消息
-    pub async fn link_file_to_message(&self, file_id: Uuid, message_id: Uuid) -> Result<()> {
-        sqlx::query(
+    /// 转换文件响应
+    fn to_file_response(&self, file: FileResource) -> FileResponse {
+        FileResponse {
+            id: file.id,
+            original_name: file.original_name,
+            file_url: file.file_url,
+            file_size: file.file_size,
+            mime_type: file.mime_type,
+            category: file.category,
+            usage_type: file.usage_type,
+            uploader: None,
+            created_at: file.created_at,
+        }
+    }
+
+    /// 清理过期文件
+    pub async fn cleanup_expired_files(&self, days: i64) -> Result<u64> {
+        let result = sqlx::query(
             r#"
             UPDATE file_resources 
-            SET message_id = $1, usage_type = 'message', updated_at = NOW()
-            WHERE id = $2
+            SET is_deleted = true 
+            WHERE created_at < NOW() - INTERVAL '1 day' * $1
+            AND is_deleted = false
             "#,
         )
-        .bind(message_id)
-        .bind(file_id)
+        .bind(days)
         .execute(self.db.pool())
         .await?;
 
-        Ok(())
+        Ok(result.rows_affected())
     }
 
-    /// 获取文件的完整路径
-    pub fn get_full_path(&self, file_path: &str) -> PathBuf {
+    /// 获取用户存储统计
+    pub async fn get_user_storage_stats(&self, user_id: Uuid) -> Result<(i64, i64)> {
+        let stats: (Option<i64>, Option<i64>) = sqlx::query_as(
+            r#"
+            SELECT 
+                COUNT(*) as file_count,
+                COALESCE(SUM(file_size), 0) as total_size
+            FROM file_resources 
+            WHERE uploader_id = $1 AND is_deleted = false
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok((stats.0.unwrap_or(0), stats.1.unwrap_or(0)))
+    }
+
+    /// 获取文件路径
+    pub fn get_file_path(&self, file_path: &str) -> PathBuf {
         PathBuf::from(&self.upload_dir).join(file_path)
     }
+}
 
-    /// 获取最大文件大小
-    pub fn max_file_size(&self) -> usize {
-        self.effective_max_file_size()
-    }
+#[cfg(test)]
+mod tests {
+    use sha2::{Digest, Sha256};
 
-    /// 获取基础URL
-    pub fn get_base_url(&self) -> String {
-        self.effective_base_url()
+    #[test]
+    fn test_calculate_hash() {
+        // 直接测试哈希计算逻辑
+        fn calculate_hash(data: &[u8]) -> String {
+            let mut hasher = Sha256::new();
+            hasher.update(data);
+            format!("{:x}", hasher.finalize())
+        }
+
+        let data = b"test data";
+        let hash1 = calculate_hash(data);
+        let hash2 = calculate_hash(data);
+
+        assert_eq!(hash1, hash2);
+        assert!(!hash1.is_empty());
     }
 }

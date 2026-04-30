@@ -4,7 +4,7 @@
  */
 
 import { getAccessToken } from './token'
-import { getConnectionConfig, calculateReconnectDelay } from '@/config/websocketConfig'
+import { getConnectionConfig, getReconnectStrategy, getHeartbeatTimeoutMs } from '@/config/websocketConfig'
 import type {
   WebSocketMessage,
   ConnectionStatus,
@@ -13,6 +13,7 @@ import type {
 } from '@/types/websocket'
 
 const WS_BASE_URL = import.meta.env.VITE_WS_URL
+
 class WebSocketClient {
   private ws: WebSocket | null = null
   private config: Required<WebSocketConfig>
@@ -28,6 +29,8 @@ class WebSocketClient {
   private authReject: ((error: Error) => void) | null = null
   private connectingPromise: Promise<void> | null = null
   private authSent = false
+  private lastMessageTime = 0
+  private heartbeatTimeoutTimer: number | null = null
 
   private customConfig: WebSocketConfig
 
@@ -159,6 +162,9 @@ class WebSocketClient {
     try {
       const message: WebSocketMessage = JSON.parse(data)
 
+      // 更新最后收到消息的时间
+      this.lastMessageTime = Date.now()
+
       // 处理认证结果
       if (message.type === 'AuthResult') {
         this.clearConnectTimer()
@@ -170,7 +176,8 @@ class WebSocketClient {
           this.reconnectAttempts = 0
           this.handlers.onConnect?.()
           this.authResolve?.()
-          this.startHeartbeat()
+          // 启动心跳超时检测（而不是主动发送心跳）
+          this.startHeartbeatTimeout()
           this.flushMessageQueue()
         } else {
           console.error('[WebSocket] 认证失败:', result.message)
@@ -191,14 +198,12 @@ class WebSocketClient {
         return
       }
 
-      // 处理心跳响应（后端回复的 Pong）
-      if (message.type === 'Pong') {
-        return
-      }
-
-      // 处理后端发送的心跳 Ping，需要回复 Pong
+      // 处理服务端发送的心跳 Ping，需要回复 Pong
       if (message.type === 'Ping') {
         this.sendInternal({ type: 'Pong' })
+        // 更新最后收到心跳的时间（收到 Ping 表示连接正常）
+        this.lastMessageTime = Date.now()
+        console.log('[WebSocket] 收到 Ping，已回复 Pong')
         return
       }
 
@@ -339,6 +344,7 @@ class WebSocketClient {
     this.clearConnectTimer()
     this.clearHeartbeatTimer()
     this.clearReconnectTimer()
+    this.clearHeartbeatTimeout()
   }
 
   /**
@@ -362,6 +368,16 @@ class WebSocketClient {
   }
 
   /**
+   * 清除心跳超时检测定时器
+   */
+  private clearHeartbeatTimeout(): void {
+    if (this.heartbeatTimeoutTimer) {
+      clearInterval(this.heartbeatTimeoutTimer)
+      this.heartbeatTimeoutTimer = null
+    }
+  }
+
+  /**
    * 清除重连定时器
    */
   private clearReconnectTimer(): void {
@@ -372,13 +388,31 @@ class WebSocketClient {
   }
 
   /**
-   * 启动心跳
+   * 启动心跳超时检测
+   * 后端机制：服务端每30秒发送Ping，90秒未收到Pong则断开
+   * 前端：检测是否收到服务端Ping（或其他消息），如果超过阈值没有收到则认为超时
    */
-  private startHeartbeat(): void {
-    this.clearHeartbeatTimer()
-    this.heartbeatTimer = window.setInterval(() => {
-      this.sendInternal({ type: 'Ping' })
-    }, this.config.heartbeatInterval)
+  private startHeartbeatTimeout(): void {
+    this.clearHeartbeatTimeout()
+
+    // 使用服务端配置的超时时间（带缓冲），默认90秒的80%即72秒
+    const timeoutMs = getHeartbeatTimeoutMs()
+
+    this.lastMessageTime = Date.now()
+
+    // 定期检查是否超时
+    const checkInterval = 10000 // 每10秒检查一次
+    this.heartbeatTimeoutTimer = window.setInterval(() => {
+      const elapsed = Date.now() - this.lastMessageTime
+      if (elapsed > timeoutMs) {
+        console.error(`[WebSocket] 心跳超时，${elapsed}ms 未收到服务端消息`)
+        this.disconnect()
+        // 触发重连
+        this.scheduleReconnect()
+      }
+    }, checkInterval)
+
+    console.log(`[WebSocket] 心跳超时检测已启动，超时时间: ${timeoutMs}ms`)
   }
 
   /**
@@ -403,14 +437,17 @@ class WebSocketClient {
     }
 
     this.reconnectAttempts++
-    const delay = calculateReconnectDelay(this.reconnectAttempts)
-    console.log(`[WebSocket] ${delay}ms 后尝试重连...`)
+    const strategy = getReconnectStrategy()
+    const delay = strategy.baseDelayMs * Math.pow(strategy.multiplier, this.reconnectAttempts)
+    const finalDelay = Math.min(delay, strategy.maxDelayMs)
+
+    console.log(`[WebSocket] ${finalDelay}ms 后尝试第 ${this.reconnectAttempts} 次重连...`)
 
     this.reconnectTimer = window.setTimeout(() => {
       this.connect().catch(() => {
         // 重连失败，继续等待下一次
       })
-    }, delay)
+    }, finalDelay)
   }
 }
 

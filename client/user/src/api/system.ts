@@ -44,8 +44,20 @@ interface HealthDetailResponse {
  * 获取客户端配置
  */
 export async function getClientConfig(): Promise<ClientConfig> {
-  const response = await apiClient.get<ClientConfig>('/api/config/client')
-  return response.data
+  // 客户端配置端点不在 /api/v1 下，直接使用 /api/config/client
+  const response = await fetch('/api/config/client')
+
+  if (!response.ok) {
+    throw new Error(`获取客户端配置失败: ${response.status}`)
+  }
+
+  const data: { success: boolean; data: ClientConfig; message?: string } = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.message || '获取客户端配置失败')
+  }
+
+  return data.data
 }
 
 /**

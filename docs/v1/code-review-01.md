@@ -98,6 +98,21 @@ WHERE content ILIKE $1
 
 **建议：** 让服务引用 `Arc<RwLock<AppConfig>>` 而非缓存值，或实现配置变更通知回调。
 
+**⚠️ 实现注意事项（2026-04-30 补充）：**
+原始修复实现中使用了 `blocking_read()` 在异步运行时中读取配置，导致服务启动时 panic：
+```
+Cannot block the current thread from within a runtime
+```
+
+**正确实现方式：**
+- 服务应存储 `SharedConfig` 引用（`Option<SharedConfig>`）
+- 使用 `try_read()` 而非 `blocking_read()` 读取配置
+- 如果获取锁失败，回退到默认配置值
+
+**修复文件：**
+- `src/services/auth_service.rs`：`get_secret()`、`get_expiration_hours()` 使用 `try_read()`
+- `src/services/file_service.rs`：`effective_max_file_size()`、`effective_base_url()` 使用 `try_read()`
+
 ---
 
 ### ~~M4. Redis 连接重复~~ ✅ 已修复 2026-04-29
@@ -177,6 +192,22 @@ FROM messages WHERE is_deleted = false
 `handle_subscribe_logs`、`handle_get_offline_notifications`、`handle_mark_notification_read` 等函数的签名中有未使用的参数。
 
 **修复：** 使用 `#[allow(unused_variables)]` 属性标记保留的参数，保持 API 兼容性。
+
+---
+
+## 测试覆盖问题（2026-04-30 补充）
+
+### 问题描述
+代码审查报告中标记为"已修复"的问题，在实际运行时发现部分修复存在实现缺陷，导致服务无法启动。
+
+**具体案例：**
+- **M3 配置热加载**：原始修复使用了 `blocking_read()` 在异步运行时中读取配置，导致 panic
+- **原因**：单元测试和集成测试未覆盖服务初始化路径
+
+### 建议改进
+1. **添加启动测试**：验证 `AppState::new()` 在异步运行时中能正常初始化
+2. **添加集成测试**：验证服务启动后配置读取功能正常
+3. **CI/CD 增强**：在测试通过后添加实际服务启动验证
 
 ---
 

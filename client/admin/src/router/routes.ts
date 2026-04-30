@@ -71,6 +71,24 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'messages',
+        name: 'MessageManagement',
+        component: () => import('@/views/MessageManagementView.vue'),
+        meta: {
+          title: '消息审核',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'statistics',
+        name: 'Statistics',
+        component: () => import('@/views/StatisticsView.vue'),
+        meta: {
+          title: '系统统计',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'setting',
         name: 'Setting',
         component: () => import('@/views/SettingView.vue'),

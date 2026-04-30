@@ -92,13 +92,23 @@ export function isConfigInitialized(): boolean {
 export function getConnectionConfig(): WebSocketConnectionConfig {
   if (serverConfig?.websocket) {
     return {
-      maxReconnectAttempts: serverConfig.websocket.max_reconnect_attempts ?? DEFAULT_CONNECTION_CONFIG.maxReconnectAttempts,
-      reconnectInterval: serverConfig.websocket.reconnect_interval_ms ?? DEFAULT_CONNECTION_CONFIG.reconnectInterval,
-      heartbeatInterval: serverConfig.websocket.heartbeat_interval_ms ?? DEFAULT_CONNECTION_CONFIG.heartbeatInterval,
+      maxReconnectAttempts: serverConfig.reconnect?.max_attempts ?? DEFAULT_CONNECTION_CONFIG.maxReconnectAttempts,
+      reconnectInterval: serverConfig.reconnect?.base_delay_ms ?? DEFAULT_CONNECTION_CONFIG.reconnectInterval,
+      heartbeatInterval: (serverConfig.websocket.heartbeat_interval_secs ?? 30) * 1000,
       connectTimeout: DEFAULT_CONNECTION_CONFIG.connectTimeout,
     }
   }
   return DEFAULT_CONNECTION_CONFIG
+}
+
+/**
+ * 获取心跳超时时间（毫秒）
+ * 使用服务端配置的 heartbeat_timeout_secs，并留出 80% 的缓冲时间
+ */
+export function getHeartbeatTimeoutMs(): number {
+  const timeoutSecs = serverConfig?.websocket?.heartbeat_timeout_secs ?? 90
+  // 使用服务端超时时间的 80% 作为客户端检测阈值（留出缓冲）
+  return Math.floor(timeoutSecs * 1000 * 0.8)
 }
 
 /**

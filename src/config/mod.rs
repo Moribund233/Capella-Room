@@ -243,6 +243,15 @@ pub struct ClientConfig {
     pub upload: ClientUploadConfig,
     /// 系统状态
     pub system: ClientSystemConfig,
+    /// 监控配置
+    pub monitor: ClientMonitorConfig,
+}
+
+/// 客户端监控配置
+#[derive(Debug, Clone, Serialize)]
+pub struct ClientMonitorConfig {
+    /// 监控数据刷新频率（秒）
+    pub refresh_interval_secs: u64,
 }
 
 /// 客户端 WebSocket 配置
@@ -315,6 +324,9 @@ impl ClientConfig {
                 version: config.system.version.clone(),
                 maintenance_mode: config.system.maintenance_mode,
                 maintenance_message: config.system.maintenance_message.clone(),
+            },
+            monitor: ClientMonitorConfig {
+                refresh_interval_secs: 30, // 默认30秒刷新一次
             },
         }
     }

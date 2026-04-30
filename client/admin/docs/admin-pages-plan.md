@@ -22,7 +22,7 @@
 
 ## 待开发页面
 
-### 1. 消息审核
+### ~~1. 消息审核~~ ✅ 已完成 2026-04-30
 
 **设计模式**：主视图 + 组件
 
@@ -30,26 +30,26 @@
 ```
 src/
 ├── views/
-│   └── MessageManagementView.vue        # 消息审核主视图
+│   └── MessageManagementView.vue        # 消息审核主视图 ✅
 ├── components/
 │   └── messages/
-│       ├── MessageTable.vue             # 消息表格
-│       ├── MessageSearchForm.vue        # 搜索表单
-│       └── MessageDetailModal.vue       # 消息详情弹窗
+│       ├── MessageTable.vue             # 消息表格 ✅
+│       ├── MessageSearchForm.vue        # 搜索表单 ✅
+│       └── MessageDetailModal.vue       # 消息详情弹窗 ✅
 └── api/
-    └── messages.ts                      # 消息审核API
+    └── admin.ts                         # 消息审核API ✅
 ```
 
 **功能需求**：
-- 展示所有房间的消息列表
-- 支持按关键词、房间、用户、时间范围搜索
-- 支持查看消息详情
-- 支持删除违规消息
-- 支持批量操作
+- ✅ 展示所有房间的消息列表
+- ✅ 支持按关键词、房间、用户、时间范围搜索
+- ✅ 支持查看消息详情
+- ✅ 支持删除违规消息
+- ✅ 支持批量操作
 
 **API接口**：
-- `GET /api/v1/admin/messages` - 获取所有消息
-- `DELETE /api/v1/admin/messages/:message_id` - 删除违规消息
+- ✅ `GET /api/v1/admin/messages` - 获取所有消息
+- ✅ `DELETE /api/v1/admin/messages/:message_id` - 删除违规消息
 
 **侧边栏配置**：
 ```typescript
@@ -59,6 +59,22 @@ src/
   path: '/messages',
 }
 ```
+
+**路由配置**：
+```typescript
+{
+  path: 'messages',
+  name: 'MessageManagement',
+  component: () => import('@/views/MessageManagementView.vue'),
+  meta: { title: '消息审核', requiresAuth: true },
+}
+```
+
+**开发备注**：
+- 实现了桌面端和移动端响应式适配
+- 日期选择器优化为独立的开始/结束时间选择，提升移动端体验
+- 支持消息批量删除和单条删除
+- 支持消息详情查看（包含编辑历史）
 
 ---
 

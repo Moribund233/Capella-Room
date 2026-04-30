@@ -182,6 +182,7 @@ Content-Type: application/json
 
 WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Token 过期，会发送错误消息并断开连接：
 
+**Token 过期错误消息**:
 ```json
 {
   "type": "Error",
@@ -191,6 +192,14 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
   }
 }
 ```
+
+**错误字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定为 "Error" |
+| payload.code | string | 错误代码: `TOKEN_EXPIRED` |
+| payload.message | string | 错误描述 |
 
 客户端需要：
 1. 使用 Refresh Token 获取新的 Access Token
@@ -203,7 +212,7 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
 
 ### 心跳流程
 
-为了保持连接活跃，服务端实现了心跳机制：
+为了保持连接活跃，服务端实现了**服务端主导的心跳机制**：
 
 1. **服务端发送 Ping**: 每 30 秒发送一次
 2. **客户端回复 Pong**: 收到 Ping 后立即回复
@@ -225,6 +234,14 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
 
 > ⚠️ **重要**: Ping 和 Pong 是 unit variant，不需要 payload 字段。
 
+### 双向心跳支持
+
+除了服务端主导的心跳外，系统也支持**客户端主动发送心跳**：
+
+- 客户端可以主动发送 `Ping` 消息，服务端会回复 `Pong`
+- WebSocket 协议层的 Ping/Pong 帧也会被自动处理（由 axum 底层实现）
+- 建议客户端采用**服务端主导模式**：等待服务端 Ping 并回复 Pong，同时监控是否超时
+
 ### 心跳配置
 
 | 配置项 | 默认值 | 说明 |
@@ -233,6 +250,42 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
 | heartbeat_timeout_secs | 90 | 心跳超时时间（秒） |
 
 这些配置可以通过管理接口动态调整。
+
+#### 获取服务端配置
+
+为了避免前后端配置不同步导致的连接问题，客户端应该在启动时从服务端获取配置：
+
+```http
+GET /api/config/client
+```
+
+**响应示例**：
+```json
+{
+  "success": true,
+  "data": {
+    "websocket": {
+      "heartbeat_interval_secs": 30,
+      "heartbeat_timeout_secs": 90,
+      "auth_timeout_secs": 30
+    },
+    "reconnect": {
+      "base_delay_ms": 1000,
+      "max_delay_ms": 30000,
+      "max_attempts": 10,
+      "multiplier": 2
+    }
+  }
+}
+```
+
+**使用建议**：
+1. 在应用启动时调用此接口获取服务端配置
+2. 使用服务端返回的 `heartbeat_interval_secs` 和 `heartbeat_timeout_secs` 设置客户端心跳超时检测
+3. 使用服务端返回的重连配置 (`reconnect`) 控制重连行为
+4. 此端点为开放端点，无需认证即可访问
+
+> 📖 **详细文档**: [system.md](../http/system.md) - 包含完整的客户端配置端点说明
 
 ### 心跳超时处理
 
@@ -249,9 +302,17 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
 }
 ```
 
+**错误字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定为 "Error" |
+| payload.code | string | 错误代码: `HEARTBEAT_TIMEOUT` |
+| payload.message | string | 错误描述 |
+
 2. 关闭 WebSocket 连接
 
-客户端应该实现自动重连机制。
+客户端应该实现自动重连机制。当收到 `HEARTBEAT_TIMEOUT` 错误时，应立即尝试重新连接。
 
 ---
 
@@ -316,7 +377,7 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
 
 **重连失败**:
 
-如果 Token 无效，服务端会返回 `AuthResult` 而不是 `ReconnectResult`，并断开连接：
+如果 Token 无效或认证失败，服务端会返回 `AuthResult`（与首次认证失败相同）并断开连接：
 
 ```json
 {
@@ -328,7 +389,7 @@ WebSocket 连接期间，服务端会每 5 分钟验证一次 Token。如果 Tok
 }
 ```
 
-> **注意**: 重连失败时，服务端会返回 `AuthResult` 并断开连接，而不是 `ReconnectResult`。
+> **注意**: 无论是首次认证 (`Auth`) 还是重连 (`Reconnect`)，只要认证失败，服务端都会返回 `AuthResult` 并断开连接，不会返回 `ReconnectResult`。
 
 **响应字段说明**:
 

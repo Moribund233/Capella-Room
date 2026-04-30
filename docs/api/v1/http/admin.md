@@ -114,6 +114,12 @@
 | POST | `/config/sync` | 触发配置同步到所有节点 | SuperAdmin |
 | GET | `/config/sync/status` | 获取配置同步状态 | Admin |
 
+### 系统监控
+
+| 方法 | 路径 | 说明 | 最低权限 |
+|------|------|------|----------|
+| GET | `/monitor` | 获取系统监控数据（内存、磁盘、数据库连接池） | Admin |
+
 ---
 
 ## 用户管理接口
@@ -1051,6 +1057,87 @@ Content-Type: application/json
 - `403 Forbidden`: 权限不足（需要 SuperAdmin）
 - `400 Bad Request`: 配置值格式错误
 - `404 Not Found`: 配置项不存在
+
+---
+
+## 系统监控接口
+
+### 获取系统监控数据
+
+获取系统监控数据，包括内存使用情况、磁盘空间、应用进程内存占用以及数据库连接池状态。
+
+#### 请求
+
+```http
+GET /api/v1/admin/monitor
+```
+
+#### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "system": {
+      "memory": {
+        "total_mb": 16384,
+        "used_mb": 8192,
+        "available_mb": 8192,
+        "usage_percent": 50.0
+      },
+      "disk": {
+        "total_gb": 512,
+        "used_gb": 256,
+        "available_gb": 256,
+        "usage_percent": 50.0
+      },
+      "process_memory_mb": 128
+    },
+    "database": {
+      "max_connections": 10,
+      "active_connections": 5,
+      "idle_connections": 5,
+      "waiting_requests": 0
+    },
+    "timestamp": "2024-01-15T10:00:00+00:00"
+  }
+}
+```
+
+#### 响应字段说明
+
+**系统信息 (system)**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| memory | object | 内存使用情况 |
+| memory.total_mb | number | 总内存（MB） |
+| memory.used_mb | number | 已使用内存（MB） |
+| memory.available_mb | number | 可用内存（MB） |
+| memory.usage_percent | number | 内存使用率（%） |
+| disk | object | 磁盘使用情况 |
+| disk.total_gb | number | 总磁盘空间（GB） |
+| disk.used_gb | number | 已使用磁盘空间（GB） |
+| disk.available_gb | number | 可用磁盘空间（GB） |
+| disk.usage_percent | number | 磁盘使用率（%） |
+| process_memory_mb | number | 当前应用进程内存占用（MB） |
+
+**数据库连接池信息 (database)**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| max_connections | integer | 连接池最大连接数 |
+| active_connections | integer | 当前活跃连接数 |
+| idle_connections | integer | 空闲连接数 |
+| waiting_requests | integer | 等待连接的请求数 |
+
+**其他字段**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| timestamp | string | 数据获取时间（ISO 8601格式） |
 
 ---
 

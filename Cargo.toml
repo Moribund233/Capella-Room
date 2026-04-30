@@ -60,6 +60,9 @@ mime_guess = "2.0"
 # Redis
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 
+# 系统监控
+sysinfo = "0.30"
+
 [dev-dependencies]
 # 测试依赖
 reqwest = { version = "0.11", features = ["json"] }

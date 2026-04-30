@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { roomsApi, adminApi } from '@/api'
 import type { RoomInfo, MemberInfo } from '@/api/rooms'
-import type { AdminMessageInfo } from '@/api/admin'
+import type { AdminMessageInfo, AdminRoomInfo } from '@/api/admin'
 
 /**
  * 房间管理 Store
@@ -67,7 +67,7 @@ export const useRoomStore = defineStore('room', () => {
   // ==================== Actions ====================
 
   /**
-   * 获取房间列表
+   * 获取房间列表（使用管理员接口，返回真实总数）
    * @param params 搜索参数
    */
   async function fetchRoomList(params: {
@@ -78,19 +78,29 @@ export const useRoomStore = defineStore('room', () => {
     loading.value = true
 
     try {
-      const response = await roomsApi.getRoomList({
+      const response = await adminApi.getRoomList({
         search: params.keyword || undefined,
-        limit: params.pageSize ?? pageSize.value,
-        offset: ((params.page ?? page.value) - 1) * (params.pageSize ?? pageSize.value),
+        page: params.page ?? page.value,
+        page_size: params.pageSize ?? pageSize.value,
       })
 
       if (response.success && response.data) {
-        rooms.value = response.data
-        // 注意：API 返回的是数组，total 需要通过其他方式获取
-        // 这里暂时使用数组长度，实际应该通过 API 返回的总数
-        total.value = response.data.length
-        page.value = params.page ?? page.value
-        pageSize.value = params.pageSize ?? pageSize.value
+        // 将 AdminRoomInfo 转换为 RoomInfo 格式
+        rooms.value = response.data.rooms.map((room: AdminRoomInfo): RoomInfo => ({
+          id: room.id,
+          name: room.name,
+          description: room.description,
+          owner: room.owner,
+          is_private: room.is_private,
+          max_members: room.max_members,
+          member_count: room.member_count,
+          created_at: room.created_at,
+          updated_at: room.updated_at,
+        }))
+        // 使用 API 返回的真实总数
+        total.value = response.data.total
+        page.value = response.data.page
+        pageSize.value = response.data.page_size
         return true
       }
       return false

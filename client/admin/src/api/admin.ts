@@ -120,6 +120,62 @@ export interface AdminMessageListData {
  */
 export type AdminRoomMessageListData = AdminMessageInfo[]
 
+// ==================== 房间管理类型 ====================
+
+/**
+ * 管理员房间信息
+ */
+export interface AdminRoomInfo {
+  /** 房间ID */
+  id: string
+  /** 房间名称 */
+  name: string
+  /** 房间描述 */
+  description: string | null
+  /** 房主信息 */
+  owner: {
+    id: string
+    username: string
+    avatar_url: string | null
+  }
+  /** 是否为私有房间 */
+  is_private: boolean
+  /** 最大成员数 */
+  max_members: number
+  /** 当前成员数 */
+  member_count: number
+  /** 创建时间 */
+  created_at: string
+  /** 更新时间 */
+  updated_at: string
+}
+
+/**
+ * 管理员房间列表查询参数
+ */
+export interface AdminRoomListParams {
+  /** 页码 */
+  page?: number
+  /** 每页数量 */
+  page_size?: number
+  /** 搜索关键词 */
+  search?: string
+}
+
+/**
+ * 管理员房间列表响应数据
+ */
+export interface AdminRoomListData {
+  /** 房间列表 */
+  rooms: AdminRoomInfo[]
+  /** 总房间数 */
+  total: number
+  /** 当前页码 */
+  page: number
+  /** 每页数量 */
+  page_size: number
+}
+
 /**
  * 管理员相关 API
  */
@@ -249,5 +305,31 @@ export const adminApi = {
    */
   setRoomMemberRole(roomId: string, userId: string, role: 'owner' | 'admin' | 'member'): Promise<ApiResponse<void>> {
     return http.put<void>(`/admin/rooms/${roomId}/members/${userId}/role`, { role })
+  },
+
+  // ==================== 房间管理 API ====================
+
+  /**
+   * 获取房间列表（管理员）
+   * @param params 查询参数
+   * @returns 房间列表数据
+   */
+  getRoomList(params: AdminRoomListParams = {}): Promise<ApiResponse<AdminRoomListData>> {
+    const queryParams = new URLSearchParams()
+    if (params.page) queryParams.append('page', String(params.page))
+    if (params.page_size) queryParams.append('page_size', String(params.page_size))
+    if (params.search) queryParams.append('search', params.search)
+
+    const query = queryParams.toString()
+    return http.get<AdminRoomListData>(`/admin/rooms${query ? `?${query}` : ''}`)
+  },
+
+  /**
+   * 删除房间（管理员）
+   * @param roomId 房间ID
+   * @returns 操作结果
+   */
+  deleteRoom(roomId: string): Promise<ApiResponse<void>> {
+    return http.delete<void>(`/admin/rooms/${roomId}`)
   },
 }

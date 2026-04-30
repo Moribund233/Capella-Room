@@ -9,6 +9,7 @@ use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
 use crate::services::ip_security_service::IpSecurityService;
 use crate::services::message_service::MessageService;
+use crate::services::monitor_service::MonitorService;
 use crate::services::notification_service::NotificationService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
@@ -100,7 +101,10 @@ impl AppState {
         let ip_security_service =
             Arc::new(IpSecurityService::new(db.clone(), audit_service.clone()).await);
 
-        let file_service = Arc::new(FileService::with_shared_config(db.clone(), shared_config.clone())?);
+        let file_service = Arc::new(FileService::with_shared_config(
+            db.clone(),
+            shared_config.clone(),
+        )?);
 
         // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
         if let Some(ref redis_mgr) = redis_manager {
@@ -184,6 +188,10 @@ impl AppState {
 
     pub fn ip_security_service(&self) -> &IpSecurityService {
         &self.ip_security_service
+    }
+
+    pub fn monitor_service(&self) -> MonitorService {
+        MonitorService::new(self.db.clone())
     }
 
     pub fn config(&self) -> Arc<tokio::sync::RwLock<AppConfig>> {

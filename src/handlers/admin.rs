@@ -733,6 +733,20 @@ pub async fn get_performance_metrics(
     })))
 }
 
+// ==================== 系统监控接口 ====================
+
+use crate::services::monitor_service::MonitorData;
+
+/// 获取系统监控数据
+pub async fn get_monitor_data(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<MonitorData>>> {
+    let monitor_service = state.monitor_service();
+    let data = monitor_service.get_monitor_data().await?;
+
+    Ok(Json(ApiResponse::success(data)))
+}
+
 // ==================== Redis 与分布式管理接口 ====================
 
 #[derive(Debug, Serialize)]
