@@ -411,6 +411,120 @@ send(message: WebSocketMessage): boolean {
 
 ---
 
+## 0004-房间列表消息预览无法实时同步 [P1-高优先级] - 待修复
+
+**位置**: WebSocket 消息订阅机制
+
+**问题描述**:
+当前后端架构中，用户必须显式发送 `JoinRoom` 消息订阅特定房间后，才能接收该房间的消息。这导致以下用户体验问题：
+
+1. **房间列表消息预览滞后**: 用户已加入的房间（如房间A、B、C），如果当前只进入了房间A，则无法实时收到房间B、C的消息更新
+2. **需要频繁刷新**: 用户必须手动刷新房间列表才能看到最新消息预览
+3. **不符合即时通讯预期**: 类似 QQ、微信等应用，用户加入群聊后即使不在该群聊天界面，也能收到消息通知
+
+**当前架构**:
+```
+用户 WebSocket 连接
+    ├── 发送 JoinRoom(roomA) ──► 订阅 roomA 消息
+    ├── 发送 JoinRoom(roomB) ──► 订阅 roomB 消息
+    └── ❌ 已加入但未 JoinRoom 的房间收不到任何消息
+```
+
+**期望架构**:
+```
+用户 WebSocket 连接
+    ├── 自动订阅所有已加入房间的消息摘要
+    │   └── 用户级通道: user:{user_id}:rooms
+    ├── 进入房间时订阅房间详情
+    │   └── 房间级通道: room:{room_id}:detail
+    └── ✅ 所有已加入房间的消息都能实时推送
+```
+
+**修复方案**:
+
+### 1. 新增用户级消息订阅
+
+**A. 新增 WebSocket 消息类型**
+```rust
+pub enum ClientMessage {
+    // ... 现有消息类型
+    SubscribeMyRooms,      // 订阅所有已加入房间的消息摘要
+    UnsubscribeMyRooms,    // 取消订阅
+    EnterRoom { room_id: Uuid },   // 进入房间（仅标记当前查看）
+    LeaveRoom { room_id: Uuid },   // 离开房间（取消标记）
+}
+
+pub enum ServerMessage {
+    // ... 现有消息类型
+    RoomMessageSummary {
+        room_id: Uuid,
+        last_message: MessagePreview,
+        unread_count: u32,
+    },
+}
+```
+
+**B. 后端实现**
+- 用户连接 WebSocket 后，自动查询该用户所有已加入的房间
+- 为用户订阅这些房间的消息摘要（Redis Pub/Sub）
+- 当任意已加入房间有新消息时，推送 `RoomMessageSummary`
+
+**C. 消息格式**
+```json
+{
+  "type": "RoomMessageSummary",
+  "payload": {
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "last_message": {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "content": "最新消息内容",
+      "sender_name": "user123",
+      "created_at": "2026-05-04T10:30:00.000Z"
+    },
+    "unread_count": 5
+  }
+}
+```
+
+### 2. 区分"加入房间"与"进入房间"
+
+| 概念 | 说明 | 后端行为 |
+|------|------|----------|
+| **加入房间** | 用户成为房间成员 | HTTP API 处理，持久化到数据库 |
+| **订阅房间消息** | WebSocket 订阅房间实时消息 | 自动订阅所有已加入房间 |
+| **进入房间** | 用户正在查看该房间 | 标记为当前房间，用于已读状态 |
+
+### 3. 前端适配
+
+```typescript
+// 用户连接 WebSocket 后自动订阅
+wsStore.onMessage<RoomMessageSummaryPayload>(
+  WSMessageType.ROOM_MESSAGE_SUMMARY,
+  (payload) => {
+    roomStore.updateRoomLastMessage(payload.room_id, payload.last_message);
+    roomStore.updateUnreadCount(payload.room_id, payload.unread_count);
+  }
+);
+```
+
+**影响范围**:
+- `src/websocket/handler.rs` - 新增消息类型处理
+- `src/websocket/connection.rs` - 用户级订阅管理
+- `src/services/room_service.rs` - 查询用户已加入房间
+- Redis Pub/Sub 通道设计
+
+**临时解决方案**:
+前端已实现本地缓存更新：当用户在某个房间收到新消息时，同步更新房间列表中的消息预览。但这只能解决"当前在房间"的场景，无法解决"后台接收其他房间消息"的场景。
+
+**状态**: ⏳ 待修复 - 需要后端支持用户级消息订阅机制
+
+**关联任务**: 
+- ⏳ 后端: 实现用户级消息订阅
+- ⏳ 后端: 新增 RoomMessageSummary 消息类型
+- ⏳ 前端: 适配新的 WebSocket 消息类型
+
+---
+
 *文档创建时间: 2026-04-10*
 *关联任务: 阶段9 - 后端细节优化*
-*更新时间: 2026-04-13 - 添加 0003 WebSocket 安全问题*
+*更新时间: 2026-05-04 - 添加 0004 房间列表消息预览同步问题*

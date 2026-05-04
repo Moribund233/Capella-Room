@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     error::{AppError, Result},
-    models::room::{MemberRole, Room, RoomMember, RoomResponse},
+    models::room::{MemberRole, MessagePreview, Room, RoomMember, RoomResponse},
     models::user::{UserInfo, UserRole},
     utils::logging::PerformanceTimer,
 };
@@ -91,15 +91,27 @@ impl RoomService {
                         r.max_members,
                         r.created_at,
                         r.updated_at,
-                        COUNT(rm.user_id) as member_count
+                        COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                     WHERE (r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     ))
                     AND r.name ILIKE $2
-                    GROUP BY r.id, u.username, u.avatar_url
+                    GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $3 OFFSET $4
                     "#,
@@ -124,14 +136,26 @@ impl RoomService {
                         r.max_members,
                         r.created_at,
                         r.updated_at,
-                        COUNT(rm.user_id) as member_count
+                        COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                     WHERE r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     )
-                    GROUP BY r.id, u.username, u.avatar_url
+                    GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $2 OFFSET $3
                     "#,
@@ -158,13 +182,25 @@ impl RoomService {
                         r.max_members,
                         r.created_at,
                         r.updated_at,
-                        COUNT(rm.user_id) as member_count
+                        COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                     WHERE r.is_private = false
                     AND r.name ILIKE $1
-                    GROUP BY r.id, u.username, u.avatar_url
+                    GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $2 OFFSET $3
                     "#,
@@ -188,12 +224,24 @@ impl RoomService {
                         r.max_members,
                         r.created_at,
                         r.updated_at,
-                        COUNT(rm.user_id) as member_count
+                        COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                     WHERE r.is_private = false
-                    GROUP BY r.id, u.username, u.avatar_url
+                    GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $1 OFFSET $2
                     "#,
@@ -232,14 +280,26 @@ impl RoomService {
                     r.max_members,
                     r.created_at,
                     r.updated_at,
-                    COUNT(rm.user_id) as member_count
+                    COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                 WHERE r.is_private = false OR EXISTS (
                     SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                 )
-                GROUP BY r.id, u.username, u.avatar_url
+                GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.updated_at DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -264,12 +324,24 @@ impl RoomService {
                     r.max_members,
                     r.created_at,
                     r.updated_at,
-                    COUNT(rm.user_id) as member_count
+                    COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                 WHERE r.is_private = false
-                GROUP BY r.id, u.username, u.avatar_url
+                GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.updated_at DESC
                 LIMIT $1 OFFSET $2
                 "#,
@@ -312,12 +384,24 @@ impl RoomService {
                 r.max_members,
                 r.created_at,
                 r.updated_at,
-                COUNT(rm.user_id) as member_count
+                COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
             FROM rooms r
             LEFT JOIN room_members rm ON r.id = rm.room_id
             LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
             WHERE r.id = $1
-            GROUP BY r.id, u.username, u.avatar_url
+            GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
             "#,
         )
         .bind(room_id)
@@ -766,13 +850,25 @@ impl RoomService {
                 r.max_members,
                 r.created_at,
                 r.updated_at,
-                COUNT(rm2.user_id) as member_count
+                COUNT(rm2.user_id) as member_count,
+                lm.id as last_message_id,
+                lm.content as last_message_content,
+                lm.sender_name as last_message_sender_name,
+                lm.created_at as last_message_created_at
             FROM rooms r
             JOIN room_members rm ON r.id = rm.room_id
             LEFT JOIN room_members rm2 ON r.id = rm2.room_id
             LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
             WHERE rm.user_id = $1
-            GROUP BY r.id, u.username, u.avatar_url
+            GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
             ORDER BY r.created_at DESC
             "#,
         )
@@ -819,12 +915,24 @@ impl RoomService {
                     r.max_members,
                     r.created_at,
                     r.updated_at,
-                    COUNT(rm.user_id) as member_count
+                    COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
                 WHERE r.name ILIKE $1
-                GROUP BY r.id, u.username, u.avatar_url
+                GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.created_at DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -848,11 +956,23 @@ impl RoomService {
                     r.max_members,
                     r.created_at,
                     r.updated_at,
-                    COUNT(rm.user_id) as member_count
+                    COUNT(rm.user_id) as member_count,
+                        lm.id as last_message_id,
+                        lm.content as last_message_content,
+                        lm.sender_name as last_message_sender_name,
+                        lm.created_at as last_message_created_at
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
-                GROUP BY r.id, u.username, u.avatar_url
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+                FROM messages m
+                LEFT JOIN users u2 ON m.sender_id = u2.id
+                WHERE m.room_id = r.id AND m.is_deleted = false
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) lm ON true
+                GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.created_at DESC
                 LIMIT $1 OFFSET $2
                 "#,
@@ -913,6 +1033,10 @@ struct RoomRow {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub member_count: i64,
+    pub last_message_id: Option<Uuid>,
+    pub last_message_content: Option<String>,
+    pub last_message_sender_name: Option<String>,
+    pub last_message_created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl RoomRow {
@@ -925,6 +1049,12 @@ impl RoomRow {
             is_private: self.is_private,
             max_members: self.max_members,
             member_count: self.member_count,
+            last_message: self.last_message_id.map(|id| MessagePreview {
+                id,
+                content: self.last_message_content.unwrap_or_default(),
+                sender_name: self.last_message_sender_name.unwrap_or_default(),
+                created_at: self.last_message_created_at.unwrap_or(chrono::DateTime::UNIX_EPOCH),
+            }),
             created_at: self.created_at,
             updated_at: self.updated_at,
         }

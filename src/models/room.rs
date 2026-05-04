@@ -72,8 +72,18 @@ pub struct RoomResponse {
     pub is_private: bool,
     pub max_members: i32,
     pub member_count: i64,
+    pub last_message: Option<MessagePreview>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// 消息预览（用于房间列表中的最后消息）
+#[derive(Debug, Clone, Serialize)]
+pub struct MessagePreview {
+    pub id: Uuid,
+    pub content: String,
+    pub sender_name: String,
+    pub created_at: DateTime<Utc>,
 }
 
 impl Room {
@@ -87,6 +97,7 @@ impl Room {
             is_private: self.is_private,
             max_members: self.max_members,
             member_count,
+            last_message: None,
             created_at: self.created_at,
             updated_at: self.updated_at,
         }
