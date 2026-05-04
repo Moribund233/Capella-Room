@@ -6,6 +6,7 @@ import { formatTime, truncate } from '@/utils'
 const props = defineProps<{
   room: Room
   active?: boolean
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -33,14 +34,19 @@ const initial = computed(() =>
 <template>
   <div
     class="room-card"
-    :class="{ 'room-card--active': active }"
+    :class="{
+      'room-card--active': active,
+      'room-card--compact': compact
+    }"
     @click="emit('click', room.id)"
+    :title="compact ? room.name : ''"
   >
-    <div class="room-card__avatar">
+    <div class="room-card__avatar" :class="{ 'room-card__avatar--compact': compact }">
       <span class="room-card__avatar-text">{{ initial }}</span>
+      <span v-if="compact && room.unread_count" class="room-card__unread-dot" />
     </div>
 
-    <div class="room-card__body">
+    <div v-if="!compact" class="room-card__body">
       <div class="room-card__top">
         <span class="room-card__name">{{ room.name }}</span>
         <span class="room-card__time">{{ timeText }}</span>
@@ -166,5 +172,34 @@ const initial = computed(() =>
   align-items: center;
   justify-content: center;
   font-weight: 600;
+}
+
+/* Compact mode */
+.room-card--compact {
+  padding: 8px;
+  justify-content: center;
+  border-bottom: none;
+}
+
+.room-card--compact:hover {
+  background: var(--color-background, #f5f5f5);
+  border-radius: var(--radius-md, 8px);
+}
+
+.room-card__avatar--compact {
+  width: 44px;
+  height: 44px;
+  position: relative;
+}
+
+.room-card__unread-dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--color-error, #d03050);
+  border-radius: 50%;
+  border: 2px solid var(--color-white, #fff);
 }
 </style>

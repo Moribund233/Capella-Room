@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { formatTime } from '@/utils/date'
 import MessageActions from './MessageActions.vue'
 import type { Message } from '@/types/message'
@@ -16,10 +16,65 @@ const emit = defineEmits<{
 }>()
 
 const showActions = ref(false)
+const bubbleRef = ref<HTMLElement>()
+
+// 长按相关
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+const LONG_PRESS_DELAY = 500
+let touchStartX = 0
+let touchStartY = 0
 
 function handleContextMenu(event: MouseEvent) {
   event.preventDefault()
   showActions.value = true
+}
+
+// 触摸开始 - 开始长按计时
+function onTouchStart(e: TouchEvent) {
+  const touch = e.touches[0]
+  if (!touch) return
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+
+  longPressTimer = setTimeout(() => {
+    showActions.value = true
+    // 触发震动反馈（如果支持）
+    if (navigator.vibrate) {
+      navigator.vibrate(50)
+    }
+  }, LONG_PRESS_DELAY)
+}
+
+// 触摸移动 - 如果移动距离过大，取消长按
+function onTouchMove(e: TouchEvent) {
+  if (!longPressTimer) return
+
+  const touch = e.touches[0]
+  if (!touch) return
+  const deltaX = Math.abs(touch.clientX - touchStartX)
+  const deltaY = Math.abs(touch.clientY - touchStartY)
+
+  // 如果移动超过 10px，取消长按
+  if (deltaX > 10 || deltaY > 10) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+// 触摸结束 - 清除长按计时器
+function onTouchEnd() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+// 触摸取消 - 清除长按计时器
+function onTouchCancel() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
 }
 
 function handleReply() {
@@ -36,10 +91,17 @@ function handleDelete() {
   emit('delete', props.message)
   showActions.value = false
 }
+
+onUnmounted(() => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+  }
+})
 </script>
 
 <template>
   <div
+    ref="bubbleRef"
     class="message-bubble"
     :class="{
       'message-bubble--own': isOwn,
@@ -47,6 +109,10 @@ function handleDelete() {
       'message-bubble--failed': message.error,
     }"
     @contextmenu="handleContextMenu"
+    @touchstart="onTouchStart"
+    @touchmove="onTouchMove"
+    @touchend="onTouchEnd"
+    @touchcancel="onTouchCancel"
   >
     <!-- 头像 -->
     <div class="message-bubble__avatar">

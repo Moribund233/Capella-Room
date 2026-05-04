@@ -3,7 +3,7 @@ import { ref, reactive } from 'vue'
 import { useRoomStore } from '@/stores/room'
 import type { CreateRoomData } from '@/types/room'
 
-const props = defineProps<{
+defineProps<{
   show: boolean
 }>()
 

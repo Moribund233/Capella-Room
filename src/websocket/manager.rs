@@ -34,10 +34,13 @@ pub struct RoomMemberInfo {
 pub struct WebSocketManager {
     /// 用户ID到连接信息的映射
     connections: DashMap<Uuid, UserConnection>,
-    /// 房间ID到用户ID集合的映射
+    /// 房间ID到用户ID集合的映射（用户主动加入的房间）
     room_subscribers: DashMap<Uuid, Vec<Uuid>>,
     /// 用户当前加入的房间
     user_rooms: DashMap<Uuid, Vec<Uuid>>,
+    /// 房间ID到用户ID集合的映射（用户级订阅，用于消息摘要推送）
+    /// 即使用户不在房间内，也能收到该房间的消息摘要
+    room_summary_subscribers: DashMap<Uuid, Vec<Uuid>>,
     /// 消息缓冲区大小（可动态更新）
     message_buffer_size: RwLock<usize>,
     /// 心跳间隔（秒，可动态更新）
@@ -57,6 +60,7 @@ impl WebSocketManager {
             connections: DashMap::new(),
             room_subscribers: DashMap::new(),
             user_rooms: DashMap::new(),
+            room_summary_subscribers: DashMap::new(),
             message_buffer_size: RwLock::new(DEFAULT_WS_MESSAGE_BUFFER_SIZE),
             heartbeat_interval_secs: RwLock::new(30),
             heartbeat_timeout_secs: RwLock::new(90),
@@ -75,6 +79,7 @@ impl WebSocketManager {
             connections: DashMap::new(),
             room_subscribers: DashMap::new(),
             user_rooms: DashMap::new(),
+            room_summary_subscribers: DashMap::new(),
             message_buffer_size: RwLock::new(buffer_size),
             heartbeat_interval_secs: RwLock::new(heartbeat_interval),
             heartbeat_timeout_secs: RwLock::new(heartbeat_timeout),
@@ -174,6 +179,9 @@ impl WebSocketManager {
             self.leave_room(room_id, user_id);
         }
 
+        // 取消订阅所有房间的消息摘要
+        self.unsubscribe_user_rooms(user_id);
+
         // 移除连接
         self.connections.remove(&user_id);
         self.user_rooms.remove(&user_id);
@@ -216,10 +224,7 @@ impl WebSocketManager {
             .entry(user_id)
             .or_default()
             .retain(|&id| id != room_id); // 先移除已存在的相同房间ID
-        self.user_rooms
-            .get_mut(&user_id)
-            .unwrap()
-            .push(room_id);
+        self.user_rooms.get_mut(&user_id).unwrap().push(room_id);
     }
 
     /// 离开房间
@@ -235,6 +240,56 @@ impl WebSocketManager {
         if let Some(mut rooms) = self.user_rooms.get_mut(&user_id) {
             rooms.retain(|&id| id != room_id);
         }
+    }
+
+    /// 订阅用户所有已加入房间的消息摘要
+    /// 即使用户不在房间内，也能收到该房间的消息摘要更新
+    pub fn subscribe_user_rooms(&self, user_id: Uuid, room_ids: Vec<Uuid>) {
+        debug!(
+            "User {} subscribing to {} rooms for message summaries",
+            user_id,
+            room_ids.len()
+        );
+
+        for room_id in room_ids {
+            self.room_summary_subscribers
+                .entry(room_id)
+                .or_default()
+                .retain(|&id| id != user_id); // 先移除已存在的相同用户ID
+            self.room_summary_subscribers
+                .get_mut(&room_id)
+                .unwrap()
+                .push(user_id);
+        }
+    }
+
+    /// 取消订阅用户所有房间的消息摘要
+    fn unsubscribe_user_rooms(&self, user_id: Uuid) {
+        debug!(
+            "User {} unsubscribing from all room message summaries",
+            user_id
+        );
+
+        // 从所有房间的消息摘要订阅列表中移除该用户
+        for mut subscribers in self.room_summary_subscribers.iter_mut() {
+            subscribers.retain(|&id| id != user_id);
+        }
+    }
+
+    /// 广播房间消息摘要给所有订阅该房间的用户
+    /// 用于房间列表实时更新
+    pub async fn broadcast_room_summary(&self, room_id: Uuid, message: String) {
+        let mut timer = PerformanceTimer::new("ws_broadcast_room_summary");
+
+        if let Some(subscribers) = self.room_summary_subscribers.get(&room_id) {
+            for user_id in subscribers.iter() {
+                if let Err(e) = self.send_to_user(*user_id, message.clone()).await {
+                    warn!("Failed to send room summary to user {}: {}", user_id, e);
+                }
+            }
+        }
+
+        timer.finish();
     }
 
     /// 广播消息到房间（排除指定用户）
@@ -417,6 +472,7 @@ impl Default for WebSocketManager {
             connections: DashMap::new(),
             room_subscribers: DashMap::new(),
             user_rooms: DashMap::new(),
+            room_summary_subscribers: DashMap::new(),
             message_buffer_size: RwLock::new(DEFAULT_WS_MESSAGE_BUFFER_SIZE),
             heartbeat_interval_secs: RwLock::new(30),
             heartbeat_timeout_secs: RwLock::new(90),

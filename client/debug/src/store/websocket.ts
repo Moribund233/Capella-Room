@@ -14,6 +14,7 @@ import type {
   UserStatus,
   TypingData,
   MessageType,
+  RoomMessageSummaryData,
 } from '@/types/websocket'
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
@@ -52,6 +53,9 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   // 正在输入的用户
   const typingUsers = ref<Map<string, TypingUser>>(new Map())
+
+  // 房间消息摘要（用于房间列表实时更新）
+  const roomMessageSummaries = ref<Map<string, RoomMessageSummaryData>>(new Map())
 
   // WebSocket 客户端实例
   const wsClient = getWebSocketClient()
@@ -479,6 +483,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
         break
       }
 
+      case 'RoomMessageSummary': {
+        const data = message.payload as RoomMessageSummaryData
+        roomMessageSummaries.value.set(data.room_id, data)
+        break
+      }
+
       case 'Error': {
         const data = message.payload as { message: string }
         lastError.value = data.message
@@ -499,6 +509,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     onlineUsers,
     currentUserStatus,
     typingUsers,
+    roomMessageSummaries,
     // Getters
     isConnected,
     isConnecting,

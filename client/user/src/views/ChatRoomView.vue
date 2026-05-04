@@ -22,7 +22,7 @@ import type {
   MessageDeletedPayload,
   UserTypingPayload,
   UserStopTypingPayload,
-  ErrorPayload,
+  RoomMessageSummaryPayload,
 } from '@/types/websocket'
 import type { Message } from '@/types/message'
 
@@ -108,13 +108,29 @@ async function handleLeave(leaveRoomId: string) {
 function handleNewMessage(payload: NewMessagePayload) {
   messageStore.addIncomingMessage(payload)
 
+  // 更新房间列表中的最新消息预览（当前房间不增加未读数）
+  const isCurrentRoom = payload.room_id === roomId.value
+  roomStore.updateRoomLastMessage(
+    payload.room_id,
+    {
+      id: payload.message_id,
+      content: payload.content,
+      sender_name: payload.sender_name,
+      created_at: payload.created_at,
+    },
+    !isCurrentRoom, // 只有非当前房间才增加未读数
+  )
+}
+
+// 处理房间消息摘要（用于房间列表实时更新）
+function handleRoomMessageSummary(payload: RoomMessageSummaryPayload) {
   // 更新房间列表中的最新消息预览
-  roomStore.updateRoomLastMessage(payload.room_id, {
-    id: payload.message_id,
-    content: payload.content,
-    sender_name: payload.sender_name,
-    created_at: payload.created_at,
-  })
+  const isCurrentRoom = payload.room_id === roomId.value
+  roomStore.updateRoomLastMessage(
+    payload.room_id,
+    payload.last_message,
+    !isCurrentRoom, // 只有非当前房间才增加未读数
+  )
 }
 
 function handleMessageEdited(payload: MessageEditedPayload) {
@@ -135,7 +151,7 @@ function handleUserStopTyping(payload: UserStopTypingPayload) {
   removeTypingUser(payload.user_id)
 }
 
-function handleError(payload: ErrorPayload) {
+function handleError() {
   // 将当前所有正在发送的乐观消息标记为失败
   const pending = messages.value.filter((m) => m.sending)
   pending.forEach((m) => messageStore.failMessage(m.id))
@@ -147,7 +163,8 @@ function subscribeMessages() {
   wsStore.onMessage<MessageDeletedPayload>(WSMessageType.MESSAGE_DELETED, handleMessageDeleted)
   wsStore.onMessage<UserTypingPayload>(WSMessageType.USER_TYPING, handleUserTyping)
   wsStore.onMessage<UserStopTypingPayload>(WSMessageType.USER_STOP_TYPING, handleUserStopTyping)
-  wsStore.onMessage<ErrorPayload>(WSMessageType.ERROR, handleError)
+  wsStore.onMessage(WSMessageType.ERROR, handleError)
+  wsStore.onMessage<RoomMessageSummaryPayload>(WSMessageType.ROOM_MESSAGE_SUMMARY, handleRoomMessageSummary)
 }
 
 function unsubscribeMessages() {
@@ -156,7 +173,8 @@ function unsubscribeMessages() {
   wsStore.offMessage<MessageDeletedPayload>(WSMessageType.MESSAGE_DELETED, handleMessageDeleted)
   wsStore.offMessage<UserTypingPayload>(WSMessageType.USER_TYPING, handleUserTyping)
   wsStore.offMessage<UserStopTypingPayload>(WSMessageType.USER_STOP_TYPING, handleUserStopTyping)
-  wsStore.offMessage<ErrorPayload>(WSMessageType.ERROR, handleError)
+  wsStore.offMessage(WSMessageType.ERROR, handleError)
+  wsStore.offMessage<RoomMessageSummaryPayload>(WSMessageType.ROOM_MESSAGE_SUMMARY, handleRoomMessageSummary)
 }
 
 function loadMore() {
@@ -187,6 +205,33 @@ watch(
   },
 )
 
+// 移动端滑动手势
+const chatRoomRef = ref<HTMLElement>()
+let touchStartX = 0
+let touchStartY = 0
+
+function onTouchStart(e: TouchEvent) {
+  const touch = e.touches[0]
+  if (!touch) return
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+}
+
+function onTouchEnd(e: TouchEvent) {
+  const touch = e.changedTouches[0]
+  if (!touch) return
+  const touchEndX = touch.clientX
+  const touchEndY = touch.clientY
+
+  const deltaX = touchEndX - touchStartX
+  const deltaY = touchEndY - touchStartY
+
+  // 检测向右滑动（从屏幕左侧边缘开始）返回上一页
+  if (deltaX > 80 && Math.abs(deltaY) < 50 && touchStartX < 50) {
+    router.push('/')
+  }
+}
+
 onUnmounted(() => {
   unsubscribeMessages()
   messageStore.$reset()
@@ -195,7 +240,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="chat-room">
+  <div
+    ref="chatRoomRef"
+    class="chat-room"
+    @touchstart="onTouchStart"
+    @touchend="onTouchEnd"
+  >
     <!-- 主内容区域 -->
     <div class="chat-room__main">
       <!-- 头部 -->

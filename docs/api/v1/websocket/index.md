@@ -132,13 +132,14 @@ const ws = new WebSocket('ws://localhost:8080/ws');
 
 | 消息类型 | 方向 | 说明 |
 |----------|------|------|
-| `JoinRoom` | C→S | 加入房间 |
-| `LeaveRoom` | C→S | 离开房间 |
+| `JoinRoom` | C→S | 加入房间（订阅房间实时消息） |
+| `LeaveRoom` | C→S | 离开房间（取消订阅） |
 | `RoomJoined` | S→C | 加入房间成功 |
 | `RoomLeft` | S→C | 离开房间成功 |
 | `UserJoined` | S→C | 用户加入房间通知 |
 | `UserLeft` | S→C | 用户离开房间通知 |
 | `OnlineUsers` | S→C | 房间在线用户列表 |
+| `RoomMessageSummary` | S→C | 房间消息摘要（用于房间列表实时更新） |
 
 ### 消息通信
 

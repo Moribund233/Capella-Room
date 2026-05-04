@@ -11,7 +11,7 @@ export function useWebSocket() {
   const { connectionState, isConnected, isConnecting } = storeToRefs(wsStore)
 
   let stopAuthWatcher: (() => void) | null = null
-  let subscribedTypes = new Map<string, Set<MessageHandler<unknown>>>()
+  const subscribedTypes = new Map<string, Set<MessageHandler<unknown>>>()
 
   function connect() {
     wsStore.connect()

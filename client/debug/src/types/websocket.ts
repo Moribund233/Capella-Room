@@ -78,6 +78,8 @@ export type MessageType =
   | 'PendingActionResponse'
   | 'GetPendingActions'
   | 'PendingActionsList'
+  // 房间消息摘要
+  | 'RoomMessageSummary'
 
 // WebSocket 消息
 export interface WebSocketMessage {
@@ -178,6 +180,21 @@ export interface WebSocketEventHandlers {
   onError?: (error: Error) => void
   onMessage?: (message: WebSocketMessage) => void
   onAuthFailed?: (error: Error) => void
+}
+
+// 消息预览（用于房间列表）
+export interface MessagePreview {
+  id: string
+  content: string
+  sender_name: string
+  created_at: string
+}
+
+// 房间消息摘要
+export interface RoomMessageSummaryData {
+  room_id: string
+  last_message: MessagePreview
+  unread_count: number
 }
 
 // 通知

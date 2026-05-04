@@ -39,7 +39,7 @@ export const useAuthStore = defineStore(
         }
         return res
       } catch {
-        logout()
+        await logout()
         throw new Error('获取用户信息失败')
       }
     }
@@ -55,16 +55,30 @@ export const useAuthStore = defineStore(
         }
         return false
       } catch {
-        logout()
+        await logout()
         return false
       }
     }
 
-    function logout() {
+    /**
+     * 登出
+     * 先清除 localStorage，再清除状态，避免状态不一致
+     */
+    async function logout() {
+      // 先清除 localStorage，确保持久化数据被删除
+      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
+
+      // 清除状态
       user.value = null
       accessToken.value = null
       refreshTokenVal.value = null
-      authApi.logout().catch(() => {})
+
+      // 调用后端登出接口（不等待结果）
+      try {
+        await authApi.logout()
+      } catch {
+        // 忽略后端错误
+      }
     }
 
     function $reset() {

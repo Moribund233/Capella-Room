@@ -78,7 +78,7 @@ pub struct RoomResponse {
 }
 
 /// 消息预览（用于房间列表中的最后消息）
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessagePreview {
     pub id: Uuid,
     pub content: String,

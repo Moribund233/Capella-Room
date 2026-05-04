@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::room::MessagePreview;
+
 /// 被引用消息的信息（用于 WebSocket 传输）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplyToInfo {
@@ -339,6 +341,14 @@ pub enum WebSocketMessage {
 
     /// 订阅确认
     LogSubscriptionConfirmed { success: bool, message: String },
+
+    // ========== 房间消息摘要 ==========
+    /// 房间消息摘要（用于房间列表实时更新）
+    RoomMessageSummary {
+        room_id: Uuid,
+        last_message: MessagePreview,
+        unread_count: u32,
+    },
 }
 
 /// 通知类型枚举

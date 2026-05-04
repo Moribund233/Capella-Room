@@ -1,16 +1,24 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import ConnectionStatus from '@/components/chat/ConnectionStatus.vue'
 import { useConnectivityStore } from '@/stores/connectivity'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { useResponsive } from '@/composables/useResponsive'
 
+const router = useRouter()
 const connectivityStore = useConnectivityStore()
 const { isConnected, isConnecting, send } = useWebSocket()
+const { isMobile } = useResponsive()
 const isOffline = computed(() => connectivityStore.isOffline)
 
 const testMessage = ref('')
-const receivedMessages = ref<Array<{ type: string; payload: unknown; time: string }>>([])
 const showTestPanel = ref(false)
+const chatViewRef = ref<HTMLElement>()
+
+// 触摸滑动相关
+let touchStartX = 0
+let touchStartY = 0
 
 function handleSendTest() {
   if (!testMessage.value.trim() || !isConnected.value) return
@@ -24,10 +32,43 @@ function handleSendTest() {
 function handleSendPing() {
   send('Ping')
 }
+
+// 移动端滑动手势 - 向右滑动返回
+function onTouchStart(e: TouchEvent) {
+  if (!isMobile.value) return
+  const touch = e.touches[0]
+  if (!touch) return
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+}
+
+function onTouchEnd(e: TouchEvent) {
+  if (!isMobile.value) return
+  const touch = e.changedTouches[0]
+  if (!touch) return
+  const touchEndX = touch.clientX
+  const touchEndY = touch.clientY
+
+  const deltaX = touchEndX - touchStartX
+  const deltaY = touchEndY - touchStartY
+
+  // 检测向右滑动（从屏幕左侧边缘开始）
+  if (deltaX > 80 && Math.abs(deltaY) < 50 && touchStartX < 50) {
+    // 返回上一页或首页
+    if (router.currentRoute.value.name === 'chat-room') {
+      router.push('/')
+    }
+  }
+}
 </script>
 
 <template>
-  <div class="chat-view">
+  <div
+    ref="chatViewRef"
+    class="chat-view"
+    @touchstart="onTouchStart"
+    @touchend="onTouchEnd"
+  >
     <!-- 离线模式横幅 -->
     <div v-if="isOffline" class="chat-view__offline-banner">
       <span class="chat-view__offline-icon">⚠</span>

@@ -231,6 +231,17 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
     // 记录连接指标
     state.metrics_collector().record_connection();
 
+    // 自动订阅用户所有已加入房间的消息摘要
+    if let Ok(user_rooms) = state.room_service().get_user_rooms(user_id).await {
+        let room_ids: Vec<Uuid> = user_rooms.iter().map(|r| r.id).collect();
+        state.ws_manager().subscribe_user_rooms(user_id, room_ids);
+        debug!(
+            "User {} subscribed to {} rooms for message summaries",
+            user_id,
+            user_rooms.len()
+        );
+    }
+
     // 如果是重连，自动重新加入之前的房间
     if is_reconnect {
         let mut restored_rooms = 0;
@@ -1195,7 +1206,26 @@ async fn handle_chat_message(
                     .await;
             }
 
-            // 4. 检测并处理@提及通知
+            // 4. 向订阅该房间的用户推送消息摘要（用于房间列表实时更新）
+            let message_preview = crate::models::room::MessagePreview {
+                id: message.id,
+                content: message.content.clone(),
+                sender_name: username.to_string(),
+                created_at: message.created_at,
+            };
+            let summary = WebSocketMessage::RoomMessageSummary {
+                room_id,
+                last_message: message_preview,
+                unread_count: 0, // TODO: 计算实际未读数
+            };
+            if let Ok(json) = summary.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_room_summary(room_id, json)
+                    .await;
+            }
+
+            // 5. 检测并处理@提及通知
             handle_mentions(
                 &content,
                 message.id,

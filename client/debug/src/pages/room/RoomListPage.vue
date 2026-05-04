@@ -13,7 +13,7 @@
           <n-list-item v-for="room in rooms" :key="room.id">
             <n-thing
               :title="room.name"
-              :description="room.description || '暂无描述'"
+              :description="getRoomLastMessage(room.id)?.content || room.description || '暂无消息'"
             >
               <template #avatar>
                 <n-avatar>
@@ -32,6 +32,9 @@
                   </n-text>
                   <n-text depth="3">
                     创建者: {{ room.owner.username }}
+                  </n-text>
+                  <n-text v-if="getRoomLastMessage(room.id)" depth="3" type="success">
+                    最新消息: {{ getRoomLastMessage(room.id)?.sender_name }}
                   </n-text>
                 </n-space>
               </template>
@@ -109,16 +112,26 @@ import {
   NInputNumber,
 } from 'naive-ui'
 import { getRooms, createRoom as createRoomApi } from '@/api/room'
+import { useWebSocketStore } from '@/store/websocket'
 import type { Room } from '@/types/api'
+import type { MessagePreview } from '@/types/websocket'
+import { storeToRefs } from 'pinia'
 
 const router = useRouter()
 const message = useMessage()
+const wsStore = useWebSocketStore()
+const { roomMessageSummaries } = storeToRefs(wsStore)
 
 const rooms = ref<Room[]>([])
 const loading = ref(false)
 const showCreateModal = ref(false)
 const creating = ref(false)
 let isMounted = true
+
+// 获取房间的最后消息预览
+function getRoomLastMessage(roomId: string): MessagePreview | undefined {
+  return roomMessageSummaries.value.get(roomId)?.last_message
+}
 
 const createForm = ref({
   name: '',

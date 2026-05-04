@@ -132,6 +132,7 @@ export const useRoomStore = defineStore('room', () => {
    * 更新房间最新消息预览（用于 WebSocket 实时更新）
    * @param roomId 房间 ID
    * @param message 消息预览数据
+   * @param incrementUnread 是否增加未读计数（默认为 true）
    */
   function updateRoomLastMessage(
     roomId: string,
@@ -141,10 +142,14 @@ export const useRoomStore = defineStore('room', () => {
       sender_name: string
       created_at: string
     },
+    incrementUnread: boolean = true,
   ) {
     const room = rooms.value.find((r) => r.id === roomId)
     if (room) {
       room.last_message = message
+      if (incrementUnread && currentRoom.value?.id !== roomId) {
+        room.unread_count = (room.unread_count || 0) + 1
+      }
     }
   }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ReplyToMessage } from '@/types/message'
 
-const props = defineProps<{
+defineProps<{
   replyTo: ReplyToMessage
 }>()
 

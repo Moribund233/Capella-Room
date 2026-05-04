@@ -151,6 +151,17 @@ ws.onclose = (event) => {
 | payload.success | boolean | 认证是否成功 |
 | payload.message | string | 认证结果描述 |
 
+### 认证成功后的自动操作
+
+认证成功后，服务端会自动执行以下操作：
+
+1. **订阅房间消息摘要**: 自动查询用户所有已加入的房间，并订阅这些房间的消息摘要
+   - 当任意已加入房间有新消息时，会收到 `RoomMessageSummary` 消息
+   - 用于实时更新房间列表的消息预览和未读计数
+   - 详见 [room.md](./room.md#房间消息摘要)
+
+2. **注册在线状态**: 将用户标记为在线状态，并向相关联系人广播状态变更
+
 ### Token 获取
 
 JWT Token 需要通过 HTTP API 获取：

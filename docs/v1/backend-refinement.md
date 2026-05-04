@@ -411,7 +411,7 @@ send(message: WebSocketMessage): boolean {
 
 ---
 
-## 0004-房间列表消息预览无法实时同步 [P1-高优先级] - 待修复
+## 0004-房间列表消息预览无法实时同步 [P1-高优先级] - ✅ 已修复
 
 **位置**: WebSocket 消息订阅机制
 
@@ -420,54 +420,32 @@ send(message: WebSocketMessage): boolean {
 
 1. **房间列表消息预览滞后**: 用户已加入的房间（如房间A、B、C），如果当前只进入了房间A，则无法实时收到房间B、C的消息更新
 2. **需要频繁刷新**: 用户必须手动刷新房间列表才能看到最新消息预览
-3. **不符合即时通讯预期**: 类似 QQ、微信等应用，用户加入群聊后即使不在该群聊天界面，也能收到消息通知
-
-**当前架构**:
-```
-用户 WebSocket 连接
-    ├── 发送 JoinRoom(roomA) ──► 订阅 roomA 消息
-    ├── 发送 JoinRoom(roomB) ──► 订阅 roomB 消息
-    └── ❌ 已加入但未 JoinRoom 的房间收不到任何消息
-```
-
-**期望架构**:
-```
-用户 WebSocket 连接
-    ├── 自动订阅所有已加入房间的消息摘要
-    │   └── 用户级通道: user:{user_id}:rooms
-    ├── 进入房间时订阅房间详情
-    │   └── 房间级通道: room:{room_id}:detail
-    └── ✅ 所有已加入房间的消息都能实时推送
-```
+3. **不符合即时通讯预期**: 用户加入群聊后即使不在该群聊天界面，也能收到消息通知
 
 **修复方案**:
 
-### 1. 新增用户级消息订阅
+### 1. 新增用户级消息订阅机制
 
-**A. 新增 WebSocket 消息类型**
+**A. 新增 WebSocket 消息类型** (`src/websocket/protocol.rs`)
 ```rust
-pub enum ClientMessage {
-    // ... 现有消息类型
-    SubscribeMyRooms,      // 订阅所有已加入房间的消息摘要
-    UnsubscribeMyRooms,    // 取消订阅
-    EnterRoom { room_id: Uuid },   // 进入房间（仅标记当前查看）
-    LeaveRoom { room_id: Uuid },   // 离开房间（取消标记）
+/// 房间消息摘要（用于房间列表实时更新）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoomMessageSummary {
+    pub room_id: Uuid,
+    pub last_message: MessagePreview,
+    pub unread_count: u32,
 }
 
 pub enum ServerMessage {
     // ... 现有消息类型
-    RoomMessageSummary {
-        room_id: Uuid,
-        last_message: MessagePreview,
-        unread_count: u32,
-    },
+    RoomMessageSummary(RoomMessageSummary),
 }
 ```
 
-**B. 后端实现**
-- 用户连接 WebSocket 后，自动查询该用户所有已加入的房间
-- 为用户订阅这些房间的消息摘要（Redis Pub/Sub）
-- 当任意已加入房间有新消息时，推送 `RoomMessageSummary`
+**B. 后端实现** (`src/websocket/handler.rs` & `src/websocket/manager.rs`)
+- 用户认证成功后，自动查询该用户所有已加入的房间
+- 将用户添加到各房间的消息摘要订阅者列表中
+- 当任意已加入房间有新消息时，广播 `RoomMessageSummary` 给所有订阅用户
 
 **C. 消息格式**
 ```json
@@ -486,42 +464,113 @@ pub enum ServerMessage {
 }
 ```
 
-### 2. 区分"加入房间"与"进入房间"
+### 2. 用户端适配 (client/user)
 
-| 概念 | 说明 | 后端行为 |
-|------|------|----------|
-| **加入房间** | 用户成为房间成员 | HTTP API 处理，持久化到数据库 |
-| **订阅房间消息** | WebSocket 订阅房间实时消息 | 自动订阅所有已加入房间 |
-| **进入房间** | 用户正在查看该房间 | 标记为当前房间，用于已读状态 |
-
-### 3. 前端适配
-
+**A. 新增类型定义** (`client/user/src/types/websocket.ts`)
 ```typescript
-// 用户连接 WebSocket 后自动订阅
-wsStore.onMessage<RoomMessageSummaryPayload>(
-  WSMessageType.ROOM_MESSAGE_SUMMARY,
-  (payload) => {
-    roomStore.updateRoomLastMessage(payload.room_id, payload.last_message);
-    roomStore.updateUnreadCount(payload.room_id, payload.unread_count);
-  }
-);
+export interface MessagePreview {
+  id: string
+  content: string
+  sender_name: string
+  created_at: string
+}
+
+export interface RoomMessageSummaryPayload {
+  room_id: string
+  last_message: MessagePreview
+  unread_count: number
+}
+
+export enum WSMessageType {
+  // ... 现有类型
+  ROOM_MESSAGE_SUMMARY = 'RoomMessageSummary',
+}
 ```
 
-**影响范围**:
-- `src/websocket/handler.rs` - 新增消息类型处理
-- `src/websocket/connection.rs` - 用户级订阅管理
-- `src/services/room_service.rs` - 查询用户已加入房间
-- Redis Pub/Sub 通道设计
+**B. Room Store 更新** (`client/user/src/stores/room.ts`)
+```typescript
+function updateRoomLastMessage(
+  roomId: string,
+  message: { id: string; content: string; sender_name: string; created_at: string },
+  incrementUnread: boolean = true,
+) {
+  const room = rooms.value.find((r) => r.id === roomId)
+  if (room) {
+    room.last_message = message
+    if (incrementUnread && currentRoom.value?.id !== roomId) {
+      room.unread_count = (room.unread_count || 0) + 1
+    }
+  }
+}
+```
 
-**临时解决方案**:
-前端已实现本地缓存更新：当用户在某个房间收到新消息时，同步更新房间列表中的消息预览。但这只能解决"当前在房间"的场景，无法解决"后台接收其他房间消息"的场景。
+**C. WebSocket 消息处理** (`client/user/src/views/ChatRoomView.vue`)
+```typescript
+function handleRoomMessageSummary(payload: RoomMessageSummaryPayload) {
+  const isCurrentRoom = payload.room_id === roomId.value
+  roomStore.updateRoomLastMessage(
+    payload.room_id,
+    payload.last_message,
+    !isCurrentRoom, // 只有非当前房间才增加未读数
+  )
+}
 
-**状态**: ⏳ 待修复 - 需要后端支持用户级消息订阅机制
+function subscribeMessages() {
+  wsStore.onMessage<RoomMessageSummaryPayload>(
+    WSMessageType.ROOM_MESSAGE_SUMMARY, 
+    handleRoomMessageSummary
+  )
+}
+```
 
-**关联任务**: 
-- ⏳ 后端: 实现用户级消息订阅
-- ⏳ 后端: 新增 RoomMessageSummary 消息类型
-- ⏳ 前端: 适配新的 WebSocket 消息类型
+### 3. 修改的文件清单
+
+**后端**:
+- ✅ `src/websocket/protocol.rs` - 新增 RoomMessageSummary 消息类型
+- ✅ `src/websocket/handler.rs` - 认证成功后自动订阅用户房间
+- ✅ `src/websocket/manager.rs` - 新增用户级房间订阅管理
+- ✅ `src/models/room.rs` - MessagePreview 添加 Deserialize trait
+
+**用户端 (client/user)**:
+- ✅ `client/user/src/types/websocket.ts` - 新增 RoomMessageSummaryPayload 类型
+- ✅ `client/user/src/stores/room.ts` - updateRoomLastMessage 支持未读计数
+- ✅ `client/user/src/views/ChatRoomView.vue` - 订阅 RoomMessageSummary 消息
+
+**调试端 (client/debug)**:
+- ✅ `client/debug/src/types/websocket.ts` - 新增 RoomMessageSummaryPayload 类型
+- ✅ `client/debug/src/store/websocket.ts` - 添加消息处理
+- ✅ `client/debug/src/pages/room/RoomListPage.vue` - 显示实时消息预览
+
+### 4. 工作流程
+
+```
+用户连接 WebSocket (用户端)
+    ├── 认证成功 
+    │   └── 后端自动查询用户所有已加入房间
+    │   └── 将用户添加到各房间的摘要订阅列表
+    │
+    ├── 任意已加入房间有新消息
+    │   ├── 如果用户在房间内 → 收到 NewMessage
+    │   └── 无论用户在何处 → 收到 RoomMessageSummary
+    │       └── 更新房间列表的消息预览和未读数
+    │
+    └── 断开连接 
+        └── 后端自动从所有订阅列表中移除用户
+```
+
+### 5. 临时方案处理
+
+原临时方案（在 ChatRoomView.vue 中通过 NewMessage 更新房间列表）已优化：
+- 保留 `updateRoomLastMessage` 函数用于处理 RoomMessageSummary
+- 新增 `incrementUnread` 参数控制是否增加未读计数
+- 当前房间的消息不增加未读数
+
+**状态**: ✅ 已修复 - 用户现在可以实时收到所有已加入房间的消息摘要更新
+
+**验证**:
+- ✅ `cargo check` 编译通过
+- ✅ `cargo clippy` 检查通过
+- ✅ `npm run type-check` (client/user) 类型检查通过
 
 ---
 

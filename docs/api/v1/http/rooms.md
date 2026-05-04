@@ -2,6 +2,19 @@
 
 > **认证要求**: 所有接口均需要认证（需要携带 Access Token）
 
+## 概述
+
+聊天室接口提供完整的房间管理功能，包括创建、查询、加入/离开房间等操作。
+
+### 房间列表实时更新
+
+房间列表接口返回的数据包含 `last_message`（最后消息预览）和 `unread_count`（未读计数）字段。为了实现实时更新：
+
+1. **初始加载**: 使用 HTTP API 获取房间列表（包含初始的最后消息和未读数）
+2. **实时更新**: 通过 WebSocket 的 `RoomMessageSummary` 消息接收更新
+
+详见 [WebSocket 房间管理文档](../websocket/room.md#房间消息摘要)
+
 ## 接口列表
 
 | 方法 | 路径 | 说明 |
@@ -58,6 +71,13 @@ Authorization: Bearer {access_token}
       "is_private": false,
       "max_members": 100,
       "member_count": 25,
+      "unread_count": 5,
+      "last_message": {
+        "id": "660e8400-e29b-41d4-a716-446655440001",
+        "content": "有人在线吗？",
+        "sender_name": "user123",
+        "created_at": "2024-01-20T10:00:00Z"
+      },
       "created_at": "2024-01-15T08:30:00Z",
       "updated_at": "2024-01-20T10:00:00Z"
     }
@@ -79,6 +99,12 @@ Authorization: Bearer {access_token}
 | `is_private` | boolean | 是否为私有聊天室 |
 | `max_members` | number | 最大成员数限制 |
 | `member_count` | number | 当前成员数量 |
+| `unread_count` | number | 未读消息数（仅对已加入房间） |
+| `last_message` | object \| null | 最后一条消息预览 |
+| `last_message.id` | string (UUID) | 消息 ID |
+| `last_message.content` | string | 消息内容 |
+| `last_message.sender_name` | string | 发送者名称 |
+| `last_message.created_at` | string (ISO 8601) | 消息发送时间 |
 | `created_at` | string (ISO 8601) | 创建时间 |
 | `updated_at` | string (ISO 8601) | 最后更新时间 |
 
@@ -194,6 +220,13 @@ Authorization: Bearer {access_token}
       "is_private": false,
       "max_members": 100,
       "member_count": 50,
+      "unread_count": 12,
+      "last_message": {
+        "id": "660e8400-e29b-41d4-a716-446655440002",
+        "content": "今天讨论了 Rust 的异步编程",
+        "sender_name": "developer",
+        "created_at": "2024-01-20T18:00:00Z"
+      },
       "created_at": "2024-01-15T08:30:00Z",
       "updated_at": "2024-01-20T18:00:00Z"
     }
@@ -205,7 +238,10 @@ Authorization: Bearer {access_token}
 
 - 按 `updated_at` 降序排序
 - 返回最近活跃的聊天室
+- 包含 `last_message` 和 `unread_count` 用于房间列表展示
 - 可用于首页展示热门房间
+
+> **提示**: 配合 WebSocket 的 `RoomMessageSummary` 消息可实现房间列表的实时更新
 
 ---
 

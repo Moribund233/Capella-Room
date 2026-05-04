@@ -81,6 +81,88 @@
   }
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 消息动画 */
 .animate-message-send {
   animation: message-send-in var(--duration-normal) var(--ease-out);
 }
@@ -89,8 +171,149 @@
   animation: message-receive-in var(--duration-normal) var(--ease-out);
 }
 
+/* 列表项动画 */
 .animate-fade-in {
   animation: list-item-fade-in var(--duration-normal) var(--ease-out);
+}
+
+.animate-fade-in-delay-1 { animation-delay: 50ms; }
+.animate-fade-in-delay-2 { animation-delay: 100ms; }
+.animate-fade-in-delay-3 { animation-delay: 150ms; }
+.animate-fade-in-delay-4 { animation-delay: 200ms; }
+.animate-fade-in-delay-5 { animation-delay: 250ms; }
+
+/* 页面过渡动画 */
+.animate-page-slide-in {
+  animation: page-slide-in var(--duration-normal) var(--ease-out);
+}
+
+.animate-page-slide-out {
+  animation: page-slide-out var(--duration-normal) var(--ease-out);
+}
+
+/* 加载动画 */
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.animate-bounce {
+  animation: bounce 1s ease-in-out infinite;
+}
+
+/* 反馈动画 */
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-slide-down {
+  animation: slide-down var(--duration-normal) var(--ease-out);
+}
+
+.animate-slide-up {
+  animation: slide-up var(--duration-normal) var(--ease-out);
+}
+
+.animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-spring);
+}
+
+.animate-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-default);
+}
+
+/* 骨架屏动画 */
+.animate-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-background) 25%,
+    var(--color-background-light) 50%,
+    var(--color-background) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* 涟漪效果 */
+.animate-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+}
+
+.animate-ripple:active::after {
+  animation: ripple 0.6s ease-out;
+}
+
+/* 发送成功动画 */
+.animate-send-success {
+  animation: send-success 0.3s var(--ease-spring);
+}
+
+/* 悬浮效果 */
+.hover-lift {
+  transition: transform var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.hover-scale {
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* 按压效果 */
+.press-scale {
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.press-scale:active {
+  transform: scale(0.98);
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .hover-lift:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .hover-scale:hover {
+    transform: none;
+  }
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

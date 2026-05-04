@@ -31,6 +31,7 @@
 | `UserJoined` | 其他用户加入房间（广播） |
 | `UserLeft` | 其他用户离开房间（广播） |
 | `OnlineUsers` | 房间在线用户列表 |
+| `RoomMessageSummary` | 房间消息摘要（用于房间列表实时更新） |
 | `Error` | 错误响应 |
 
 ---
@@ -221,6 +222,97 @@
   │         广播给房间其他成员          │
   │◀───── UserLeft ──────────────────│ (其他用户收到)
 ```
+
+---
+
+## 房间消息摘要
+
+当用户已加入的任意房间有新消息时，服务端会自动推送 `RoomMessageSummary` 消息，用于更新房间列表中的消息预览和未读计数。
+
+> **特性说明**:
+> - 用户 WebSocket 认证成功后，后端自动订阅该用户所有已加入房间
+> - 无需手动发送订阅消息
+> - 当任意已加入房间有新消息时自动推送
+> - 即使用户不在该房间界面，也能收到消息摘要
+
+### 消息格式
+
+```json
+{
+  "type": "RoomMessageSummary",
+  "payload": {
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "last_message": {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "content": "最新消息内容",
+      "sender_name": "user123",
+      "created_at": "2026-05-04T10:30:00.000Z"
+    },
+    "unread_count": 5
+  }
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| room_id | string (UUID) | 房间 ID |
+| last_message | object | 最后一条消息预览 |
+| last_message.id | string (UUID) | 消息 ID |
+| last_message.content | string | 消息内容（已截断） |
+| last_message.sender_name | string | 发送者名称 |
+| last_message.created_at | string (ISO 8601) | 消息发送时间 |
+| unread_count | number | 未读消息数 |
+
+### 工作流程
+
+```
+用户连接 WebSocket
+    │
+    ├── 认证成功
+    │   └── 后端自动查询用户所有已加入房间
+    │   └── 将用户添加到各房间的摘要订阅列表
+    │
+    ├── 任意已加入房间有新消息
+    │   └── 后端推送 RoomMessageSummary 给该用户
+    │
+    └── 断开连接
+        └── 后端自动从所有订阅列表中移除用户
+```
+
+### JavaScript 示例
+
+```javascript
+// 监听房间消息摘要
+ws.addEventListener('message', (event) => {
+  const msg = JSON.parse(event.data);
+  
+  if (msg.type === 'RoomMessageSummary') {
+    const { room_id, last_message, unread_count } = msg.payload;
+    
+    // 更新房间列表中的消息预览
+    updateRoomPreview(room_id, {
+      content: last_message.content,
+      senderName: last_message.sender_name,
+      createdAt: last_message.created_at
+    });
+    
+    // 更新未读计数
+    updateUnreadCount(room_id, unread_count);
+  }
+});
+```
+
+### 与 JoinRoom 的区别
+
+| 特性 | `RoomMessageSummary` | `JoinRoom` |
+|------|---------------------|------------|
+| 触发方式 | 自动订阅（认证后） | 手动发送 |
+| 接收内容 | 消息摘要（预览） | 完整消息内容 |
+| 适用场景 | 房间列表页面 | 聊天室页面 |
+| 消息类型 | 仅最后消息预览 | 所有实时消息 |
+| 未读计数 | 包含 | 不包含 |
 
 ---
 

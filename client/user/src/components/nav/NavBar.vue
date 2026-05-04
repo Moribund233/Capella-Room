@@ -2,12 +2,18 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useResponsive } from '@/composables/useResponsive'
-import { MessageSquare, User, Settings } from 'lucide-vue-next'
+import { MessageSquare, User, Settings, LogOut } from 'lucide-vue-next'
+import { QuickBar } from '@/components/quick'
+import { useQuickBar } from '@/composables/quick'
+import { quickBarConfig } from '@/config/quick'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { isMobile } = useResponsive()
+
+// 初始化 QuickBar
+const { items: quickItems } = useQuickBar(quickBarConfig)
 
 const navItems = [
   { name: 'chat', path: '/', icon: MessageSquare, label: '聊天' },
@@ -25,13 +31,28 @@ function isActive(item: (typeof navItems)[0]): boolean {
 function navigate(path: string) {
   router.push(path)
 }
+
+/**
+ * 处理登出
+ */
+async function handleLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
   <nav class="nav-bar" :class="{ 'nav-bar--mobile': isMobile }">
-    <!-- Logo -->
-    <div class="nav-bar__logo" @click="navigate('/')">
-      <span class="nav-bar__logo-text">S</span>
+    <!-- 登出按钮 -->
+    <div class="nav-bar__logout">
+      <button
+        class="nav-bar__logout-btn"
+        @click="handleLogout"
+        title="登出"
+        aria-label="登出"
+      >
+        <LogOut :size="20" />
+      </button>
     </div>
 
     <!-- Nav items -->
@@ -48,15 +69,9 @@ function navigate(path: string) {
       </button>
     </div>
 
-    <!-- User avatar -->
-    <div v-if="authStore.user" class="nav-bar__user">
-      <button
-        class="nav-bar__avatar"
-        @click="navigate('/profile')"
-        :title="authStore.user.username"
-      >
-        {{ authStore.user.username.charAt(0).toUpperCase() }}
-      </button>
+    <!-- QuickBar 快捷栏（仅桌面端） -->
+    <div v-if="!isMobile" class="nav-bar__quick">
+      <QuickBar :items="quickItems" position="header" />
     </div>
   </nav>
 </template>
@@ -86,26 +101,40 @@ function navigate(path: string) {
   z-index: 200;
 }
 
-/* Logo */
-.nav-bar__logo {
+/* 登出按钮 */
+.nav-bar__logout {
   width: 100%;
-  height: 52px;
+  padding: 8px 0;
   display: flex;
-  align-items: center;
   justify-content: center;
   border-bottom: 1px solid var(--color-divider);
-  cursor: pointer;
   flex-shrink: 0;
 }
 
-.nav-bar--mobile .nav-bar__logo {
-  display: none;
+.nav-bar--mobile .nav-bar__logout {
+  width: auto;
+  padding: 0 8px;
+  border-bottom: none;
+  border-right: 1px solid var(--color-divider);
 }
 
-.nav-bar__logo-text {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--color-primary);
+.nav-bar__logout-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.nav-bar__logout-btn:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-light, rgba(239, 68, 68, 0.1));
 }
 
 /* Nav items */
@@ -179,36 +208,18 @@ function navigate(path: string) {
   border-radius: 0 0 3px 3px;
 }
 
-/* User area */
-.nav-bar__user {
+/* QuickBar 区域 */
+.nav-bar__quick {
   padding: 8px 0;
   border-top: 1px solid var(--color-divider);
   width: 100%;
   display: flex;
-  justify-content: center;
-}
-
-.nav-bar--mobile .nav-bar__user {
-  display: none;
-}
-
-.nav-bar__avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-white);
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  transition: opacity var(--duration-fast);
+  gap: 4px;
 }
 
-.nav-bar__avatar:hover {
-  opacity: 0.85;
+.nav-bar--mobile .nav-bar__quick {
+  display: none;
 }
 </style>

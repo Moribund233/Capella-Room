@@ -213,6 +213,21 @@ export interface GlobalOnlineUsersPayload {
   total: number
 }
 
+/** 消息预览（用于房间列表中的最后消息） */
+export interface MessagePreview {
+  id: string
+  content: string
+  sender_name: string
+  created_at: string
+}
+
+/** 房间消息摘要（用于房间列表实时更新） */
+export interface RoomMessageSummaryPayload {
+  room_id: string
+  last_message: MessagePreview
+  unread_count: number
+}
+
 // ========== 消息类型枚举 ==========
 
 export enum WSMessageType {
@@ -254,6 +269,7 @@ export enum WSMessageType {
   ERROR = 'Error',
   SYSTEM_MESSAGE = 'SystemMessage',
   MENTIONED = 'Mentioned',
+  ROOM_MESSAGE_SUMMARY = 'RoomMessageSummary',
 }
 
 // ========== 消息处理器类型 ==========
