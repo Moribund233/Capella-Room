@@ -1,6 +1,5 @@
 export { http, request, buildUrl } from './request'
 export { authApi, isAdmin, isSuperAdmin } from './auth'
-export { wsClient, useWebSocket } from './websocket'
 export { uiApi } from './ui'
 export { adminApi } from './admin'
 export { roomsApi } from './rooms'

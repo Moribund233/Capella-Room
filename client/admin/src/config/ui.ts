@@ -140,6 +140,13 @@ export const quickBarConfig: QuickItemConfig[] = [
     ],
   },
   {
+    key: 'notification',
+    display: 'visible',
+    type: 'action',
+    icon: 'Bell',
+    label: '通知中心',
+  },
+  {
     key: 'user',
     display: 'dropdown',
     type: 'menu',

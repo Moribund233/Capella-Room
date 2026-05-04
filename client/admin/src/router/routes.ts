@@ -89,6 +89,45 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'audit',
+        name: 'Audit',
+        component: () => import('@/views/AuditView.vue'),
+        redirect: '/audit/logs',
+        meta: {
+          title: '审计系统',
+          requiresAuth: true,
+        },
+        children: [
+          {
+            path: 'logs',
+            name: 'AuditLogs',
+            component: () => import('@/pages/audit/AuditLogPage.vue'),
+            meta: { title: '审计日志', requiresAuth: true },
+          },
+          {
+            path: 'alerts',
+            name: 'SecurityAlerts',
+            component: () => import('@/pages/audit/SecurityAlertPage.vue'),
+            meta: { title: '安全告警', requiresAuth: true },
+          },
+          {
+            path: 'rules',
+            name: 'AlertRules',
+            component: () => import('@/pages/audit/AlertRulePage.vue'),
+            meta: { title: '告警规则', requiresAuth: true, requiresSuperAdmin: true },
+          },
+        ],
+      },
+      {
+        path: 'security',
+        name: 'Security',
+        component: () => import('@/views/IPSecurityView.vue'),
+        meta: {
+          title: 'IP安全',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'setting',
         name: 'Setting',
         component: () => import('@/views/SettingView.vue'),
@@ -103,6 +142,18 @@ export const routes: RouteRecordRaw[] = [
             name: 'SettingUI',
             component: () => import('@/pages/setting/UISettingsPanel.vue'),
             meta: { title: '界面设置', requiresAuth: true },
+          },
+          {
+            path: 'config',
+            name: 'SettingConfig',
+            component: () => import('@/pages/setting/ConfigSettingsPage.vue'),
+            meta: { title: '系统配置', requiresAuth: true },
+          },
+          {
+            path: 'redis',
+            name: 'SettingRedis',
+            component: () => import('@/pages/setting/RedisStatusPage.vue'),
+            meta: { title: 'Redis状态', requiresAuth: true },
           },
         ],
       },

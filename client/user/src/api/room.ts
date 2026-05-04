@@ -22,7 +22,7 @@ export async function getRooms(params?: PaginationParams): Promise<RoomListRespo
   if (params?.per_page) queryParams.per_page = params.per_page.toString()
   if (params?.page_size) queryParams.page_size = params.page_size.toString()
 
-  const response = await apiClient.get<Room[] | RoomListResponse>('/api/v1/rooms', queryParams)
+  const response = await apiClient.get<Room[] | RoomListResponse>('/rooms', queryParams)
   const data = response.data
 
   // 适配两种可能的响应格式：直接返回数组或包装在 items 字段中
@@ -47,7 +47,7 @@ export async function getRooms(params?: PaginationParams): Promise<RoomListRespo
  * 获取房间详情
  */
 export async function getRoom(roomId: string): Promise<Room> {
-  const response = await apiClient.get<Room>(`/api/v1/rooms/${roomId}`)
+  const response = await apiClient.get<Room>(`/rooms/${roomId}`)
   return response.data
 }
 
@@ -60,7 +60,7 @@ export async function createRoom(data: {
   is_private?: boolean
   max_members?: number
 }): Promise<Room> {
-  const response = await apiClient.post<Room>('/api/v1/rooms', data)
+  const response = await apiClient.post<Room>('/rooms', data)
   return response.data
 }
 
@@ -76,7 +76,7 @@ export async function updateRoom(
     max_members?: number
   }
 ): Promise<Room> {
-  const response = await apiClient.put<Room>(`/api/v1/rooms/${roomId}`, data)
+  const response = await apiClient.put<Room>(`/rooms/${roomId}`, data)
   return response.data
 }
 
@@ -84,7 +84,7 @@ export async function updateRoom(
  * 删除房间
  */
 export async function deleteRoom(roomId: string): Promise<void> {
-  await apiClient.delete<void>(`/api/v1/rooms/${roomId}`)
+  await apiClient.delete<void>(`/rooms/${roomId}`)
 }
 
 /**
@@ -100,7 +100,7 @@ export async function getRoomMessages(
   if (params?.page_size) queryParams.page_size = params.page_size.toString()
 
   const response = await apiClient.get<MessageListResponse>(
-    `/api/v1/rooms/${roomId}/messages`,
+    `/rooms/${roomId}/messages`,
     queryParams
   )
   return response.data
@@ -115,7 +115,7 @@ export async function sendMessage(
   type: 'text' | 'image' | 'file' = 'text',
   replyTo?: string
 ): Promise<Message> {
-  const response = await apiClient.post<Message>(`/api/v1/rooms/${roomId}/messages`, {
+  const response = await apiClient.post<Message>(`/rooms/${roomId}/messages`, {
     content,
     type,
     reply_to: replyTo,
@@ -127,12 +127,12 @@ export async function sendMessage(
  * 加入房间
  */
 export async function joinRoom(roomId: string): Promise<void> {
-  await apiClient.post<void>(`/api/v1/rooms/${roomId}/join`)
+  await apiClient.post<void>(`/rooms/${roomId}/join`)
 }
 
 /**
  * 离开房间
  */
 export async function leaveRoom(roomId: string): Promise<void> {
-  await apiClient.post<void>(`/api/v1/rooms/${roomId}/leave`)
+  await apiClient.post<void>(`/rooms/${roomId}/leave`)
 }

@@ -47,3 +47,6 @@ temp/
 
 # Uploads
 uploads/
+
+# audit_log
+archives/

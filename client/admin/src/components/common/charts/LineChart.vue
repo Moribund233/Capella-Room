@@ -48,6 +48,8 @@ export interface LineSeries {
   markPoint?: Record<string, unknown>
   /** 标记线配置 */
   markLine?: Record<string, unknown>
+  /** Y轴索引（用于双Y轴） */
+  yAxisIndex?: number
 }
 
 /**
@@ -118,6 +120,7 @@ const chartOption = computed<EChartsOption>(() => {
     smooth: s.smooth ?? true,
     symbol: 'circle' as const,
     symbolSize: 6,
+    yAxisIndex: s.yAxisIndex ?? 0,
     lineStyle: {
       width: 2,
       ...s.lineStyle,
@@ -201,7 +204,10 @@ const chartOption = computed<EChartsOption>(() => {
         },
       ]
       : undefined,
-    series: seriesConfig,
+    series: seriesConfig.map(s => ({
+    ...s,
+    yAxisIndex: s.yAxisIndex ?? 0,
+  })),
   }
 
   // 合并用户自定义配置

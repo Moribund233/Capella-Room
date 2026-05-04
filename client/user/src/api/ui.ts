@@ -9,7 +9,7 @@ import type { UIConfigResponse, SaveUIConfigParams } from '@/types'
  * 获取用户云端 UI 配置
  */
 export async function getUserConfig(): Promise<UIConfigResponse> {
-  const response = await apiClient.get<UIConfigResponse>('/api/v1/ui/config')
+  const response = await apiClient.get<UIConfigResponse>('/ui/config')
   return response.data
 }
 
@@ -17,7 +17,7 @@ export async function getUserConfig(): Promise<UIConfigResponse> {
  * 保存用户云端 UI 配置
  */
 export async function saveUserConfig(params: SaveUIConfigParams): Promise<void> {
-  await apiClient.post('/api/v1/ui/config', {
+  await apiClient.post('/ui/config', {
     body: JSON.stringify(params),
   })
 }
@@ -26,7 +26,7 @@ export async function saveUserConfig(params: SaveUIConfigParams): Promise<void> 
  * 重置用户云端 UI 配置
  */
 export async function resetUserConfig(): Promise<void> {
-  await apiClient.delete('/api/v1/ui/config')
+  await apiClient.delete('/ui/config')
 }
 
 // UI API 对象

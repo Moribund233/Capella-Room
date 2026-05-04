@@ -31,19 +31,31 @@ export interface MobileColumn<T = unknown> {
 }
 
 /**
+ * 任意类型的操作按钮配置（用于组件内部）
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyMobileAction = MobileAction<any>
+
+/**
+ * 任意类型的列配置（用于组件内部）
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyMobileColumn = MobileColumn<any>
+
+/**
  * 组件属性
  */
 interface Props {
   /** 表格数据 */
   data: unknown[]
   /** 列配置 */
-  columns: MobileColumn[]
+  columns: AnyMobileColumn[]
   /** 标题列（显示在卡片头部） */
   titleColumn?: string
   /** 空数据提示 */
   emptyText?: string
   /** 操作按钮配置 */
-  actions?: MobileAction[]
+  actions?: AnyMobileAction[]
   /** 是否显示操作按钮区域 */
   showActions?: boolean
   /** 是否使用下拉菜单模式（节省空间） */
@@ -53,6 +65,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  data: () => [],
   titleColumn: '',
   emptyText: '暂无数据',
   showActions: true,
@@ -83,7 +96,7 @@ const handleCardClick = (row: unknown, index: number) => {
 /**
  * 检查操作按钮是否显示
  */
-const isActionVisible = (action: MobileAction, row: unknown, index: number): boolean => {
+const isActionVisible = (action: AnyMobileAction, row: unknown, index: number): boolean => {
   if (action.show === undefined) return true
   return action.show(row, index)
 }
@@ -91,7 +104,7 @@ const isActionVisible = (action: MobileAction, row: unknown, index: number): boo
 /**
  * 获取可见的操作按钮列表
  */
-const getVisibleActions = (row: unknown, index: number): MobileAction[] => {
+const getVisibleActions = (row: unknown, index: number): AnyMobileAction[] => {
   if (!props.actions) return []
   return props.actions.filter(action => isActionVisible(action, row, index))
 }

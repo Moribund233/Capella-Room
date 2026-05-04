@@ -105,6 +105,47 @@ export const routes: RouteRecordRaw[] = [
           },
         ],
       },
+      // Debug工具页面 - 主页面+子页面模式
+      {
+        path: 'debug',
+        name: 'Debug',
+        component: () => import('@/views/DebugView.vue'),
+        redirect: '/debug/multi-user',
+        meta: {
+          title: '调试工具',
+          requiresAuth: true,
+          hasDock: true,
+        },
+        children: [
+          {
+            path: 'multi-user',
+            name: 'MultiUserTest',
+            component: () => import('@/pages/debug/MultiUserTest.vue'),
+            meta: {
+              title: '多用户测试',
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'websocket',
+            name: 'WebSocketTest',
+            component: () => import('@/pages/debug/WebSocketTest.vue'),
+            meta: {
+              title: 'WebSocket测试',
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'api',
+            name: 'ApiTest',
+            component: () => import('@/pages/debug/ApiTest.vue'),
+            meta: {
+              title: 'API测试',
+              requiresAuth: true,
+            },
+          },
+        ],
+      },
     ],
   },
   {

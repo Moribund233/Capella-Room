@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authApi, isAdmin, wsClient } from '@/api'
+import { authApi, isAdmin } from '@/api'
+import { useWebSocketStore } from './websocket'
 import type { UserInfo, LoginResult, UserRole } from '@/types'
 
 /**
@@ -71,7 +72,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(REFRESH_TOKEN_KEY)
     localStorage.removeItem(USER_INFO_KEY)
     // 断开 WebSocket 连接
-    wsClient.disconnect()
+    const wsStore = useWebSocketStore()
+    wsStore.disconnect()
   }
 
   /**
@@ -123,7 +125,8 @@ export const useAuthStore = defineStore('auth', () => {
       setUserInfo(user)
 
       // 建立 WebSocket 连接
-      wsClient.connect(response.data.access_token)
+      const wsStore = useWebSocketStore()
+      wsStore.connect(response.data.access_token)
 
       return { success: true, message: '登录成功' }
     } catch (error) {
@@ -193,14 +196,16 @@ export const useAuthStore = defineStore('auth', () => {
     const success = await fetchCurrentUser()
     if (success && accessToken.value) {
       // 建立 WebSocket 连接
-      wsClient.connect(accessToken.value)
+      const wsStore = useWebSocketStore()
+      wsStore.connect(accessToken.value)
       return true
     }
 
     // 获取失败，尝试刷新令牌
     const refreshed = await refreshAccessToken()
     if (refreshed && accessToken.value) {
-      wsClient.connect(accessToken.value)
+      const wsStore = useWebSocketStore()
+      wsStore.connect(accessToken.value)
     }
 
     return refreshed

@@ -6,7 +6,7 @@ import type { ApiResponse } from '@/types/api'
 import { getAccessToken } from './token'
 
 // API 基础配置
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || ''
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 // Token 过期事件名称
 export const TOKEN_EXPIRED_EVENT = 'token_expired'

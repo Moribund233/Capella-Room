@@ -12,7 +12,7 @@ import type {
   WebSocketEventHandlers,
 } from '@/types/websocket'
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL
+const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL
 
 class WebSocketClient {
   private ws: WebSocket | null = null

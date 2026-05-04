@@ -47,6 +47,7 @@ import {
   useQuickLayout,
   useQuickUser,
   useQuickPersonalization,
+  useQuickNotification,
   type QuickConfigItem,
   type QuickRuntimeItem,
   type QuickContext,
@@ -135,6 +136,11 @@ const userQuick = useQuickUser({ key: 'user', type: 'menu', icon: 'UserCircle', 
 const personalizationQuick = useQuickPersonalization({ key: 'personalization', type: 'action', icon: 'Palette', label: '个性化', display: 'visible' }, quickContext)
 
 /**
+ * 通知中心 Quick
+ */
+const notificationQuick = useQuickNotification({ key: 'notification', type: 'action', icon: 'Bell', label: '通知中心', display: 'visible' }, quickContext)
+
+/**
  * Quick 实例映射表
  */
 const quickInstances: Record<string, UseQuickReturn> = {
@@ -143,6 +149,7 @@ const quickInstances: Record<string, UseQuickReturn> = {
   footer: footerQuick,
   user: userQuick,
   personalization: personalizationQuick,
+  notification: notificationQuick,
 }
 
 /**

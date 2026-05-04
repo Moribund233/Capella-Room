@@ -27,7 +27,7 @@ import type {
  * @returns 登录响应
  */
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', credentials)
+  const response = await apiClient.post<LoginResponse>('/auth/login', credentials)
 
   // 保存 token 和用户信息
   if (response.data.access_token && response.data.refresh_token) {
@@ -44,7 +44,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
  * @returns 注册响应
  */
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
-  const response = await apiClient.post<RegisterResponse>('/api/v1/auth/register', data)
+  const response = await apiClient.post<RegisterResponse>('/auth/register', data)
 
   // 保存 token 和用户信息
   if (response.data.access_token && response.data.refresh_token) {
@@ -66,7 +66,7 @@ export async function refreshToken(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +91,7 @@ export async function refreshToken(): Promise<boolean> {
  */
 export async function logout(): Promise<void> {
   try {
-    await apiClient.post('/api/v1/users/logout')
+    await apiClient.post('/users/logout')
   } finally {
     clearTokens()
   }
@@ -102,7 +102,7 @@ export async function logout(): Promise<void> {
  * @returns 用户信息
  */
 export async function getCurrentUser(): Promise<User> {
-  const response = await apiClient.get<User>('/api/v1/users/me')
+  const response = await apiClient.get<User>('/users/me')
   return response.data
 }
 

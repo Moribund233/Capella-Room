@@ -2,7 +2,7 @@
  * 系统相关 API
  */
 
-import { apiClient, API_BASE_URL } from './client'
+import { API_BASE_URL } from './client'
 import type { ClientConfig } from '@/types/api'
 
 /**
@@ -20,23 +20,13 @@ export interface SystemStats {
 }
 
 /**
- * 健康检查详细响应（后端直接返回，无 ApiResponse 包装）
+ * 健康检查响应
  */
-interface HealthDetailResponse {
+interface HealthResponse {
   success: boolean
   data: {
     status: string
     timestamp: string
-    components: {
-      database: {
-        status: string
-      }
-      websocket: {
-        status: string
-        connections: number
-        online_users: number
-      }
-    }
   }
 }
 
@@ -62,31 +52,65 @@ export async function getClientConfig(): Promise<ClientConfig> {
 
 /**
  * 健康检查
+ * 使用 /health 端点，无需认证
  */
 export async function healthCheck(): Promise<{ status: string; version: string }> {
-  const response = await apiClient.get<{ status: string; version: string }>('/api/v1/health')
-  return response.data
+  // 健康检查端点不使用 /api/v1 前缀
+  const baseUrl = API_BASE_URL?.replace('/api/v1', '') || ''
+  const response = await fetch(`${baseUrl}/health`)
+
+  if (!response.ok) {
+    throw new Error(`健康检查失败: ${response.status}`)
+  }
+
+  const data: HealthResponse = await response.json()
+  return {
+    status: data.data.status,
+    version: '1.0.0', // 健康检查端点不返回版本号
+  }
 }
 
 /**
  * 获取系统统计信息
- * 使用 /health/detail 端点获取在线用户、连接数等信息
- * 注意：此端点直接返回数据，无 ApiResponse 包装
+ * 注意：后端可能未实现 /health/detail 端点，暂时使用基础健康检查
  */
 export async function getSystemStats(): Promise<SystemStats> {
-  // 健康检查端点直接返回，不使用 apiClient 的包装处理
-  const baseUrl = API_BASE_URL || ''
-  const response = await fetch(`${baseUrl}/health/detail`)
+  // 尝试使用 /health/detail 端点
+  const baseUrl = API_BASE_URL?.replace('/api/v1', '') || ''
 
-  if (!response.ok) {
-    throw new Error(`获取系统状态失败: ${response.status}`)
+  try {
+    const response = await fetch(`${baseUrl}/health/detail`)
+
+    if (response.ok) {
+      const data = await response.json()
+      return {
+        online_users: data.data?.components?.websocket?.online_users || 0,
+        active_rooms: 0,
+        websocket_connections: data.data?.components?.websocket?.connections || 0,
+      }
+    }
+  } catch {
+    // /health/detail 端点不可用，降级处理
   }
 
-  const data: HealthDetailResponse = await response.json()
+  // 降级：返回基础健康状态
+  try {
+    const response = await fetch(`${baseUrl}/health`)
+    if (response.ok) {
+      return {
+        online_users: 0,
+        active_rooms: 0,
+        websocket_connections: 0,
+      }
+    }
+  } catch {
+    // 健康检查也失败
+  }
 
+  // 如果都失败了，返回空数据
   return {
-    online_users: data.data.components.websocket.online_users,
-    active_rooms: 0, // 健康检查端点不返回房间数
-    websocket_connections: data.data.components.websocket.connections,
+    online_users: 0,
+    active_rooms: 0,
+    websocket_connections: 0,
   }
 }

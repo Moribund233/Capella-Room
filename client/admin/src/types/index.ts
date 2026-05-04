@@ -28,4 +28,9 @@ export {
   type WsAuthMessage,
   type WsAuthResult,
   type WsConnectionState,
+  type NotificationItem,
+  type GetOfflineNotificationsParams,
+  type OfflineNotificationsPayload,
+  type MarkNotificationReadParams,
+  type NotificationReadConfirmPayload,
 } from './types'

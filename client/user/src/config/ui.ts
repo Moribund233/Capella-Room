@@ -40,6 +40,11 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
       icon: 'Settings',
       path: '/setting',
     },
+    {
+      name: '调试工具',
+      icon: 'Bug',
+      path: '/debug',
+    },
   ],
 }
 
@@ -222,6 +227,32 @@ export const dockConfig: DockConfig = {
         label: '界面设置',
         icon: 'Palette',
         path: '/setting/ui',
+      },
+    ],
+  },
+  // Debug工具页 - 子页面通过 DockBar 导航
+  debug: {
+    enabled: true,
+    position: 'bottom',
+    offset: 24,
+    items: [
+      {
+        key: 'multi-user',
+        label: '多用户测试',
+        icon: 'Users',
+        path: '/debug/multi-user',
+      },
+      {
+        key: 'websocket',
+        label: 'WebSocket测试',
+        icon: 'Wifi',
+        path: '/debug/websocket',
+      },
+      {
+        key: 'api',
+        label: 'API测试',
+        icon: 'Terminal',
+        path: '/debug/api',
       },
     ],
   },

@@ -10,6 +10,7 @@ import type { GlobalTheme } from 'naive-ui'
 const themeMap: Record<ThemeType, GlobalTheme | null> = {
   light: null, // Naive UI 默认就是亮色主题，传入 null
   dark: darkTheme, // Naive UI 暗色主题
+  system: null, // 跟随系统，默认使用亮色
 }
 
 /**
