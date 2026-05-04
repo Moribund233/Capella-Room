@@ -6,7 +6,7 @@ import type { ApiResponse } from '@/types/api'
 import { getAccessToken } from './token'
 
 // API 基础配置
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 // Token 过期事件名称
 export const TOKEN_EXPIRED_EVENT = 'token_expired'
@@ -18,24 +18,38 @@ interface RequestConfig extends RequestInit {
 
 /**
  * 构建 URL
+ * 支持绝对路径和相对路径
  */
 function buildUrl(endpoint: string, params?: Record<string, string>): string {
-  const url = new URL(endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`)
+  let urlString: string
 
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      url.searchParams.append(key, value)
-    })
+  if (endpoint.startsWith('http')) {
+    // 绝对 URL
+    urlString = endpoint
+  } else if (API_BASE_URL) {
+    // 使用配置的 API 基础 URL
+    urlString = `${API_BASE_URL}${endpoint}`
+  } else {
+    // 使用相对路径（让浏览器自动处理为当前域名）
+    urlString = endpoint
   }
 
-  return url.toString()
+  // 添加查询参数
+  if (params && Object.keys(params).length > 0) {
+    const separator = urlString.includes('?') ? '&' : '?'
+    const queryString = Object.entries(params)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&')
+    urlString = `${urlString}${separator}${queryString}`
+  }
+
+  return urlString
 }
 
 /**
  * 触发 token 过期事件
  */
 function triggerTokenExpired(message: string = '登录已过期，请重新登录') {
-  // 使用自定义事件通知应用 token 已过期
   window.dispatchEvent(new CustomEvent(TOKEN_EXPIRED_EVENT, {
     detail: { message }
   }))
@@ -43,7 +57,6 @@ function triggerTokenExpired(message: string = '登录已过期，请重新登�
 
 /**
  * 发送 HTTP 请求
- * 注意：此函数不处理 token 刷新逻辑，只负责发送请求
  */
 async function request<T>(endpoint: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
   const { params, ...fetchConfig } = config
@@ -60,7 +73,7 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     Object.assign(headers, customHeaders)
   }
 
-  // 添加认证头（从 token 模块获取，但不处理刷新逻辑）
+  // 添加认证头
   const token = getAccessToken()
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
@@ -72,7 +85,7 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
       headers,
     })
 
-    // 处理 204 No Content（删除成功）
+    // 处理 204 No Content
     if (response.status === 204) {
       return { success: true, data: {} as T, message: '' }
     }
@@ -85,7 +98,6 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     try {
       data = JSON.parse(responseText)
     } catch {
-      // 如果不是 JSON，构造一个错误响应
       throw new Error(responseText || `HTTP ${response.status}`)
     }
 
@@ -98,11 +110,13 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
 
     // 处理 403 权限不足错误
     if (response.status === 403) {
-      throw new Error(data.message || '权限不足')
+      const errorMessage = data.message || '权限不足'
+      throw new Error(errorMessage)
     }
 
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP ${response.status}`)
+    // 处理其他错误
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || `请求失败: ${response.status}`)
     }
 
     return data
@@ -110,11 +124,13 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     if (error instanceof Error) {
       throw error
     }
-    throw new Error('Network error')
+    throw new Error('网络请求失败')
   }
 }
 
-// API Client 对象
+/**
+ * API Client 对象
+ */
 export const apiClient = {
   /**
    * GET 请求
@@ -149,16 +165,6 @@ export const apiClient = {
   delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return request<T>(endpoint, { method: 'DELETE' })
   },
-
-  /**
-   * PATCH 请求
-   */
-  patch<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
-    return request<T>(endpoint, {
-      method: 'PATCH',
-      body: body ? JSON.stringify(body) : undefined,
-    })
-  },
 }
 
-export default apiClient
+export { API_BASE_URL }

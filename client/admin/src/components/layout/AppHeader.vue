@@ -1,5 +1,5 @@
 <template>
-  <header class="app-header">
+  <header class="app-header" :class="{ 'is-scrolled': isScrolled }">
     <div class="header-left">
       <!-- Logo/品牌名 -->
       <div class="brand">
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { User } from 'lucide-vue-next'
 import { useAppConfig, useQuickBarConfig } from '@/composables'
 import { useLayoutStore, useAuthStore } from '@/store'
@@ -34,6 +34,7 @@ import QuickBar from '@/components/common/QuickBar.vue'
 /**
  * AppHeader 组件
  * 页面头部导航，包含 Logo、QuickBar、用户信息
+ * 特性：玻璃态设计、滚动效果
  */
 
 /** 应用配置 */
@@ -62,6 +63,22 @@ const showBrandText = computed(() => {
 const username = computed(() => {
   return authStore.userInfo?.nickname || authStore.userInfo?.username || '访客'
 })
+
+/** 滚动状态 */
+const isScrolled = ref(false)
+
+/** 监听滚动 */
+const handleScroll = () => {
+  isScrolled.value = window.scrollY > 10
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>
 
 <style scoped>
@@ -74,16 +91,24 @@ const username = computed(() => {
   margin: 0 var(--header-margin, 0);
   padding: 0 16px;
   background: var(--header-bg);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
   box-shadow: var(--header-shadow);
   position: fixed;
   top: 0;
   left: 0;
   z-index: 100;
-  transition: var(--transition-base);
+  transition: all var(--duration-slow) var(--ease-out-expo);
   border-radius: 0 0 var(--header-border-radius) var(--header-border-radius);
   opacity: var(--header-opacity);
   border: var(--layout-border-width) var(--layout-border-style) var(--layout-border-color);
   border-top: none;
+}
+
+/* 滚动后的效果 */
+.app-header.is-scrolled {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-md);
 }
 
 /* 左侧区域 */

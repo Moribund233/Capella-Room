@@ -9,6 +9,7 @@ import type {
   QuickItemConfig,
   ThemeConfig,
   DockConfig,
+  AppearanceConfig,
 } from '@/types'
 
 /**
@@ -73,6 +74,16 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
  */
 export const themeConfig: ThemeConfig = {
   name: 'dark',
+}
+
+/**
+ * 外观配置
+ * 用户可自定义的应用外观设置
+ */
+export const appearanceConfig: AppearanceConfig = {
+  backgroundImage: '',
+  backgroundOpacity: 0.15,
+  accentColor: null,
 }
 
 /**
@@ -266,6 +277,7 @@ export const uiConfig = {
   theme: themeConfig,
   quickBar: quickBarConfig,
   dock: dockConfig,
+  appearance: appearanceConfig,
 }
 
 export default uiConfig

@@ -17,6 +17,7 @@ export {
   type DockConfig,
   type AppConfig,
   type ThemeConfig,
+  type AppearanceConfig,
   type QuickChildItemConfig,
   type QuickItemConfig,
   type UIConfig,

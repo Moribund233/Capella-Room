@@ -51,5 +51,38 @@ onMounted(() => {
 /* 导入全局样式 */
 @import './styles/global/color.css';
 @import './styles/global/base.css';
+@import './styles/global/animations.css';
 @import './styles/responsive/breakpoints.css';
+
+/* 全局字体优化 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* 全局背景氛围 */
+.app-container::before {
+  content: '';
+  position: fixed;
+  top: -30%;
+  right: -10%;
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(circle,
+      rgba(99, 102, 241, 0.04) 0%,
+      transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.app-container::after {
+  content: '';
+  position: fixed;
+  bottom: -20%;
+  left: -5%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle,
+      rgba(139, 92, 246, 0.03) 0%,
+      transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
 </style>

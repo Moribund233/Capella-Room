@@ -15,10 +15,15 @@
           <li v-for="item in menuItems" :key="item.key" class="nav-item"
             :class="{ 'is-active': activeKey === item.key }">
             <a class="nav-link" :href="item.path" @click.prevent="handleMenuClick(item)">
-              <component :is="item.icon" class="nav-icon" :size="isCollapsed && isDesktop ? 20 : 18" />
+              <div class="nav-icon-wrapper">
+                <component :is="item.icon" class="nav-icon" :size="isCollapsed && isDesktop ? 22 : 20" />
+              </div>
               <span v-if="showMenuText" class="nav-text">{{ item.label }}</span>
-              <ChevronRight v-if="showMenuText && item.children" class="nav-arrow" :size="14"
-                :class="{ 'is-expanded': expandedKeys.includes(item.key) }" />
+              <div v-if="showMenuText && item.children" class="nav-arrow-wrapper">
+                <ChevronRight class="nav-arrow" :size="16" />
+              </div>
+              <!-- 激活指示器 -->
+              <div class="active-indicator"></div>
             </a>
 
             <!-- 子菜单 -->
@@ -241,7 +246,9 @@ const handleLogout = () => {
   top: var(--sidebar-top-offset, var(--header-height));
   height: var(--sidebar-compact-height, calc(100vh - var(--header-height) - var(--footer-height)));
   background: var(--sidebar-bg);
-  transition: var(--transition-base);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  transition: all var(--duration-slow) var(--ease-out-expo);
   z-index: 99;
   display: flex;
   flex-direction: column;
@@ -249,6 +256,15 @@ const handleLogout = () => {
   opacity: var(--sidebar-opacity);
   border: var(--layout-border-width) var(--layout-border-style) var(--layout-border-color);
   border-left: none;
+}
+
+/* 移动端遮罩层 */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: -1;
 }
 
 /* 移动端样式 */
@@ -266,19 +282,13 @@ const handleLogout = () => {
     top: var(--header-height-mobile);
     width: 100%;
     background: transparent;
+    backdrop-filter: none;
     pointer-events: none;
     border: none;
     border-radius: 0;
   }
 
   .app-sidebar.is-mobile-open {
-    pointer-events: auto;
-  }
-
-  .sidebar-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
     pointer-events: auto;
   }
 
@@ -338,8 +348,10 @@ const handleLogout = () => {
   color: var(--sidebar-text);
   text-decoration: none;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: all var(--duration-normal) var(--ease-smooth);
   position: relative;
+  border-radius: var(--radius-lg);
+  margin: 0 8px;
 }
 
 .nav-link:hover {
@@ -352,9 +364,30 @@ const handleLogout = () => {
   background: var(--sidebar-bg-active);
 }
 
+/* 图标包装器 */
+.nav-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.nav-item.is-active .nav-icon-wrapper {
+  background: var(--color-primary-light);
+}
+
 .nav-icon {
   flex-shrink: 0;
-  transition: var(--transition-fast);
+  transition: all var(--duration-normal) var(--ease-smooth);
+  color: var(--sidebar-text);
+}
+
+.nav-item.is-active .nav-icon {
+  color: var(--color-primary);
 }
 
 .nav-text {
@@ -366,13 +399,38 @@ const handleLogout = () => {
   transition: opacity 0.2s;
 }
 
-.nav-arrow {
-  flex-shrink: 0;
-  transition: transform 0.3s;
+/* 箭头包装器 */
+.nav-arrow-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-normal) var(--ease-spring);
 }
 
-.nav-arrow.is-expanded {
+.nav-item.is-expanded .nav-arrow-wrapper {
   transform: rotate(90deg);
+}
+
+.nav-arrow {
+  flex-shrink: 0;
+  transition: color var(--duration-normal) var(--ease-smooth);
+}
+
+/* 激活指示器 */
+.active-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 20px;
+  background: var(--color-primary-gradient);
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  transition: transform var(--duration-normal) var(--ease-spring);
+}
+
+.nav-item.is-active .active-indicator {
+  transform: translateY(-50%) scaleY(1);
 }
 
 /* 折叠状态下的图标居中 */

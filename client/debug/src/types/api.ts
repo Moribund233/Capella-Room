@@ -1,35 +1,50 @@
 /**
  * API 类型定义
+ * 用户客户端 API 类型
  */
 
+// 消息列表响应（后端实际返回格式）
+export interface MessageListResponse {
+  messages: Message[]
+  total: number
+  has_more: boolean
+}
+
 // 通用响应格式
-// 后端返回格式: { success: bool, data?: T, message?: string }
 export interface ApiResponse<T> {
   success: boolean
   data: T
   message?: string
 }
 
-// 用户信息（完整）
+// 分页响应
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  per_page: number
+}
+
+// 用户在线状态
+export type UserOnlineStatus = 'online' | 'offline' | 'away' | 'disabled'
+
+// 用户角色
+export type UserRole = 'user' | 'admin' | 'super_admin'
+
+// 用户信息
 export interface User {
   id: string
   username: string
   email: string
-  role: 'user' | 'admin' | 'super_admin'
-  status: 'active' | 'inactive'
+  role: UserRole
+  status: UserOnlineStatus
   created_at: string
-  last_login?: string
-}
-
-// 用户信息（简化版，用于嵌套）
-export interface UserInfo {
-  id: string
-  username: string
+  updated_at: string
   avatar_url?: string
 }
 
-// 发送者信息
-export interface SenderInfo {
+// 用户信息（简化版）
+export interface UserInfo {
   id: string
   username: string
   avatar_url?: string
@@ -41,19 +56,19 @@ export interface LoginRequest {
   password: string
 }
 
+// 注册请求
+export interface RegisterRequest {
+  username: string
+  email: string
+  password: string
+}
+
 // 登录响应
 export interface LoginResponse {
   user: User
   access_token: string
   refresh_token: string
   expires_in: number
-}
-
-// 注册请求
-export interface RegisterRequest {
-  username: string
-  email: string
-  password: string
 }
 
 // 注册响应
@@ -81,51 +96,99 @@ export interface Room {
   member_count: number
   created_at: string
   updated_at: string
-  owner: UserInfo  // 修改：从 owner_id 改为 owner
+  owner: UserInfo
 }
 
 // 消息信息
 export interface Message {
   id: string
   content: string
-  sender: SenderInfo  // 修改：从 string 改为 SenderInfo 对象
+  sender: UserInfo
   room_id: string
   created_at: string
   type: 'text' | 'image' | 'file'
-  reply_to?: string  // 回复的消息ID
+  reply_to?: string
 }
 
 // 文件资源信息
 export interface FileResource {
   id: string
-  original_name: string
-  file_url: string
-  file_size: number
+  filename: string
+  url: string
+  size: number
   mime_type: string
-  category: 'image' | 'document' | 'video' | 'audio' | 'other'
-  usage_type: 'avatar' | 'message' | 'room_cover' | 'general'
-  uploader?: UserInfo  // 新增：上传者信息
   created_at: string
 }
 
-// 审计告警信息
-export interface AuditAlert {
-  id: string
-  rule_id?: string
-  alert_type: string
-  severity: 'info' | 'warning' | 'error' | 'critical'
-  title: string
-  description: string
-  affected_user?: UserInfo  // 新增：受影响用户信息
-  acknowledged_by?: UserInfo  // 新增：确认者信息
-  resolved_by?: UserInfo  // 新增：解决者信息
-  status: 'new' | 'acknowledged' | 'resolved' | 'ignored'
-  created_at: string
-  updated_at: string
+// 房间列表响应
+export interface RoomListResponse {
+  items: Room[]
+  total: number
+  page: number
+  per_page: number
 }
 
-// WebSocket 消息
-export interface WebSocketMessage {
-  type: string
-  [key: string]: any
+// 创建房间请求
+export interface CreateRoomRequest {
+  name: string
+  description?: string
+  is_private?: boolean
+  max_members?: number
+}
+
+// 更新房间请求
+export interface UpdateRoomRequest {
+  name?: string
+  description?: string
+  is_private?: boolean
+  max_members?: number
+}
+
+// 分页请求参数
+export interface PaginationParams {
+  page?: number
+  per_page?: number
+  page_size?: number
+}
+
+// 系统状态响应
+export interface SystemStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy'
+  version: string
+  timestamp: string
+  uptime: number
+}
+
+// 系统统计信息
+export interface SystemStats {
+  total_users: number
+  total_rooms: number
+  total_messages: number
+  online_users: number
+}
+
+// 客户端配置
+export interface ClientConfig {
+  websocket: {
+    heartbeat_interval_secs: number
+    heartbeat_timeout_secs: number
+    auth_timeout_secs: number
+    max_reconnect_attempts?: number
+    reconnect_interval_ms?: number
+    heartbeat_interval_ms?: number
+  }
+  reconnect: {
+    base_delay_ms: number
+    max_delay_ms: number
+    max_attempts: number
+    multiplier: number
+  }
+  upload: {
+    max_file_size: number
+    max_file_size_human: string
+  }
+  system: {
+    maintenance_mode: boolean
+    maintenance_message?: string
+  }
 }

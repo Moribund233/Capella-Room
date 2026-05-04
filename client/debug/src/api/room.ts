@@ -1,153 +1,138 @@
 /**
- * 房间管理 API
- * 负责房间的创建、查询、更新、删除等操作
+ * 房间相关 API
  */
 
 import { apiClient } from './client'
-import type { Room } from '@/types/api'
+import type { Room, Message, MessageListResponse, PaginationParams } from '@/types/api'
 
-// 房间列表响应
+// 房间列表响应（兼容直接返回数组或包装对象）
 export interface RoomListResponse {
-  rooms: Room[]
+  items: Room[]
   total: number
-}
-
-// 创建房间请求
-export interface CreateRoomRequest {
-  name: string
-  description?: string
-  is_private: boolean
-}
-
-// 更新房间请求
-export interface UpdateRoomRequest {
-  name?: string
-  description?: string
-  is_private?: boolean
-}
-
-// 房间成员信息
-export interface RoomMember {
-  user_id: string
-  username: string
-  role: 'owner' | 'admin' | 'member'
-  joined_at: string
-  email?: string
-  avatar_url?: string | null
-}
-
-// 房间详情响应
-export interface RoomDetailResponse {
-  room: Room
-  members: RoomMember[]
+  page: number
+  per_page: number
 }
 
 /**
  * 获取房间列表
- * @param params 查询参数
- * @returns 房间列表
  */
-export async function getRooms(params?: {
-  search?: string
-  is_public?: boolean
-  page?: number
-  per_page?: number
-}): Promise<Room[]> {
-  // 转换参数为字符串格式
+export async function getRooms(params?: PaginationParams): Promise<RoomListResponse> {
   const queryParams: Record<string, string> = {}
-  if (params?.search) queryParams.search = params.search
-  if (params?.is_public !== undefined) queryParams.is_public = String(params.is_public)
-  if (params?.page) queryParams.page = String(params.page)
-  if (params?.per_page) queryParams.per_page = String(params.per_page)
+  if (params?.page) queryParams.page = params.page.toString()
+  if (params?.per_page) queryParams.per_page = params.per_page.toString()
+  if (params?.page_size) queryParams.page_size = params.page_size.toString()
 
-  const response = await apiClient.get<Room[] | RoomListResponse>('/api/v1/rooms', queryParams)
-  // 适配两种可能的响应格式：直接返回数组或包装在 rooms 字段中
+  const response = await apiClient.get<Room[] | RoomListResponse>('/rooms', queryParams)
   const data = response.data
+
+  // 适配两种可能的响应格式：直接返回数组或包装在 items 字段中
   if (Array.isArray(data)) {
-    return data
+    return {
+      items: data,
+      total: data.length,
+      page: 1,
+      per_page: data.length,
+    }
   }
-  return data.rooms || []
+
+  return {
+    items: data.items || [],
+    total: data.total || 0,
+    page: data.page || 1,
+    per_page: data.per_page || 20,
+  }
 }
 
 /**
  * 获取房间详情
- * @param roomId 房间ID
- * @returns 房间详情
  */
-export async function getRoomDetail(roomId: string): Promise<RoomDetailResponse> {
-  const response = await apiClient.get<RoomDetailResponse>(`/api/v1/rooms/${roomId}`)
+export async function getRoom(roomId: string): Promise<Room> {
+  const response = await apiClient.get<Room>(`/rooms/${roomId}`)
   return response.data
 }
 
 /**
  * 创建房间
- * @param data 房间信息
- * @returns 创建的房间
  */
-export async function createRoom(data: CreateRoomRequest): Promise<Room> {
-  const response = await apiClient.post<Room>('/api/v1/rooms', data)
+export async function createRoom(data: {
+  name: string
+  description?: string
+  is_private?: boolean
+  max_members?: number
+}): Promise<Room> {
+  const response = await apiClient.post<Room>('/rooms', data)
   return response.data
 }
 
 /**
  * 更新房间
- * @param roomId 房间ID
- * @param data 更新信息
- * @returns 更新后的房间
  */
-export async function updateRoom(roomId: string, data: UpdateRoomRequest): Promise<Room> {
-  const response = await apiClient.put<Room>(`/api/v1/rooms/${roomId}`, data)
+export async function updateRoom(
+  roomId: string,
+  data: {
+    name?: string
+    description?: string
+    is_private?: boolean
+    max_members?: number
+  }
+): Promise<Room> {
+  const response = await apiClient.put<Room>(`/rooms/${roomId}`, data)
   return response.data
 }
 
 /**
  * 删除房间
- * @param roomId 房间ID
  */
 export async function deleteRoom(roomId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/rooms/${roomId}`)
+  await apiClient.delete<void>(`/rooms/${roomId}`)
+}
+
+/**
+ * 获取房间消息
+ */
+export async function getRoomMessages(
+  roomId: string,
+  params?: PaginationParams
+): Promise<MessageListResponse> {
+  const queryParams: Record<string, string> = {}
+  if (params?.page) queryParams.page = params.page.toString()
+  if (params?.per_page) queryParams.per_page = params.per_page.toString()
+  if (params?.page_size) queryParams.page_size = params.page_size.toString()
+
+  const response = await apiClient.get<MessageListResponse>(
+    `/rooms/${roomId}/messages`,
+    queryParams
+  )
+  return response.data
+}
+
+/**
+ * 发送消息到房间
+ */
+export async function sendMessage(
+  roomId: string,
+  content: string,
+  type: 'text' | 'image' | 'file' = 'text',
+  replyTo?: string
+): Promise<Message> {
+  const response = await apiClient.post<Message>(`/rooms/${roomId}/messages`, {
+    content,
+    type,
+    reply_to: replyTo,
+  })
+  return response.data
 }
 
 /**
  * 加入房间
- * @param roomId 房间ID
  */
 export async function joinRoom(roomId: string): Promise<void> {
-  await apiClient.post(`/api/v1/rooms/${roomId}/join`, {})
+  await apiClient.post<void>(`/rooms/${roomId}/join`)
 }
 
 /**
  * 离开房间
- * @param roomId 房间ID
  */
 export async function leaveRoom(roomId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/rooms/${roomId}/leave`)
-}
-
-/**
- * 获取用户加入的房间列表
- * @returns 房间列表
- */
-export async function getMyRooms(): Promise<Room[]> {
-  const response = await apiClient.get<Room[]>('/api/v1/users/me/rooms')
-  return response.data
-}
-
-/**
- * 获取房间成员列表
- * @param roomId 房间ID
- * @returns 成员列表
- */
-export async function getRoomMembers(roomId: string): Promise<RoomMember[]> {
-  const response = await apiClient.get<RoomMember[]>(`/api/v1/rooms/${roomId}/members`)
-  return response.data
-}
-
-/**
- * 踢出房间成员
- * @param roomId 房间ID
- * @param userId 要踢出的用户ID
- */
-export async function kickMember(roomId: string, userId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/rooms/${roomId}/members/${userId}`)
+  await apiClient.post<void>(`/rooms/${roomId}/leave`)
 }

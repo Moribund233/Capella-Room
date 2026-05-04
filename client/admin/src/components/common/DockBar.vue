@@ -2,7 +2,9 @@
   <div v-if="visible" ref="dockRef" class="dock-bar" :class="[`position-${position}`, { 'is-expanded': isExpanded }]"
     :style="dockStyle" tabindex="-1" @click="handleDockClick" @blur="handleBlur">
     <!-- 线条指示器 -->
-    <div class="dock-indicator" :class="`indicator-${position}`"></div>
+    <div class="dock-indicator" :class="`indicator-${position}`">
+      <div class="indicator-glow"></div>
+    </div>
 
     <!-- 悬浮面板容器 -->
     <n-card class="dock-panel" :bordered="false" size="small">
@@ -315,37 +317,59 @@ onUnmounted(() => {
 /* 线条指示器 */
 .dock-indicator {
   position: absolute;
-  background: var(--dock-indicator-color, rgba(128, 128, 128, 0.5));
-  border-radius: 2px;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--duration-normal) var(--ease-smooth);
+  overflow: hidden;
+}
+
+/* 发光效果 */
+.indicator-glow {
+  position: absolute;
+  inset: 0;
+  background: var(--color-primary-gradient);
+  opacity: 0.6;
+  filter: blur(4px);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
 }
 
 /* 底部位置 - 水平线条 */
 .position-bottom .dock-indicator {
   left: 50%;
-  bottom: -8px;
+  bottom: -10px;
   transform: translateX(-50%);
-  width: 60px;
+  width: 40px;
   height: 4px;
 }
 
 /* 左侧位置 - 垂直线条 */
 .position-left .dock-indicator {
-  left: -8px;
+  left: -10px;
   top: 50%;
   transform: translateY(-50%);
   width: 4px;
-  height: 60px;
+  height: 40px;
 }
 
 /* 右侧位置 - 垂直线条 */
 .position-right .dock-indicator {
-  right: -8px;
+  right: -10px;
   top: 50%;
   transform: translateY(-50%);
   width: 4px;
-  height: 60px;
+  height: 40px;
 }
 
 /* 展开时隐藏线条 */
@@ -355,22 +379,26 @@ onUnmounted(() => {
 }
 
 /* 悬停时线条高亮 */
-.dock-bar:hover .dock-indicator {
-  background: var(--dock-indicator-hover-color, rgba(128, 128, 128, 0.8));
-  transform: translateX(-50%) scaleX(1.2);
+.dock-bar:hover .indicator-bottom {
+  width: 56px;
+  box-shadow: 0 0 12px var(--color-primary);
 }
 
-.position-left .dock-bar:hover .dock-indicator,
-.position-right .dock-bar:hover .dock-indicator {
-  transform: translateY(-50%) scaleY(1.2);
+.dock-bar:hover .indicator-left,
+.dock-bar:hover .indicator-right {
+  height: 56px;
+  box-shadow: 0 0 12px var(--color-primary);
 }
 
 .dock-panel {
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
+  background: var(--dock-bg);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
   box-shadow: var(--dock-shadow);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: var(--space-3);
+  transition: all var(--duration-slow) var(--ease-out-expo);
 }
 
 /* 收起状态 - 面板隐藏 */
@@ -388,15 +416,20 @@ onUnmounted(() => {
 }
 
 .dock-item {
-  transition: all 0.2s ease;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xl);
+  transition: all var(--duration-normal) var(--ease-spring);
 }
 
 .dock-item:hover {
-  transform: scale(1.1);
+  transform: scale(1.1) translateY(-2px);
+  background: var(--color-primary-light);
 }
 
 .dock-item.is-active {
-  transform: scale(1.05);
+  background: var(--color-primary-gradient);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
 /* 位置样式 */

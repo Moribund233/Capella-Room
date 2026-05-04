@@ -8,6 +8,11 @@ import type { ThemeType } from '@/types'
 const THEME_KEY = 'app_theme'
 
 /**
+ * 强调色存储键名
+ */
+const ACCENT_COLOR_KEY = 'app_accent_color'
+
+/**
  * 主题样式链接 ID
  */
 const THEME_LINK_ID = 'theme-style-link'
@@ -33,6 +38,56 @@ function getSystemTheme(): ThemeType {
     return 'dark'
   }
   return 'light'
+}
+
+/**
+ * 获取本地存储的强调色
+ * @returns 强调色值或 null
+ */
+function getStoredAccentColor(): string | null {
+  return localStorage.getItem(ACCENT_COLOR_KEY)
+}
+
+/**
+ * 生成强调色的衍生色
+ * @param baseColor 基础色（hex 格式）
+ * @returns 包含各种强调色变体的对象
+ */
+function generateAccentColors(baseColor: string): {
+  primary: string
+  primaryHover: string
+  primaryLight: string
+  primaryDark: string
+} {
+  // 简单的颜色变体生成（实际项目中可能需要更复杂的颜色处理库）
+  return {
+    primary: baseColor,
+    primaryHover: baseColor,
+    primaryLight: baseColor + '20', // 添加透明度
+    primaryDark: baseColor,
+  }
+}
+
+/**
+ * 应用强调色到 CSS 变量
+ * @param color 强调色值，null 表示移除自定义强调色
+ */
+function applyAccentColor(color: string | null): void {
+  const root = document.documentElement
+
+  if (color) {
+    const colors = generateAccentColors(color)
+    root.style.setProperty('--color-primary', colors.primary)
+    root.style.setProperty('--color-primary-hover', colors.primaryHover)
+    root.style.setProperty('--color-primary-light', colors.primaryLight)
+    root.style.setProperty('--color-primary-dark', colors.primaryDark)
+  } else {
+    // 移除自定义 CSS 变量，恢复为主题默认值
+    root.style.removeProperty('--color-primary')
+    root.style.removeProperty('--color-primary-hover')
+    root.style.removeProperty('--color-primary-light')
+    root.style.removeProperty('--color-primary-dark')
+  }
 }
 
 /**
@@ -72,6 +127,11 @@ export const useThemeStore = defineStore('theme', () => {
   const currentTheme = ref<ThemeType>(getStoredTheme() || getSystemTheme())
 
   /**
+   * 自定义强调色
+   */
+  const accentColor = ref<string | null>(getStoredAccentColor())
+
+  /**
    * 是否为暗色主题
    */
   const isDark = computed(() => currentTheme.value === 'dark')
@@ -89,6 +149,11 @@ export const useThemeStore = defineStore('theme', () => {
     const stored = getStoredTheme()
     const theme = stored || getSystemTheme()
     setTheme(theme, false)
+
+    // 应用保存的强调色
+    if (accentColor.value) {
+      applyAccentColor(accentColor.value)
+    }
   }
 
   /**
@@ -139,12 +204,41 @@ export const useThemeStore = defineStore('theme', () => {
     document.documentElement.removeAttribute('data-theme')
   }
 
+  /**
+   * 设置强调色
+   * @param color 强调色值（hex 格式），null 表示使用主题默认色
+   * @param persist 是否持久化到本地存储，默认为 true
+   */
+  function setAccentColor(color: string | null, persist: boolean = true): void {
+    accentColor.value = color
+    applyAccentColor(color)
+
+    if (persist) {
+      if (color) {
+        localStorage.setItem(ACCENT_COLOR_KEY, color)
+      } else {
+        localStorage.removeItem(ACCENT_COLOR_KEY)
+      }
+    }
+  }
+
+  /**
+   * 重置强调色为默认值
+   * 清除本地存储的自定义强调色
+   */
+  function resetAccentColor(): void {
+    setAccentColor(null)
+  }
+
   return {
     currentTheme,
+    accentColor,
     isDark,
     isLight,
     initTheme,
     setTheme,
+    setAccentColor,
+    resetAccentColor,
     toggleTheme,
     resetToSystem,
     unloadTheme,

@@ -1,5 +1,8 @@
 <template>
   <div class="main-layout" :style="layoutStore.cssVariables">
+    <!-- 背景图片层 -->
+    <div v-if="layoutStore.layoutStyles.backgroundImage" class="background-layer" :style="backgroundLayerStyle"></div>
+
     <!-- 头部导航 -->
     <AppHeader />
 
@@ -60,6 +63,14 @@ const route = useRoute()
 const layoutStore = useLayoutStore()
 const { config: uiConfig } = useConfig()
 const { state: modalState, handlePositiveClick: handleModalPositiveClick, handleNegativeClick: handleModalNegativeClick, handleClose: handleModalClose } = useGlobalModal()
+
+/**
+ * 背景图层样式
+ */
+const backgroundLayerStyle = computed(() => ({
+  backgroundImage: `url(${layoutStore.layoutStyles.backgroundImage})`,
+  opacity: layoutStore.layoutStyles.backgroundOpacity,
+}))
 
 // 从 store 获取响应式状态
 const { isMobile } = storeToRefs(layoutStore)
@@ -127,6 +138,19 @@ const currentPageDockConfig = computed(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* 背景图片层 */
+.background-layer {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: -1;
+  transition: opacity 0.3s ease;
 }
 
 .main-content {

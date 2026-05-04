@@ -16,6 +16,8 @@ coverage
 
 # Editor directories and files
 .vscode/*
+.trae/*
+.idea/*
 !.vscode/extensions.json
 .idea
 *.suo
@@ -38,5 +40,6 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
-test-results/
-playwright-report/
+# env
+.env*
+!.env.example

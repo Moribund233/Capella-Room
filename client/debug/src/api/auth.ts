@@ -1,9 +1,9 @@
 /**
  * 认证相关 API
- * 负责处理登录、注册、登出等认证业务逻辑，包括 token 管理
+ * 负责处理登录、注册、登出等认证业务逻辑
  */
 
-import { apiClient } from './client'
+import { apiClient, API_BASE_URL } from './client'
 import {
   setTokens,
   clearTokens,
@@ -21,16 +21,13 @@ import type {
   User,
 } from '@/types/api'
 
-// API 基础配置（用于刷新 token 的原始请求）
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
-
 /**
  * 用户登录
  * @param credentials 登录凭证
  * @returns 登录响应
  */
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', credentials)
+  const response = await apiClient.post<LoginResponse>('/auth/login', credentials)
 
   // 保存 token 和用户信息
   if (response.data.access_token && response.data.refresh_token) {
@@ -47,7 +44,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
  * @returns 注册响应
  */
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
-  const response = await apiClient.post<RegisterResponse>('/api/v1/auth/register', data)
+  const response = await apiClient.post<RegisterResponse>('/auth/register', data)
 
   // 保存 token 和用户信息
   if (response.data.access_token && response.data.refresh_token) {
@@ -69,7 +66,7 @@ export async function refreshToken(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +91,7 @@ export async function refreshToken(): Promise<boolean> {
  */
 export async function logout(): Promise<void> {
   try {
-    await apiClient.post('/api/v1/users/logout')
+    await apiClient.post('/users/logout')
   } finally {
     clearTokens()
   }
@@ -105,13 +102,18 @@ export async function logout(): Promise<void> {
  * @returns 用户信息
  */
 export async function getCurrentUser(): Promise<User> {
-  const response = await apiClient.get<User>('/api/v1/users/me')
-
-  // 更新本地存储的用户信息
-  setUser(response.data)
-
+  const response = await apiClient.get<User>('/users/me')
   return response.data
 }
 
-// 重新导出 token 模块的函数，方便使用
-export { getStoredUser, isAuthenticated }
+// 导出 token 管理函数
+export {
+  getAccessToken,
+  getRefreshToken,
+  getStoredUser,
+  isAuthenticated,
+  setTokens,
+  clearTokens,
+  setUser,
+  clearUser,
+} from './token'

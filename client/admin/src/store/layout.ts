@@ -31,6 +31,10 @@ export interface LayoutStyles {
   headerOpacity: number
   /** 底部透明度 (0-1) */
   footerOpacity: number
+  /** 背景图片 URL */
+  backgroundImage: string
+  /** 背景图片不透明度 (0-1) */
+  backgroundOpacity: number
 }
 
 /**
@@ -50,6 +54,8 @@ const defaultLayoutStyles: LayoutStyles = {
   sidebarOpacity: 1,
   headerOpacity: 1,
   footerOpacity: 1,
+  backgroundImage: '',
+  backgroundOpacity: 0.15,
 }
 
 /**

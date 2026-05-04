@@ -5,10 +5,14 @@
       <!-- Action 类型：直接点击执行 -->
       <n-tooltip v-if="item.type === 'action'" :show-arrow="false" placement="bottom" :disabled="item.disabled">
         <template #trigger>
-          <button class="action-btn" :class="{ 'is-disabled': item.disabled }" @click="item.onClick"
-            :aria-label="item.label" :disabled="item.disabled">
-            <component :is="getIconComponent(item.currentIcon)" class="icon" :size="18" />
+          <button class="action-btn" :class="{ 'is-disabled': item.disabled, 'is-active': item.isActive }"
+            @click="item.onClick" :aria-label="item.label" :disabled="item.disabled">
+            <div class="icon-wrapper">
+              <component :is="getIconComponent(item.currentIcon)" class="icon" :size="18" />
+            </div>
             <span v-if="item.badge" class="badge">{{ item.badge }}</span>
+            <!-- 激活指示器 -->
+            <div class="active-dot"></div>
           </button>
         </template>
         {{ item.disabled ? '暂不可用' : item.label }}
@@ -17,10 +21,13 @@
       <!-- Menu 类型：带下拉菜单 -->
       <n-dropdown v-else :options="getDropdownOptions(item)" placement="bottom" trigger="click"
         @select="(key: string) => handleMenuSelect(item, key)" :disabled="item.disabled">
-        <button class="action-btn" :class="{ 'is-disabled': item.disabled }" :aria-label="item.label"
-          :disabled="item.disabled">
-          <component :is="getIconComponent(item.currentIcon)" class="icon" :size="18" />
+        <button class="action-btn" :class="{ 'is-disabled': item.disabled, 'is-active': item.isActive }"
+          :aria-label="item.label" :disabled="item.disabled">
+          <div class="icon-wrapper">
+            <component :is="getIconComponent(item.currentIcon)" class="icon" :size="18" />
+          </div>
           <span v-if="item.badge" class="badge">{{ item.badge }}</span>
+          <div class="active-dot"></div>
         </button>
       </n-dropdown>
     </template>
@@ -28,15 +35,17 @@
     <!-- 下拉菜单按钮（聚合所有 dropdown 类型的按钮） -->
     <n-dropdown v-if="dropdownItems.length > 0" :options="aggregatedOptions" placement="bottom-end" trigger="click"
       @select="handleAggregatedSelect">
-      <button class="action-btn" aria-label="更多操作">
-        <MoreVertical class="icon" :size="18" />
+      <button class="action-btn more-btn" aria-label="更多操作">
+        <div class="icon-wrapper">
+          <MoreVertical class="icon" :size="18" />
+        </div>
       </button>
     </n-dropdown>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, unref } from 'vue'
 import { NDropdown, NTooltip } from 'naive-ui'
 import { MoreVertical } from 'lucide-vue-next'
 import * as LucideIcons from 'lucide-vue-next'
@@ -49,9 +58,10 @@ import {
   useQuickPersonalization,
   useQuickNotification,
   type QuickConfigItem,
-  type QuickRuntimeItem,
   type QuickContext,
+  type QuickRuntimeItem,
   type UseQuickReturn,
+  type QuickFactory,
 } from '@/composables/quick'
 
 /**
@@ -65,15 +75,11 @@ const iconCache = new Map<string, FunctionalComponent<LucideProps>>()
  * @returns 图标组件
  */
 function getIconComponent(iconName: string): FunctionalComponent<LucideProps> {
-  // 使用缓存的图标组件
   if (iconCache.has(iconName)) {
     return iconCache.get(iconName)!
   }
-
-  // 直接从 lucide-vue-next 获取图标组件
   const component = (LucideIcons as unknown as Record<string, FunctionalComponent<LucideProps>>)[iconName]
     || LucideIcons.Circle
-
   iconCache.set(iconName, component)
   return component
 }
@@ -100,7 +106,6 @@ const emit = defineEmits<{
 
 /**
  * Quick 上下文
- * 使用 emit 触发 action 事件给父组件处理
  */
 const quickContext: QuickContext = {
   emitAction: (key: string, childKey?: string) => {
@@ -108,125 +113,95 @@ const quickContext: QuickContext = {
   },
 }
 
+/**
+ * Quick 工厂映射表
+ * 注册所有可用的 Quick 组合式函数
+ */
+const quickFactories: Record<string, QuickFactory> = {
+  theme: useQuickTheme,
+  sidebar: useQuickLayout,
+  footer: useQuickLayout,
+  user: useQuickUser,
+  personalization: useQuickPersonalization,
+  notification: useQuickNotification,
+}
+
 // ==================== 在 setup 同步期间创建所有 Quick 实例 ====================
 
 /**
- * 主题 Quick
+ * 根据配置创建 Quick 实例
+ * 在 setup 同步期间执行，确保 inject/onMounted 在正确上下文执行
  */
-const themeQuick = useQuickTheme({ key: 'theme', type: 'action', icon: 'Sun', iconAlt: 'Moon', label: '主题', display: 'visible' }, quickContext)
+function createQuickInstances(items: QuickConfigItem[]): Record<string, UseQuickReturn> {
+  const instances: Record<string, UseQuickReturn> = {}
+
+  for (const item of items) {
+    const factory = quickFactories[item.key]
+    if (factory && !instances[item.key]) {
+      // 在 setup 同步期间调用 composable，确保生命周期钩子正确注册
+      instances[item.key] = factory(item, quickContext)
+    }
+  }
+
+  return instances
+}
+
+// 创建 Quick 实例（setup 同步期间）
+const quickInstances = createQuickInstances(props.items)
 
 /**
- * 侧边栏 Quick
+ * 将 UseQuickReturn 转换为 QuickRuntimeItem
+ * 提取 Ref 的值用于渲染
  */
-const sidebarQuick = useQuickLayout({ key: 'sidebar', type: 'action', icon: 'PanelLeft', label: '侧边栏', display: 'visible' }, quickContext)
-
-/**
- * 页脚 Quick
- */
-const footerQuick = useQuickLayout({ key: 'footer', type: 'action', icon: 'PanelBottom', label: '页脚', display: 'visible' }, quickContext)
-
-/**
- * 用户 Quick
- */
-const userQuick = useQuickUser({ key: 'user', type: 'menu', icon: 'UserCircle', iconAlt: 'User', label: '用户中心', display: 'visible', children: [] }, quickContext)
-
-/**
- * 个性化 Quick
- */
-const personalizationQuick = useQuickPersonalization({ key: 'personalization', type: 'action', icon: 'Palette', label: '个性化', display: 'visible' }, quickContext)
-
-/**
- * 通知中心 Quick
- */
-const notificationQuick = useQuickNotification({ key: 'notification', type: 'action', icon: 'Bell', label: '通知中心', display: 'visible' }, quickContext)
-
-/**
- * Quick 实例映射表
- */
-const quickInstances: Record<string, UseQuickReturn> = {
-  theme: themeQuick,
-  sidebar: sidebarQuick,
-  footer: footerQuick,
-  user: userQuick,
-  personalization: personalizationQuick,
-  notification: notificationQuick,
+function toRuntimeItem(config: QuickConfigItem, quickReturn: UseQuickReturn): QuickRuntimeItem {
+  return {
+    ...config,
+    isActive: unref(quickReturn.isActive),
+    currentIcon: unref(quickReturn.currentIcon),
+    disabled: quickReturn.disabled ? unref(quickReturn.disabled) : false,
+    onClick: quickReturn.onClick,
+    onSelect: quickReturn.onSelect,
+  }
 }
 
 /**
  * 运行时 Quick 项列表
+ * 使用 computed 确保响应式更新（图标、激活状态等）
  */
-const runtimeItems = ref<QuickRuntimeItem[]>([])
+const runtimeItems = computed<QuickRuntimeItem[]>(() => {
+  return props.items.map((config): QuickRuntimeItem => {
+    const quickReturn = quickInstances[config.key]
 
-/**
- * 根据配置生成运行时项
- * 在 setup 同步期间执行，确保 inject() 在正确上下文中
- */
-const generateRuntimeItems = (items: QuickConfigItem[]): QuickRuntimeItem[] => {
-  return items.map((config): QuickRuntimeItem => {
-    const quickInstance = quickInstances[config.key]
-
-    if (!quickInstance) {
-      // 未注册的 Quick，使用默认行为（直接触发 action 事件）
-      return {
-        ...config,
-        isActive: false,
-        currentIcon: config.icon,
-        onClick: () => emit('action', config.key),
-        onSelect: config.type === 'menu'
-          ? (childKey: string) => emit('action', config.key, childKey)
-          : undefined,
-      }
+    if (quickReturn) {
+      // 使用已创建的 Quick 实例，unref 获取当前值
+      return toRuntimeItem(config, quickReturn)
     }
 
-    // 使用已创建的 Quick 实例
+    // 默认行为：直接触发 action 事件
     return {
       ...config,
-      isActive: quickInstance.isActive.value,
-      currentIcon: quickInstance.currentIcon.value,
-      disabled: quickInstance.disabled?.value ?? false,
-      onClick: quickInstance.onClick,
-      onSelect: quickInstance.onSelect,
+      isActive: false,
+      currentIcon: config.icon,
+      onClick: () => emit('action', config.key),
+      onSelect: config.type === 'menu'
+        ? (childKey: string) => emit('action', config.key, childKey)
+        : undefined,
     }
   })
-}
+})
 
-// 初始化运行时项
-runtimeItems.value = generateRuntimeItems(props.items)
-
-/**
- * 监听配置变化，更新运行时项
- * 注意：这里只更新值，不重新创建 Quick 实例
- */
-watch(
-  () => props.items,
-  (newItems) => {
-    runtimeItems.value = generateRuntimeItems(newItems)
-  },
-  { deep: true }
-)
-
-/**
- * 外显按钮列表
- */
 const visibleItems = computed(() =>
   runtimeItems.value.filter(item => item.display === 'visible')
 )
 
-/**
- * 下拉菜单按钮列表
- */
 const dropdownItems = computed(() =>
   runtimeItems.value.filter(item => item.display === 'dropdown')
 )
 
-/**
- * 获取下拉菜单选项（用于 Menu 类型的外显按钮）
- */
 function getDropdownOptions(item: QuickRuntimeItem) {
   if (!item.children || item.children.length === 0) {
     return []
   }
-
   return item.children.map(child => ({
     key: child.key,
     label: child.label,
@@ -237,9 +212,6 @@ function getDropdownOptions(item: QuickRuntimeItem) {
   }))
 }
 
-/**
- * 处理外显菜单项选择
- */
 function handleMenuSelect(item: QuickRuntimeItem, childKey: string) {
   if (item.onSelect) {
     item.onSelect(childKey)
@@ -248,9 +220,6 @@ function handleMenuSelect(item: QuickRuntimeItem, childKey: string) {
   }
 }
 
-/**
- * 聚合下拉菜单选项
- */
 const aggregatedOptions = computed(() => {
   const options: Array<{
     key: string
@@ -261,7 +230,6 @@ const aggregatedOptions = computed(() => {
 
   for (const item of dropdownItems.value) {
     if (item.type === 'menu' && item.children && item.children.length > 0) {
-      // Menu 类型：渲染为级联菜单
       options.push({
         key: item.key,
         label: item.label,
@@ -275,7 +243,6 @@ const aggregatedOptions = computed(() => {
         })),
       })
     } else {
-      // Action 类型：渲染为普通菜单项
       options.push({
         key: item.key,
         label: item.label,
@@ -283,15 +250,10 @@ const aggregatedOptions = computed(() => {
       })
     }
   }
-
   return options
 })
 
-/**
- * 处理聚合菜单选择
- */
 function handleAggregatedSelect(key: string) {
-  // 检查是否是级联菜单项（格式：parentKey:childKey）
   if (key.includes(':')) {
     const [parentKey, childKey] = key.split(':') as [string, string]
     const parent = runtimeItems.value.find(item => item.key === parentKey)
@@ -301,7 +263,6 @@ function handleAggregatedSelect(key: string) {
       emit('action', parentKey, childKey)
     }
   } else {
-    // 普通菜单项
     const item = runtimeItems.value.find(item => item.key === key)
     if (item) {
       item.onClick()
@@ -316,7 +277,10 @@ function handleAggregatedSelect(key: string) {
 .quick-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius-lg);
 }
 
 .action-btn {
@@ -324,19 +288,25 @@ function handleAggregatedSelect(key: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--text-secondary);
-  transition: var(--transition-fast);
+  transition: all var(--duration-fast) var(--ease-smooth);
+  overflow: hidden;
 }
 
 .action-btn:hover {
-  background: var(--bg-layout);
-  color: var(--color-primary);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.action-btn:active {
+  transform: scale(0.95);
 }
 
 .action-btn.is-disabled {
@@ -346,25 +316,88 @@ function handleAggregatedSelect(key: string) {
 
 .action-btn.is-disabled:hover {
   background: transparent;
+  color: var(--text-secondary);
+  transform: none;
+}
+
+.action-btn.is-active {
+  color: var(--color-primary);
+}
+
+.action-btn.is-active .icon-wrapper {
+  background: var(--color-primary-light);
+}
+
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.action-btn:hover .icon-wrapper {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.action-btn.is-active:hover .icon-wrapper {
+  background: var(--color-primary-light);
 }
 
 .icon {
-  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-smooth);
 }
 
-.badge {
+.action-btn:hover .icon {
+  transform: scale(1.1);
+}
+
+.action-btn .badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  text-align: center;
-  color: white;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   background: var(--color-error);
-  border-radius: 8px;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+
+  0%,
+  100% {
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.active-dot {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  width: 4px;
+  height: 4px;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: transform var(--duration-fast) var(--ease-spring);
+}
+
+.action-btn.is-active .active-dot {
+  transform: translateX(-50%) scale(1);
 }
 </style>

@@ -120,6 +120,19 @@ export interface RegisterParams {
   password: string
 }
 
+/**
+ * 外观配置
+ * 用户可自定义的应用外观设置
+ */
+export interface AppearanceConfig {
+  /** 背景图片 URL */
+  backgroundImage: string
+  /** 背景图片不透明度 (0-1) */
+  backgroundOpacity: number
+  /** 强调色（hex 格式），null 表示使用主题默认色 */
+  accentColor: string | null
+}
+
 // ==================== 房间相关类型 ====================
 
 /**
@@ -583,6 +596,19 @@ export interface PaginationResult<T> {
 }
 
 /**
+ * 外观配置
+ * 用户可自定义的应用外观设置
+ */
+export interface AppearanceConfig {
+  /** 背景图片 URL */
+  backgroundImage: string
+  /** 背景图片不透明度 (0-1) */
+  backgroundOpacity: number
+  /** 强调色（hex 格式），null 表示使用主题默认色 */
+  accentColor: string | null
+}
+
+/**
  * UI配置
  */
 export interface UIConfig {
@@ -596,6 +622,8 @@ export interface UIConfig {
   quickBar: QuickItemConfig[]
   /** DockBar 配置 */
   dock: DockConfig
+  /** 外观配置 */
+  appearance?: AppearanceConfig
 }
 
 /**

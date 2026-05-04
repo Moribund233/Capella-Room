@@ -1,10 +1,15 @@
 <template>
-  <n-card class="chart-card" :bordered="bordered" :segmented="segmented">
+  <n-card class="chart-card" :class="{ 'is-loading': loading, 'is-empty': isEmpty }" :bordered="bordered"
+    :segmented="segmented">
     <template v-if="title || $slots.header" #header>
       <slot name="header">
         <div class="chart-card-header">
-          <span class="chart-card-title">{{ title }}</span>
-          <span v-if="subtitle" class="chart-card-subtitle">{{ subtitle }}</span>
+          <div class="chart-card-title-wrapper">
+            <span class="chart-card-title">{{ title }}</span>
+            <span v-if="subtitle" class="chart-card-subtitle">{{ subtitle }}</span>
+          </div>
+          <!-- 装饰性渐变条 -->
+          <div class="title-accent"></div>
         </div>
       </slot>
     </template>
@@ -83,10 +88,62 @@ const isEmpty = computed(() => props.empty)
 
 <style scoped>
 .chart-card {
-  transition: var(--transition-base);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  border: 1px solid var(--border-color-base);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-slow) var(--ease-out-expo);
+  overflow: hidden;
+  position: relative;
+}
+
+/* 顶部渐变装饰 */
+.chart-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(99, 102, 241, 0.3) 20%,
+      rgba(139, 92, 246, 0.3) 80%,
+      transparent 100%);
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-smooth);
+}
+
+.chart-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+  border-color: rgba(99, 102, 241, 0.15);
+}
+
+.chart-card:hover::before {
+  opacity: 1;
+}
+
+/* 加载状态 */
+.chart-card.is-loading {
+  opacity: 0.8;
+}
+
+/* 空状态 */
+.chart-card.is-empty {
+  background: var(--bg-secondary);
 }
 
 .chart-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+
+.chart-card-title-wrapper {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -94,13 +151,31 @@ const isEmpty = computed(() => props.empty)
 
 .chart-card-title {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .chart-card-subtitle {
   font-size: 12px;
   color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+/* 标题装饰条 */
+.title-accent {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 24px;
+  height: 2px;
+  background: var(--color-primary-gradient);
+  border-radius: var(--radius-full);
+  transition: width var(--duration-slow) var(--ease-out-expo);
+}
+
+.chart-card:hover .title-accent {
+  width: 48px;
 }
 
 .chart-card-body {
