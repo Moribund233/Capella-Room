@@ -323,6 +323,45 @@ Authorization: Bearer {access_token}
 
 ---
 
+## 获取用户统计信息
+
+### 请求
+
+```http
+GET /api/v1/users/me/stats
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "joined_rooms": 5,
+    "total_messages": 128,
+    "online_hours": 168
+  }
+}
+```
+
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `joined_rooms` | number | 加入的聊天室数量 |
+| `total_messages` | number | 发送的消息总数 |
+| `online_hours` | number | 在线时长（小时） |
+
+### 说明
+
+- 统计数据实时计算
+- `online_hours` 基于用户注册时间估算
+
+---
+
 ## 获取用户列表
 
 ### 请求

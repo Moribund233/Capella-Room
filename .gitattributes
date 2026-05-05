@@ -1,0 +1,14 @@
+# 自动处理行尾符
+* text=auto
+
+# SQL 迁移文件使用 LF 行尾符（避免 sqlx 迁移校验失败）
+migrations/*.sql text eol=lf
+
+# Rust 源文件使用 LF 行尾符
+*.rs text eol=lf
+
+# 配置文件使用 LF 行尾符
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf

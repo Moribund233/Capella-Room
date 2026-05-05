@@ -20,13 +20,14 @@ impl UIConfigService {
     }
 
     /// 获取用户 UI 配置
+    /// 注意：app_config 字段已从数据库中移除
     pub async fn get_user_config(
         &self,
         user_id: Uuid,
     ) -> Result<Option<UIConfigResponse>, AppError> {
         let config: Option<UserUIConfig> = sqlx::query_as::<_, UserUIConfig>(
             r#"
-            SELECT id, user_id, app_config, theme_config, sidebar_config,
+            SELECT id, user_id, theme_config, sidebar_config,
                    quickbar_config, dock_config, created_at, updated_at
             FROM user_ui_configs
             WHERE user_id = $1
@@ -41,14 +42,12 @@ impl UIConfigService {
     }
 
     /// 保存用户 UI 配置
+    /// 注意：应用配置(app)已从云端配置中移除，改为从 ui.ts 配置文件读取
     pub async fn save_user_config(
         &self,
         user_id: Uuid,
         request: SaveUIConfigRequest,
     ) -> Result<(), AppError> {
-        let app_config = request
-            .app
-            .map(|c| serde_json::to_value(c).unwrap_or_default());
         let theme_config = request
             .theme
             .map(|c| serde_json::to_value(c).unwrap_or_default());
@@ -65,13 +64,12 @@ impl UIConfigService {
         sqlx::query(
             r#"
             INSERT INTO user_ui_configs (
-                user_id, app_config, theme_config, sidebar_config,
+                user_id, theme_config, sidebar_config,
                 quickbar_config, dock_config
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (user_id)
             DO UPDATE SET
-                app_config = COALESCE(EXCLUDED.app_config, user_ui_configs.app_config),
                 theme_config = COALESCE(EXCLUDED.theme_config, user_ui_configs.theme_config),
                 sidebar_config = COALESCE(EXCLUDED.sidebar_config, user_ui_configs.sidebar_config),
                 quickbar_config = COALESCE(EXCLUDED.quickbar_config, user_ui_configs.quickbar_config),
@@ -80,7 +78,6 @@ impl UIConfigService {
             "#
         )
         .bind(user_id)
-        .bind(app_config)
         .bind(theme_config)
         .bind(sidebar_config)
         .bind(quickbar_config)
@@ -101,31 +98,6 @@ impl UIConfigService {
             "#,
         )
         .bind(user_id)
-        .execute(&self.pool)
-        .await
-        .map_err(AppError::Database)?;
-
-        Ok(())
-    }
-
-    /// 更新应用配置
-    pub async fn update_app_config(
-        &self,
-        user_id: Uuid,
-        app_config: serde_json::Value,
-    ) -> Result<(), AppError> {
-        sqlx::query(
-            r#"
-            INSERT INTO user_ui_configs (user_id, app_config)
-            VALUES ($1, $2)
-            ON CONFLICT (user_id)
-            DO UPDATE SET
-                app_config = EXCLUDED.app_config,
-                updated_at = NOW()
-            "#,
-        )
-        .bind(user_id)
-        .bind(app_config)
         .execute(&self.pool)
         .await
         .map_err(AppError::Database)?;

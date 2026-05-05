@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Menu, MessageCircle, X } from 'lucide-vue-next'
+import { Menu, MessageCircle, X, ArrowLeft } from 'lucide-vue-next'
 import { useNotification } from 'naive-ui'
 import { useResponsive } from '@/composables/useResponsive'
 import { useRoomStore } from '@/stores/room'
@@ -254,7 +254,7 @@ onUnmounted(() => {
           @click="router.push('/')"
           aria-label="返回"
         >
-          ←
+          <ArrowLeft :size="24" />
         </button>
         <h1 class="main-layout__mobile-title">Seredeli</h1>
         <!-- 移动端 QuickBar -->
@@ -359,7 +359,8 @@ onUnmounted(() => {
 
 /* 移动端样式 */
 .main-layout--mobile {
-  padding-bottom: 56px; /* 底部导航栏高度 */
+  /* 注意：不在主布局添加 padding-bottom，由各页面自行控制 */
+  /* 聊天页面等需要底部空间的页面应自行处理 */
 }
 
 .main-layout__mobile-header {

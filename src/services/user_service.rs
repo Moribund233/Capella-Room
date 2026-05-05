@@ -494,4 +494,60 @@ impl UserService {
 
         Ok(())
     }
+
+    /// 获取用户统计信息
+    pub async fn get_user_stats(&self, user_id: Uuid) -> Result<UserStats> {
+        // 获取加入的聊天室数量
+        let joined_rooms: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(DISTINCT room_id)
+            FROM room_members
+            WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 获取发送的消息数量
+        let total_messages: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)
+            FROM messages
+            WHERE sender_id = $1 AND is_deleted = false
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 计算在线时长（小时）- 基于用户创建时间和最后更新时间估算
+        let online_hours: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(
+                EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600,
+                0
+            )::bigint
+            FROM users
+            WHERE id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(UserStats {
+            joined_rooms,
+            total_messages,
+            online_hours,
+        })
+    }
+}
+
+/// 用户统计信息
+#[derive(Debug, serde::Serialize)]
+pub struct UserStats {
+    pub joined_rooms: i64,
+    pub total_messages: i64,
+    pub online_hours: i64,
 }

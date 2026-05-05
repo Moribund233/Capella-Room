@@ -30,7 +30,8 @@ export function formatTime(dateStr: string): string {
   return `${date.getFullYear()}/${padZero(date.getMonth() + 1)}/${padZero(date.getDate())}`
 }
 
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '-'
   const date = new Date(dateStr)
   return `${date.getFullYear()}-${padZero(date.getMonth() + 1)}-${padZero(date.getDate())}`
 }

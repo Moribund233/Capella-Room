@@ -60,23 +60,10 @@ export const useUIStore = defineStore('ui', () => {
   // ========== 计算属性 ==========
 
   /**
-   * 合并后的应用配置
-   * 优先级：云端 > 本地 > 默认
+   * 应用配置
+   * 注意：应用配置已从云端配置中移除，仅使用本地配置文件(ui.ts)中的值
    */
-  const appConfig = computed<AppConfig>({
-    get: () => ({
-      ...defaultUiConfig.app,
-      ...cloudConfig.value?.app,
-      ...localConfig.value?.app,
-    }),
-    set: (value) => {
-      localConfig.value = {
-        ...localConfig.value,
-        app: value,
-      }
-      saveToLocalStorage()
-    },
-  })
+  const appConfig = computed<AppConfig>(() => defaultUiConfig.app)
 
   /**
    * 合并后的主题配置
@@ -150,9 +137,9 @@ export const useUIStore = defineStore('ui', () => {
 
   /**
    * 完整的合并配置
+   * 注意：应用配置(app)已从云端配置中移除
    */
   const mergedConfig = computed<UIConfig>(() => ({
-    app: appConfig.value,
     theme: themeConfig.value,
     sidebar: sidebarConfig.value,
     quickBar: quickBarConfig.value,
@@ -209,14 +196,6 @@ export const useUIStore = defineStore('ui', () => {
    */
   function initConfig(): void {
     loadFromLocalStorage()
-  }
-
-  /**
-   * 更新应用配置
-   * @param config 部分应用配置
-   */
-  function updateAppConfig(config: Partial<AppConfig>): void {
-    appConfig.value = { ...appConfig.value, ...config }
   }
 
   /**
@@ -312,7 +291,6 @@ export const useUIStore = defineStore('ui', () => {
       if (!localConfig.value) return
 
       const response = await uiApi.saveUserConfig({
-        app: localConfig.value.app,
         theme: localConfig.value.theme,
         sidebar: localConfig.value.sidebar,
         quickBar: localConfig.value.quickBar,
@@ -385,7 +363,6 @@ export const useUIStore = defineStore('ui', () => {
 
     // Actions
     initConfig,
-    updateAppConfig,
     updateThemeConfig,
     updateSidebarItems,
     updateQuickBarItems,

@@ -8,11 +8,11 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 /// 用户 UI 配置数据库模型
+/// 注意：app_config 字段已从数据库中移除，应用配置改为从 ui.ts 配置文件读取
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct UserUIConfig {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub app_config: Option<serde_json::Value>,
     pub theme_config: Option<serde_json::Value>,
     pub sidebar_config: Option<serde_json::Value>,
     pub quickbar_config: Option<serde_json::Value>,
@@ -117,8 +117,6 @@ pub struct DockConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UIConfigResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub app: Option<AppConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub theme: Option<ThemeConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sidebar: Option<SidebarConfig>,
@@ -132,8 +130,6 @@ pub struct UIConfigResponse {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SaveUIConfigRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub app: Option<AppConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub theme: Option<ThemeConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sidebar: Option<SidebarConfig>,
@@ -145,13 +141,25 @@ pub struct SaveUIConfigRequest {
 
 impl UserUIConfig {
     /// 转换为 UI 配置响应
+    /// 注意：应用配置(app)已从云端配置中移除
     pub fn to_response(&self) -> UIConfigResponse {
         UIConfigResponse {
-            app: self.app_config.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
-            theme: self.theme_config.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
-            sidebar: self.sidebar_config.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
-            quickbar: self.quickbar_config.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
-            dock: self.dock_config.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
+            theme: self
+                .theme_config
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            sidebar: self
+                .sidebar_config
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            quickbar: self
+                .quickbar_config
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            dock: self
+                .dock_config
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
         }
     }
 }

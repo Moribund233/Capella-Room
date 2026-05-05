@@ -12,7 +12,7 @@ use crate::{
     error::{AppError, Result},
     models::response::ApiResponse,
     models::user::{ChangePasswordRequest, UpdateUserRequest, UserResponse},
-    services::auth_service::Claims,
+    services::{auth_service::Claims, user_service::UserStats},
     state::AppState,
 };
 
@@ -217,4 +217,18 @@ pub async fn logout(
     });
 
     Ok(Json(ApiResponse::success_with_message("登出成功")))
+}
+
+/// 获取当前用户统计信息
+pub async fn get_user_stats(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<UserStats>>> {
+    // 从 Claims 中提取用户 ID
+    let user_id = state.auth_service().extract_user_id(&claims)?;
+
+    // 查询用户统计信息
+    let stats = state.user_service().get_user_stats(user_id).await?;
+
+    Ok(Json(ApiResponse::success(stats)))
 }

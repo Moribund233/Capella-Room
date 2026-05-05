@@ -610,10 +610,9 @@ export interface AppearanceConfig {
 
 /**
  * UI配置
+ * 注意：应用配置(app)已从云端配置中移除，改为从 ui.ts 配置文件读取
  */
 export interface UIConfig {
-  /** 应用配置 */
-  app: AppConfig
   /** 主题配置 */
   theme: ThemeConfig
   /** 侧边栏配置 */
@@ -628,9 +627,9 @@ export interface UIConfig {
 
 /**
  * 保存UI配置参数
+ * 注意：应用配置(app)已从云端配置中移除，改为从 ui.ts 配置文件读取
  */
 export interface SaveUIConfigParams {
-  app?: AppConfig
   theme?: ThemeConfig
   sidebar?: { items: SidebarItemConfig[] }
   quickBar?: QuickItemConfig[]

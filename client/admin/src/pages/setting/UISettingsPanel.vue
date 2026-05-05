@@ -199,9 +199,10 @@ const themeStore = useThemeStore()
 /** 默认配置（用于重置） */
 const defaultConfig = defaultUiConfig
 
-/** 当前编辑的配置（副本） */
+/** 当前编辑的配置（副本）
+ * 注意：应用配置(app)已从云端配置中移除，改为从 ui.ts 配置文件读取
+ */
 const config = reactive<UIConfig>({
-  app: { ...uiStore.appConfig },
   sidebar: {
     items: uiStore.sidebarConfig.items.map(item => ({ ...item })),
   },
@@ -413,7 +414,7 @@ function resetConfig(): void {
       themeStore.resetAccentColor()
 
       // 重置本地编辑状态为默认值
-      config.app = { ...defaultConfig.app }
+      // 注意：应用配置(app)已从云端配置中移除
       config.theme = { ...defaultConfig.theme }
       config.appearance = { ...defaultAppearanceConfig }
       config.sidebar.items = defaultConfig.sidebar.items.map(item => ({ ...item }))

@@ -125,6 +125,7 @@ fn user_routes() -> Router<Arc<AppState>> {
         .route("/me", get(user::get_current_user))
         .route("/me", put(user::update_user))
         .route("/me/password", put(user::change_password))
+        .route("/me/stats", get(user::get_user_stats))
         .route("/me/rooms", get(room::get_my_rooms))
         .route("/logout", post(user::logout))
         // 用户列表和详情

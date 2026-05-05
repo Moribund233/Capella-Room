@@ -747,6 +747,158 @@ notification:unread:{user_id} = [notification_id_1, notification_id_2, ...]
 
 ---
 
+---
+
+## 0006-用户设置体系缺失，前端 SettingsView.vue 开发受阻 [P1-高优先级] - 📋 规划中
+
+**位置**: 后端用户相关模块
+
+**问题描述**:
+当前后端已完成阶段8（含8.7.1 IP安全），但缺少专用于用户的设置功能。前端 `SettingsView.vue` 开发需要以下后端支持：
+
+1. **账号安全**（已规划阶段8.7.2）
+   - 登录设备管理
+   - 登录历史查询
+   - 异地登录提醒
+
+2. **通知偏好设置**（缺失）
+   - 私信通知开关
+   - @提及通知开关
+   - 房间邀请通知开关
+   - 系统通知开关
+   - 声音提醒开关
+   - 桌面通知开关
+
+3. **隐私设置**（缺失）
+   - 在线状态可见性
+   - 个人资料可见性
+   - 允许陌生人私信
+   - 允许房间邀请
+
+4. **消息设置**（缺失）
+   - 消息预览开关
+   - 已读回执开关
+   - 输入状态显示开关
+   - 免打扰模式
+
+**解决方案**:
+
+### 方案A：独立用户设置表（推荐）
+
+创建 `user_settings` 表存储用户个性化设置：
+
+```sql
+-- 用户设置表
+CREATE TABLE user_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- 通知设置 (JSONB)
+    notification_settings JSONB DEFAULT '{
+        "private_message": true,
+        "mentioned": true,
+        "room_invitation": true,
+        "system_notification": true,
+        "file_upload_complete": true,
+        "sound_enabled": true,
+        "desktop_notification": true
+    }'::jsonb,
+    
+    -- 隐私设置 (JSONB)
+    privacy_settings JSONB DEFAULT '{
+        "online_status_visibility": "everyone",
+        "profile_visibility": "everyone",
+        "allow_stranger_message": true,
+        "allow_room_invitation": true
+    }'::jsonb,
+    
+    -- 消息设置 (JSONB)
+    message_settings JSONB DEFAULT '{
+        "message_preview": true,
+        "read_receipt": true,
+        "typing_indicator": true,
+        "do_not_disturb": false
+    }'::jsonb,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT unique_user_settings UNIQUE (user_id)
+);
+```
+
+### API 设计
+
+```
+GET    /api/v1/users/me/settings          # 获取用户设置
+PUT    /api/v1/users/me/settings          # 更新用户设置（支持部分更新）
+```
+
+**请求/响应示例**:
+
+```json
+// GET /api/v1/users/me/settings
+{
+  "success": true,
+  "data": {
+    "notifications": {
+      "private_message": true,
+      "mentioned": true,
+      "room_invitation": true,
+      "system_notification": true,
+      "sound_enabled": true,
+      "desktop_notification": true
+    },
+    "privacy": {
+      "online_status_visibility": "everyone",
+      "profile_visibility": "everyone",
+      "allow_stranger_message": true,
+      "allow_room_invitation": true
+    },
+    "message": {
+      "message_preview": true,
+      "read_receipt": true,
+      "typing_indicator": true,
+      "do_not_disturb": false
+    }
+  }
+}
+
+// PUT /api/v1/users/me/settings（部分更新）
+{
+  "notifications": {
+    "sound_enabled": false,
+    "desktop_notification": false
+  }
+}
+```
+
+### 实现建议
+
+**后端**:
+- 新增 `UserSettingsService` 服务层
+- 新增 `UserSettings` 模型和 DTO
+- 修改 `user_settings` 时同步更新通知服务的行为
+
+**前端**:
+- `SettingsView.vue` 按模块组织：账号安全、通知设置、隐私设置、消息设置
+- 使用本地缓存 + 云端同步策略
+- 设置变更实时生效
+
+**优先级**:
+1. 账号安全（阶段8.7.2）- 高优先级
+2. 通知设置 - 中优先级
+3. 隐私设置 - 中优先级
+4. 消息设置 - 低优先级
+
+**状态**: 📋 规划中 - 待阶段9完成后实施
+
+**关联任务**:
+- 阶段8.7.2 用户账号安全系统
+- 前端 SettingsView.vue 开发
+
+---
+
 *文档创建时间: 2026-04-10*
 *关联任务: 阶段9 - 后端细节优化*
-*更新时间: 2026-05-05 - 添加 0005 通知系统在线/离线判断导致消息丢失*
+*更新时间: 2026-05-06 - 添加 0006 用户设置体系缺失*
