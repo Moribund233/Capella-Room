@@ -4,7 +4,7 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
 import App from './App.vue'
 import router from './router'
-import { useConfigStore } from './stores/config'
+import { useConfigStore, useThemeStore, usePersonalizationStore } from './stores'
 import './styles/index.css'
 
 async function bootstrap() {
@@ -15,6 +15,15 @@ async function bootstrap() {
 
   app.use(pinia)
   app.use(router)
+
+  // 初始化主题（在挂载前执行，避免闪烁）
+  const themeStore = useThemeStore()
+  themeStore.initTheme()
+  themeStore.watchSystemThemeChange()
+
+  // 初始化个性化配置
+  const personalizationStore = usePersonalizationStore()
+  personalizationStore.initPersonalization()
 
   // 在 app 挂载前预取服务端配置（不阻塞挂载）
   const configStore = useConfigStore()

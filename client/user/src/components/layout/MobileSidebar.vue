@@ -103,12 +103,13 @@ watch(() => props.show, (show) => {
 </script>
 
 <template>
-  <Transition name="mobile-sidebar">
-    <div
-      v-if="show"
-      class="mobile-sidebar"
-      @click="handleBackdropClick"
-    >
+  <Teleport to="body">
+    <Transition name="mobile-sidebar">
+      <div
+        v-if="show"
+        class="mobile-sidebar"
+        @click="handleBackdropClick"
+      >
       <!-- 遮罩层 -->
       <div class="mobile-sidebar__backdrop" />
 
@@ -204,8 +205,9 @@ watch(() => props.show, (show) => {
           </div>
         </footer>
       </aside>
-    </div>
-  </Transition>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -213,10 +215,10 @@ watch(() => props.show, (show) => {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1000;
-  display: flex;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  pointer-events: auto;
 }
 
 .mobile-sidebar__backdrop {
@@ -227,10 +229,13 @@ watch(() => props.show, (show) => {
   bottom: 0;
   background: var(--color-mask);
   backdrop-filter: blur(2px);
+  z-index: 1;
 }
 
 .mobile-sidebar__content {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 85%;
   max-width: 320px;
   height: 100%;
@@ -239,6 +244,7 @@ watch(() => props.show, (show) => {
   flex-direction: column;
   box-shadow: var(--shadow-xl);
   transition: transform var(--duration-normal) var(--ease-out);
+  z-index: 2;
 }
 
 /* 头部 */

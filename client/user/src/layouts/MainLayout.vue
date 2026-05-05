@@ -8,6 +8,7 @@ import { useRoomStore } from '@/stores/room'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useGlobalModal } from '@/composables/useGlobalModal'
+import { usePersonalizationStore } from '@/stores/personalization'
 import { QuickBar } from '@/components/quick'
 import { useQuickBar } from '@/composables/quick'
 import { quickBarConfig } from '@/config/quick'
@@ -26,6 +27,7 @@ const { isMobile, isTablet, isDesktop } = useResponsive()
 const roomStore = useRoomStore()
 const authStore = useAuthStore()
 const wsStore = useWebSocketStore()
+const personalizationStore = usePersonalizationStore()
 
 // 判断是否在聊天页面（显示侧边栏的页面）
 const isChatPage = computed(() => {
@@ -199,7 +201,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="main-layout">
+  <div
+    class="main-layout"
+    :style="{
+      backgroundImage: personalizationStore.backgroundImage && personalizationStore.enableBackgroundImage
+        ? `url(${personalizationStore.backgroundImage})`
+        : 'none',
+    }"
+  >
+    <!-- 背景遮罩层（用于透明度效果） -->
+    <div
+      v-if="personalizationStore.backgroundImage && personalizationStore.enableBackgroundImage"
+      class="main-layout__bg-overlay"
+      :style="{ opacity: 1 - personalizationStore.backgroundOpacity }"
+    />
+
     <!-- 桌面端导航栏 -->
     <NavBar v-if="!isMobile" class="main-layout__navbar" />
 
@@ -271,16 +287,9 @@ onUnmounted(() => {
     <GlobalModal
       v-model:visible="modalState.visible"
       :title="modalState.title"
-      :content="modalState.content"
       :preset="modalState.preset"
-      :type="modalState.type"
-      :size="modalState.size"
-      :width="modalState.width"
-      :max-width="modalState.maxWidth"
-      :min-width="modalState.minWidth"
       :mask-closable="modalState.maskClosable"
       :closable="modalState.closable"
-      :show-icon="modalState.showIcon"
       :positive-text="modalState.positiveText"
       :negative-text="modalState.negativeText"
       :loading="modalState.loading"
@@ -304,6 +313,28 @@ onUnmounted(() => {
   height: 100vh;
   overflow: hidden;
   background: var(--color-background);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+/* 背景遮罩层 */
+.main-layout__bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-background);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 确保所有子元素在遮罩层之上 */
+.main-layout > *:not(.main-layout__bg-overlay) {
+  position: relative;
+  z-index: 1;
 }
 
 /* 桌面端导航栏 */

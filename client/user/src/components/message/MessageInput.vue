@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue'
+import { ArrowDownToLine } from 'lucide-vue-next'
 import MessageReply from './MessageReply.vue'
 import type { ReplyToMessage } from '@/types/message'
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   placeholder?: string
   replyTo?: ReplyToMessage | null
   editingMessage?: { id: string; content: string } | null
+  showScrollToBottom?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -15,6 +17,7 @@ const emit = defineEmits<{
   cancelReply: []
   edit: [messageId: string, content: string]
   cancelEdit: []
+  scrollToBottom: []
 }>()
 
 const text = ref('')
@@ -101,6 +104,16 @@ function onKeydown(e: KeyboardEvent) {
     </div>
 
     <div class="message-input__container">
+      <!-- 回到底部按钮 -->
+      <button
+        v-if="showScrollToBottom"
+        class="message-input__scroll-btn"
+        @click="emit('scrollToBottom')"
+        title="回到底部"
+      >
+        <ArrowDownToLine :size="18" />
+      </button>
+
       <textarea
         ref="textareaRef"
         v-model="text"
@@ -136,6 +149,39 @@ function onKeydown(e: KeyboardEvent) {
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-lg);
   align-items: flex-end;
+}
+
+/* 回到底部按钮 */
+.message-input__scroll-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast);
+  flex-shrink: 0;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.message-input__scroll-btn:hover {
+  background: var(--color-primary-hover, var(--color-primary));
+  transform: translateY(1px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .message-input__textarea {

@@ -28,7 +28,6 @@ export function useQuickNotification(config: QuickItem): Partial<QuickRuntimeIte
 
     open({
       preset: 'card',
-      size: 'medium',
       component: markRaw(NotificationPanel),
       componentProps: {
         // 只传递事件处理器，数据直接从 store 获取

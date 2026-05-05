@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { isSameDay } from '@/utils/date'
+import { ChevronDown } from 'lucide-vue-next'
 import MessageBubble from './MessageBubble.vue'
 import type { Message } from '@/types/message'
 
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   reply: [message: Message]
   edit: [message: Message]
   delete: [message: Message]
+  scrollStateChange: [showScrollBtn: boolean]
 }>()
 
 const listRef = ref<HTMLDivElement | null>(null)
@@ -73,7 +75,11 @@ function handleScroll() {
   // 是否在底部附近（阈值 100px）
   const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
   autoScroll.value = nearBottom
-  showScrollBtn.value = !nearBottom
+  const newShowScrollBtn = !nearBottom
+  if (showScrollBtn.value !== newShowScrollBtn) {
+    showScrollBtn.value = newShowScrollBtn
+    emit('scrollStateChange', newShowScrollBtn)
+  }
 
   // 滚动到顶部时加载更多
   if (el.scrollTop < 80 && props.hasMore && !props.loadingMore && !props.loading) {
@@ -124,13 +130,17 @@ defineExpose({ scrollToBottom })
     <template v-if="!loading || messages.length > 0">
       <!-- 加载更多指示器 -->
       <div v-if="hasMore" class="message-list__more">
-        <span v-if="loadingMore" class="message-list__more-text">加载更多...</span>
+        <div v-if="loadingMore" class="message-list__loading-more">
+          <div class="message-list__spinner" />
+          <span class="message-list__loading-text">加载中...</span>
+        </div>
         <button
           v-else
           class="message-list__more-btn"
           @click="emit('loadMore')"
         >
-          加载更多消息
+          <ChevronDown :size="14" />
+          <span>加载更多消息</span>
         </button>
       </div>
 
@@ -155,15 +165,7 @@ defineExpose({ scrollToBottom })
       </template>
     </template>
 
-    <!-- 滚动到底部按钮 -->
-    <button
-      v-if="showScrollBtn && messages.length > 0"
-      class="message-list__scroll-btn"
-      @click="scrollToBottom()"
-      title="滚动到底部"
-    >
-      ↓
-    </button>
+
   </div>
 </template>
 
@@ -195,24 +197,50 @@ defineExpose({ scrollToBottom })
   padding: var(--space-sm) 0;
 }
 
-.message-list__more-text {
+.message-list__loading-more {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.message-list__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.message-list__loading-text {
   font-size: var(--font-size-small);
   color: var(--color-text-tertiary);
 }
 
 .message-list__more-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
   font-size: var(--font-size-small);
   color: var(--color-primary);
-  background: none;
-  border: none;
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
   cursor: pointer;
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  transition: background var(--duration-fast);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  transition: all var(--duration-fast);
 }
 
 .message-list__more-btn:hover {
-  background: var(--color-primary-light);
+  background: var(--color-primary);
+  color: var(--color-white);
 }
 
 /* Empty state */
@@ -240,31 +268,4 @@ defineExpose({ scrollToBottom })
   border-radius: var(--radius-full);
 }
 
-/* Scroll to bottom button */
-.message-list__scroll-btn {
-  position: sticky;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-white);
-  color: var(--color-text-secondary);
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--duration-fast);
-  z-index: 10;
-}
-
-.message-list__scroll-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  box-shadow: var(--shadow-lg);
-}
 </style>

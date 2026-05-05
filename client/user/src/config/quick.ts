@@ -2,7 +2,7 @@
  * QuickBar 配置文件
  * 定义快捷按钮的配置项
  */
-import type { Ref } from 'vue'
+import type { Ref, ComputedRef } from 'vue'
 
 /**
  * Quick 子菜单项
@@ -58,10 +58,10 @@ export interface QuickItem {
  * Quick 运行时项（组件内部使用）
  */
 export interface QuickRuntimeItem extends QuickItem {
-  /** 当前是否激活 */
-  isActive: boolean
-  /** 当前显示的图标（根据状态动态切换） */
-  currentIcon: string
+  /** 当前是否激活（支持响应式） */
+  isActive: boolean | ComputedRef<boolean>
+  /** 当前显示的图标（根据状态动态切换，支持响应式） */
+  currentIcon: string | ComputedRef<string>
   /** 是否禁用 */
   disabled: boolean
   /** 点击处理函数 */
@@ -79,13 +79,13 @@ export interface QuickRuntimeItem extends QuickItem {
  */
 export const quickBarConfig: QuickItem[] = [
   {
-    key: 'theme',
+    key: 'personalization',
     display: 'visible',
     type: 'action',
-    icon: 'Sun',
-    iconAlt: 'Moon',
-    label: '切换主题',
-    handler: 'useQuickTheme',
+    icon: 'Paintbrush',
+    iconAlt: 'PaintbrushVertical',
+    label: '个性化',
+    handler: 'useQuickPersonalization',
   },
   {
     key: 'notification',

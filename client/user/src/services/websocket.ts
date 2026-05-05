@@ -60,7 +60,16 @@ class WebSocketService {
 
   /** 建立 WebSocket 连接 */
   connect(url: string, token: string): void {
-    this.url = url
+    // 支持相对路径（生产环境）和绝对路径（开发环境）
+    if (url.startsWith('ws://') || url.startsWith('wss://')) {
+      this.url = url
+    } else if (url.startsWith('/')) {
+      // 相对路径，使用当前页面的协议和主机
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      this.url = `${protocol}//${window.location.host}${url}`
+    } else {
+      this.url = url
+    }
     this.token = token
     this.manuallyDisconnected = false
     this.reconnectAttempts = 0

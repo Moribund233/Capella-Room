@@ -1,0 +1,234 @@
+/**
+ * 暗色主题 CSS 变量
+ * 基于现有 variables.css 进行覆盖
+ * 通过 [data-theme="dark"] 选择器实现主题切换
+ * 支持智能透明度调整
+ */
+
+[data-theme="dark"] {
+  /* ========== 透明度变量（由 JS 动态设置）========== */
+  --opacity-container: 1;
+  --opacity-elevated: 1;
+  --opacity-light-bg: 1;
+  --opacity-dark-bg: 1;
+  --opacity-base: 1;
+  --shadow-intensity: 1;
+
+  /* ========== 主色调 - 调整为适合暗色的饱和度 ========== */
+  --color-primary: #10b981;
+  --color-primary-hover: #34d399;
+  --color-primary-pressed: #059669;
+  --color-primary-light: rgba(16, 185, 129, calc(0.15 * var(--opacity-light-bg)));
+  --color-primary-soft: rgba(16, 185, 129, calc(0.1 * var(--opacity-light-bg)));
+
+  /* ========== 功能色 - 暗色模式优化 ========== */
+  --color-success: #34d399;
+  --color-success-light: rgba(52, 211, 153, calc(0.15 * var(--opacity-light-bg)));
+  --color-warning: #fbbf24;
+  --color-warning-light: rgba(251, 191, 36, calc(0.15 * var(--opacity-light-bg)));
+  --color-error: #f87171;
+  --color-error-light: rgba(248, 113, 113, calc(0.15 * var(--opacity-light-bg)));
+  --color-danger: #f87171;
+  --color-danger-light: rgba(248, 113, 113, calc(0.15 * var(--opacity-light-bg)));
+  --color-info: #60a5fa;
+  --color-info-light: rgba(96, 165, 250, calc(0.15 * var(--opacity-light-bg)));
+
+  /* ========== 中性色 - 文字（反转，保持高可读性）========== */
+  --color-text-primary: rgba(255, 255, 255, 0.9);
+  --color-text-secondary: rgba(255, 255, 255, 0.65);
+  --color-text-tertiary: rgba(255, 255, 255, 0.45);
+  --color-text-quaternary: rgba(255, 255, 255, 0.3);
+
+  /* ========== 中性色 - 边框和分割线 ========== */
+  --color-border: rgba(255, 255, 255, calc(0.1 * var(--opacity-container)));
+  --color-border-light: rgba(255, 255, 255, calc(0.06 * var(--opacity-container)));
+  --color-border-lighter: rgba(255, 255, 255, calc(0.04 * var(--opacity-container)));
+  --color-divider: rgba(255, 255, 255, calc(0.06 * var(--opacity-container)));
+
+  /* ========== 中性色 - 背景（暗色层次，应用智能透明度）========== */
+  --color-background: rgba(15, 15, 15, var(--opacity-dark-bg));
+  --color-background-light: rgba(26, 26, 26, var(--opacity-container));
+  --color-white: rgba(31, 31, 31, var(--opacity-elevated));
+
+  /* ========== 遮罩和阴影色 ========== */
+  --color-mask: rgba(0, 0, 0, calc(0.7 * var(--opacity-base)));
+  --color-mask-light: rgba(0, 0, 0, calc(0.5 * var(--opacity-base)));
+  --color-shadow: rgba(0, 0, 0, calc(0.4 * var(--shadow-intensity)));
+  --color-shadow-dark: rgba(0, 0, 0, calc(0.6 * var(--shadow-intensity)));
+
+  /* ========== 组件特定颜色 - 消息气泡（应用智能透明度）========== */
+  --color-message-self-bg: #10b981;
+  --color-message-self-text: #ffffff;
+  --color-message-other-bg: rgba(42, 42, 42, var(--opacity-container));
+  --color-message-other-text: rgba(255, 255, 255, 0.9);
+  --color-message-reply-border: #fbbf24;
+  --color-message-error-text: #fca5a5;
+  --color-message-time-text: rgba(255, 255, 255, 0.5);
+
+  /* ========== 阴影系统 - 暗色增强（应用阴影强度）========== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, calc(0.4 * var(--shadow-intensity)));
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, calc(0.5 * var(--shadow-intensity)));
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, calc(0.6 * var(--shadow-intensity)));
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, calc(0.7 * var(--shadow-intensity)));
+}
+
+/* ========== 特定组件暗色样式覆盖 ========== */
+
+/* 消息气泡 */
+[data-theme="dark"] .message-bubble-other {
+  background-color: #2a2a2a;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .message-bubble-self {
+  background-color: #10b981;
+  color: #ffffff;
+}
+
+/* 输入框（应用智能透明度） */
+[data-theme="dark"] .message-input {
+  background-color: rgba(26, 26, 26, var(--opacity-container));
+  border-color: rgba(255, 255, 255, calc(0.1 * var(--opacity-container)));
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .message-input:focus {
+  border-color: #10b981;
+}
+
+[data-theme="dark"] .message-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* 侧边栏（应用智能透明度） */
+[data-theme="dark"] .sidebar {
+  background-color: rgba(26, 26, 26, var(--opacity-container));
+  border-right-color: rgba(255, 255, 255, calc(0.06 * var(--opacity-container)));
+}
+
+[data-theme="dark"] .sidebar-item:hover {
+  background-color: rgba(255, 255, 255, calc(0.05 * var(--opacity-container)));
+}
+
+[data-theme="dark"] .sidebar-item.active {
+  background-color: rgba(16, 185, 129, calc(0.15 * var(--opacity-light-bg)));
+  color: #34d399;
+}
+
+/* 房间卡片（应用智能透明度） */
+[data-theme="dark"] .room-card {
+  background-color: rgba(26, 26, 26, var(--opacity-container));
+  border-color: rgba(255, 255, 255, calc(0.06 * var(--opacity-container)));
+}
+
+[data-theme="dark"] .room-card:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, calc(0.4 * var(--shadow-intensity)));
+}
+
+/* 导航栏（应用智能透明度） */
+[data-theme="dark"] .navbar {
+  background-color: rgba(26, 26, 26, calc(0.95 * var(--opacity-container)));
+  border-bottom-color: rgba(255, 255, 255, calc(0.06 * var(--opacity-container)));
+}
+
+/* 模态框（应用智能透明度） */
+[data-theme="dark"] .modal-overlay {
+  background-color: rgba(0, 0, 0, calc(0.7 * var(--opacity-base)));
+}
+
+[data-theme="dark"] .modal-content {
+  background-color: rgba(26, 26, 26, var(--opacity-elevated));
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, calc(0.7 * var(--shadow-intensity)));
+}
+
+/* 滚动条 - 暗色 */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: rgba(26, 26, 26, var(--opacity-container));
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(58, 58, 58, var(--opacity-container));
+  border-radius: 3px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(74, 74, 74, var(--opacity-container));
+}
+
+/* QuickBar（应用智能透明度） */
+[data-theme="dark"] .quick-bar {
+  background-color: rgba(26, 26, 26, calc(0.95 * var(--opacity-elevated)));
+  border-color: rgba(255, 255, 255, calc(0.06 * var(--opacity-container)));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, calc(0.5 * var(--shadow-intensity)));
+}
+
+[data-theme="dark"] .quick-bar-item:hover {
+  background-color: rgba(255, 255, 255, calc(0.05 * var(--opacity-container)));
+}
+
+/* 搜索框（应用智能透明度） */
+[data-theme="dark"] .search-input {
+  background-color: rgba(42, 42, 42, var(--opacity-container));
+  border-color: rgba(255, 255, 255, calc(0.08 * var(--opacity-container)));
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .search-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* 下拉菜单 */
+[data-theme="dark"] .dropdown-menu {
+  background-color: #1f1f1f;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* 按钮 - 次要按钮 */
+[data-theme="dark"] .btn-secondary {
+  background-color: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background-color: #333333;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* 加载动画 */
+[data-theme="dark"] .loading-spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: #10b981;
+}
+
+/* 空状态 */
+[data-theme="dark"] .empty-state {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* 分割线 */
+[data-theme="dark"] .divider {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* 标签 */
+[data-theme="dark"] .tag {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme="dark"] .tag-primary {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}

@@ -10,7 +10,16 @@ export const configApi = {
   async getClientConfig(): Promise<ApiResponse<ClientConfig>> {
     const baseUrl = import.meta.env.VITE_API_BASE_URL
     // 从 base URL 中提取 origin（去掉 path 部分），因为 config 端点不在 v1 命名空间下
-    const origin = baseUrl ? new URL(baseUrl).origin : ''
+    // 支持相对路径（生产环境）和绝对路径（开发环境）
+    let origin: string
+    if (!baseUrl) {
+      origin = ''
+    } else if (baseUrl.startsWith('http')) {
+      origin = new URL(baseUrl).origin
+    } else {
+      // 相对路径，使用当前页面 origin
+      origin = window.location.origin
+    }
     const url = `${origin}/api/config/client`
     const res = await fetch(url)
     return res.json()

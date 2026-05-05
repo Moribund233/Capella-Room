@@ -3,7 +3,11 @@ import { computed } from 'vue'
 import { Bell, CheckCheck, Trash2, Loader2, ChevronDown, Wifi, WifiOff, Loader } from 'lucide-vue-next'
 import { useNotificationStore } from '@/stores/notification'
 import { useWebSocketStore } from '@/stores/websocket'
+import { useResponsive } from '@/composables/useResponsive'
 import type { NotificationItem } from '@/types/notification'
+
+// 使用响应式布局
+const { isMobile } = useResponsive()
 
 /**
  * 组件事件定义
@@ -212,7 +216,7 @@ const connectionColor = computed(() => {
 </script>
 
 <template>
-  <div class="notification-panel">
+  <div class="notification-panel" :class="{ 'is-mobile': isMobile }">
     <!-- 头部工具栏 -->
     <div class="notification-panel__header">
       <div class="notification-panel__title">
@@ -344,6 +348,14 @@ const connectionColor = computed(() => {
   flex-direction: column;
   max-height: 60vh;
   min-height: 300px;
+  width: 420px;
+}
+
+/* 移动端适配 */
+.notification-panel.is-mobile {
+  width: 100vw;
+  max-height: 80vh;
+  min-height: auto;
 }
 
 /* 头部 */
@@ -622,5 +634,44 @@ const connectionColor = computed(() => {
 .notification-panel__load-more-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* 移动端样式优化 */
+.notification-panel.is-mobile .notification-panel__header {
+  padding: var(--space-sm) var(--space-md);
+}
+
+.notification-panel.is-mobile .notification-panel__title {
+  font-size: var(--font-size-body);
+}
+
+.notification-panel.is-mobile .notification-panel__connection-text {
+  display: none;
+}
+
+.notification-panel.is-mobile .notification-panel__list {
+  padding: var(--space-sm);
+}
+
+.notification-panel.is-mobile .notification-panel__item {
+  padding: var(--space-sm);
+}
+
+.notification-panel.is-mobile .notification-panel__item-actions {
+  opacity: 1;
+}
+
+.notification-panel.is-mobile .notification-panel__item-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.notification-panel.is-mobile .notification-panel__empty {
+  padding: var(--space-lg);
+}
+
+.notification-panel.is-mobile .notification-panel__empty-icon {
+  width: 40px;
+  height: 40px;
 }
 </style>

@@ -8,6 +8,7 @@ import { useMessageStore } from '@/stores/message'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useMessageActions } from '@/composables/useMessageActions'
+import { useResponsive } from '@/composables/useResponsive'
 import { Search } from 'lucide-vue-next'
 import ConnectionStatus from '@/components/chat/ConnectionStatus.vue'
 import RoomDetail from '@/components/room/RoomDetail.vue'
@@ -41,6 +42,19 @@ useWebSocket()
 
 const roomId = ref(route.params.roomId as string)
 const showDetail = ref(false)
+const showScrollToBottom = ref(false)
+const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
+const { isMobile } = useResponsive()
+
+// 处理滚动状态变化
+function handleScrollStateChange(show: boolean) {
+  showScrollToBottom.value = show
+}
+
+// 滚动到底部
+function scrollToBottom() {
+  messageListRef.value?.scrollToBottom()
+}
 
 // 使用消息操作组合式函数
 const {
@@ -243,6 +257,7 @@ onUnmounted(() => {
   <div
     ref="chatRoomRef"
     class="chat-room"
+    :class="{ 'chat-room--mobile': isMobile }"
     @touchstart="onTouchStart"
     @touchend="onTouchEnd"
   >
@@ -280,6 +295,7 @@ onUnmounted(() => {
 
       <!-- 消息列表 -->
       <MessageList
+        ref="messageListRef"
         :messages="messages"
         :loading="loading"
         :loading-more="loadingMore"
@@ -289,6 +305,7 @@ onUnmounted(() => {
         @reply="startReply"
         @edit="startEdit"
         @delete="handleDeleteMessage"
+        @scroll-state-change="handleScrollStateChange"
       />
 
       <!-- 正在输入提示 -->
@@ -299,10 +316,12 @@ onUnmounted(() => {
         :disabled="!isConnected"
         :reply-to="replyingTo"
         :editing-message="editingMessage"
+        :show-scroll-to-bottom="showScrollToBottom"
         @send="sendMessage"
         @cancel-reply="cancelReply"
         @edit="handleEditMessage"
         @cancel-edit="cancelEdit"
+        @scroll-to-bottom="scrollToBottom"
       />
     </div>
 
@@ -429,5 +448,20 @@ onUnmounted(() => {
 .chat-room__detail-btn--active {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+/* 移动端适配 - 输入框固定定位 */
+.chat-room--mobile :deep(.message-input) {
+  /* 移动端输入框固定定位，紧贴底部导航栏上方 */
+  position: fixed;
+  bottom: 56px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+/* 移动端消息列表底部留出输入框空间 */
+.chat-room--mobile :deep(.message-list) {
+  padding-bottom: 80px;
 }
 </style>

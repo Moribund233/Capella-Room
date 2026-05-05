@@ -104,4 +104,8 @@
   --duration-normal: 250ms;
   --duration-slow: 350ms;
   --duration-slower: 500ms;
+
+  /* 个性化设置变量 */
+  --app-background-opacity: 1;
+  --app-background-image: none;
 }

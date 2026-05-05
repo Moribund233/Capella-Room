@@ -4,6 +4,7 @@ import type { QuickItem, QuickRuntimeItem } from '@/config/quick'
 // 导入各个 Quick 处理函数
 import { useQuickTheme } from './useQuickTheme'
 import { useQuickNotification } from './useQuickNotification'
+import { useQuickPersonalization } from './useQuickPersonalization'
 
 /**
  * Quick 处理函数映射表
@@ -11,6 +12,7 @@ import { useQuickNotification } from './useQuickNotification'
 const quickHandlers: Record<string, (item: QuickItem) => Partial<QuickRuntimeItem>> = {
   useQuickTheme,
   useQuickNotification,
+  useQuickPersonalization,
 }
 
 /**

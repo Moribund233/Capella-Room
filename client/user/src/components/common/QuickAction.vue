@@ -42,9 +42,33 @@ function getIconComponent(iconName: string): FunctionalComponent<LucideProps> {
 }
 
 /**
+ * 获取图标名称（处理 ComputedRef 和普通 string）
+ */
+const iconName = computed(() => {
+  const currentIcon = props.item.currentIcon
+  // 检查是否是 ComputedRef
+  if (currentIcon && typeof currentIcon === 'object' && 'value' in currentIcon) {
+    return (currentIcon as { value: string }).value
+  }
+  return currentIcon as string
+})
+
+/**
  * 当前图标组件
  */
-const IconComponent = computed(() => getIconComponent(props.item.currentIcon))
+const IconComponent = computed(() => getIconComponent(iconName.value))
+
+/**
+ * 计算激活状态（处理 ComputedRef 和普通 boolean）
+ */
+const isActiveValue = computed(() => {
+  const isActive = props.item.isActive
+  // 检查是否是 ComputedRef
+  if (isActive && typeof isActive === 'object' && 'value' in isActive) {
+    return (isActive as { value: boolean }).value
+  }
+  return isActive as boolean
+})
 
 /**
  * 计算徽章数值（支持普通值和 Ref）
@@ -72,7 +96,7 @@ function handleClick() {
   <button
     class="quick-action"
     :class="{
-      'is-active': item.isActive,
+      'is-active': isActiveValue,
       'is-disabled': item.disabled,
     }"
     :aria-label="item.label"
@@ -88,7 +112,7 @@ function handleClick() {
       {{ badgeValue > 99 ? '99+' : badgeValue }}
     </span>
     <!-- 激活指示器 -->
-    <div v-if="item.isActive" class="quick-action__active-dot" />
+    <div v-if="isActiveValue" class="quick-action__active-dot" />
   </button>
 </template>
 
