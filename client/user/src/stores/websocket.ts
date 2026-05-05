@@ -9,6 +9,10 @@ import type { ConnectionState, MessageHandler } from '@/types/websocket'
 export const useWebSocketStore = defineStore('websocket', () => {
   const connectionState = ref<ConnectionState>('disconnected')
   const reconnectAttempts = ref(0)
+  // 标记是否已注册状态监听，避免重复注册
+  let isStateHandlerRegistered = false
+  // 标记是否正在连接中，避免重复连接
+  let isConnectingInProgress = false
 
   const isConnected = computed(() => connectionState.value === 'connected')
   const isConnecting = computed(() =>
@@ -22,13 +26,29 @@ export const useWebSocketStore = defineStore('websocket', () => {
       reconnectAttempts.value++
     } else if (state === 'connected') {
       reconnectAttempts.value = 0
+      isConnectingInProgress = false
+    } else if (state === 'disconnected') {
+      isConnectingInProgress = false
     }
   }
 
   // 注入服务端配置 + 初始化连接
   async function connect() {
     const authStore = useAuthStore()
-    if (!authStore.accessToken) return
+    if (!authStore.accessToken) {
+      console.warn('[WebSocketStore] No access token, skipping connection')
+      return
+    }
+
+    // 如果已经连接或正在连接，不重复操作
+    if (connectionState.value === 'connected') {
+      console.log('[WebSocketStore] Already connected')
+      return
+    }
+    if (isConnectingInProgress) {
+      console.log('[WebSocketStore] Connection already in progress')
+      return
+    }
 
     const wsUrl = import.meta.env.VITE_WS_URL
     if (!wsUrl) {
@@ -44,6 +64,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
 
+    isConnectingInProgress = true
+
     // 确保服务端配置已加载并注入 wsService
     const configStore = useConfigStore()
     await configStore.ensureLoaded()
@@ -52,13 +74,19 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (connectivity.isOffline) {
       console.warn('[WebSocketStore] Server marked offline during config load, skipping WS connection')
       connectionState.value = 'disconnected'
+      isConnectingInProgress = false
       return
     }
 
     wsService.setConfig(configStore.config.reconnect)
     wsService.setOfflineCheck(() => useConnectivityStore().isOffline)
 
-    wsService.onConnectionState(onStateChange)
+    // 只注册一次状态监听
+    if (!isStateHandlerRegistered) {
+      wsService.onConnectionState(onStateChange)
+      isStateHandlerRegistered = true
+    }
+
     wsService.connect(wsUrl, authStore.accessToken)
   }
 

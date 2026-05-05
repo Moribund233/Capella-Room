@@ -574,6 +574,179 @@ function subscribeMessages() {
 
 ---
 
+## 0005-通知系统在线/离线判断导致消息丢失 [P1-高优先级] - ✅ 已修复
+
+**位置**: `src/services/notification_service.rs` - 各类通知发送方法
+
+**问题描述**:
+当前通知系统的逻辑是：
+1. 如果用户**在线** → 通过 WebSocket 实时推送，**不存储到数据库**
+2. 如果用户**离线** → 存储到数据库作为离线通知
+
+这导致以下问题：
+1. **消息丢失风险**: 用户在线时推送失败（网络抖动、连接未就绪），通知丢失
+2. **多设备不同步**: 手机在线收到通知，电脑端无记录
+3. **页面刷新丢失**: 在线时收到通知，刷新页面后通知消失
+4. **无历史记录**: 无法查询历史通知，只能获取当前未读
+
+**修复方案**: **方案A（后端双写）**
+
+### 实现细节
+
+无论用户是否在线，都先将通知存储到数据库，如果用户在线则额外推送 WebSocket。
+
+**核心逻辑** (`src/services/notification_service.rs`):
+```rust
+pub async fn send_mention(&self, mentioned_user_id: Uuid, mention_info: MentionInfo) -> Result<()> {
+    // 1. 先存储到数据库（无论在线与否，确保持久化）
+    let notification_id = self
+        .store_notification(
+            mentioned_user_id,
+            NotificationDbType::Mentioned,
+            None,
+            &format!("{} 提到了你", mention_info.mentioned_by_name),
+            &serde_json::to_value(&mention_info).unwrap_or_default(),
+        )
+        .await?;
+
+    debug!("Mention notification stored to database, id: {}", notification_id);
+
+    // 2. 如果用户在线，额外推送WebSocket（异步，失败不影响已存储的通知）
+    if self.ws_manager.is_user_online(mentioned_user_id) {
+        let ws_message = WebSocketMessage::Mentioned { ... };
+        if let Ok(json) = ws_message.to_json() {
+            if let Err(e) = self.ws_manager.send_to_user(mentioned_user_id, json).await {
+                warn!("Failed to send WebSocket notification: {}", e);
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+### 覆盖范围
+
+| 通知方法 | 目标用户 | 写表 | WebSocket推送 | 状态 |
+|---------|---------|------|--------------|------|
+| `send_private_message` | 普通用户 | ✅ | ✅ | 已修复 |
+| `send_mention` | 普通用户 | ✅ | ✅ | 已修复 |
+| `send_room_invitation` | 普通用户 | ✅ | ✅ | 已修复 |
+| `send_system_notification` | 指定用户（含admin） | ✅ | ✅ | 已修复 |
+| `send_file_upload_complete` | 普通用户 | ✅ | ✅ | 已修复 |
+| `send_pending_action` | Admin | ✅ | ✅ | 已修复 |
+| `send_config_reload_notification` | Admin | ✅ | ✅ | 已修复 |
+
+### HTTP API 端点
+
+新增 RESTful API 用于前端获取通知和标记已读：
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/notifications` | 获取通知列表（支持分页） |
+| GET | `/notifications/unread-count` | 获取未读通知数量 |
+| POST | `/notifications/:id/read` | 标记单条通知已读 |
+| POST | `/notifications/read-all` | 标记所有通知已读 |
+
+**架构简化**:
+- **WebSocket**: 仅用于实时推送新通知
+- **HTTP API**: 用于获取通知列表、标记已读/未读
+
+### WebSocket 清理
+
+移除了 WebSocket 中标记通知已读的处理，避免与 HTTP API 重复：
+- 移除 `MarkNotificationRead` 消息处理
+- 移除 `MarkAllNotificationsRead` 消息处理
+- 移除 `handle_mark_notification_read` 函数
+- 移除 `handle_mark_all_notifications_read` 函数
+
+### 前端适配
+
+**1. 新增 API 模块** (`client/user/src/api/notification.ts`):
+```typescript
+export const notificationApi = {
+  getNotifications(params: NotificationQueryParams): Promise<ApiResponse<NotificationListResponse>>
+  getUnreadCount(): Promise<ApiResponse<{ count: number }>>
+  markAsRead(notificationId: string): Promise<ApiResponse<void>>
+  markAllAsRead(): Promise<ApiResponse<void>>
+}
+```
+
+**2. Store 更新** (`client/user/src/stores/notification.ts`):
+- 使用服务端未读计数替代本地计数
+- 集成 HTTP API 获取通知列表
+- 标记已读时同步调用 API
+
+**3. Badge 修复** (`client/user/src/styles/variables.css`):
+- 添加 `--color-danger` CSS 变量，修复 badge 背景透明问题
+
+### 前端缓存弃用说明
+
+之前实现的前端缓存（`localStorage` 存储通知）已弃用，原因：
+1. **数据一致性**: 后端双写确保数据持久化，前端无需缓存
+2. **多端同步**: 后端成为唯一数据源，多设备自动同步
+3. **简化逻辑**: 移除缓存逻辑，降低代码复杂度
+
+**移除的缓存逻辑**:
+- `localStorage` 中的通知存储
+- 缓存过期检查
+- 缓存与服务器数据合并逻辑
+
+### 修复文件清单
+
+**后端**:
+- ✅ `src/services/notification_service.rs` - 所有通知方法实现双写
+- ✅ `src/handlers/notification.rs` - 新增 HTTP API 处理器
+- ✅ `src/routes/mod.rs` - 注册通知路由
+- ✅ `src/websocket/handler.rs` - 移除 WS 标记已读处理
+
+**前端**:
+- ✅ `client/user/src/api/notification.ts` - 新增通知 API 模块
+- ✅ `client/user/src/stores/notification.ts` - 集成 HTTP API，使用服务端计数
+- ✅ `client/user/src/composables/quick/useQuickNotification.ts` - Badge 响应式更新
+- ✅ `client/user/src/styles/variables.css` - 添加 `--color-danger` 变量
+
+### 验证结果
+
+- ✅ 在线用户收到通知后刷新页面，通知仍然显示
+- ✅ Badge 正确显示未读数量（基于服务端计数）
+- ✅ 标记已读后 Badge 实时更新
+- ✅ `cargo clippy` 检查通过
+- ✅ `npm run lint` 检查通过
+
+**状态**: ✅ 已修复 - 所有通知类型（普通用户和 admin）都实现双写，确保不丢失
+
+---
+
+### 附录: 方案B（Redis 混合架构）- 后续优化参考
+
+对于高并发场景，可考虑引入 Redis 优化性能：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  后端通知服务                                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │  1. 写入DB   │  │ 2. 写入Redis │  │  3. WebSocket推送    │ │
+│  │  (持久化)    │  │ (实时计数)   │  │  (在线用户)          │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Redis 数据结构**:
+```redis
+# 用户未读通知计数
+notification:unread_count:{user_id} = 5
+
+# 用户未读通知列表 (Sorted Set)
+notification:unread:{user_id} = [notification_id_1, notification_id_2, ...]
+```
+
+**适用场景**: 日活用户 > 10万，通知发送频率 > 1000/秒
+
+**当前状态**: 方案A已满足需求，方案B作为未来高并发优化参考
+
+---
+
 *文档创建时间: 2026-04-10*
 *关联任务: 阶段9 - 后端细节优化*
-*更新时间: 2026-05-04 - 添加 0004 房间列表消息预览同步问题*
+*更新时间: 2026-05-05 - 添加 0005 通知系统在线/离线判断导致消息丢失*

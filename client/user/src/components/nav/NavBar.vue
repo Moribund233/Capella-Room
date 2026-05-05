@@ -186,7 +186,14 @@ async function handleLogout() {
   background: var(--color-primary-light);
 }
 
-/* Active indicator pill */
+/* 移动端：移除高亮背景，仅改变图标颜色 */
+.nav-bar--mobile .nav-bar__item:hover,
+.nav-bar--mobile .nav-bar__item--active {
+  background: transparent;
+  color: var(--color-primary);
+}
+
+/* Active indicator pill - 桌面端 */
 .nav-bar__item--active::before {
   content: '';
   position: absolute;
@@ -200,12 +207,7 @@ async function handleLogout() {
 }
 
 .nav-bar--mobile .nav-bar__item--active::before {
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
+  display: none;
 }
 
 /* QuickBar 区域 */

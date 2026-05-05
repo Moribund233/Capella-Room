@@ -78,7 +78,7 @@ function handleRoomClick(roomId: string) {
 .room-list__search-input {
   width: 100%;
   padding: 6px 12px;
-  border: 1px solid var(--color-border, #e0e0e0);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm, 6px);
   font-size: var(--font-size-small, 13px);
   outline: none;
@@ -87,11 +87,11 @@ function handleRoomClick(roomId: string) {
 }
 
 .room-list__search-input:focus {
-  border-color: var(--color-primary, #2080f0);
+  border-color: var(--color-primary);
 }
 
 .room-list__search-input::placeholder {
-  color: var(--color-text-tertiary, #999);
+  color: var(--color-text-tertiary);
 }
 
 .room-list__items {

@@ -68,7 +68,9 @@ export function useWebSocket() {
   onUnmounted(() => {
     stopAuthWatcher?.()
     cleanupSubscriptions()
-    disconnect()
+    // 注意：不在此处调用 disconnect()
+    // WebSocket 是全局单例，不应该因为组件卸载而断开连接
+    // 连接管理应该由 App.vue 或 WebSocketStore 负责
   })
 
   return {

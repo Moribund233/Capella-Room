@@ -168,7 +168,7 @@ function onKeydown(e: KeyboardEvent) {
 .message-input__send {
   padding: 8px 20px;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border: none;
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
@@ -195,7 +195,7 @@ function onKeydown(e: KeyboardEvent) {
   padding: var(--space-sm) var(--space-md);
   background: var(--color-background);
   border-top: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-warning, #f59e0b);
+  border-left: 3px solid var(--color-warning);
 }
 
 .message-input__editing-content {
@@ -205,7 +205,7 @@ function onKeydown(e: KeyboardEvent) {
 .message-input__editing-label {
   font-size: var(--font-size-small);
   font-weight: 600;
-  color: var(--color-warning, #f59e0b);
+  color: var(--color-warning);
 }
 
 .message-input__editing-cancel {

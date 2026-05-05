@@ -741,16 +741,6 @@ async fn handle_message(
                 .await?;
         }
 
-        // 标记通知已读
-        WebSocketMessage::MarkNotificationRead { notification_id } => {
-            handle_mark_notification_read(user_id, notification_id, state, tx).await?;
-        }
-
-        // 标记所有通知已读
-        WebSocketMessage::MarkAllNotificationsRead => {
-            handle_mark_all_notifications_read(user_id, state, tx).await?;
-        }
-
         // ========== 待办通知系统 ==========
         // 获取待办列表
         WebSocketMessage::GetPendingActions { action_type } => {
@@ -1790,80 +1780,6 @@ async fn handle_get_offline_notifications(
             warn!("Failed to get offline notifications: {}", e);
             let error_msg =
                 WebSocketMessage::error("FETCH_FAILED", "Failed to fetch notifications");
-            if let Ok(json) = error_msg.to_json() {
-                let _ = tx.send(json).await;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// 处理标记通知已读
-async fn handle_mark_notification_read(
-    user_id: Uuid,
-    notification_id: Uuid,
-    state: &AppState,
-    tx: &mpsc::Sender<String>,
-) -> anyhow::Result<()> {
-    debug!(
-        "Marking notification {} as read for user {}",
-        notification_id, user_id
-    );
-
-    match state
-        .notification_service()
-        .mark_as_read(user_id, notification_id)
-        .await
-    {
-        Ok(_) => {
-            let confirm = WebSocketMessage::NotificationReadConfirm { notification_id };
-
-            if let Ok(json) = confirm.to_json() {
-                let _ = tx.send(json).await;
-            }
-
-            debug!("Notification {} marked as read", notification_id);
-        }
-        Err(e) => {
-            warn!("Failed to mark notification as read: {}", e);
-            let error_msg =
-                WebSocketMessage::error("UPDATE_FAILED", "Failed to mark notification as read");
-            if let Ok(json) = error_msg.to_json() {
-                let _ = tx.send(json).await;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// 处理标记所有通知已读
-async fn handle_mark_all_notifications_read(
-    user_id: Uuid,
-    state: &AppState,
-    tx: &mpsc::Sender<String>,
-) -> anyhow::Result<()> {
-    debug!("Marking all notifications as read for user {}", user_id);
-
-    match state.notification_service().mark_all_as_read(user_id).await {
-        Ok(_) => {
-            let confirm = WebSocketMessage::NotificationReadConfirm {
-                notification_id: Uuid::nil(), // 使用nil UUID表示所有通知
-            };
-
-            if let Ok(json) = confirm.to_json() {
-                let _ = tx.send(json).await;
-            }
-
-            debug!("All notifications marked as read for user {}", user_id);
-        }
-        Err(e) => {
-            warn!("Failed to mark all notifications as read: {}", e);
-            let error_msg = WebSocketMessage::error(
-                "UPDATE_FAILED",
-                "Failed to mark all notifications as read",
-            );
             if let Ok(json) = error_msg.to_json() {
                 let _ = tx.send(json).await;
             }

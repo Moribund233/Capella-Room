@@ -161,7 +161,7 @@ function highlightMatch(content: string, query: string): string {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-mask);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -174,7 +174,7 @@ function highlightMatch(content: string, query: string): string {
   max-height: 80vh;
   background: var(--color-white);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px var(--color-shadow-dark);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -239,7 +239,7 @@ function highlightMatch(content: string, query: string): string {
 .message-search__button {
   padding: 10px 20px;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   border: none;
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);

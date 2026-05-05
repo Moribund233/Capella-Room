@@ -1,92 +1,47 @@
-import { ref, computed, markRaw } from 'vue'
+import { markRaw, ref, watch } from 'vue'
 import type { QuickItem, QuickRuntimeItem } from '@/config/quick'
 import { useGlobalModal } from '@/composables/useGlobalModal'
+import { useNotificationStore } from '@/stores/notification'
 import NotificationPanel from '@/components/quick/NotificationPanel.vue'
 
 /**
- * 通知项接口
- */
-interface Notification {
-  id: string
-  title: string
-  content: string
-  type: 'info' | 'success' | 'warning' | 'error'
-  isRead: boolean
-  createdAt: string
-}
-
-/**
  * 通知中心 Quick 组合式函数
+ * 对接真实的 WebSocket 通知系统
  * @param config Quick 配置项
  * @returns Quick 运行时属性
  */
 export function useQuickNotification(config: QuickItem): Partial<QuickRuntimeItem> {
-  const { open, close } = useGlobalModal()
-
-  // 未读消息数量
-  const unreadCount = ref(config.badge || 0)
-
-  // 是否显示通知面板
-  const isPanelOpen = ref(false)
-
-  // 加载状态
-  const loading = ref(false)
-
-  // 通知列表（模拟数据，实际应从API获取）
-  const notifications = ref<Notification[]>([
-    {
-      id: '1',
-      title: '系统维护通知',
-      content: '系统将于今晚 02:00-04:00 进行例行维护，期间服务可能暂时不可用。',
-      type: 'info',
-      isRead: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30分钟前
-    },
-    {
-      id: '2',
-      title: '房间创建成功',
-      content: '您创建的 "周末游戏局" 房间已成功创建，快邀请好友加入吧！',
-      type: 'success',
-      isRead: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2小时前
-    },
-    {
-      id: '3',
-      title: '新消息提醒',
-      content: '张三在 "技术交流" 房间中提到了你。',
-      type: 'warning',
-      isRead: true,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1天前
-    },
-  ])
-
-  // 计算未读数量
-  function updateUnreadCount() {
-    unreadCount.value = notifications.value.filter(n => !n.isRead).length
-  }
+  const { open } = useGlobalModal()
+  const notificationStore = useNotificationStore()
 
   /**
    * 显示通知面板弹窗
    */
   function showNotificationPanel(): void {
-    isPanelOpen.value = true
+    // 确保通知系统已初始化
+    if (!notificationStore.initialized) {
+      notificationStore.initialize()
+    }
+
+    // 获取离线通知
+    notificationStore.fetchOfflineNotifications()
+
     open({
       preset: 'card',
       size: 'medium',
       component: markRaw(NotificationPanel),
       componentProps: {
-        notifications: notifications.value,
-        loading: loading.value,
+        // 只传递事件处理器，数据直接从 store 获取
         onMarkAsRead: handleMarkAsRead,
         onMarkAllAsRead: handleMarkAllAsRead,
         onDelete: handleDelete,
         onClearAll: handleClearAll,
-        onOpenSettings: handleOpenSettings,
+        onLoadMore: handleLoadMore,
       },
       closable: true,
       maskClosable: true,
       onClose: () => {
-        isPanelOpen.value = false
+        // 面板关闭时的回调
       },
     })
   }
@@ -95,82 +50,60 @@ export function useQuickNotification(config: QuickItem): Partial<QuickRuntimeIte
    * 切换通知面板
    */
   function togglePanel() {
-    if (isPanelOpen.value) {
-      close()
-      isPanelOpen.value = false
-    } else {
-      showNotificationPanel()
-    }
+    showNotificationPanel()
   }
 
   /**
    * 处理标记已读
    */
   function handleMarkAsRead(id: string) {
-    const notification = notifications.value.find(n => n.id === id)
-    if (notification) {
-      notification.isRead = true
-      updateUnreadCount()
-    }
+    notificationStore.markAsRead(id)
   }
 
   /**
    * 处理标记全部已读
    */
   function handleMarkAllAsRead() {
-    notifications.value.forEach(n => n.isRead = true)
-    unreadCount.value = 0
+    notificationStore.markAllAsRead()
   }
 
   /**
    * 处理删除通知
    */
   function handleDelete(id: string) {
-    const index = notifications.value.findIndex(n => n.id === id)
-    if (index > -1) {
-      notifications.value.splice(index, 1)
-      updateUnreadCount()
-    }
+    notificationStore.deleteNotification(id)
   }
 
   /**
    * 处理清空所有
    */
   function handleClearAll() {
-    notifications.value = []
-    unreadCount.value = 0
+    notificationStore.clearAll()
   }
 
   /**
-   * 处理打开设置
+   * 加载更多离线通知
    */
-  function handleOpenSettings() {
-    // 可以打开通知设置弹窗
-    console.log('打开通知设置')
+  function handleLoadMore() {
+    notificationStore.loadMoreOfflineNotifications()
   }
 
-  /**
-   * 添加新通知（供外部调用）
-   */
-  function addNotification(notification: Omit<Notification, 'id' | 'createdAt'>) {
-    const newNotification: Notification = {
-      ...notification,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    }
-    notifications.value.unshift(newNotification)
-    updateUnreadCount()
-  }
+  // 创建一个响应式的 badge ref，监听 store 的变化
+  const badgeRef = ref(notificationStore.totalUnreadCount)
+  watch(
+    () => notificationStore.totalUnreadCount,
+    (newCount) => {
+      badgeRef.value = newCount
+    },
+    { immediate: true }
+  )
 
   return {
-    isActive: isPanelOpen.value,
+    isActive: false,
     currentIcon: config.icon,
     disabled: false,
-    badge: unreadCount.value,
+    // 使用 ref 的 value，确保响应式更新
+    badge: badgeRef,
     onClick: togglePanel,
-    // 暴露额外方法供外部使用
-    addNotification,
-    notifications,
-    unreadCount: computed(() => unreadCount.value),
   }
 }

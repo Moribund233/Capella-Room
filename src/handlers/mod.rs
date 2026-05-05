@@ -4,6 +4,7 @@ pub mod auth;
 pub mod config;
 pub mod file;
 pub mod message;
+pub mod notification;
 pub mod room;
 pub mod security;
 pub mod ui_config;
@@ -17,6 +18,7 @@ pub mod user;
 // - user: 用户相关处理器（获取用户信息、更新资料、用户列表）
 // - room: 聊天室处理器（创建、加入、离开、获取列表）
 // - message: 消息处理器（获取历史消息、搜索消息、删除消息）
+// - notification: 通知处理器（获取通知列表、标记已读）
 // - file: 文件上传处理器（上传、获取、删除文件）
 // - security: IP 安全处理器（白名单/黑名单管理）
 // - ui_config: 用户 UI 配置处理器（界面偏好设置云端同步）

@@ -31,13 +31,15 @@
 
 ### 客户端管理通知的消息
 
-| 消息类型 | 说明 |
-|----------|------|
-| `GetOfflineNotifications` | 获取离线通知 |
-| `MarkNotificationRead` | 标记通知已读 |
-| `MarkAllNotificationsRead` | 标记所有通知已读 |
-| `RespondPendingAction` | 响应待办通知 |
-| `GetPendingActions` | 获取待办列表 |
+| 消息类型 | 说明 | 状态 |
+|----------|------|------|
+| `GetOfflineNotifications` | 获取离线通知 | ⚠️ 已弃用，请使用 HTTP API |
+| `MarkNotificationRead` | 标记通知已读 | ❌ 已移除，请使用 HTTP API |
+| `MarkAllNotificationsRead` | 标记所有通知已读 | ❌ 已移除，请使用 HTTP API |
+| `RespondPendingAction` | 响应待办通知 | ✅ 仍支持 |
+| `GetPendingActions` | 获取待办列表 | ✅ 仍支持 |
+
+> **重要变更**: 通知的获取和已读标记已迁移到 HTTP API，详见 [HTTP 通知接口文档](../http/notifications.md)
 
 ---
 
@@ -198,7 +200,9 @@
 
 ---
 
-## 离线通知同步
+## 离线通知同步 (已弃用)
+
+> ⚠️ **已弃用**: 此功能已迁移到 HTTP API，请使用 `GET /api/v1/notifications` 获取通知列表
 
 ### 获取离线通知
 
@@ -249,9 +253,13 @@
 
 ---
 
-## 标记通知已读
+## 标记通知已读 (已移除)
 
-### 标记单个通知已读
+> ❌ **已移除**: 此功能已迁移到 HTTP API
+> - 标记单个已读: `POST /api/v1/notifications/:id/read`
+> - 标记全部已读: `POST /api/v1/notifications/read-all`
+
+### 标记单个通知已读 (旧版)
 
 ```json
 {
@@ -273,7 +281,7 @@
 }
 ```
 
-### 标记所有通知已读
+### 标记所有通知已读 (旧版)
 
 ```json
 {

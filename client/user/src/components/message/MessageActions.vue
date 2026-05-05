@@ -81,7 +81,7 @@ onUnmounted(() => {
   background: var(--color-white);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px var(--color-shadow-dark);
   z-index: 100;
   min-width: 120px;
   padding: 4px 0;
@@ -110,7 +110,7 @@ onUnmounted(() => {
 }
 
 .message-actions__item--danger:hover {
-  background: var(--color-error-light, #fee2e2);
+  background: var(--color-error-light);
 }
 
 .message-actions__icon {

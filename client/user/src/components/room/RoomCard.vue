@@ -94,7 +94,7 @@ const initial = computed(() =>
 }
 
 .room-card__avatar-text {
-  color: #fff;
+  color: var(--color-white);
   font-weight: 600;
   font-size: 16px;
 }
@@ -166,8 +166,8 @@ const initial = computed(() =>
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--color-error, #d03050);
-  color: #fff;
+  background: var(--color-error);
+  color: var(--color-white);
   display: flex;
   align-items: center;
   justify-content: center;

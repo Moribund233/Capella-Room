@@ -225,7 +225,7 @@ watch(() => props.show, (show) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-mask);
   backdrop-filter: blur(2px);
 }
 
@@ -261,7 +261,7 @@ watch(() => props.show, (show) => {
   width: 36px;
   height: 36px;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-white);
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;

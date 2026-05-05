@@ -1,33 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Bell, CheckCheck, Trash2, Settings } from 'lucide-vue-next'
-
-/**
- * 通知项接口
- */
-interface NotificationItem {
-  id: string
-  title: string
-  content: string
-  type: 'info' | 'success' | 'warning' | 'error'
-  isRead: boolean
-  createdAt: string
-}
-
-/**
- * 组件属性定义
- */
-interface Props {
-  /** 通知列表 */
-  notifications?: NotificationItem[]
-  /** 加载状态 */
-  loading?: boolean
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  notifications: () => [],
-  loading: false,
-})
+import { Bell, CheckCheck, Trash2, Loader2, ChevronDown, Wifi, WifiOff, Loader } from 'lucide-vue-next'
+import { useNotificationStore } from '@/stores/notification'
+import { useWebSocketStore } from '@/stores/websocket'
+import type { NotificationItem } from '@/types/notification'
 
 /**
  * 组件事件定义
@@ -41,34 +17,58 @@ const emit = defineEmits<{
   (e: 'delete', id: string): void
   /** 清空所有 */
   (e: 'clearAll'): void
-  /** 打开设置 */
-  (e: 'openSettings'): void
+  /** 加载更多 */
+  (e: 'loadMore'): void
 }>()
+
+// 使用 store
+const notificationStore = useNotificationStore()
+const wsStore = useWebSocketStore()
+
+/**
+ * 通知列表
+ */
+const notifications = computed(() => notificationStore.notifications)
+
+/**
+ * 加载状态
+ */
+const loading = computed(() => notificationStore.loading)
+
+/**
+ * 是否有更多
+ */
+const hasMore = computed(() => notificationStore.hasMoreOffline)
+
+/**
+ * WebSocket 连接状态
+ */
+const connectionState = computed(() => wsStore.connectionState)
 
 /**
  * 未读数量
  */
-const unreadCount = computed(() => props.notifications.filter(n => !n.isRead).length)
+const unreadCount = computed(() => notifications.value.filter((n: NotificationItem) => !n.isRead).length)
 
 /**
  * 是否有通知
  */
-const hasNotifications = computed(() => props.notifications.length > 0)
+const hasNotifications = computed(() => notifications.value.length > 0)
 
 /**
  * 按日期分组的通知
  */
 const groupedNotifications = computed(() => {
   const groups: Record<string, NotificationItem[]> = {}
-  
-  props.notifications.forEach(notification => {
+
+  notifications.value.forEach((notification: NotificationItem) => {
     const date = new Date(notification.createdAt).toLocaleDateString('zh-CN')
     if (!groups[date]) {
       groups[date] = []
     }
     groups[date].push(notification)
   })
-  
+
   return groups
 })
 
@@ -105,24 +105,24 @@ function formatTime(dateStr: string): string {
   const date = new Date(dateStr)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
-  
+
   // 小于1小时显示相对时间
   if (diff < 60 * 60 * 1000) {
     const minutes = Math.floor(diff / (60 * 1000))
     return minutes < 1 ? '刚刚' : `${minutes}分钟前`
   }
-  
+
   // 今天显示时间
   if (date.toDateString() === now.toDateString()) {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }
-  
+
   // 其他显示日期时间
-  return date.toLocaleString('zh-CN', { 
-    month: 'short', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  return date.toLocaleString('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -155,11 +155,60 @@ function handleClearAll() {
 }
 
 /**
- * 处理设置
+ * 处理加载更多
  */
-function handleSettings() {
-  emit('openSettings')
+function handleLoadMore() {
+  emit('loadMore')
 }
+
+/**
+ * 获取连接状态图标
+ */
+const connectionIcon = computed(() => {
+  switch (connectionState.value) {
+    case 'connected':
+      return Wifi
+    case 'connecting':
+    case 'reconnecting':
+      return Loader
+    case 'disconnected':
+    default:
+      return WifiOff
+  }
+})
+
+/**
+ * 获取连接状态文本
+ */
+const connectionText = computed(() => {
+  switch (connectionState.value) {
+    case 'connected':
+      return '已连接'
+    case 'connecting':
+      return '连接中'
+    case 'reconnecting':
+      return '重连中'
+    case 'disconnected':
+    default:
+      return '已断开'
+  }
+})
+
+/**
+ * 获取连接状态颜色
+ */
+const connectionColor = computed(() => {
+  switch (connectionState.value) {
+    case 'connected':
+      return 'var(--color-success)'
+    case 'connecting':
+    case 'reconnecting':
+      return 'var(--color-warning)'
+    case 'disconnected':
+    default:
+      return 'var(--color-danger)'
+  }
+})
 </script>
 
 <template>
@@ -174,6 +223,15 @@ function handleSettings() {
         </span>
       </div>
       <div class="notification-panel__actions">
+        <!-- WebSocket 连接状态指示器 -->
+        <div
+          class="notification-panel__connection-status"
+          :style="{ color: connectionColor }"
+          :title="`WebSocket ${connectionText}`"
+        >
+          <component :is="connectionIcon" :size="14" :class="{ 'is-spinning': connectionState === 'connecting' || connectionState === 'reconnecting' }" />
+          <span class="notification-panel__connection-text">{{ connectionText }}</span>
+        </div>
         <button
           v-if="unreadCount > 0"
           class="notification-panel__action-btn"
@@ -190,19 +248,12 @@ function handleSettings() {
         >
           <Trash2 :size="16" />
         </button>
-        <button
-          class="notification-panel__action-btn"
-          title="设置"
-          @click="handleSettings"
-        >
-          <Settings :size="16" />
-        </button>
       </div>
     </div>
 
     <!-- 加载状态 -->
-    <div v-if="loading" class="notification-panel__loading">
-      <div class="notification-panel__spinner" />
+    <div v-if="loading && !hasNotifications" class="notification-panel__loading">
+      <Loader2 :size="24" class="notification-panel__spinner" />
       <span>加载中...</span>
     </div>
 
@@ -232,7 +283,7 @@ function handleSettings() {
             class="notification-panel__type-indicator"
             :style="{ backgroundColor: getTypeColor(notification.type) }"
           />
-          
+
           <!-- 内容 -->
           <div class="notification-panel__content">
             <div class="notification-panel__item-header">
@@ -270,6 +321,19 @@ function handleSettings() {
           </div>
         </div>
       </div>
+
+      <!-- 加载更多 -->
+      <div v-if="hasMore" class="notification-panel__load-more">
+        <button
+          class="notification-panel__load-more-btn"
+          :disabled="loading"
+          @click="handleLoadMore"
+        >
+          <Loader2 v-if="loading" :size="16" class="notification-panel__spinner" />
+          <ChevronDown v-else :size="16" />
+          <span>{{ loading ? '加载中...' : '加载更多' }}</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -297,11 +361,12 @@ function handleSettings() {
   align-items: center;
   gap: var(--space-sm);
   font-weight: 600;
+  font-size: var(--font-size-body);
   color: var(--color-text-primary);
 }
 
 .notification-panel__badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 18px;
@@ -316,7 +381,32 @@ function handleSettings() {
 
 .notification-panel__actions {
   display: flex;
+  align-items: center;
   gap: var(--space-xs);
+}
+
+.notification-panel__connection-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  background: var(--color-background);
+  transition: all var(--duration-fast);
+}
+
+.notification-panel__connection-status:hover {
+  background: var(--color-background-hover);
+}
+
+.notification-panel__connection-text {
+  white-space: nowrap;
+}
+
+.is-spinning {
+  animation: spin 1s linear infinite;
 }
 
 .notification-panel__action-btn {
@@ -350,15 +440,13 @@ function handleSettings() {
 }
 
 .notification-panel__spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
   to {
     transform: rotate(360deg);
   }
@@ -370,33 +458,31 @@ function handleSettings() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-2xl);
-  text-align: center;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  color: var(--color-text-secondary);
 }
 
 .notification-panel__empty-icon {
-  color: var(--color-text-tertiary);
-  margin-bottom: var(--space-md);
+  opacity: 0.3;
 }
 
 .notification-panel__empty-text {
-  font-size: var(--font-size-h6);
+  font-size: var(--font-size-body);
   font-weight: 500;
-  color: var(--color-text-secondary);
-  margin: 0 0 var(--space-xs);
+  color: var(--color-text-primary);
 }
 
 .notification-panel__empty-hint {
   font-size: var(--font-size-small);
-  color: var(--color-text-tertiary);
-  margin: 0;
+  opacity: 0.7;
 }
 
-/* 列表 */
+/* 通知列表 */
 .notification-panel__list {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-sm);
+  padding: var(--space-md);
 }
 
 .notification-panel__group {
@@ -404,42 +490,33 @@ function handleSettings() {
 }
 
 .notification-panel__date {
-  padding: var(--space-xs) var(--space-md);
   font-size: var(--font-size-small);
   font-weight: 500;
   color: var(--color-text-secondary);
-  background: var(--color-background);
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
-/* 通知项 */
 .notification-panel__item {
   display: flex;
+  align-items: flex-start;
   gap: var(--space-sm);
   padding: var(--space-md);
-  border-radius: var(--radius-md);
-  background: var(--color-white);
-  border: 1px solid var(--color-border);
-  margin-bottom: var(--space-sm);
-  transition: all var(--duration-fast);
-}
-
-.notification-panel__item:hover {
-  border-color: var(--color-primary-light);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  margin-bottom: var(--space-xs);
+  transition: background var(--duration-fast);
 }
 
 .notification-panel__item.is-unread {
-  background: var(--color-primary-light, rgba(99, 102, 241, 0.05));
-  border-color: var(--color-primary-light);
+  background: var(--color-primary-light);
 }
 
 .notification-panel__type-indicator {
   width: 4px;
-  height: 100%;
-  min-height: 40px;
-  border-radius: 2px;
+  height: 4px;
+  border-radius: 50%;
+  margin-top: 8px;
   flex-shrink: 0;
 }
 
@@ -461,15 +538,15 @@ function handleSettings() {
 }
 
 .notification-panel__time {
-  font-size: var(--font-size-small);
-  color: var(--color-text-tertiary);
+  font-size: 11px;
+  color: var(--color-text-secondary);
 }
 
 .notification-panel__item-title {
   font-size: var(--font-size-body);
   font-weight: 500;
   color: var(--color-text-primary);
-  margin: 0 0 var(--space-xs);
+  margin: 0 0 var(--space-xs) 0;
   line-height: 1.4;
 }
 
@@ -478,15 +555,16 @@ function handleSettings() {
   color: var(--color-text-secondary);
   margin: 0;
   line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .notification-panel__item-actions {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-xs);
   opacity: 0;
   transition: opacity var(--duration-fast);
@@ -504,26 +582,45 @@ function handleSettings() {
   height: 28px;
   border: none;
   background: transparent;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--duration-fast);
 }
 
 .notification-panel__item-btn:hover {
+  background: var(--color-white);
+  color: var(--color-text-primary);
+}
+
+/* 加载更多 */
+.notification-panel__load-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.notification-panel__load-more-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-small);
+  transition: all var(--duration-fast);
+}
+
+.notification-panel__load-more-btn:hover:not(:disabled) {
   background: var(--color-background);
   color: var(--color-text-primary);
 }
 
-/* 移动端适配 */
-@media (max-width: 640px) {
-  .notification-panel {
-    max-height: 70vh;
-    min-height: 250px;
-  }
-
-  .notification-panel__item-actions {
-    opacity: 1;
-  }
+.notification-panel__load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

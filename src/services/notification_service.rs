@@ -90,8 +90,9 @@ impl NotificationService {
     /// - `message`: 私信信息
     ///
     /// # 说明
-    /// - 如果接收者在线，通过WebSocket实时推送
-    /// - 如果接收者离线，存储到数据库待上线后同步
+    /// - 无论接收者是否在线，都先将通知存储到数据库（持久化）
+    /// - 如果接收者在线，额外通过WebSocket实时推送
+    /// - 这种"双写"模式确保通知不会丢失，同时保证实时性
     pub async fn send_private_message(
         &self,
         receiver_id: Uuid,
@@ -102,46 +103,9 @@ impl NotificationService {
             receiver_id
         );
 
-        let ws_message = WebSocketMessage::PrivateMessage {
-            message_id: message.message_id,
-            sender_id: message.sender_id,
-            sender_name: message.sender_name.clone(),
-            content: message.content.clone(),
-            created_at: message.created_at,
-        };
-
-        // 检查接收者是否在线
-        if self.ws_manager.is_user_online(receiver_id) {
-            // 在线：通过WebSocket实时推送
-            if let Ok(json) = ws_message.to_json() {
-                if let Err(e) = self.ws_manager.send_to_user(receiver_id, json).await {
-                    warn!(
-                        "Failed to send private message notification to online user {}: {}",
-                        receiver_id, e
-                    );
-                    // 发送失败时存储到数据库
-                    self.store_offline_notification(
-                        receiver_id,
-                        NotificationDbType::PrivateMessage,
-                        None,
-                        &format!("来自 {} 的私信", message.sender_name),
-                        &serde_json::to_value(&message).unwrap_or_default(),
-                    )
-                    .await?;
-                } else {
-                    debug!(
-                        "Private message notification sent to online user: {}",
-                        receiver_id
-                    );
-                }
-            }
-        } else {
-            // 离线：存储到数据库
-            debug!(
-                "User {} is offline, storing private message notification",
-                receiver_id
-            );
-            self.store_offline_notification(
+        // 1. 先存储到数据库（无论在线与否，确保持久化）
+        let notification_id = self
+            .store_notification(
                 receiver_id,
                 NotificationDbType::PrivateMessage,
                 None,
@@ -149,6 +113,36 @@ impl NotificationService {
                 &serde_json::to_value(&message).unwrap_or_default(),
             )
             .await?;
+
+        debug!(
+            "Private message notification stored to database, id: {}",
+            notification_id
+        );
+
+        // 2. 如果用户在线，额外推送WebSocket（异步，失败不影响已存储的通知）
+        if self.ws_manager.is_user_online(receiver_id) {
+            let ws_message = WebSocketMessage::PrivateMessage {
+                message_id: message.message_id,
+                sender_id: message.sender_id,
+                sender_name: message.sender_name.clone(),
+                content: message.content.clone(),
+                created_at: message.created_at,
+            };
+
+            if let Ok(json) = ws_message.to_json() {
+                if let Err(e) = self.ws_manager.send_to_user(receiver_id, json).await {
+                    warn!(
+                        "Failed to send private message WebSocket notification to user {}: {}. \
+                         Notification is already persisted in database.",
+                        receiver_id, e
+                    );
+                } else {
+                    debug!(
+                        "Private message WebSocket notification sent to online user: {}",
+                        receiver_id
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -161,8 +155,8 @@ impl NotificationService {
     /// - `mention_info`: @提及信息
     ///
     /// # 说明
-    /// - 如果用户在线，通过WebSocket实时推送
-    /// - 如果用户离线，存储到数据库
+    /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
+    /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_mention(
         &self,
         mentioned_user_id: Uuid,
@@ -173,35 +167,9 @@ impl NotificationService {
             mentioned_user_id
         );
 
-        let ws_message = WebSocketMessage::Mentioned {
-            message_id: mention_info.message_id,
-            room_id: mention_info.room_id,
-            mentioned_by: mention_info.mentioned_by,
-            mentioned_by_name: mention_info.mentioned_by_name.clone(),
-            content_preview: mention_info.content_preview.clone(),
-            created_at: mention_info.created_at,
-        };
-
-        // 检查用户是否在线
-        if self.ws_manager.is_user_online(mentioned_user_id) {
-            if let Ok(json) = ws_message.to_json() {
-                if let Err(e) = self.ws_manager.send_to_user(mentioned_user_id, json).await {
-                    warn!(
-                        "Failed to send mention notification to online user {}: {}",
-                        mentioned_user_id, e
-                    );
-                    self.store_offline_notification(
-                        mentioned_user_id,
-                        NotificationDbType::Mentioned,
-                        None,
-                        &format!("{} 提到了你", mention_info.mentioned_by_name),
-                        &serde_json::to_value(&mention_info).unwrap_or_default(),
-                    )
-                    .await?;
-                }
-            }
-        } else {
-            self.store_offline_notification(
+        // 1. 先存储到数据库（无论在线与否，确保持久化）
+        let notification_id = self
+            .store_notification(
                 mentioned_user_id,
                 NotificationDbType::Mentioned,
                 None,
@@ -209,6 +177,37 @@ impl NotificationService {
                 &serde_json::to_value(&mention_info).unwrap_or_default(),
             )
             .await?;
+
+        debug!(
+            "Mention notification stored to database, id: {}",
+            notification_id
+        );
+
+        // 2. 如果用户在线，额外推送WebSocket（异步，失败不影响已存储的通知）
+        if self.ws_manager.is_user_online(mentioned_user_id) {
+            let ws_message = WebSocketMessage::Mentioned {
+                message_id: mention_info.message_id,
+                room_id: mention_info.room_id,
+                mentioned_by: mention_info.mentioned_by,
+                mentioned_by_name: mention_info.mentioned_by_name.clone(),
+                content_preview: mention_info.content_preview.clone(),
+                created_at: mention_info.created_at,
+            };
+
+            if let Ok(json) = ws_message.to_json() {
+                if let Err(e) = self.ws_manager.send_to_user(mentioned_user_id, json).await {
+                    warn!(
+                        "Failed to send mention WebSocket notification to user {}: {}. \
+                         Notification is already persisted in database.",
+                        mentioned_user_id, e
+                    );
+                } else {
+                    debug!(
+                        "Mention WebSocket notification sent to online user: {}",
+                        mentioned_user_id
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -238,6 +237,10 @@ impl NotificationService {
     /// # 参数
     /// - `invited_user_id`: 被邀请的用户ID
     /// - `invitation`: 邀请信息
+    ///
+    /// # 说明
+    /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
+    /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_room_invitation(
         &self,
         invited_user_id: Uuid,
@@ -248,37 +251,9 @@ impl NotificationService {
             invited_user_id
         );
 
-        let ws_message = WebSocketMessage::RoomInvitation {
-            invitation_id: invitation.invitation_id,
-            room_id: invitation.room_id,
-            room_name: invitation.room_name.clone(),
-            invited_by: invitation.invited_by,
-            invited_by_name: invitation.invited_by_name.clone(),
-            created_at: invitation.created_at,
-        };
-
-        if self.ws_manager.is_user_online(invited_user_id) {
-            if let Ok(json) = ws_message.to_json() {
-                if let Err(e) = self.ws_manager.send_to_user(invited_user_id, json).await {
-                    warn!(
-                        "Failed to send room invitation to online user {}: {}",
-                        invited_user_id, e
-                    );
-                    self.store_offline_notification(
-                        invited_user_id,
-                        NotificationDbType::RoomInvitation,
-                        None,
-                        &format!(
-                            "{} 邀请你加入 {}",
-                            invitation.invited_by_name, invitation.room_name
-                        ),
-                        &serde_json::to_value(&invitation).unwrap_or_default(),
-                    )
-                    .await?;
-                }
-            }
-        } else {
-            self.store_offline_notification(
+        // 1. 先存储到数据库（无论在线与否，确保持久化）
+        let notification_id = self
+            .store_notification(
                 invited_user_id,
                 NotificationDbType::RoomInvitation,
                 None,
@@ -289,6 +264,37 @@ impl NotificationService {
                 &serde_json::to_value(&invitation).unwrap_or_default(),
             )
             .await?;
+
+        debug!(
+            "Room invitation notification stored to database, id: {}",
+            notification_id
+        );
+
+        // 2. 如果用户在线，额外推送WebSocket（异步，失败不影响已存储的通知）
+        if self.ws_manager.is_user_online(invited_user_id) {
+            let ws_message = WebSocketMessage::RoomInvitation {
+                invitation_id: invitation.invitation_id,
+                room_id: invitation.room_id,
+                room_name: invitation.room_name.clone(),
+                invited_by: invitation.invited_by,
+                invited_by_name: invitation.invited_by_name.clone(),
+                created_at: invitation.created_at,
+            };
+
+            if let Ok(json) = ws_message.to_json() {
+                if let Err(e) = self.ws_manager.send_to_user(invited_user_id, json).await {
+                    warn!(
+                        "Failed to send room invitation WebSocket notification to user {}: {}. \
+                         Notification is already persisted in database.",
+                        invited_user_id, e
+                    );
+                } else {
+                    debug!(
+                        "Room invitation WebSocket notification sent to online user: {}",
+                        invited_user_id
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -299,6 +305,10 @@ impl NotificationService {
     /// # 参数
     /// - `notification`: 系统通知信息
     /// - `target_users`: 目标用户列表，None表示广播给所有在线用户
+    ///
+    /// # 说明
+    /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
+    /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_system_notification(
         &self,
         notification: SystemNotificationInfo,
@@ -318,18 +328,9 @@ impl NotificationService {
             Some(user_ids) => {
                 // 发送给指定用户
                 for user_id in user_ids {
-                    if self.ws_manager.is_user_online(user_id) {
-                        if let Ok(json) = ws_message.to_json() {
-                            if let Err(e) = self.ws_manager.send_to_user(user_id, json).await {
-                                warn!(
-                                    "Failed to send system notification to user {}: {}",
-                                    user_id, e
-                                );
-                            }
-                        }
-                    } else {
-                        // 离线用户存储到数据库
-                        self.store_offline_notification(
+                    // 1. 先存储到数据库（无论在线与否，确保持久化）
+                    let notification_id = self
+                        .store_notification(
                             user_id,
                             NotificationDbType::SystemNotification,
                             Some(&notification.title),
@@ -337,14 +338,39 @@ impl NotificationService {
                             &serde_json::to_value(&notification).unwrap_or_default(),
                         )
                         .await?;
+
+                    debug!(
+                        "System notification stored to database for user {}, id: {}",
+                        user_id, notification_id
+                    );
+
+                    // 2. 如果用户在线，额外推送WebSocket（异步，失败不影响已存储的通知）
+                    if self.ws_manager.is_user_online(user_id) {
+                        if let Ok(json) = ws_message.to_json() {
+                            if let Err(e) = self.ws_manager.send_to_user(user_id, json).await {
+                                warn!(
+                                    "Failed to send system WebSocket notification to user {}: {}. \
+                                     Notification is already persisted in database.",
+                                    user_id, e
+                                );
+                            } else {
+                                debug!(
+                                    "System WebSocket notification sent to online user: {}",
+                                    user_id
+                                );
+                            }
+                        }
                     }
                 }
             }
             None => {
                 // 广播给所有在线用户
-                // 注意：这里简化处理，实际应用可能需要更高效的广播机制
-                // 目前只广播给已知的在线用户，无法遍历所有连接
-                warn!("Broadcasting system notification to all users is not fully implemented");
+                // 注意：广播模式下无法存储到数据库（不知道目标用户列表）
+                // 如果需要持久化广播通知，需要传入目标用户列表
+                warn!(
+                    "Broadcasting system notification to all users is not fully implemented. \
+                       To persist notifications, provide target user list instead of None."
+                );
             }
         }
 
@@ -356,6 +382,10 @@ impl NotificationService {
     /// # 参数
     /// - `user_id`: 上传文件的用户ID
     /// - `file_info`: 文件信息
+    ///
+    /// # 说明
+    /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
+    /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_file_upload_complete(
         &self,
         user_id: Uuid,
@@ -366,33 +396,9 @@ impl NotificationService {
             user_id
         );
 
-        let ws_message = WebSocketMessage::FileUploadComplete {
-            file_id: file_info.file_id,
-            file_name: file_info.file_name.clone(),
-            file_url: file_info.file_url.clone(),
-            file_size: file_info.file_size,
-            uploaded_at: file_info.uploaded_at,
-        };
-
-        if self.ws_manager.is_user_online(user_id) {
-            if let Ok(json) = ws_message.to_json() {
-                if let Err(e) = self.ws_manager.send_to_user(user_id, json).await {
-                    warn!(
-                        "Failed to send file upload notification to online user {}: {}",
-                        user_id, e
-                    );
-                    self.store_offline_notification(
-                        user_id,
-                        NotificationDbType::FileUploadComplete,
-                        None,
-                        &format!("文件 {} 上传完成", file_info.file_name),
-                        &serde_json::to_value(&file_info).unwrap_or_default(),
-                    )
-                    .await?;
-                }
-            }
-        } else {
-            self.store_offline_notification(
+        // 1. 先存储到数据库（无论在线与否，确保持久化）
+        let notification_id = self
+            .store_notification(
                 user_id,
                 NotificationDbType::FileUploadComplete,
                 None,
@@ -400,24 +406,65 @@ impl NotificationService {
                 &serde_json::to_value(&file_info).unwrap_or_default(),
             )
             .await?;
+
+        debug!(
+            "File upload complete notification stored to database, id: {}",
+            notification_id
+        );
+
+        // 2. 如果用户在线，额外推送WebSocket（异步，失败不影响已存储的通知）
+        if self.ws_manager.is_user_online(user_id) {
+            let ws_message = WebSocketMessage::FileUploadComplete {
+                file_id: file_info.file_id,
+                file_name: file_info.file_name.clone(),
+                file_url: file_info.file_url.clone(),
+                file_size: file_info.file_size,
+                uploaded_at: file_info.uploaded_at,
+            };
+
+            if let Ok(json) = ws_message.to_json() {
+                if let Err(e) = self.ws_manager.send_to_user(user_id, json).await {
+                    warn!(
+                        "Failed to send file upload WebSocket notification to user {}: {}. \
+                         Notification is already persisted in database.",
+                        user_id, e
+                    );
+                } else {
+                    debug!(
+                        "File upload WebSocket notification sent to online user: {}",
+                        user_id
+                    );
+                }
+            }
         }
 
         Ok(())
     }
 
-    /// 存储离线通知到数据库
-    async fn store_offline_notification(
+    /// 存储通知到数据库（统一存储方法）
+    ///
+    /// # 参数
+    /// - `user_id`: 接收通知的用户ID
+    /// - `notification_type`: 通知类型
+    /// - `title`: 通知标题（可选）
+    /// - `content`: 通知内容
+    /// - `data`: 附加数据（JSON格式）
+    ///
+    /// # 返回
+    /// - 成功返回通知ID
+    async fn store_notification(
         &self,
         user_id: Uuid,
         notification_type: NotificationDbType,
         title: Option<&str>,
         content: &str,
         data: &serde_json::Value,
-    ) -> Result<()> {
-        sqlx::query(
+    ) -> Result<Uuid> {
+        let result = sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO notifications (user_id, notification_type, title, content, data)
             VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
             "#,
         )
         .bind(user_id)
@@ -425,14 +472,14 @@ impl NotificationService {
         .bind(title)
         .bind(content)
         .bind(data)
-        .execute(self.db.pool())
+        .fetch_one(self.db.pool())
         .await
         .map_err(|e| {
-            error!("Failed to store offline notification: {}", e);
+            error!("Failed to store notification: {}", e);
             AppError::Database(e)
         })?;
 
-        Ok(())
+        Ok(result)
     }
 
     /// 获取用户的未读通知

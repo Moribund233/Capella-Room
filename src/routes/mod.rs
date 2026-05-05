@@ -7,7 +7,9 @@ use chrono::Utc;
 use std::sync::Arc;
 
 use crate::{
-    handlers::{admin, audit, auth, config, file, message, room, security, ui_config, user},
+    handlers::{
+        admin, audit, auth, config, file, message, notification, room, security, ui_config, user,
+    },
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
     middleware::auth_middleware,
@@ -50,6 +52,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // 消息路由
         .nest(&format!("/api/{}/messages", API_VERSION), message_routes())
         .nest("/api/messages", message_routes())
+        // 通知路由
+        .nest(
+            &format!("/api/{}/notifications", API_VERSION),
+            notification_routes(),
+        )
+        .nest("/api/notifications", notification_routes())
         // 文件路由
         .nest(&format!("/api/{}/files", API_VERSION), file_routes())
         .nest(&format!("/api/{}/upload", API_VERSION), upload_routes())
@@ -164,6 +172,15 @@ fn message_routes() -> Router<Arc<AppState>> {
             "/:message_id/history",
             get(message::get_message_edit_history),
         )
+}
+
+/// 通知路由
+fn notification_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/", get(notification::get_notifications))
+        .route("/unread-count", get(notification::get_unread_count))
+        .route("/:id/read", post(notification::mark_as_read))
+        .route("/read-all", post(notification::mark_all_as_read))
 }
 
 /// 文件路由

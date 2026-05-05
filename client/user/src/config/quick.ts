@@ -2,6 +2,7 @@
  * QuickBar 配置文件
  * 定义快捷按钮的配置项
  */
+import type { Ref } from 'vue'
 
 /**
  * Quick 子菜单项
@@ -47,8 +48,6 @@ export interface QuickItem {
   iconAlt?: string
   /** 显示标签 */
   label: string
-  /** 徽标数字 */
-  badge?: number
   /** 子菜单项（type为menu时有效） */
   children?: QuickChildItem[]
   /** 关联的处理函数名称 */
@@ -69,6 +68,8 @@ export interface QuickRuntimeItem extends QuickItem {
   onClick: () => void
   /** 子菜单选择处理函数 */
   onSelect?: (childKey: string) => void
+  /** 徽标数字（支持响应式 Ref） */
+  badge?: number | Ref<number>
   /** 允许扩展其他属性 */
   [key: string]: unknown
 }
@@ -92,7 +93,6 @@ export const quickBarConfig: QuickItem[] = [
     type: 'action',
     icon: 'Bell',
     label: '通知',
-    badge: 0,
     handler: 'useQuickNotification',
   },
 ]

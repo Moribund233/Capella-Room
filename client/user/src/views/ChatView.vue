@@ -140,8 +140,8 @@ function onTouchEnd(e: TouchEvent) {
   justify-content: center;
   gap: 6px;
   padding: 10px var(--space-lg);
-  background: var(--color-error, #d03050);
-  color: #fff;
+  background: var(--color-error);
+  color: var(--color-white);
   font-size: var(--font-size-small, 13px);
   flex-shrink: 0;
 }
@@ -188,15 +188,15 @@ function onTouchEnd(e: TouchEvent) {
 }
 
 .chat-view__test-info--ok {
-  color: var(--color-success, #18a058);
+  color: var(--color-success);
 }
 
 .chat-view__test-info--pending {
-  color: var(--color-warning, #f0a020);
+  color: var(--color-warning);
 }
 
 .chat-view__test-info--err {
-  color: var(--color-error, #d03050);
+  color: var(--color-error);
 }
 
 .chat-view__test-controls {

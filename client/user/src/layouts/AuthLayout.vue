@@ -9,6 +9,7 @@ const { isMobile } = useResponsive()
     <div class="auth-layout__container">
       <div v-if="!isMobile" class="auth-layout__banner">
         <div class="auth-layout__banner-content">
+          <img src="/favicon.svg" alt="Seredeli Room" class="auth-layout__logo" />
           <h1 class="auth-layout__title">Seredeli Room</h1>
           <p class="auth-layout__subtitle">现代化实时聊天室</p>
         </div>
@@ -47,13 +48,20 @@ const { isMobile } = useResponsive()
   justify-content: center;
   width: 360px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--color-primary) 0%, #05a34e 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-pressed) 100%);
   color: var(--color-white);
 }
 
 .auth-layout__banner-content {
   text-align: center;
   padding: var(--space-3xl);
+}
+
+.auth-layout__logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--space-lg);
+  filter: brightness(0) invert(1);
 }
 
 .auth-layout__title {

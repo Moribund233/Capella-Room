@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { roomApi } from '@/api/room'
+import { useAuthStore } from '@/stores/auth'
 import type { Room, RoomMember, CreateRoomData } from '@/types/room'
 
 export const useRoomStore = defineStore('room', () => {
@@ -10,6 +11,9 @@ export const useRoomStore = defineStore('room', () => {
   const members = ref<RoomMember[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  // 获取认证状态
+  const getAuthStore = () => useAuthStore()
 
   // 计算属性
   const roomMap = computed(() => {
@@ -39,6 +43,11 @@ export const useRoomStore = defineStore('room', () => {
 
   // 获取我加入的房间
   async function fetchMyRooms() {
+    // 检查用户是否已登录
+    const authStore = getAuthStore()
+    if (!authStore.isAuthenticated) {
+      return
+    }
     loading.value = true
     error.value = null
     try {

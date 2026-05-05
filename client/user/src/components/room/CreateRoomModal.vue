@@ -173,7 +173,7 @@ function handleClose() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--color-mask);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -181,11 +181,11 @@ function handleClose() {
 }
 
 .modal-container {
-  background: #fff;
+  background: var(--color-white);
   border-radius: 12px;
   width: 440px;
   max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px var(--color-shadow-dark);
 }
 
 .modal-header {
@@ -280,7 +280,7 @@ function handleClose() {
   text-align: center;
   margin-bottom: 0;
   padding: 8px;
-  background: rgba(208, 48, 80, 0.06);
+  background: var(--color-error-light);
   border-radius: 6px;
 }
 
@@ -308,8 +308,8 @@ function handleClose() {
 }
 
 .btn--primary {
-  background: var(--color-primary, #2080f0);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-white);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -317,12 +317,12 @@ function handleClose() {
 }
 
 .btn--secondary {
-  background: var(--color-background, #f5f5f5);
-  color: var(--color-text, #333);
-  border: 1px solid var(--color-border, #d9d9d9);
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }
 
 .btn--secondary:hover:not(:disabled) {
-  background: #e8e8e8;
+  background: var(--color-border-light);
 }
 </style>

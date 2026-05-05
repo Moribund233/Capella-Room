@@ -200,7 +200,7 @@ onUnmounted(() => {
   height: 32px;
   border-radius: var(--radius-full);
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -241,7 +241,7 @@ onUnmounted(() => {
   margin-bottom: 2px;
   border-left: 3px solid var(--color-primary);
   border-radius: 4px;
-  background: rgba(7, 193, 96, 0.06);
+  background: var(--color-primary-soft);
   cursor: default;
 }
 
@@ -286,9 +286,9 @@ onUnmounted(() => {
 }
 
 .message-bubble--own .message-bubble__content {
-  background: var(--color-primary);
+  background: var(--color-message-self-bg);
   border-radius: 12px 4px 12px 12px;
-  color: #fff;
+  color: var(--color-message-self-text);
 }
 
 .message-bubble--failed .message-bubble__content {
@@ -328,7 +328,7 @@ onUnmounted(() => {
 }
 
 .message-bubble--own .message-bubble__time {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-message-time-text);
 }
 
 .message-bubble__edited {
@@ -349,10 +349,10 @@ onUnmounted(() => {
 }
 
 .message-bubble--own .message-bubble__status--sending {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-message-time-text);
 }
 
 .message-bubble--own .message-bubble__status--error {
-  color: #ffccc7;
+  color: var(--color-message-error-text);
 }
 </style>

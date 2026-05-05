@@ -1,6 +1,7 @@
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useRoomStore } from '@/stores/room'
+import { useAuthStore } from '@/stores/auth'
 import { useWebSocketStore } from '@/stores/websocket'
 import type { CreateRoomData } from '@/types/room'
 import { ROUTE_PATHS } from '@/constants'
@@ -8,10 +9,15 @@ import { ROUTE_PATHS } from '@/constants'
 export function useRoom() {
   const router = useRouter()
   const roomStore = useRoomStore()
+  const authStore = useAuthStore()
   const wsStore = useWebSocketStore()
   const { rooms, currentRoom, members, loading, error } = storeToRefs(roomStore)
 
   async function loadRooms() {
+    // 仅在用户已登录时获取房间列表
+    if (!authStore.isAuthenticated) {
+      return
+    }
     await roomStore.fetchMyRooms()
   }
 

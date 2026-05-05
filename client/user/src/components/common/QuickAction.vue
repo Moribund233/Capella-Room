@@ -47,6 +47,18 @@ function getIconComponent(iconName: string): FunctionalComponent<LucideProps> {
 const IconComponent = computed(() => getIconComponent(props.item.currentIcon))
 
 /**
+ * 计算徽章数值（支持普通值和 Ref）
+ */
+const badgeValue = computed(() => {
+  const badge = props.item.badge
+  // 检查是否是 Ref 对象
+  if (badge && typeof badge === 'object' && 'value' in badge) {
+    return (badge as { value: number }).value || 0
+  }
+  return (badge as number) || 0
+})
+
+/**
  * 处理点击
  */
 function handleClick() {
@@ -72,8 +84,8 @@ function handleClick() {
       <IconComponent class="quick-action__icon" :size="18" />
     </div>
     <!-- 徽标 -->
-    <span v-if="item.badge && item.badge > 0" class="quick-action__badge">
-      {{ item.badge > 99 ? '99+' : item.badge }}
+    <span v-if="badgeValue > 0" class="quick-action__badge">
+      {{ badgeValue > 99 ? '99+' : badgeValue }}
     </span>
     <!-- 激活指示器 -->
     <div v-if="item.isActive" class="quick-action__active-dot" />

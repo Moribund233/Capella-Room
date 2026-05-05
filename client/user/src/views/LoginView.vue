@@ -4,11 +4,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { NButton, NInput, NForm, NFormItem, useMessage } from 'naive-ui'
 import type { FormRules } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
+import { useResponsive } from '@/composables/useResponsive'
 
 const router = useRouter()
 const route = useRoute()
 const message = useMessage()
 const authStore = useAuthStore()
+const { isMobile } = useResponsive()
 
 const form = reactive({
   email: '',
@@ -57,6 +59,10 @@ function goRegister() {
 
 <template>
   <div class="login-view">
+    <div v-if="isMobile" class="login-view__header">
+      <img src="/favicon.svg" alt="Seredeli Room" class="login-view__logo" />
+      <span class="login-view__app-name">Seredeli Room</span>
+    </div>
     <h2 class="login-view__title">欢迎回来</h2>
     <p class="login-view__subtitle">请登录你的账号</p>
 
@@ -102,6 +108,24 @@ function goRegister() {
 .login-view {
   width: 100%;
   max-width: 320px;
+}
+
+.login-view__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+}
+
+.login-view__logo {
+  width: 32px;
+  height: 32px;
+}
+
+.login-view__app-name {
+  font-size: var(--font-size-h4);
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .login-view__title {

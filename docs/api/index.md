@@ -114,9 +114,25 @@ ws://localhost:8080/ws
 | | `Typing` / `StopTyping` | C→S | 输入状态 |
 | **用户状态** | `UpdateStatus` | C→S | 更新状态 |
 | | `UserStatusChanged` | S→C | 用户状态变更 |
+| **通知系统** | `PrivateMessage` | S→C | 私信通知 |
+| | `Mentioned` | S→C | @提及通知 |
+| | `RoomInvitation` | S→C | 房间邀请通知 |
+| | `SystemNotification` | S→C | 系统通知 |
+| | `FileUploadComplete` | S→C | 文件上传完成通知 |
+| | `PendingAction` | S→C | 待办通知 |
+| | `GetOfflineNotifications` | C→S | 获取离线通知 (⚠️ 已弃用) |
+| | `OfflineNotifications` | S→C | 离线通知列表 |
+| | `MarkNotificationRead` | C→S | 标记通知已读 (❌ 已移除) |
+| | `MarkAllNotificationsRead` | C→S | 标记所有已读 (❌ 已移除) |
+| | `NotificationReadConfirm` | S→C | 已读确认 |
+| | `RespondPendingAction` | C→S | 响应待办通知 |
+| | `GetPendingActions` | C→S | 获取待办列表 |
+| | `PendingActionsList` | S→C | 待办列表响应 |
 
 > **C→S**: Client to Server (客户端发送)  
 > **S→C**: Server to Client (服务端推送)
+>
+> **注意**: 通知的获取和已读标记已迁移到 HTTP API，详见 [通知接口文档](./v1/http/notifications.md)
 
 ---
 
@@ -225,6 +241,21 @@ ws://localhost:8080/ws
 | DELETE | `/api/v1/ui/config` | 是 | 重置用户 UI 配置 |
 
 **详细文档**: [ui-config.md](./v1/http/ui-config.md)
+
+---
+
+### 通知接口
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/notifications` | 是 | 获取通知列表 |
+| GET | `/api/v1/notifications/unread-count` | 是 | 获取未读通知数量 |
+| POST | `/api/v1/notifications/:id/read` | 是 | 标记通知已读 |
+| POST | `/api/v1/notifications/read-all` | 是 | 标记所有通知已读 |
+
+**详细文档**: [notifications.md](./v1/http/notifications.md)
+
+> **架构说明**: 通知系统采用双写模式，所有通知先写入数据库，再推送 WebSocket（如果用户在线）。HTTP API 用于获取通知列表和标记已读，WebSocket 仅用于实时推送新通知。
 
 ---
 

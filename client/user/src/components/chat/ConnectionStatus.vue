@@ -77,7 +77,7 @@ const statusConfig = computed(() => {
 }
 
 .connection-status--connected {
-  color: var(--color-success, #18a058);
+  color: var(--color-success);
 }
 
 .connection-status--connected .connection-status__dot {
@@ -85,7 +85,7 @@ const statusConfig = computed(() => {
 }
 
 .connection-status--connecting {
-  color: var(--color-warning, #f0a020);
+  color: var(--color-warning);
 }
 
 .connection-status--connecting .connection-status__dot {
@@ -101,12 +101,12 @@ const statusConfig = computed(() => {
 }
 
 .connection-status--disconnected {
-  color: var(--color-error, #d03050);
+  color: var(--color-error);
 }
 
 .connection-status--offline {
-  color: var(--color-error, #d03050);
-  background: rgba(208, 48, 80, 0.08);
+  color: var(--color-error);
+  background: var(--color-error-light);
 }
 
 .connection-status--offline .connection-status__dot {

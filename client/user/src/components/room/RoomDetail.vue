@@ -132,8 +132,8 @@ function roleLabel(role: string) {
 <style scoped>
 .room-detail {
   width: 280px;
-  border-left: 1px solid var(--color-border, #e0e0e0);
-  background: var(--color-white, #fff);
+  border-left: 1px solid var(--color-border);
+  background: var(--color-white);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -145,7 +145,7 @@ function roleLabel(role: string) {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -160,7 +160,7 @@ function roleLabel(role: string) {
   border: none;
   font-size: 16px;
   cursor: pointer;
-  color: var(--color-text-tertiary, #999);
+  color: var(--color-text-tertiary);
   padding: 2px;
 }
 
@@ -171,7 +171,7 @@ function roleLabel(role: string) {
 
 .room-detail__section {
   padding: 14px 16px;
-  border-bottom: 1px solid var(--color-border, #f0f0f0);
+  border-bottom: 1px solid var(--color-border-lighter);
 }
 
 .room-detail__section-title {
@@ -187,10 +187,10 @@ function roleLabel(role: string) {
 
 .room-detail__count {
   font-size: 11px;
-  background: var(--color-background, #f5f5f5);
+  background: var(--color-background);
   padding: 1px 6px;
   border-radius: 8px;
-  color: var(--color-text-secondary, #666);
+  color: var(--color-text-secondary);
 }
 
 .room-detail__info-row {
@@ -205,7 +205,7 @@ function roleLabel(role: string) {
 }
 
 .room-detail__value {
-  color: var(--color-text, #333);
+  color: var(--color-text-primary);
   text-align: right;
   max-width: 60%;
   overflow: hidden;
@@ -229,8 +229,8 @@ function roleLabel(role: string) {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--color-primary, #2080f0);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-white);
   display: flex;
   align-items: center;
   justify-content: center;
