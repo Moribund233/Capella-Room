@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use crate::{
     handlers::{
-        admin, audit, auth, config, file, message, notification, room, security, ui_config, user,
-        user_settings,
+        account_security, admin, audit, auth, config, file, message, notification, room, security,
+        ui_config, user, user_settings,
     },
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
@@ -131,11 +131,34 @@ fn user_routes() -> Router<Arc<AppState>> {
         // 用户设置
         .route("/me/settings", get(user_settings::get_user_settings))
         .route("/me/settings", patch(user_settings::update_user_settings))
-        // 房间级设置
+        // 账号安全
         .route(
-            "/me/rooms/settings",
-            get(user_settings::list_room_settings),
+            "/me/security/overview",
+            get(account_security::get_security_overview),
         )
+        .route("/me/devices", get(account_security::list_devices))
+        .route(
+            "/me/devices/:device_id",
+            delete(account_security::terminate_device),
+        )
+        .route(
+            "/me/devices/:device_id/block",
+            post(account_security::block_device),
+        )
+        .route(
+            "/me/devices/:device_id/unblock",
+            post(account_security::unblock_device),
+        )
+        .route(
+            "/me/login-history",
+            get(account_security::get_login_history),
+        )
+        .route(
+            "/me/login-history/suspicious",
+            get(account_security::get_suspicious_logins),
+        )
+        // 房间级设置
+        .route("/me/rooms/settings", get(user_settings::list_room_settings))
         .route(
             "/me/rooms/:room_id/settings",
             get(user_settings::get_room_settings)

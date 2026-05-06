@@ -1,3 +1,4 @@
+pub mod account_security_service;
 pub mod alert_engine;
 pub mod alert_handler;
 pub mod audit_service;

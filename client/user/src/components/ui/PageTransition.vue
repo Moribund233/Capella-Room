@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-type TransitionName = 'slide' | 'fade' | 'scale' | 'slide-up' | 'slide-down'
+type TransitionName = 'slide' | 'fade' | 'scale' | 'slide-up' | 'slide-down' | 'tab-slide'
 
 const props = withDefaults(defineProps<{
   name?: TransitionName
@@ -102,5 +102,27 @@ const transitionStyle = computed(() => ({
 .page-slide-down-leave-to {
   opacity: 0;
   transform: translateY(30px);
+}
+
+/* Tab 滑动切换 - 更流畅的左右滑动效果 */
+.page-tab-slide-enter-active,
+.page-tab-slide-leave-active {
+  transition: all var(--transition-duration, 300ms) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-tab-slide-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.page-tab-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.page-tab-slide-enter-to,
+.page-tab-slide-leave-from {
+  opacity: 1;
+  transform: translateX(0);
 }
 </style>

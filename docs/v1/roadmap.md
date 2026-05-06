@@ -1409,28 +1409,30 @@ CREATE UNIQUE INDEX idx_ip_lists_address_type ON ip_lists(ip_address, list_type)
 - ✅ 审计集成：IP 安全事件自动记录到审计系统
 - ✅ 测试覆盖：15 个 IP 安全测试全部通过
 
-- [⏸️] **8.7.2 用户账号安全系统**（规划中，待实施）
+- [✅] **8.7.2 用户账号安全系统**（已完成）
   - **目标**：实现用户级账号安全功能，支持用户查看和管理登录设备、登录历史，增强账号安全性
-  - **数据库设计**（规划）：
-    - 创建 `user_sessions` 表存储用户登录会话信息
-      - 字段：session_token_hash、device_name、device_type、ip_address、user_agent、is_current、last_active_at、expires_at
-    - 创建 `login_history` 表存储用户登录历史
-      - 字段：ip_address、device_info、login_status、failure_reason、created_at
-  - **核心功能**（规划）：
-    - 登录设备管理：查看当前所有登录设备，支持远程登出指定设备
-    - 登录历史查询：查看近期登录记录（IP、时间、设备、登录结果）
-    - 异地登录检测：检测到异常登录地点时通过系统通知推送安全提醒
-    - 会话安全（用户可选启用）：JWT Token 绑定设备指纹，支持单设备登出（当前允许多设备同时登录）
-  - **API 接口**（规划）：
-    - `GET /api/v1/users/me/sessions` - 获取当前登录设备列表
-    - `DELETE /api/v1/users/me/sessions/:id` - 登出指定设备
-    - `GET /api/v1/users/me/login-history` - 获取登录历史记录
-  - **前端配套**（规划）：
-    - SettingsView.vue 新增"账号安全"模块
-    - 设备管理界面：显示设备列表、设备类型图标、登录时间、操作按钮
-    - 登录历史界面：时间线形式展示登录记录
+  - **数据库设计**（已完成）：
+    - ✅ 创建 `user_sessions` 表存储用户登录会话信息
+      - 字段：session_token_hash、device_name、device_type、ip_address、user_agent、is_current、is_active、is_blocked、last_active_at、expires_at
+    - ✅ 创建 `login_history` 表存储用户登录历史
+      - 字段：ip_address、device_info、login_status、failure_reason、is_suspicious、risk_level、created_at
+  - **核心功能**（已完成）：
+    - ✅ 登录设备管理：查看当前所有登录设备，支持远程登出指定设备
+    - ✅ 设备禁用管理：支持用户禁用/启用设备，被禁用设备无法使用旧 Token 登录
+    - ✅ 登录历史查询：查看近期登录记录（IP、时间、设备、登录结果）
+    - ✅ 异地登录检测：检测到异常登录地点时通过系统通知推送安全提醒
+    - ✅ 会话安全（用户可选启用）：用户设置中添加 `single_device_login` 开关，开启后只允许单设备登录
+  - **API 接口**（已完成）：
+    - ✅ `GET /api/v1/users/me/devices` - 获取当前登录设备列表（包含 is_blocked 状态）
+    - ✅ `DELETE /api/v1/users/me/devices/:id` - 登出指定设备
+    - ✅ `POST /api/v1/users/me/devices/:id/block` - 禁用指定设备
+    - ✅ `POST /api/v1/users/me/devices/:id/unblock` - 启用被禁用的设备
+    - ✅ `DELETE /api/v1/users/me/devices` - 登出所有其他设备
+    - ✅ `GET /api/v1/users/me/login-history` - 获取登录历史记录
+    - ✅ `GET /api/v1/users/me/login-history/suspicious` - 获取可疑登录记录
+    - ✅ `GET /api/v1/users/me/security/overview` - 获取账号安全概览
   - **依赖**：依赖阶段 8.4 审计系统的用户事件记录能力
-  - **状态**：⏸️ 待开发，预计 2-3 天
+  - **状态**：✅ 已完成
 
 ---
 

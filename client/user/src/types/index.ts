@@ -16,3 +16,23 @@ export type {
   MessageHandler, ConnectionStateHandler,
 } from './websocket'
 export { WSMessageType, buildMessage, parseMessage } from './websocket'
+export type {
+  UserSettings,
+  PartialUserSettings,
+  NotificationSettings,
+  PrivacySettings,
+  MessageSettings,
+  SecuritySettings,
+  LocaleSettings,
+  AccessibilitySettings,
+  MediaSettings,
+  LoginDevice,
+  LoginHistory,
+  DeviceType,
+  VisibilityOption,
+  FontSize,
+  TimeFormat,
+  DateFormat,
+  WeekStartDay,
+  ImageQuality,
+} from './settings'

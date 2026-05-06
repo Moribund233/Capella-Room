@@ -25,6 +25,8 @@
 Seredeli Room 是一个基于 Rust + Axum 构建的实时聊天室后端服务，提供以下核心功能：
 
 - **用户管理**: 注册、登录、资料管理
+- **用户设置**: 通知、隐私、消息、语言、无障碍、媒体设置
+- **账号安全**: 设备管理、登录历史、单设备登录、设备禁用
 - **聊天室**: 创建、加入、离开、成员管理
 - **实时消息**: WebSocket 双向通信，支持文本/图片/文件消息
 - **消息功能**: 发送、编辑、删除、回复、搜索
@@ -176,6 +178,26 @@ ws://localhost:8080/ws
 | POST | `/api/v1/users/logout` | 是 | 登出 |
 | GET | `/api/v1/users` | 是 | 获取用户列表 |
 | GET | `/api/v1/users/:user_id` | 是 | 获取指定用户信息 |
+
+#### 用户设置接口
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/users/me/settings` | 是 | 获取用户设置 |
+| PATCH | `/api/v1/users/me/settings` | 是 | 部分更新用户设置 |
+
+#### 账号安全接口
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/users/me/security/overview` | 是 | 获取账号安全概览 |
+| GET | `/api/v1/users/me/devices` | 是 | 获取登录设备列表 |
+| DELETE | `/api/v1/users/me/devices/:device_id` | 是 | 登出指定设备 |
+| POST | `/api/v1/users/me/devices/:device_id/block` | 是 | 禁用指定设备 |
+| POST | `/api/v1/users/me/devices/:device_id/unblock` | 是 | 启用被禁用的设备 |
+| POST | `/api/v1/users/me/devices/terminate-others` | 是 | 登出所有其他设备 |
+| GET | `/api/v1/users/me/login-history` | 是 | 获取登录历史 |
+| GET | `/api/v1/users/me/login-history/suspicious` | 是 | 获取可疑登录记录 |
 
 **详细文档**: [user.md](./v1/http/user.md)
 

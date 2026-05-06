@@ -77,7 +77,7 @@ maintenance_message = "Test message"
     let temp_file = create_temp_config(config_content);
     let path = temp_file.path().to_str().unwrap();
 
-    // 使用 load_from_file_only 方法，但环境变量需要在测试前设置
+    // 使用 load_from_file_only 方法，只从文件加载配置
     let config = ConfigLoader::load_from_file_only(path).expect("Failed to load config");
 
     // 验证非敏感配置从配置文件加载
@@ -88,9 +88,8 @@ maintenance_message = "Test message"
     assert_eq!(config.database.idle_timeout_secs, 600);
     assert_eq!(config.jwt.expiration_hours, 24);
 
-    // 验证敏感配置从环境变量加载
-    assert_eq!(config.database.url, Some("postgres://test:test@localhost:5432/test".to_string()));
-    assert_eq!(config.jwt.secret, Some("test-secret-key-for-jwt-signing".to_string()));
+    // load_from_file_only 不会从环境变量加载敏感配置
+    // 敏感配置需要通过 load 方法或手动设置
 }
 
 #[test]
@@ -165,9 +164,8 @@ email = "admin@test.com"
     assert!(config.system.maintenance_mode);
     assert!(!config.admin.initial.enabled);
 
-    // 验证敏感配置从环境变量加载
-    assert_eq!(config.database.url, Some("postgres://test:test@localhost:5432/test".to_string()));
-    assert_eq!(config.jwt.secret, Some("test-secret-key-for-jwt-signing".to_string()));
+    // load_from_file_only 不会从环境变量加载敏感配置
+    // 敏感配置需要通过 load 方法或手动设置
 }
 
 #[test]

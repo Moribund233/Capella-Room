@@ -148,12 +148,18 @@ mod user_model_tests {
         let valid = LoginRequest {
             email: "test@example.com".to_string(),
             password: "password123".to_string(),
+            device_name: None,
+            device_type: None,
+            user_agent: None,
         };
         assert!(valid.validate().is_ok());
 
         let invalid_email = LoginRequest {
             email: "invalid-email".to_string(),
             password: "password123".to_string(),
+            device_name: None,
+            device_type: None,
+            user_agent: None,
         };
         assert!(invalid_email.validate().is_err());
     }

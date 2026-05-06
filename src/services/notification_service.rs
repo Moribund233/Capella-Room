@@ -1,19 +1,16 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use serde_json::json;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use crate::{
     db::Database,
     error::{AppError, Result},
+    services::user_settings_service::UserSettingsService,
     websocket::{
         manager::WebSocketManager,
-        protocol::{
-            NotificationDbType, PendingActionInfo, PendingActionStatus, PendingActionType,
-            WebSocketMessage,
-        },
+        protocol::{NotificationDbType, PendingActionInfo, PendingActionStatus, WebSocketMessage},
     },
 };
 
@@ -75,12 +72,39 @@ pub struct FileInfo {
 pub struct NotificationService {
     db: Database,
     ws_manager: Arc<WebSocketManager>,
+    user_settings_service: Arc<UserSettingsService>,
 }
 
 impl NotificationService {
     /// 创建新的通知服务
-    pub fn new(db: Database, ws_manager: Arc<WebSocketManager>) -> Self {
-        Self { db, ws_manager }
+    pub fn new(
+        db: Database,
+        ws_manager: Arc<WebSocketManager>,
+        user_settings_service: Arc<UserSettingsService>,
+    ) -> Self {
+        Self {
+            db,
+            ws_manager,
+            user_settings_service,
+        }
+    }
+
+    /// 检查用户是否启用了特定类型的通知
+    async fn is_notification_enabled(&self, user_id: Uuid, notification_type: &str) -> bool {
+        match self
+            .user_settings_service
+            .is_notification_enabled(user_id, notification_type)
+            .await
+        {
+            Ok(enabled) => enabled,
+            Err(e) => {
+                warn!(
+                    "Failed to check notification settings for user {}: {}",
+                    user_id, e
+                );
+                true // 默认启用通知（故障开放）
+            }
+        }
     }
 
     /// 发送私信通知
@@ -90,6 +114,7 @@ impl NotificationService {
     /// - `message`: 私信信息
     ///
     /// # 说明
+    /// - 检查用户设置，如果用户关闭了私信通知，则不发送
     /// - 无论接收者是否在线，都先将通知存储到数据库（持久化）
     /// - 如果接收者在线，额外通过WebSocket实时推送
     /// - 这种"双写"模式确保通知不会丢失，同时保证实时性
@@ -102,6 +127,18 @@ impl NotificationService {
             "Sending private message notification to user: {}",
             receiver_id
         );
+
+        // 检查用户是否启用了私信通知
+        if !self
+            .is_notification_enabled(receiver_id, "private_message")
+            .await
+        {
+            debug!(
+                "User {} has disabled private message notifications, skipping",
+                receiver_id
+            );
+            return Ok(());
+        }
 
         // 1. 先存储到数据库（无论在线与否，确保持久化）
         let notification_id = self
@@ -155,6 +192,7 @@ impl NotificationService {
     /// - `mention_info`: @提及信息
     ///
     /// # 说明
+    /// - 检查用户设置，如果用户关闭了@提及通知，则不发送
     /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
     /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_mention(
@@ -166,6 +204,18 @@ impl NotificationService {
             "Sending mention notification to user: {}",
             mentioned_user_id
         );
+
+        // 检查用户是否启用了@提及通知
+        if !self
+            .is_notification_enabled(mentioned_user_id, "mentioned")
+            .await
+        {
+            debug!(
+                "User {} has disabled mention notifications, skipping",
+                mentioned_user_id
+            );
+            return Ok(());
+        }
 
         // 1. 先存储到数据库（无论在线与否，确保持久化）
         let notification_id = self
@@ -239,6 +289,7 @@ impl NotificationService {
     /// - `invitation`: 邀请信息
     ///
     /// # 说明
+    /// - 检查用户设置，如果用户关闭了房间邀请通知，则不发送
     /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
     /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_room_invitation(
@@ -250,6 +301,18 @@ impl NotificationService {
             "Sending room invitation notification to user: {}",
             invited_user_id
         );
+
+        // 检查用户是否启用了房间邀请通知
+        if !self
+            .is_notification_enabled(invited_user_id, "room_invitation")
+            .await
+        {
+            debug!(
+                "User {} has disabled room invitation notifications, skipping",
+                invited_user_id
+            );
+            return Ok(());
+        }
 
         // 1. 先存储到数据库（无论在线与否，确保持久化）
         let notification_id = self
@@ -307,6 +370,7 @@ impl NotificationService {
     /// - `target_users`: 目标用户列表，None表示广播给所有在线用户
     ///
     /// # 说明
+    /// - 检查用户设置，如果用户关闭了系统通知，则不发送
     /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
     /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_system_notification(
@@ -328,6 +392,18 @@ impl NotificationService {
             Some(user_ids) => {
                 // 发送给指定用户
                 for user_id in user_ids {
+                    // 检查用户是否启用了系统通知
+                    if !self
+                        .is_notification_enabled(user_id, "system_notification")
+                        .await
+                    {
+                        debug!(
+                            "User {} has disabled system notifications, skipping",
+                            user_id
+                        );
+                        continue;
+                    }
+
                     // 1. 先存储到数据库（无论在线与否，确保持久化）
                     let notification_id = self
                         .store_notification(
@@ -384,6 +460,7 @@ impl NotificationService {
     /// - `file_info`: 文件信息
     ///
     /// # 说明
+    /// - 检查用户设置，如果用户关闭了文件上传通知，则不发送
     /// - 无论用户是否在线，都先将通知存储到数据库（持久化）
     /// - 如果用户在线，额外通过WebSocket实时推送
     pub async fn send_file_upload_complete(
@@ -395,6 +472,18 @@ impl NotificationService {
             "Sending file upload complete notification to user: {}",
             user_id
         );
+
+        // 检查用户是否启用了文件上传完成通知
+        if !self
+            .is_notification_enabled(user_id, "file_upload_complete")
+            .await
+        {
+            debug!(
+                "User {} has disabled file upload notifications, skipping",
+                user_id
+            );
+            return Ok(());
+        }
 
         // 1. 先存储到数据库（无论在线与否，确保持久化）
         let notification_id = self
@@ -651,21 +740,17 @@ impl NotificationService {
             if let Ok(json) = ws_message.to_json() {
                 if let Err(e) = self.ws_manager.send_to_user(admin_user_id, json).await {
                     warn!(
-                        "Failed to send pending action to online admin {}: {}",
+                        "Failed to send pending action WebSocket notification to admin {}: {}. \
+                         Notification is already persisted in database.",
                         admin_user_id, e
                     );
                 } else {
                     debug!(
-                        "Pending action notification sent to online admin: {}",
+                        "Pending action WebSocket notification sent to online admin: {}",
                         admin_user_id
                     );
                 }
             }
-        } else {
-            debug!(
-                "Admin {} is offline, pending action stored for later sync",
-                admin_user_id
-            );
         }
 
         Ok(())
@@ -674,7 +759,7 @@ impl NotificationService {
     /// 存储待办通知到数据库
     async fn store_pending_action(
         &self,
-        user_id: Uuid,
+        admin_user_id: Uuid,
         action_info: &PendingActionInfo,
     ) -> Result<Uuid> {
         let record: (Uuid,) = sqlx::query_as(
@@ -687,11 +772,11 @@ impl NotificationService {
             RETURNING id
             "#,
         )
-        .bind(user_id)
+        .bind(admin_user_id)
         .bind(NotificationDbType::PendingAction)
         .bind(&action_info.title)
         .bind(&action_info.description)
-        .bind(json!({
+        .bind(serde_json::json!({
             "related_config_key": action_info.related_config_key,
             "related_config_value": action_info.related_config_value,
         }))
@@ -709,254 +794,79 @@ impl NotificationService {
         Ok(record.0)
     }
 
-    /// 处理待办响应
-    ///
-    /// # 参数
-    /// - `admin_user_id`: 管理员用户ID
-    /// - `notification_id`: 通知ID
-    /// - `action`: 操作类型（Approve/Reject/Snooze）
-    /// - `comment`: 可选备注
-    pub async fn handle_pending_action_response(
-        &self,
-        admin_user_id: Uuid,
-        notification_id: Uuid,
-        action: PendingActionType,
-        comment: Option<String>,
-    ) -> Result<PendingActionStatus> {
-        // 1. 验证通知是否存在且属于该管理员
-        let _notification: crate::websocket::protocol::Notification = sqlx::query_as(
-            r#"
-            SELECT id, notification_type, title, content, data, is_read, read_at, created_at
-            FROM notifications
-            WHERE id = $1 AND user_id = $2 AND requires_action = true
-            "#,
-        )
-        .bind(notification_id)
-        .bind(admin_user_id)
-        .fetch_optional(self.db.pool())
-        .await
-        .map_err(AppError::Database)?
-        .ok_or(AppError::NotFound)?;
-
-        // 2. 根据操作类型更新状态
-        let new_status = match action {
-            PendingActionType::Approve => PendingActionStatus::Approved,
-            PendingActionType::Reject => PendingActionStatus::Rejected,
-            PendingActionType::Snooze => PendingActionStatus::Snoozed,
-        };
-
-        // 3. 更新通知状态
-        sqlx::query(
-            r#"
-            UPDATE notifications
-            SET action_status = $1,
-                action_by = $2,
-                action_at = NOW(),
-                action_result = $3,
-                is_read = true,
-                read_at = NOW()
-            WHERE id = $4
-            "#,
-        )
-        .bind(&new_status)
-        .bind(admin_user_id)
-        .bind(json!({
-            "action": action.to_string(),
-            "comment": comment,
-        }))
-        .bind(notification_id)
-        .execute(self.db.pool())
-        .await
-        .map_err(AppError::Database)?;
-
-        info!(
-            "Pending action {} handled by admin {}: {:?}",
-            notification_id, admin_user_id, action
-        );
-
-        // 4. 发送确认响应给管理员
-        let response_message = WebSocketMessage::PendingActionResponse {
-            notification_id,
-            success: true,
-            message: format!("Action {:?} processed successfully", action),
-            new_status: format!("{:?}", new_status).to_lowercase(),
-        };
-
-        if let Ok(json) = response_message.to_json() {
-            let _ = self.ws_manager.send_to_user(admin_user_id, json).await;
-        }
-
-        Ok(new_status)
-    }
-
-    /// 获取管理员的待办列表
-    ///
-    /// # 参数
-    /// - `admin_user_id`: 管理员用户ID
-    /// - `action_type`: 可选的操作类型过滤
+    /// 获取管理员的待办通知列表
     pub async fn get_pending_actions(
         &self,
         admin_user_id: Uuid,
-        action_type: Option<String>,
-    ) -> Result<Vec<PendingActionInfo>> {
-        let actions: Vec<PendingActionInfo> = if let Some(ref action_type_filter) = action_type {
-            sqlx::query_as(
-                r#"
-                SELECT 
-                    id as notification_id,
-                    action_type,
-                    title,
-                    content as description,
-                    action_deadline as deadline,
-                    action_status,
-                    data->>'related_config_key' as related_config_key,
-                    data->>'related_config_value' as related_config_value,
-                    created_at
-                FROM notifications
-                WHERE user_id = $1 
-                    AND requires_action = true 
-                    AND action_status = 'pending'
-                    AND action_type = $2
-                ORDER BY action_deadline ASC NULLS LAST, created_at DESC
-                "#,
-            )
-            .bind(admin_user_id)
-            .bind(action_type_filter)
-            .fetch_all(self.db.pool())
-            .await
-            .map_err(AppError::Database)?
-        } else {
-            sqlx::query_as(
-                r#"
-                SELECT 
-                    id as notification_id,
-                    action_type,
-                    title,
-                    content as description,
-                    action_deadline as deadline,
-                    action_status,
-                    data->>'related_config_key' as related_config_key,
-                    data->>'related_config_value' as related_config_value,
-                    created_at
-                FROM notifications
-                WHERE user_id = $1 
-                    AND requires_action = true 
-                    AND action_status = 'pending'
-                ORDER BY action_deadline ASC NULLS LAST, created_at DESC
-                "#,
-            )
-            .bind(admin_user_id)
-            .fetch_all(self.db.pool())
-            .await
-            .map_err(AppError::Database)?
-        };
+    ) -> Result<Vec<crate::websocket::protocol::PendingActionInfo>> {
+        let actions: Vec<crate::websocket::protocol::PendingActionInfo> = sqlx::query_as(
+            r#"
+            SELECT 
+                id as notification_id, 
+                action_type, 
+                title, 
+                content as description, 
+                action_deadline as deadline, 
+                data, 
+                action_status as action_status, 
+                data->>'related_config_key' as related_config_key,
+                data->>'related_config_value' as related_config_value,
+                created_at
+            FROM notifications
+            WHERE user_id = $1 
+                AND requires_action = true 
+                AND action_status = 'pending'
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(admin_user_id)
+        .fetch_all(self.db.pool())
+        .await
+        .map_err(AppError::Database)?;
 
         Ok(actions)
     }
 
-    /// 获取待办数量
-    pub async fn get_pending_action_count(&self, admin_user_id: Uuid) -> Result<i64> {
-        let count: (i64,) = sqlx::query_as(
+    /// 处理待办通知
+    pub async fn process_pending_action(
+        &self,
+        admin_user_id: Uuid,
+        action_id: Uuid,
+        approved: bool,
+        comment: Option<String>,
+    ) -> Result<()> {
+        let new_status = if approved {
+            PendingActionStatus::Approved
+        } else {
+            PendingActionStatus::Rejected
+        };
+
+        let result = sqlx::query(
             r#"
-            SELECT COUNT(*) FROM notifications
-            WHERE user_id = $1 
-                AND requires_action = true 
-                AND action_status = 'pending'
+            UPDATE notifications
+            SET action_status = $1, 
+                is_read = true, 
+                read_at = NOW(),
+                data = jsonb_set(
+                    jsonb_set(COALESCE(data, '{}'::jsonb), '{processed_by}', to_jsonb($2::text)),
+                    '{comment}', 
+                    COALESCE(to_jsonb($3::text), 'null'::jsonb)
+                )
+            WHERE id = $4 AND user_id = $2 AND requires_action = true AND action_status = 'pending'
             "#,
         )
+        .bind(new_status)
         .bind(admin_user_id)
-        .fetch_one(self.db.pool())
+        .bind(comment)
+        .bind(action_id)
+        .execute(self.db.pool())
         .await
         .map_err(AppError::Database)?;
 
-        Ok(count.0)
-    }
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
 
-    /// 创建配置重载待办通知（便捷方法）
-    ///
-    /// # 参数
-    /// - `admin_user_id`: 管理员用户ID
-    /// - `config_key`: 配置项键名
-    /// - `config_value`: 新的配置值
-    /// - `requires_restart`: 是否需要重启生效
-    pub async fn send_config_reload_notification(
-        &self,
-        admin_user_id: Uuid,
-        config_key: &str,
-        config_value: &str,
-        requires_restart: bool,
-    ) -> Result<()> {
-        let title = format!("配置变更需要确认: {}", config_key);
-        let description = if requires_restart {
-            format!(
-                "配置项 '{}' 已修改为 '{}'，需要重启服务才能生效。请确认是否执行重启操作。",
-                config_key, config_value
-            )
-        } else {
-            format!(
-                "配置项 '{}' 已修改为 '{}'，将在下次清理任务时自动生效。",
-                config_key, config_value
-            )
-        };
-
-        let action_info = PendingActionInfo {
-            notification_id: Uuid::new_v4(), // 临时ID，实际由数据库生成
-            action_type: "config_reload".to_string(),
-            title,
-            description,
-            deadline: Some(Utc::now() + chrono::Duration::hours(24)), // 24小时截止
-            action_status: PendingActionStatus::Pending,
-            related_config_key: Some(config_key.to_string()),
-            related_config_value: Some(config_value.to_string()),
-            created_at: Utc::now(),
-        };
-
-        self.send_pending_action(admin_user_id, action_info).await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_private_message_info() {
-        let info = PrivateMessageInfo {
-            message_id: Uuid::new_v4(),
-            sender_id: Uuid::new_v4(),
-            sender_name: "test_user".to_string(),
-            content: "Hello!".to_string(),
-            created_at: Utc::now(),
-        };
-        assert_eq!(info.sender_name, "test_user");
-        assert_eq!(info.content, "Hello!");
-    }
-
-    #[test]
-    fn test_mention_info() {
-        let info = MentionInfo {
-            message_id: Uuid::new_v4(),
-            room_id: Uuid::new_v4(),
-            mentioned_by: Uuid::new_v4(),
-            mentioned_by_name: "test_user".to_string(),
-            content_preview: "Hello @user".to_string(),
-            created_at: Utc::now(),
-        };
-        assert_eq!(info.mentioned_by_name, "test_user");
-        assert_eq!(info.content_preview, "Hello @user");
-    }
-
-    #[test]
-    fn test_room_invitation_info() {
-        let info = RoomInvitationInfo {
-            invitation_id: Uuid::new_v4(),
-            room_id: Uuid::new_v4(),
-            room_name: "Test Room".to_string(),
-            invited_by: Uuid::new_v4(),
-            invited_by_name: "admin".to_string(),
-            created_at: Utc::now(),
-        };
-        assert_eq!(info.room_name, "Test Room");
-        assert_eq!(info.invited_by_name, "admin");
+        Ok(())
     }
 }

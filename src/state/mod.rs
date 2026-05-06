@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
 use crate::redis::{pubsub::RedisPubSub, RedisManager, StreamManager};
+use crate::services::account_security_service::AccountSecurityService;
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
@@ -34,6 +35,7 @@ pub struct AppState {
     pub audit_service: Arc<AuditService>,
     pub ip_security_service: Arc<IpSecurityService>,
     pub user_settings_service: UserSettingsService,
+    pub account_security_service: AccountSecurityService,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
     pub redis_manager: Option<Arc<RedisManager>>,
@@ -80,8 +82,16 @@ impl AppState {
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
-        let notification_service =
-            Arc::new(NotificationService::new(db.clone(), ws_manager.clone()));
+
+        // 先创建用户设置服务（通知服务依赖它）
+        let user_settings_service = UserSettingsService::new(db.clone().pool().clone());
+        let user_settings_service_arc = Arc::new(user_settings_service);
+
+        let notification_service = Arc::new(NotificationService::new(
+            db.clone(),
+            ws_manager.clone(),
+            user_settings_service_arc.clone(),
+        ));
 
         // 初始化 Stream 管理器（如果 Redis 可用）
         let stream_manager = if let Some(ref redis_mgr) = redis_manager {
@@ -103,12 +113,12 @@ impl AppState {
         let ip_security_service =
             Arc::new(IpSecurityService::new(db.clone(), audit_service.clone()).await);
 
-        let user_settings_service = UserSettingsService::new(db.clone().pool().clone());
-
         let file_service = Arc::new(FileService::with_shared_config(
             db.clone(),
             shared_config.clone(),
         )?);
+
+        let account_security_service = AccountSecurityService::new(db.clone().pool().clone());
 
         // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
         if let Some(ref redis_mgr) = redis_manager {
@@ -131,7 +141,8 @@ impl AppState {
             notification_service,
             audit_service,
             ip_security_service,
-            user_settings_service,
+            user_settings_service: (*user_settings_service_arc).clone(),
+            account_security_service,
             config: shared_config,
             config_manager: config_manager.clone(),
             redis_manager,
@@ -199,6 +210,10 @@ impl AppState {
         &self.user_settings_service
     }
 
+    pub fn account_security_service(&self) -> &AccountSecurityService {
+        &self.account_security_service
+    }
+
     pub fn monitor_service(&self) -> MonitorService {
         MonitorService::new(self.db.clone())
     }
@@ -233,6 +248,7 @@ impl Clone for AppState {
             audit_service: Arc::clone(&self.audit_service),
             ip_security_service: Arc::clone(&self.ip_security_service),
             user_settings_service: UserSettingsService::new(self.db.clone().pool().clone()),
+            account_security_service: AccountSecurityService::new(self.db.clone().pool().clone()),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
             redis_manager: self.redis_manager.clone(),

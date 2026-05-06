@@ -75,9 +75,9 @@ Seredeli Room 是一个现代化的实时聊天室系统，本客户端面向普
 3. 优化动画与交互体验
 
 ### 长期目标 (Phase 7-8)
-1. 完善响应式适配
-2. 性能优化与代码分割
-3. 添加可选的数据可视化功能
+1. 完善响应式适配 ✅
+2. 性能优化与代码分割 ✅
+3. 添加可选的数据可视化功能 ⏳ (可选)
 
 ## 项目文档结构
 
@@ -88,7 +88,8 @@ docs/
 ├── design-system.md     # UI 设计规范
 ├── phases.md            # 开发阶段规划
 ├── api-integration.md   # API 集成规范
-└── directory-structure.md # 目录结构规范
+├── directory-structure.md # 目录结构规范
+└── deployment.md        # 部署文档
 ```
 
 ## 参考资源

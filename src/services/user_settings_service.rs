@@ -4,11 +4,12 @@ use uuid::Uuid;
 use crate::error::{AppError, Result};
 use crate::models::user_settings::{
     AccessibilitySettings, LanguageSettings, MediaSettings, MessageSettings, NotificationSettings,
-    PrivacySettings, UpdateRoomSettingsRequest, UpdateUserSettingsRequest, UserRoomSettings,
-    UserRoomSettingsResponse, UserSettingsResponse,
+    PrivacySettings, RoomNotificationPreference, UpdateRoomSettingsRequest,
+    UpdateUserSettingsRequest, UserRoomSettings, UserRoomSettingsResponse, UserSettingsResponse,
 };
 
 /// 用户设置服务
+#[derive(Debug, Clone)]
 pub struct UserSettingsService {
     pool: PgPool,
 }
@@ -84,118 +85,61 @@ impl UserSettingsService {
         user_id: Uuid,
         request: UpdateUserSettingsRequest,
     ) -> Result<UserSettingsResponse> {
-        // 先确保 user_settings 行存在
+        // 先获取当前设置（用于合并）
+        let current = self.get_user_settings(user_id).await?;
+
+        // 构建更新后的完整设置
+        let notification = request.notification.unwrap_or(current.notification);
+        let privacy = request.privacy.unwrap_or(current.privacy);
+        let message = request.message.unwrap_or(current.message);
+        let language = request.language.unwrap_or(current.language);
+        let accessibility = request.accessibility.unwrap_or(current.accessibility);
+        let media = request.media.unwrap_or(current.media);
+
+        // 使用 UPSERT 保存完整设置
         sqlx::query(
             r#"
-            INSERT INTO user_settings (user_id)
-            VALUES ($1)
-            ON CONFLICT (user_id) DO NOTHING
+            INSERT INTO user_settings (
+                user_id,
+                notification_settings,
+                privacy_settings,
+                message_settings,
+                language_settings,
+                accessibility_settings,
+                media_settings
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                notification_settings = EXCLUDED.notification_settings,
+                privacy_settings = EXCLUDED.privacy_settings,
+                message_settings = EXCLUDED.message_settings,
+                language_settings = EXCLUDED.language_settings,
+                accessibility_settings = EXCLUDED.accessibility_settings,
+                media_settings = EXCLUDED.media_settings,
+                updated_at = NOW()
             "#,
         )
         .bind(user_id)
+        .bind(serde_json::to_value(&notification).unwrap_or_default())
+        .bind(serde_json::to_value(&privacy).unwrap_or_default())
+        .bind(serde_json::to_value(&message).unwrap_or_default())
+        .bind(serde_json::to_value(&language).unwrap_or_default())
+        .bind(serde_json::to_value(&accessibility).unwrap_or_default())
+        .bind(serde_json::to_value(&media).unwrap_or_default())
         .execute(&self.pool)
         .await
         .map_err(AppError::Database)?;
 
-        // 逐个分组更新（只更新请求中存在的分组）
-        if let Some(settings) = request.notification {
-            let value = serde_json::to_value(&settings).unwrap_or_default();
-            sqlx::query(
-                r#"
-                UPDATE user_settings
-                SET notification_settings = $1::jsonb, updated_at = NOW()
-                WHERE user_id = $2
-                "#,
-            )
-            .bind(value)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-        }
-
-        if let Some(settings) = request.privacy {
-            let value = serde_json::to_value(&settings).unwrap_or_default();
-            sqlx::query(
-                r#"
-                UPDATE user_settings
-                SET privacy_settings = $1::jsonb, updated_at = NOW()
-                WHERE user_id = $2
-                "#,
-            )
-            .bind(value)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-        }
-
-        if let Some(settings) = request.message {
-            let value = serde_json::to_value(&settings).unwrap_or_default();
-            sqlx::query(
-                r#"
-                UPDATE user_settings
-                SET message_settings = $1::jsonb, updated_at = NOW()
-                WHERE user_id = $2
-                "#,
-            )
-            .bind(value)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-        }
-
-        if let Some(settings) = request.language {
-            let value = serde_json::to_value(&settings).unwrap_or_default();
-            sqlx::query(
-                r#"
-                UPDATE user_settings
-                SET language_settings = $1::jsonb, updated_at = NOW()
-                WHERE user_id = $2
-                "#,
-            )
-            .bind(value)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-        }
-
-        if let Some(settings) = request.accessibility {
-            let value = serde_json::to_value(&settings).unwrap_or_default();
-            sqlx::query(
-                r#"
-                UPDATE user_settings
-                SET accessibility_settings = $1::jsonb, updated_at = NOW()
-                WHERE user_id = $2
-                "#,
-            )
-            .bind(value)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-        }
-
-        if let Some(settings) = request.media {
-            let value = serde_json::to_value(&settings).unwrap_or_default();
-            sqlx::query(
-                r#"
-                UPDATE user_settings
-                SET media_settings = $1::jsonb, updated_at = NOW()
-                WHERE user_id = $2
-                "#,
-            )
-            .bind(value)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-        }
-
-        // 返回更新后的完整设置
-        self.get_user_settings(user_id).await
+        // 返回更新后的设置
+        Ok(UserSettingsResponse {
+            notification,
+            privacy,
+            message,
+            language,
+            accessibility,
+            media,
+        })
     }
 
     // ============================================================
@@ -227,7 +171,7 @@ impl UserSettingsService {
             None => Ok(UserRoomSettingsResponse {
                 room_id,
                 is_muted: false,
-                notification_preference: "all".to_string(),
+                notification_preference: RoomNotificationPreference::default().as_str().to_string(),
                 is_pinned: false,
                 custom_name: None,
                 custom_color: None,
@@ -236,10 +180,7 @@ impl UserSettingsService {
     }
 
     /// 获取用户在所有房间的设置列表
-    pub async fn list_room_settings(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<UserRoomSettingsResponse>> {
+    pub async fn list_room_settings(&self, user_id: Uuid) -> Result<Vec<UserRoomSettingsResponse>> {
         let settings = sqlx::query_as::<_, UserRoomSettings>(
             r#"
             SELECT id, user_id, room_id, is_muted, notification_preference,
@@ -264,6 +205,12 @@ impl UserSettingsService {
         room_id: Uuid,
         request: UpdateRoomSettingsRequest,
     ) -> Result<UserRoomSettingsResponse> {
+        // 将枚举转换为字符串存储
+        let notification_pref_str = request
+            .notification_preference
+            .as_ref()
+            .map(|p| p.as_str().to_string());
+
         // UPSERT: 存在则更新，不存在则插入
         let settings = sqlx::query_as::<_, UserRoomSettings>(
             r#"
@@ -285,7 +232,7 @@ impl UserSettingsService {
         .bind(user_id)
         .bind(room_id)
         .bind(request.is_muted)
-        .bind(&request.notification_preference)
+        .bind(notification_pref_str)
         .bind(request.is_pinned)
         .bind(&request.custom_name)
         .bind(&request.custom_color)
@@ -348,6 +295,49 @@ impl UserSettingsService {
         .map_err(AppError::Database)?;
 
         Ok(ids.into_iter().map(|r| r.0).collect())
+    }
+
+    /// 检查用户是否将某个房间设置为静音
+    pub async fn is_room_muted(&self, user_id: Uuid, room_id: Uuid) -> Result<bool> {
+        let result: Option<(bool,)> = sqlx::query_as(
+            r#"
+            SELECT is_muted FROM user_room_settings
+            WHERE user_id = $1 AND room_id = $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(room_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(result.map(|r| r.0).unwrap_or(false))
+    }
+
+    /// 获取用户的通知偏好设置
+    pub async fn get_notification_settings(&self, user_id: Uuid) -> Result<NotificationSettings> {
+        let settings = self.get_user_settings(user_id).await?;
+        Ok(settings.notification)
+    }
+
+    /// 检查用户是否启用了特定类型的通知
+    pub async fn is_notification_enabled(
+        &self,
+        user_id: Uuid,
+        notification_type: &str,
+    ) -> Result<bool> {
+        let settings = self.get_notification_settings(user_id).await?;
+
+        let enabled = match notification_type {
+            "private_message" => settings.private_message,
+            "mentioned" => settings.mentioned,
+            "room_invitation" => settings.room_invitation,
+            "system_notification" => settings.system_notification,
+            "file_upload_complete" => settings.file_upload_complete,
+            _ => true, // 默认启用未知类型
+        };
+
+        Ok(enabled && !settings.do_not_disturb)
     }
 }
 

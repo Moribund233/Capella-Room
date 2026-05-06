@@ -102,6 +102,11 @@ pub async fn update_room_settings(
         .extract_user_id(&claims)
         .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
 
+    // 验证请求数据
+    if let Err(msg) = request.validate() {
+        return Err(AppError::Validation(msg));
+    }
+
     let settings = state
         .user_settings_service()
         .update_room_settings(user_id, room_id, request)

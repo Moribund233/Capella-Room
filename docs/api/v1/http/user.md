@@ -674,5 +674,694 @@ async function logout() {
 
 ---
 
-*文档版本: 1.0.0*  
-*最后更新: 2026-04-26*
+# 用户设置接口
+
+> **API 前缀**: `/api/v1`
+> **认证要求**: 所有接口均需要认证
+
+## 接口列表
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/users/me/settings` | 获取用户设置 |
+| PATCH | `/api/v1/users/me/settings` | 部分更新用户设置 |
+
+---
+
+## 获取用户设置
+
+### 请求
+
+```http
+GET /api/v1/users/me/settings
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notification": {
+      "private_message": true,
+      "mentioned": true,
+      "room_invitation": true,
+      "system_notification": true,
+      "file_upload_complete": true,
+      "sound_enabled": true,
+      "desktop_notification": true,
+      "do_not_disturb": false
+    },
+    "privacy": {
+      "online_status_visibility": "everyone",
+      "profile_visibility": "everyone",
+      "allow_stranger_message": true,
+      "allow_room_invitation": true,
+      "single_device_login": false
+    },
+    "message": {
+      "message_preview": true,
+      "read_receipt": true,
+      "typing_indicator": true,
+      "do_not_disturb": false
+    },
+    "language": {
+      "language": "zh-CN",
+      "timezone": "Asia/Shanghai",
+      "time_format": "24h",
+      "date_format": "YYYY-MM-DD",
+      "first_day_of_week": "monday"
+    },
+    "accessibility": {
+      "font_size": "medium",
+      "reduce_motion": false,
+      "high_contrast": false,
+      "dense_mode": false
+    },
+    "media": {
+      "auto_download_media": true,
+      "save_media_gallery": false,
+      "image_quality": "high",
+      "auto_play_video": true,
+      "auto_play_audio": false
+    }
+  }
+}
+```
+
+### 响应字段说明
+
+#### 通知设置 (notification)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `private_message` | boolean | 私信通知 |
+| `mentioned` | boolean | @提及通知 |
+| `room_invitation` | boolean | 房间邀请通知 |
+| `system_notification` | boolean | 系统通知 |
+| `file_upload_complete` | boolean | 文件上传完成通知 |
+| `sound_enabled` | boolean | 声音提醒 |
+| `desktop_notification` | boolean | 桌面通知 |
+| `do_not_disturb` | boolean | 勿扰模式 |
+
+#### 隐私设置 (privacy)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `online_status_visibility` | string | 在线状态可见性: `everyone`/`friends`/`nobody` |
+| `profile_visibility` | string | 个人资料可见性: `everyone`/`friends`/`nobody` |
+| `allow_stranger_message` | boolean | 允许陌生人私信 |
+| `allow_room_invitation` | boolean | 允许房间邀请 |
+| `single_device_login` | boolean | 单设备登录开关 |
+
+#### 消息设置 (message)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `message_preview` | boolean | 消息预览 |
+| `read_receipt` | boolean | 已读回执 |
+| `typing_indicator` | boolean | 输入状态指示器 |
+| `do_not_disturb` | boolean | 消息勿扰 |
+
+#### 语言设置 (language)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `language` | string | 语言代码，如 `zh-CN` |
+| `timezone` | string | 时区，如 `Asia/Shanghai` |
+| `time_format` | string | 时间格式: `12h`/`24h` |
+| `date_format` | string | 日期格式: `YYYY-MM-DD`/`DD/MM/YYYY`/`MM/DD/YYYY` |
+| `first_day_of_week` | string | 周起始日: `monday`/`sunday` |
+
+#### 无障碍设置 (accessibility)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `font_size` | string | 字体大小: `small`/`medium`/`large` |
+| `reduce_motion` | boolean | 减少动画 |
+| `high_contrast` | boolean | 高对比度 |
+| `dense_mode` | boolean | 紧凑模式 |
+
+#### 媒体设置 (media)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `auto_download_media` | boolean | 自动下载媒体 |
+| `save_media_gallery` | boolean | 保存到相册 |
+| `image_quality` | string | 图片质量: `original`/`high`/`medium`/`low` |
+| `auto_play_video` | boolean | 自动播放视频 |
+| `auto_play_audio` | boolean | 自动播放音频 |
+
+---
+
+## 部分更新用户设置
+
+### 请求
+
+```http
+PATCH /api/v1/users/me/settings
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 请求体
+
+只传递需要修改的分组，未传递的分组保持不变：
+
+```json
+{
+  "privacy": {
+    "single_device_login": true
+  }
+}
+```
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `notification` | object | 否 | 通知设置对象 |
+| `privacy` | object | 否 | 隐私设置对象 |
+| `message` | object | 否 | 消息设置对象 |
+| `language` | object | 否 | 语言设置对象 |
+| `accessibility` | object | 否 | 无障碍设置对象 |
+| `media` | object | 否 | 媒体设置对象 |
+
+### 响应
+
+**成功 (200 OK)**
+
+返回更新后的完整设置（同获取设置接口）。
+
+---
+
+# 账号安全接口
+
+> **API 前缀**: `/api/v1`
+> **认证要求**: 所有接口均需要认证
+
+## 接口列表
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/users/me/security/overview` | 获取账号安全概览 |
+| GET | `/api/v1/users/me/devices` | 获取登录设备列表 |
+| DELETE | `/api/v1/users/me/devices/:device_id` | 登出指定设备 |
+| POST | `/api/v1/users/me/devices/:device_id/block` | 禁用指定设备 |
+| POST | `/api/v1/users/me/devices/:device_id/unblock` | 启用被禁用的设备 |
+| POST | `/api/v1/users/me/devices/terminate-others` | 登出所有其他设备 |
+| GET | `/api/v1/users/me/login-history` | 获取登录历史 |
+| GET | `/api/v1/users/me/login-history/suspicious` | 获取可疑登录记录 |
+
+---
+
+## 获取账号安全概览
+
+### 请求
+
+```http
+GET /api/v1/users/me/security/overview
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "active_devices_count": 2,
+    "recent_logins": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "ip_address": "192.168.1.100",
+        "device_name": "Chrome on Windows",
+        "device_type": "desktop",
+        "location": "Beijing, China",
+        "login_status": "success",
+        "risk_level": "low",
+        "is_suspicious": false,
+        "created_at": "2024-01-15T08:30:00Z"
+      }
+    ],
+    "has_suspicious_activity": false,
+    "abnormal_login_alert": true
+  }
+}
+```
+
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `active_devices_count` | number | 活跃设备数量 |
+| `recent_logins` | array | 最近登录记录列表 |
+| `has_suspicious_activity` | boolean | 是否存在可疑活动 |
+| `abnormal_login_alert` | boolean | 是否开启异常登录提醒 |
+
+---
+
+## 获取登录设备列表
+
+### 请求
+
+```http
+GET /api/v1/users/me/devices
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "device_name": "Chrome on Windows",
+      "device_type": "desktop",
+      "ip_address": "192.168.1.100/32",
+      "location": "Beijing, China",
+      "is_current": true,
+      "is_active": true,
+      "is_blocked": false,
+      "last_active_at": "2024-01-15T08:30:00Z",
+      "created_at": "2024-01-15T08:00:00Z"
+    }
+  ]
+}
+```
+
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string (UUID) | 设备/会话唯一标识 |
+| `device_name` | string | 设备名称 |
+| `device_type` | string | 设备类型: `mobile`/`tablet`/`desktop`/`unknown` |
+| `ip_address` | string | IP地址（CIDR格式） |
+| `location` | string \| null | 地理位置 |
+| `is_current` | boolean | 是否为当前设备 |
+| `is_active` | boolean | 是否活跃 |
+| `is_blocked` | boolean | 是否被禁用 |
+| `last_active_at` | string (ISO 8601) | 最后活跃时间 |
+| `created_at` | string (ISO 8601) | 创建时间 |
+
+---
+
+## 登出指定设备
+
+远程登出其他设备，当前设备的 Token 将失效。
+
+### 请求
+
+```http
+DELETE /api/v1/users/me/devices/{device_id}
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `device_id` | string (UUID) | 设备/会话 ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "设备已成功登出"
+  }
+}
+```
+
+**失败 - 不能登出当前设备 (400 Bad Request)**
+
+```json
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "error": "请求参数错误",
+  "message": "不能终止当前会话，请使用登出功能"
+}
+```
+
+---
+
+## 禁用指定设备
+
+被禁用的设备无法使用旧 Token 登录，需要重新登录。
+
+### 请求
+
+```http
+POST /api/v1/users/me/devices/{device_id}/block
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `device_id` | string (UUID) | 设备/会话 ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "设备已禁用，该设备无法再使用旧 Token 登录"
+  }
+}
+```
+
+**失败 - 不能禁用当前设备 (400 Bad Request)**
+
+```json
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "error": "请求参数错误",
+  "message": "不能禁用当前设备"
+}
+```
+
+---
+
+## 启用被禁用的设备
+
+将设备从禁用状态恢复，但用户需要重新登录。
+
+### 请求
+
+```http
+POST /api/v1/users/me/devices/{device_id}/unblock
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `device_id` | string (UUID) | 设备/会话 ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "设备已启用"
+  }
+}
+```
+
+---
+
+## 登出所有其他设备
+
+一键登出除当前设备外的所有活跃设备。
+
+### 请求
+
+```http
+POST /api/v1/users/me/devices/terminate-others
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "其他设备已成功登出",
+    "terminated_count": 3
+  }
+}
+```
+
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `message` | string | 操作结果消息 |
+| `terminated_count` | number | 被登出的设备数量 |
+
+---
+
+## 获取登录历史
+
+### 请求
+
+```http
+GET /api/v1/users/me/login-history?limit=20&offset=0
+Authorization: Bearer {access_token}
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `limit` | number | 否 | 每页数量，默认 20，最大 100 |
+| `offset` | number | 否 | 偏移量，默认 0 |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "ip_address": "192.168.1.100",
+      "device_name": "Chrome on Windows",
+      "device_type": "desktop",
+      "location": "Beijing, China",
+      "login_status": "success",
+      "risk_level": "low",
+      "is_suspicious": false,
+      "failure_reason": null,
+      "created_at": "2024-01-15T08:30:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 50,
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+### 响应字段说明
+
+#### 登录记录
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string (UUID) | 记录唯一标识 |
+| `ip_address` | string | IP地址 |
+| `device_name` | string | 设备名称 |
+| `device_type` | string | 设备类型 |
+| `location` | string \| null | 地理位置 |
+| `login_status` | string | 登录状态: `success`/`failed`/`blocked` |
+| `risk_level` | string | 风险等级: `low`/`medium`/`high` |
+| `is_suspicious` | boolean | 是否可疑 |
+| `failure_reason` | string \| null | 失败原因 |
+| `created_at` | string (ISO 8601) | 登录时间 |
+
+#### 分页信息
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `total` | number | 总记录数 |
+| `limit` | number | 每页数量 |
+| `offset` | number | 当前偏移量 |
+
+---
+
+## 获取可疑登录记录
+
+获取被标记为可疑的登录记录。
+
+### 请求
+
+```http
+GET /api/v1/users/me/login-history/suspicious?limit=20&offset=0
+Authorization: Bearer {access_token}
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `limit` | number | 否 | 每页数量，默认 20，最大 100 |
+| `offset` | number | 否 | 偏移量，默认 0 |
+
+### 响应
+
+同登录历史接口，但只返回 `is_suspicious` 为 `true` 的记录。
+
+---
+
+## 使用示例
+
+### cURL 示例
+
+```bash
+# 获取用户设置
+curl -X GET http://localhost:3000/api/v1/users/me/settings \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 更新隐私设置（开启单设备登录）
+curl -X PATCH http://localhost:3000/api/v1/users/me/settings \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "privacy": {
+      "single_device_login": true
+    }
+  }'
+
+# 获取账号安全概览
+curl -X GET http://localhost:3000/api/v1/users/me/security/overview \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 获取登录设备列表
+curl -X GET http://localhost:3000/api/v1/users/me/devices \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 登出指定设备
+curl -X DELETE http://localhost:3000/api/v1/users/me/devices/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 禁用指定设备
+curl -X POST http://localhost:3000/api/v1/users/me/devices/550e8400-e29b-41d4-a716-446655440000/block \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 启用被禁用的设备
+curl -X POST http://localhost:3000/api/v1/users/me/devices/550e8400-e29b-41d4-a716-446655440000/unblock \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 登出所有其他设备
+curl -X POST http://localhost:3000/api/v1/users/me/devices/terminate-others \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 获取登录历史
+curl -X GET "http://localhost:3000/api/v1/users/me/login-history?limit=10&offset=0" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 获取可疑登录记录
+curl -X GET "http://localhost:3000/api/v1/users/me/login-history/suspicious?limit=10" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### JavaScript 示例
+
+```javascript
+// 获取用户设置
+async function getUserSettings() {
+  const response = await fetch('http://localhost:3000/api/v1/users/me/settings', {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+    }
+  });
+  const data = await response.json();
+  return data.success ? data.data : null;
+}
+
+// 更新单设备登录设置
+async function updateSingleDeviceLogin(enabled) {
+  const response = await fetch('http://localhost:3000/api/v1/users/me/settings', {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      privacy: { single_device_login: enabled }
+    })
+  });
+  const data = await response.json();
+  return data.success;
+}
+
+// 获取登录设备列表
+async function getDevices() {
+  const response = await fetch('http://localhost:3000/api/v1/users/me/devices', {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+    }
+  });
+  const data = await response.json();
+  return data.success ? data.data : [];
+}
+
+// 禁用设备
+async function blockDevice(deviceId) {
+  const response = await fetch(
+    `http://localhost:3000/api/v1/users/me/devices/${deviceId}/block`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    }
+  );
+  const data = await response.json();
+  return data.success;
+}
+
+// 登出所有其他设备
+async function terminateOtherDevices() {
+  const response = await fetch(
+    'http://localhost:3000/api/v1/users/me/devices/terminate-others',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    }
+  );
+  const data = await response.json();
+  return data.success ? data.data.terminated_count : 0;
+}
+```
+
+---
+
+## 错误码汇总
+
+### 账号安全相关错误码
+
+| 错误码 | HTTP 状态码 | 说明 | 处理建议 |
+|--------|------------|------|---------|
+| `DEVICE_NOT_FOUND` | 404 | 设备不存在 | 检查设备 ID 是否正确 |
+| `DEVICE_BLOCKED` | 403 | 设备已被禁用 | 先启用设备或联系管理员 |
+| `CANNOT_BLOCK_CURRENT_DEVICE` | 400 | 不能禁用当前设备 | 使用其他设备操作 |
+| `CANNOT_TERMINATE_CURRENT_SESSION` | 400 | 不能终止当前会话 | 使用登出功能 |
+
+---
+
+*文档版本: 1.1.0*  
+*最后更新: 2026-05-06*

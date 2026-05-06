@@ -14,7 +14,8 @@ tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
 
 # 数据库
-sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "migrate", "chrono", "uuid"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "migrate", "chrono", "uuid", "ipnetwork"] }
+ipnetwork = "0.20"
 
 # 序列化/反序列化
 serde = { version = "1.0", features = ["derive"] }

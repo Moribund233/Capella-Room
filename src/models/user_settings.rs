@@ -4,6 +4,152 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 // ============================================================
+// 枚举类型定义
+// ============================================================
+
+/// 可见性设置枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Visibility {
+    #[default]
+    Everyone, // 所有人可见
+    Friends, // 仅好友可见
+    Nobody,  // 不可见
+}
+
+impl Visibility {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Visibility::Everyone => "everyone",
+            Visibility::Friends => "friends",
+            Visibility::Nobody => "nobody",
+        }
+    }
+}
+
+/// 时间格式枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TimeFormat {
+    #[serde(rename = "12h")]
+    H12,
+    #[serde(rename = "24h")]
+    #[default]
+    H24,
+}
+
+impl TimeFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TimeFormat::H12 => "12h",
+            TimeFormat::H24 => "24h",
+        }
+    }
+}
+
+/// 日期格式枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum DateFormat {
+    #[serde(rename = "YYYY-MM-DD")]
+    #[default]
+    YyyyMmDd,
+    #[serde(rename = "DD/MM/YYYY")]
+    DdMmYyyy,
+    #[serde(rename = "MM/DD/YYYY")]
+    MmDdYyyy,
+}
+
+impl DateFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DateFormat::YyyyMmDd => "YYYY-MM-DD",
+            DateFormat::DdMmYyyy => "DD/MM/YYYY",
+            DateFormat::MmDdYyyy => "MM/DD/YYYY",
+        }
+    }
+}
+
+/// 星期起始日枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum FirstDayOfWeek {
+    #[default]
+    Monday,
+    Sunday,
+}
+
+impl FirstDayOfWeek {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FirstDayOfWeek::Monday => "monday",
+            FirstDayOfWeek::Sunday => "sunday",
+        }
+    }
+}
+
+/// 字体大小枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum FontSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+impl FontSize {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FontSize::Small => "small",
+            FontSize::Medium => "medium",
+            FontSize::Large => "large",
+        }
+    }
+}
+
+/// 图片质量枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageQuality {
+    Original,
+    #[default]
+    High,
+    Medium,
+    Low,
+}
+
+impl ImageQuality {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ImageQuality::Original => "original",
+            ImageQuality::High => "high",
+            ImageQuality::Medium => "medium",
+            ImageQuality::Low => "low",
+        }
+    }
+}
+
+/// 房间通知偏好枚举
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomNotificationPreference {
+    #[default]
+    All, // 所有通知
+    MentionOnly, // 仅@提及
+    Muted,       // 静音
+}
+
+impl RoomNotificationPreference {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RoomNotificationPreference::All => "all",
+            RoomNotificationPreference::MentionOnly => "mention_only",
+            RoomNotificationPreference::Muted => "muted",
+        }
+    }
+}
+
+// ============================================================
 // 用户整体设置
 // ============================================================
 
@@ -29,6 +175,7 @@ pub struct NotificationSettings {
     pub file_upload_complete: bool,
     pub sound_enabled: bool,
     pub desktop_notification: bool,
+    pub do_not_disturb: bool,
 }
 
 impl Default for NotificationSettings {
@@ -41,6 +188,7 @@ impl Default for NotificationSettings {
             file_upload_complete: true,
             sound_enabled: true,
             desktop_notification: true,
+            do_not_disturb: false,
         }
     }
 }
@@ -49,19 +197,22 @@ impl Default for NotificationSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PrivacySettings {
-    pub online_status_visibility: String, // everyone / friends / nobody
-    pub profile_visibility: String,       // everyone / friends / nobody
+    pub online_status_visibility: Visibility,
+    pub profile_visibility: Visibility,
     pub allow_stranger_message: bool,
     pub allow_room_invitation: bool,
+    /// 单设备登录开关：开启后只允许一个设备登录
+    pub single_device_login: bool,
 }
 
 impl Default for PrivacySettings {
     fn default() -> Self {
         Self {
-            online_status_visibility: "everyone".to_string(),
-            profile_visibility: "everyone".to_string(),
+            online_status_visibility: Visibility::default(),
+            profile_visibility: Visibility::default(),
             allow_stranger_message: true,
             allow_room_invitation: true,
+            single_device_login: false,
         }
     }
 }
@@ -93,9 +244,9 @@ impl Default for MessageSettings {
 pub struct LanguageSettings {
     pub language: String,
     pub timezone: String,
-    pub time_format: String,  // 12h / 24h
-    pub date_format: String,  // YYYY-MM-DD / DD/MM/YYYY / MM/DD/YYYY
-    pub first_day_of_week: String, // monday / sunday
+    pub time_format: TimeFormat,
+    pub date_format: DateFormat,
+    pub first_day_of_week: FirstDayOfWeek,
 }
 
 impl Default for LanguageSettings {
@@ -103,32 +254,21 @@ impl Default for LanguageSettings {
         Self {
             language: "zh-CN".to_string(),
             timezone: "Asia/Shanghai".to_string(),
-            time_format: "24h".to_string(),
-            date_format: "YYYY-MM-DD".to_string(),
-            first_day_of_week: "monday".to_string(),
+            time_format: TimeFormat::default(),
+            date_format: DateFormat::default(),
+            first_day_of_week: FirstDayOfWeek::default(),
         }
     }
 }
 
 /// 无障碍设置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct AccessibilitySettings {
-    pub font_size: String,  // small / medium / large
+    pub font_size: FontSize,
     pub reduce_motion: bool,
     pub high_contrast: bool,
     pub dense_mode: bool,
-}
-
-impl Default for AccessibilitySettings {
-    fn default() -> Self {
-        Self {
-            font_size: "medium".to_string(),
-            reduce_motion: false,
-            high_contrast: false,
-            dense_mode: false,
-        }
-    }
 }
 
 /// 媒体与存储设置
@@ -137,7 +277,7 @@ impl Default for AccessibilitySettings {
 pub struct MediaSettings {
     pub auto_download_media: bool,
     pub save_media_gallery: bool,
-    pub image_quality: String, // original / high / medium / low
+    pub image_quality: ImageQuality,
     pub auto_play_video: bool,
     pub auto_play_audio: bool,
 }
@@ -147,7 +287,7 @@ impl Default for MediaSettings {
         Self {
             auto_download_media: true,
             save_media_gallery: false,
-            image_quality: "high".to_string(),
+            image_quality: ImageQuality::default(),
             auto_play_video: true,
             auto_play_audio: false,
         }
@@ -216,18 +356,50 @@ impl From<UserRoomSettings> for UserRoomSettingsResponse {
 }
 
 /// 更新房间设置请求
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct UpdateRoomSettingsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_muted: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub notification_preference: Option<String>,
+    pub notification_preference: Option<RoomNotificationPreference>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_pinned: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_color: Option<String>,
+}
+
+impl UpdateRoomSettingsRequest {
+    /// 验证请求数据
+    pub fn validate(&self) -> Result<(), String> {
+        // 验证自定义名称长度
+        if let Some(ref name) = self.custom_name {
+            if name.len() > 100 {
+                return Err("自定义名称不能超过100个字符".to_string());
+            }
+        }
+
+        // 验证颜色格式（十六进制颜色）
+        if let Some(ref color) = self.custom_color {
+            if !Self::is_valid_hex_color(color) {
+                return Err("颜色格式无效，应为 #RRGGBB 格式".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 验证十六进制颜色格式
+    fn is_valid_hex_color(color: &str) -> bool {
+        if color.len() != 7 {
+            return false;
+        }
+        if !color.starts_with('#') {
+            return false;
+        }
+        color[1..].chars().all(|c| c.is_ascii_hexdigit())
+    }
 }
 
 #[cfg(test)]
@@ -250,8 +422,8 @@ mod tests {
     #[test]
     fn test_privacy_defaults() {
         let s = PrivacySettings::default();
-        assert_eq!(s.online_status_visibility, "everyone");
-        assert_eq!(s.profile_visibility, "everyone");
+        assert_eq!(s.online_status_visibility, Visibility::Everyone);
+        assert_eq!(s.profile_visibility, Visibility::Everyone);
         assert!(s.allow_stranger_message);
         assert!(s.allow_room_invitation);
     }
@@ -270,15 +442,15 @@ mod tests {
         let s = LanguageSettings::default();
         assert_eq!(s.language, "zh-CN");
         assert_eq!(s.timezone, "Asia/Shanghai");
-        assert_eq!(s.time_format, "24h");
-        assert_eq!(s.date_format, "YYYY-MM-DD");
-        assert_eq!(s.first_day_of_week, "monday");
+        assert_eq!(s.time_format, TimeFormat::H24);
+        assert_eq!(s.date_format, DateFormat::YyyyMmDd);
+        assert_eq!(s.first_day_of_week, FirstDayOfWeek::Monday);
     }
 
     #[test]
     fn test_accessibility_defaults() {
         let s = AccessibilitySettings::default();
-        assert_eq!(s.font_size, "medium");
+        assert_eq!(s.font_size, FontSize::Medium);
         assert!(!s.reduce_motion);
         assert!(!s.high_contrast);
         assert!(!s.dense_mode);
@@ -289,7 +461,7 @@ mod tests {
         let s = MediaSettings::default();
         assert!(s.auto_download_media);
         assert!(!s.save_media_gallery);
-        assert_eq!(s.image_quality, "high");
+        assert_eq!(s.image_quality, ImageQuality::High);
         assert!(s.auto_play_video);
         assert!(!s.auto_play_audio);
     }
@@ -304,6 +476,7 @@ mod tests {
             file_upload_complete: false,
             sound_enabled: false,
             desktop_notification: true,
+            do_not_disturb: false,
         };
         let json = serde_json::to_value(&original).unwrap();
         let deserialized: NotificationSettings = serde_json::from_value(json).unwrap();
@@ -333,7 +506,7 @@ mod tests {
         assert!(!req.notification.as_ref().unwrap().private_message);
         assert_eq!(
             req.privacy.as_ref().unwrap().online_status_visibility,
-            "nobody"
+            Visibility::Nobody
         );
     }
 
@@ -366,5 +539,87 @@ mod tests {
         assert_eq!(req.custom_name, Some("Favorites".to_string()));
         assert!(req.custom_color.is_none());
         assert!(req.notification_preference.is_none());
+    }
+
+    #[test]
+    fn test_room_notification_preference_enum() {
+        let pref = RoomNotificationPreference::MentionOnly;
+        assert_eq!(pref.as_str(), "mention_only");
+
+        let json = serde_json::to_value(&pref).unwrap();
+        assert_eq!(json, "mention_only");
+
+        let deserialized: RoomNotificationPreference = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized, RoomNotificationPreference::MentionOnly);
+    }
+
+    #[test]
+    fn test_visibility_enum() {
+        let vis = Visibility::Friends;
+        assert_eq!(vis.as_str(), "friends");
+
+        let json = serde_json::to_value(&vis).unwrap();
+        assert_eq!(json, "friends");
+
+        let deserialized: Visibility = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized, Visibility::Friends);
+    }
+
+    #[test]
+    fn test_update_room_settings_validation() {
+        // 有效数据
+        let req = UpdateRoomSettingsRequest {
+            is_muted: Some(true),
+            notification_preference: Some(RoomNotificationPreference::All),
+            is_pinned: Some(false),
+            custom_name: Some("Test Room".to_string()),
+            custom_color: Some("#ff0000".to_string()),
+        };
+        assert!(req.validate().is_ok());
+
+        // 无效颜色格式
+        let req_invalid_color = UpdateRoomSettingsRequest {
+            custom_color: Some("invalid".to_string()),
+            ..Default::default()
+        };
+        assert!(req_invalid_color.validate().is_err());
+
+        // 无效颜色 - 缺少 #
+        let req_no_hash = UpdateRoomSettingsRequest {
+            custom_color: Some("ff0000".to_string()),
+            ..Default::default()
+        };
+        assert!(req_no_hash.validate().is_err());
+
+        // 无效颜色 - 长度不对
+        let req_wrong_len = UpdateRoomSettingsRequest {
+            custom_color: Some("#ff00".to_string()),
+            ..Default::default()
+        };
+        assert!(req_wrong_len.validate().is_err());
+    }
+
+    #[test]
+    fn test_valid_hex_colors() {
+        assert!(UpdateRoomSettingsRequest {
+            custom_color: Some("#ff0000".to_string()),
+            ..Default::default()
+        }
+        .validate()
+        .is_ok());
+
+        assert!(UpdateRoomSettingsRequest {
+            custom_color: Some("#00FF00".to_string()),
+            ..Default::default()
+        }
+        .validate()
+        .is_ok());
+
+        assert!(UpdateRoomSettingsRequest {
+            custom_color: Some("#123abc".to_string()),
+            ..Default::default()
+        }
+        .validate()
+        .is_ok());
     }
 }

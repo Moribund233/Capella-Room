@@ -5,10 +5,14 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import App from './App.vue'
 import router from './router'
 import { useConfigStore, useThemeStore, usePersonalizationStore } from './stores'
+import { initErrorHandler } from './services/error'
 import './styles/index.css'
 
 async function bootstrap() {
   const app = createApp(App)
+
+  // 初始化全局错误处理
+  initErrorHandler(app)
 
   const pinia = createPinia()
   pinia.use(piniaPluginPersistedstate)

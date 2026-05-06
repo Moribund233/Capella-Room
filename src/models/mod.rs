@@ -1,3 +1,4 @@
+pub mod account_security;
 pub mod audit;
 pub mod file;
 pub mod message;

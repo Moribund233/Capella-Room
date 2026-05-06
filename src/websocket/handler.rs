@@ -770,22 +770,22 @@ async fn handle_message(
 /// 处理获取待办列表
 async fn handle_get_pending_actions(
     user_id: Uuid,
-    action_type: Option<String>,
+    _action_type: Option<String>,
     state: &AppState,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
     debug!(
         "Getting pending actions for user {}, action_type={:?}",
-        user_id, action_type
+        user_id, _action_type
     );
 
     match state
         .notification_service()
-        .get_pending_actions(user_id, action_type)
+        .get_pending_actions(user_id)
         .await
     {
         Ok(actions) => {
-            let total = actions.len();
+            let total: usize = actions.len();
             let pending_actions_list = WebSocketMessage::PendingActionsList { actions, total };
 
             if let Ok(json) = pending_actions_list.to_json() {

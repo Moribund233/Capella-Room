@@ -146,11 +146,7 @@ async fn create_test_user(state: &AppState, username: &str, email: &str) -> (Uui
     (user.id, token.access_token)
 }
 
-async fn create_test_room(
-    state: &AppState,
-    token: &str,
-    name: &str,
-) -> (Uuid, Uuid) {
+async fn create_test_room(state: &AppState, token: &str, name: &str) -> (Uuid, Uuid) {
     let claims = state.auth_service().verify_token(token).unwrap();
     let user_id: Uuid = claims.sub.parse().unwrap();
 
@@ -192,8 +188,13 @@ async fn test_get_settings_returns_defaults() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    // 调试输出
+    let status = response.status();
     let body = parse_body(response).await;
+    if status != StatusCode::OK {
+        println!("ERROR Response: status={:?}, body={}", status, body);
+        panic!("Expected OK, got {:?}", status);
+    }
     assert!(body["success"].as_bool().unwrap());
 
     let data = &body["data"];
@@ -238,13 +239,21 @@ async fn test_patch_settings_updates_specific_groups() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    // 调试输出
+    let status = response.status();
     let body = parse_body(response).await;
+    if status != StatusCode::OK {
+        println!("ERROR Response: status={:?}, body={}", status, body);
+        panic!("Expected OK, got {:?}", status);
+    }
 
     // Updated groups should reflect new values
     assert_eq!(body["data"]["notification"]["private_message"], false);
     assert_eq!(body["data"]["notification"]["sound_enabled"], false);
-    assert_eq!(body["data"]["privacy"]["online_status_visibility"], "nobody");
+    assert_eq!(
+        body["data"]["privacy"]["online_status_visibility"],
+        "nobody"
+    );
     assert_eq!(body["data"]["privacy"]["allow_stranger_message"], false);
 
     // Unchanged fields in updated groups should still be defaults
@@ -297,7 +306,10 @@ async fn test_patch_settings_no_side_effects_on_other_groups() {
 
     // Other groups untouched
     assert_eq!(body["data"]["notification"]["private_message"], true);
-    assert_eq!(body["data"]["privacy"]["online_status_visibility"], "everyone");
+    assert_eq!(
+        body["data"]["privacy"]["online_status_visibility"],
+        "everyone"
+    );
     assert_eq!(body["data"]["message"]["message_preview"], true);
     assert_eq!(body["data"]["accessibility"]["font_size"], "medium");
     assert_eq!(body["data"]["media"]["auto_download_media"], true);
@@ -309,8 +321,7 @@ async fn test_settings_persist_across_calls() {
     let (_user_id, token) = create_test_user(&state, "set_user4", "set_user4@test.com").await;
 
     // Update privacy
-    app
-        .clone()
+    app.clone()
         .oneshot(
             Request::builder()
                 .method("PATCH")
@@ -347,7 +358,10 @@ async fn test_settings_persist_across_calls() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = parse_body(response).await;
-    assert_eq!(body["data"]["privacy"]["online_status_visibility"], "friends");
+    assert_eq!(
+        body["data"]["privacy"]["online_status_visibility"],
+        "friends"
+    );
     assert_eq!(body["data"]["privacy"]["allow_room_invitation"], false);
     assert_eq!(body["data"]["privacy"]["profile_visibility"], "everyone");
 }
@@ -471,8 +485,7 @@ async fn test_room_settings_delete_resets_to_default() {
     let (_user_id, room_id) = create_test_room(&state, &token, "room-delete-test").await;
 
     // Set some values first
-    app
-        .clone()
+    app.clone()
         .oneshot(
             Request::builder()
                 .method("PATCH")
@@ -625,8 +638,7 @@ async fn test_room_settings_isolated_per_user() {
     let (_owner_id, room_id) = create_test_room(&state, &token1, "isolation-room").await;
 
     // User1 mutes the room
-    app
-        .clone()
+    app.clone()
         .oneshot(
             Request::builder()
                 .method("PATCH")

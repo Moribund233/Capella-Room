@@ -1,11 +1,14 @@
 use axum::{extract::State, Json};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use validator::Validate;
 
 use crate::{
     error::{AppError, Result},
+    models::account_security::{CreateSessionRequest, LoginStatus, RecordLoginRequest},
     models::response::ApiResponse,
     models::user::{LoginRequest, RegisterRequest, UserResponse},
     state::AppState,
@@ -166,6 +169,101 @@ pub async fn login(
         state
             .auth_service()
             .generate_token_pair(user.id, &user.username, user.role.clone())?;
+
+    // 创建设备会话记录
+    let session_token_hash = {
+        let mut hasher = Sha256::new();
+        hasher.update(&token_pair.access_token);
+        format!("{:x}", hasher.finalize())
+    };
+    let device_name = request
+        .device_name
+        .clone()
+        .unwrap_or_else(|| "未知设备".to_string());
+    let device_type = request
+        .device_type
+        .clone()
+        .unwrap_or_else(|| "unknown".to_string());
+    let user_agent = request.user_agent.clone();
+
+    let create_session_req = CreateSessionRequest {
+        session_token_hash: session_token_hash.clone(),
+        device_name: Some(device_name.clone()),
+        device_type: Some(device_type.clone()),
+        ip_address: ip,
+        user_agent: user_agent.clone(),
+        location_info: None,
+        expires_at: Utc::now() + chrono::Duration::days(7),
+    };
+
+    let session = state
+        .account_security_service()
+        .create_session(user.id, create_session_req)
+        .await?;
+
+    // 检查用户是否开启单设备登录
+    let user_settings = state
+        .user_settings_service()
+        .get_user_settings(user.id)
+        .await?;
+
+    if user_settings.privacy.single_device_login {
+        // 终止其他所有会话
+        let terminated_count = state
+            .account_security_service()
+            .terminate_other_sessions(user.id, session.id)
+            .await?;
+
+        if terminated_count > 0 {
+            tracing::info!(
+                "用户 {} 开启单设备登录，已终止 {} 个其他会话",
+                user.id,
+                terminated_count
+            );
+        }
+    }
+
+    // 检测异地登录
+    let (is_suspicious, risk_level) = state
+        .account_security_service()
+        .detect_abnormal_login(user.id, ip, &device_type)
+        .await?;
+
+    // 记录登录历史
+    let device_info = serde_json::json!({
+        "device_name": device_name,
+        "device_type": device_type,
+        "user_agent": user_agent,
+    });
+
+    let record_login_req = RecordLoginRequest {
+        ip_address: ip,
+        device_info: Some(device_info),
+        location_info: None,
+        login_status: LoginStatus::Success,
+        failure_reason: None,
+        is_suspicious,
+        risk_level: risk_level.clone(),
+    };
+
+    state
+        .account_security_service()
+        .record_login(user.id, record_login_req)
+        .await?;
+
+    // 如果是异地登录，发送安全提醒
+    if is_suspicious {
+        let _ = state
+            .account_security_service()
+            .send_abnormal_login_alert(
+                state.notification_service(),
+                user.id,
+                ip,
+                &device_name,
+                None,
+            )
+            .await;
+    }
 
     // 记录登录成功审计日志
     let user_id = user.id;

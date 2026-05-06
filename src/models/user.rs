@@ -103,6 +103,12 @@ pub struct LoginRequest {
     #[validate(email(message = "邮箱格式不正确"))]
     pub email: String,
     pub password: String,
+    /// 设备名称（如 "iPhone 15", "Windows PC"）
+    pub device_name: Option<String>,
+    /// 设备类型（mobile, tablet, desktop, unknown）
+    pub device_type: Option<String>,
+    /// User-Agent 字符串
+    pub user_agent: Option<String>,
 }
 
 /// 创建用户请求（用于服务层）

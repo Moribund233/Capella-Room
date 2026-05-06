@@ -1,21 +1,27 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { NConfigProvider, NMessageProvider, NNotificationProvider, zhCN, dateZhCN } from 'naive-ui'
+import { NConfigProvider, NMessageProvider, NNotificationProvider, NDialogProvider, zhCN, dateZhCN, darkTheme } from 'naive-ui'
 import { storeToRefs } from 'pinia'
-import { themeOverrides } from '@/styles/native-ui-overrides'
+import { themeOverrides, darkThemeOverrides } from '@/styles/native-ui-overrides'
 import { AuthLayout, MainLayout } from '@/layouts'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useNotificationStore } from '@/stores/notification'
 import { useResponsive } from '@/composables/useResponsive'
+import { useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const wsStore = useWebSocketStore()
 const notificationStore = useNotificationStore()
+const themeStore = useThemeStore()
 const { isMobile } = useResponsive()
 const { isAuthenticated } = storeToRefs(authStore)
+
+// Naive UI 主题配置
+const naiveTheme = computed(() => themeStore.isDark ? darkTheme : null)
+const currentThemeOverrides = computed(() => themeStore.isDark ? darkThemeOverrides : themeOverrides)
 
 const layout = computed(() => {
   if (route.name === 'login' || route.name === 'register') {
@@ -58,12 +64,14 @@ const maxNotifications = computed(() => isMobile.value ? 1 : 2)
 </script>
 
 <template>
-  <NConfigProvider :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
+  <NConfigProvider :theme="naiveTheme" :theme-overrides="currentThemeOverrides" :locale="zhCN" :date-locale="dateZhCN">
     <NMessageProvider>
       <NNotificationProvider :max="maxNotifications" placement="top">
-        <component :is="layout">
-          <router-view />
-        </component>
+        <NDialogProvider>
+          <component :is="layout">
+            <router-view />
+          </component>
+        </NDialogProvider>
       </NNotificationProvider>
     </NMessageProvider>
   </NConfigProvider>

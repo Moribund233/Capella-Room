@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { STORAGE_KEYS } from '@/constants/storageKeys'
+import { uiConfigApi, type UIConfig } from '@/api/ui-config'
 import type { ThemeType } from './theme'
 
 /**
@@ -184,6 +185,28 @@ function applyBackgroundSettings(
 }
 
 /**
+ * 将个性化配置转换为 UI 配置
+ */
+function toUIConfig(personalization: PersonalizationConfig): UIConfig {
+  return {
+    theme: {
+      name: personalization.theme === 'system' ? 'auto' : personalization.theme,
+    },
+  }
+}
+
+/**
+ * 从 UI 配置中提取个性化配置
+ */
+function fromUIConfig(uiConfig: UIConfig): Partial<PersonalizationConfig> {
+  const result: Partial<PersonalizationConfig> = {}
+  if (uiConfig.theme?.name) {
+    result.theme = uiConfig.theme.name === 'auto' ? 'system' : uiConfig.theme.name
+  }
+  return result
+}
+
+/**
  * 个性化配置存储
  */
 export const usePersonalizationStore = defineStore(
@@ -195,6 +218,10 @@ export const usePersonalizationStore = defineStore(
       ...DEFAULT_CONFIG,
       ...stored,
     })
+
+    // 云端同步状态
+    const syncing = ref(false)
+    const lastSyncedAt = ref<string | null>(null)
 
     // 计算属性
     const theme = computed(() => config.value.theme)
@@ -311,6 +338,68 @@ export const usePersonalizationStore = defineStore(
     }
 
     /**
+     * 从云端同步 UI 配置
+     * 加载用户保存在云端的 UI 配置并合并到本地
+     */
+    async function syncFromCloud(): Promise<boolean> {
+      syncing.value = true
+      try {
+        const res = await uiConfigApi.getUIConfig()
+        if (res.data) {
+          const cloudConfig = fromUIConfig(res.data)
+          // 合并云端配置到本地（云端优先级更高）
+          if (cloudConfig.theme) {
+            config.value.theme = cloudConfig.theme
+          }
+          persistConfig()
+          lastSyncedAt.value = new Date().toISOString()
+          return true
+        }
+        return false
+      } catch (err) {
+        console.warn('[Personalization] Failed to sync from cloud:', err)
+        return false
+      } finally {
+        syncing.value = false
+      }
+    }
+
+    /**
+     * 同步配置到云端
+     * 将本地个性化配置保存到云端
+     */
+    async function syncToCloud(): Promise<boolean> {
+      syncing.value = true
+      try {
+        const uiConfig = toUIConfig(config.value)
+        const res = await uiConfigApi.saveUIConfig(uiConfig)
+        if (res.success) {
+          lastSyncedAt.value = new Date().toISOString()
+          return true
+        }
+        return false
+      } catch (err) {
+        console.warn('[Personalization] Failed to sync to cloud:', err)
+        return false
+      } finally {
+        syncing.value = false
+      }
+    }
+
+    /**
+     * 重置云端 UI 配置
+     */
+    async function resetCloudConfig(): Promise<boolean> {
+      try {
+        const res = await uiConfigApi.resetUIConfig()
+        return res.success
+      } catch (err) {
+        console.warn('[Personalization] Failed to reset cloud config:', err)
+        return false
+      }
+    }
+
+    /**
      * 应用配置到页面
      */
     function applyConfig(): void {
@@ -364,6 +453,8 @@ export const usePersonalizationStore = defineStore(
       smartOpacity,
       hasCustomBackground,
       hasCustomAccent,
+      syncing,
+      lastSyncedAt,
       updateConfig,
       setTheme,
       setBackgroundOpacity,
@@ -373,6 +464,9 @@ export const usePersonalizationStore = defineStore(
       setEnableCustomAccent,
       initPersonalization,
       resetToDefault,
+      syncFromCloud,
+      syncToCloud,
+      resetCloudConfig,
     }
   },
   {
