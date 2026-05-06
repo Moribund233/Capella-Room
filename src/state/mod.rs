@@ -13,6 +13,7 @@ use crate::services::monitor_service::MonitorService;
 use crate::services::notification_service::NotificationService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
+use crate::services::user_settings_service::UserSettingsService;
 use crate::utils::logging::{
     init_global_log_broadcaster, LogBroadcaster, MetricsCollector, StructuredLogger,
 };
@@ -32,6 +33,7 @@ pub struct AppState {
     pub notification_service: Arc<NotificationService>,
     pub audit_service: Arc<AuditService>,
     pub ip_security_service: Arc<IpSecurityService>,
+    pub user_settings_service: UserSettingsService,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
     pub redis_manager: Option<Arc<RedisManager>>,
@@ -101,6 +103,8 @@ impl AppState {
         let ip_security_service =
             Arc::new(IpSecurityService::new(db.clone(), audit_service.clone()).await);
 
+        let user_settings_service = UserSettingsService::new(db.clone().pool().clone());
+
         let file_service = Arc::new(FileService::with_shared_config(
             db.clone(),
             shared_config.clone(),
@@ -127,6 +131,7 @@ impl AppState {
             notification_service,
             audit_service,
             ip_security_service,
+            user_settings_service,
             config: shared_config,
             config_manager: config_manager.clone(),
             redis_manager,
@@ -190,6 +195,10 @@ impl AppState {
         &self.ip_security_service
     }
 
+    pub fn user_settings_service(&self) -> &UserSettingsService {
+        &self.user_settings_service
+    }
+
     pub fn monitor_service(&self) -> MonitorService {
         MonitorService::new(self.db.clone())
     }
@@ -223,6 +232,7 @@ impl Clone for AppState {
             notification_service: Arc::clone(&self.notification_service),
             audit_service: Arc::clone(&self.audit_service),
             ip_security_service: Arc::clone(&self.ip_security_service),
+            user_settings_service: UserSettingsService::new(self.db.clone().pool().clone()),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
             redis_manager: self.redis_manager.clone(),

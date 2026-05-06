@@ -6,6 +6,7 @@ pub mod room;
 pub mod security;
 pub mod ui_config;
 pub mod user;
+pub mod user_settings;
 
 // 数据模型模块
 // - response: 统一响应结构（ApiResponse、PaginatedData 等）

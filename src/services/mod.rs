@@ -11,6 +11,10 @@ pub mod room_service;
 pub mod ui_config_service;
 pub mod user_service;
 
+pub mod user_settings_service;
+// 为了保持命名一致性，同时暴露 user_settings
+pub use user_settings_service as user_settings;
+
 // 业务逻辑服务层
 // - auth_service: 认证相关业务逻辑（注册、登录、Token管理）
 // - user_service: 用户相关业务逻辑（用户信息、状态管理）

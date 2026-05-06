@@ -9,6 +9,7 @@ pub mod room;
 pub mod security;
 pub mod ui_config;
 pub mod user;
+pub mod user_settings;
 
 // HTTP请求处理器模块
 // - admin: 管理员处理器（用户管理、系统配置管理）

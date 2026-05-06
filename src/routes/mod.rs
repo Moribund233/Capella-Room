@@ -1,6 +1,6 @@
 use axum::{
     middleware,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 use chrono::Utc;
@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::{
     handlers::{
         admin, audit, auth, config, file, message, notification, room, security, ui_config, user,
+        user_settings,
     },
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
@@ -127,6 +128,20 @@ fn user_routes() -> Router<Arc<AppState>> {
         .route("/me/password", put(user::change_password))
         .route("/me/stats", get(user::get_user_stats))
         .route("/me/rooms", get(room::get_my_rooms))
+        // 用户设置
+        .route("/me/settings", get(user_settings::get_user_settings))
+        .route("/me/settings", patch(user_settings::update_user_settings))
+        // 房间级设置
+        .route(
+            "/me/rooms/settings",
+            get(user_settings::list_room_settings),
+        )
+        .route(
+            "/me/rooms/:room_id/settings",
+            get(user_settings::get_room_settings)
+                .patch(user_settings::update_room_settings)
+                .delete(user_settings::delete_room_settings),
+        )
         .route("/logout", post(user::logout))
         // 用户列表和详情
         .route("/", get(user::list_users))
