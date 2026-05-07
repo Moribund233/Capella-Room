@@ -16,6 +16,8 @@ import MessageList from '@/components/message/MessageList.vue'
 import MessageInput from '@/components/message/MessageInput.vue'
 import TypingIndicator from '@/components/message/TypingIndicator.vue'
 import MessageSearch from '@/components/message/MessageSearch.vue'
+import MessageEditHistory from '@/components/message/MessageEditHistory.vue'
+import RoomMemberManager from '@/components/room/RoomMemberManager.vue'
 import { WSMessageType } from '@/types/websocket'
 import type {
   NewMessagePayload,
@@ -45,6 +47,13 @@ const showDetail = ref(false)
 const showScrollToBottom = ref(false)
 const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
 const { isMobile } = useResponsive()
+
+// 编辑历史弹窗状态
+const showEditHistory = ref(false)
+const editHistoryMessageId = ref<string | null>(null)
+
+// 成员管理弹窗状态
+const showMemberManager = ref(false)
 
 // 处理滚动状态变化
 function handleScrollStateChange(show: boolean) {
@@ -107,6 +116,23 @@ function handleEditMessage(messageId: string, newContent: string) {
 // 处理删除消息
 function handleDeleteMessage(message: Message) {
   deleteMessage(message)
+}
+
+// 处理查看编辑历史
+function handleViewEditHistory(message: Message) {
+  editHistoryMessageId.value = message.id
+  showEditHistory.value = true
+}
+
+// 关闭编辑历史弹窗
+function closeEditHistory() {
+  showEditHistory.value = false
+  editHistoryMessageId.value = null
+}
+
+// 处理成员变更
+function handleMembersChanged() {
+  roomStore.fetchMembers(roomId.value)
 }
 
 // 离开房间
@@ -305,6 +331,7 @@ onUnmounted(() => {
         @reply="startReply"
         @edit="startEdit"
         @delete="handleDeleteMessage"
+        @view-history="handleViewEditHistory"
         @scroll-state-change="handleScrollStateChange"
       />
 
@@ -339,6 +366,22 @@ onUnmounted(() => {
       :visible="showSearch"
       @close="closeSearch"
       @jump-to-message="jumpToMessage"
+    />
+
+    <!-- 编辑历史弹窗 -->
+    <MessageEditHistory
+      :message-id="editHistoryMessageId"
+      :visible="showEditHistory"
+      @close="closeEditHistory"
+    />
+
+    <!-- 成员管理弹窗 -->
+    <RoomMemberManager
+      v-model:visible="showMemberManager"
+      :room-id="roomId"
+      :members="roomStore.members"
+      :loading="roomStore.loading"
+      @members-changed="handleMembersChanged"
     />
   </div>
 </template>

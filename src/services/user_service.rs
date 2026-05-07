@@ -3,7 +3,10 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     error::{AppError, Result},
-    models::user::{User, UserRole, UserStatus},
+    models::user::{
+        FriendRequest, FriendRequestResponse, FriendRequestStatus, FriendResponse, Friendship,
+        SendFriendRequest, User, UserInfo, UserRole, UserStatus,
+    },
 };
 
 /// 用户服务
@@ -550,4 +553,321 @@ pub struct UserStats {
     pub joined_rooms: i64,
     pub total_messages: i64,
     pub online_hours: i64,
+}
+
+// ==================== 好友功能服务方法 ====================
+
+impl UserService {
+    /// 搜索用户（按用户名，用于好友功能）
+    pub async fn search_users_by_username(
+        &self,
+        keyword: &str,
+        limit: i64,
+    ) -> Result<Vec<UserInfo>> {
+        let users = sqlx::query_as::<_, User>(
+            r#"
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            FROM users
+            WHERE username ILIKE $1 AND is_active = true
+            ORDER BY username
+            LIMIT $2
+            "#
+        )
+        .bind(format!("%{}%", keyword))
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(users
+            .into_iter()
+            .map(|u| UserInfo::new(u.id, u.username, u.avatar_url))
+            .collect())
+    }
+
+    /// 发送好友申请
+    pub async fn send_friend_request(
+        &self,
+        sender_id: Uuid,
+        request: SendFriendRequest,
+    ) -> Result<FriendRequest> {
+        // 不能向自己发送申请
+        if sender_id == request.target_user_id {
+            return Err(AppError::Validation("不能向自己发送好友申请".to_string()));
+        }
+
+        // 检查目标用户是否存在
+        let target_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND is_active = true)",
+        )
+        .bind(request.target_user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        if !target_exists {
+            return Err(AppError::NotFound);
+        }
+
+        // 检查是否已经是好友
+        let is_friend = self.are_friends(sender_id, request.target_user_id).await?;
+        if is_friend {
+            return Err(AppError::Conflict("你们已经是好友了".to_string()));
+        }
+
+        // 检查是否已有待处理的申请（双向检查）
+        let existing_request = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM friend_requests
+                WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+                AND status = 'pending'
+            )
+            "#
+        )
+        .bind(sender_id)
+        .bind(request.target_user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        if existing_request {
+            return Err(AppError::Conflict("已存在待处理的好友申请".to_string()));
+        }
+
+        // 创建好友申请
+        let friend_request = sqlx::query_as::<_, FriendRequest>(
+            r#"
+            INSERT INTO friend_requests (sender_id, receiver_id, status, message)
+            VALUES ($1, $2, 'pending', $3)
+            RETURNING *
+            "#,
+        )
+        .bind(sender_id)
+        .bind(request.target_user_id)
+        .bind(request.message)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(friend_request)
+    }
+
+    /// 获取收到的好友申请列表
+    pub async fn get_received_friend_requests(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<FriendRequestResponse>> {
+        let requests = sqlx::query_as::<_, FriendRequest>(
+            r#"
+            SELECT * FROM friend_requests
+            WHERE receiver_id = $1 AND status = 'pending'
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        let mut responses = Vec::new();
+        for request in requests {
+            if let Ok(sender) = self.get_user_info(request.sender_id).await {
+                responses.push(FriendRequestResponse {
+                    id: request.id,
+                    sender,
+                    status: request.status,
+                    message: request.message,
+                    created_at: request.created_at,
+                });
+            }
+        }
+
+        Ok(responses)
+    }
+
+    /// 获取发送的好友申请列表
+    pub async fn get_sent_friend_requests(&self, user_id: Uuid) -> Result<Vec<FriendRequest>> {
+        let requests = sqlx::query_as::<_, FriendRequest>(
+            r#"
+            SELECT * FROM friend_requests
+            WHERE sender_id = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(requests)
+    }
+
+    /// 处理好友申请（接受或拒绝）
+    pub async fn handle_friend_request(
+        &self,
+        user_id: Uuid,
+        request_id: Uuid,
+        accept: bool,
+    ) -> Result<()> {
+        // 获取申请信息
+        let request: FriendRequest = sqlx::query_as("SELECT * FROM friend_requests WHERE id = $1")
+            .bind(request_id)
+            .fetch_one(self.db.pool())
+            .await
+            .map_err(|_| AppError::NotFound)?;
+
+        // 检查是否是接收者
+        if request.receiver_id != user_id {
+            return Err(AppError::Forbidden);
+        }
+
+        // 检查状态
+        if !matches!(request.status, FriendRequestStatus::Pending) {
+            return Err(AppError::Validation("该申请已处理".to_string()));
+        }
+
+        let mut tx = self.db.pool().begin().await?;
+
+        if accept {
+            // 更新申请状态为已接受
+            sqlx::query("UPDATE friend_requests SET status = 'accepted' WHERE id = $1")
+                .bind(request_id)
+                .execute(&mut *tx)
+                .await?;
+
+            // 创建好友关系（确保 user_id_a < user_id_b）
+            let (user_a, user_b) = if request.sender_id < request.receiver_id {
+                (request.sender_id, request.receiver_id)
+            } else {
+                (request.receiver_id, request.sender_id)
+            };
+
+            sqlx::query(
+                r#"
+                INSERT INTO friendships (user_id_a, user_id_b)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id_a, user_id_b) DO NOTHING
+                "#,
+            )
+            .bind(user_a)
+            .bind(user_b)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            // 更新申请状态为已拒绝
+            sqlx::query("UPDATE friend_requests SET status = 'rejected' WHERE id = $1")
+                .bind(request_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// 取消发送的好友申请
+    pub async fn cancel_friend_request(&self, user_id: Uuid, request_id: Uuid) -> Result<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE friend_requests
+            SET status = 'cancelled'
+            WHERE id = $1 AND sender_id = $2 AND status = 'pending'
+            "#,
+        )
+        .bind(request_id)
+        .bind(user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 获取好友列表
+    pub async fn get_friends(&self, user_id: Uuid) -> Result<Vec<FriendResponse>> {
+        // 查询好友关系
+        let friendships: Vec<Friendship> = sqlx::query_as(
+            r#"
+            SELECT * FROM friendships
+            WHERE user_id_a = $1 OR user_id_b = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        let mut friends = Vec::new();
+        for friendship in friendships {
+            // 获取好友ID（不是当前用户的那个）
+            let friend_id = if friendship.user_id_a == user_id {
+                friendship.user_id_b
+            } else {
+                friendship.user_id_a
+            };
+
+            if let Ok(friend_info) = self.get_user_info(friend_id).await {
+                friends.push(FriendResponse {
+                    id: friendship.id,
+                    friend: friend_info,
+                    created_at: friendship.created_at,
+                });
+            }
+        }
+
+        Ok(friends)
+    }
+
+    /// 删除好友
+    pub async fn remove_friend(&self, user_id: Uuid, friend_id: Uuid) -> Result<()> {
+        let (user_a, user_b) = if user_id < friend_id {
+            (user_id, friend_id)
+        } else {
+            (friend_id, user_id)
+        };
+
+        let result = sqlx::query("DELETE FROM friendships WHERE user_id_a = $1 AND user_id_b = $2")
+            .bind(user_a)
+            .bind(user_b)
+            .execute(self.db.pool())
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 检查两个用户是否是好友
+    pub async fn are_friends(&self, user_a: Uuid, user_b: Uuid) -> Result<bool> {
+        let (user_a, user_b) = if user_a < user_b {
+            (user_a, user_b)
+        } else {
+            (user_b, user_a)
+        };
+
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM friendships WHERE user_id_a = $1 AND user_id_b = $2)",
+        )
+        .bind(user_a)
+        .bind(user_b)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(exists)
+    }
+
+    /// 获取用户信息
+    async fn get_user_info(&self, user_id: Uuid) -> Result<UserInfo> {
+        let row = sqlx::query("SELECT id, username, avatar_url FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(self.db.pool())
+            .await?;
+
+        use sqlx::Row;
+        Ok(UserInfo::new(
+            row.get("id"),
+            row.get("username"),
+            row.get("avatar_url"),
+        ))
+    }
 }

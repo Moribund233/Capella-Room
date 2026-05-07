@@ -169,6 +169,28 @@ fn user_routes() -> Router<Arc<AppState>> {
         // 用户列表和详情
         .route("/", get(user::list_users))
         .route("/:user_id", get(user::get_user_by_id))
+        // 搜索用户
+        .route("/search", get(user::search_users))
+        // 好友功能
+        .route("/friends", get(user::get_friends))
+        .route("/friends/requests", post(user::send_friend_request))
+        .route(
+            "/friends/requests/received",
+            get(user::get_received_friend_requests),
+        )
+        .route(
+            "/friends/requests/sent",
+            get(user::get_sent_friend_requests),
+        )
+        .route(
+            "/friends/requests/handle",
+            post(user::handle_friend_request),
+        )
+        .route(
+            "/friends/requests/:request_id",
+            delete(user::cancel_friend_request),
+        )
+        .route("/friends/:friend_id", delete(user::remove_friend))
 }
 
 /// 聊天室路由
@@ -178,6 +200,13 @@ fn room_routes() -> Router<Arc<AppState>> {
         .route("/", get(room::list_rooms).post(room::create_room))
         // 最近更新的聊天室列表
         .route("/recent", get(room::list_recent_rooms))
+        // 私聊房间
+        .route("/direct", post(room::create_direct_room))
+        .route("/direct/list", get(room::get_direct_rooms))
+        // 通过邀请码加入房间（公开端点，需要认证）
+        .route("/join-by-invite", post(room::join_by_invite))
+        // 验证邀请码（公开端点，需要认证）
+        .route("/validate-invite", get(room::validate_invite_code))
         // 聊天室详情、更新、删除
         .route(
             "/:room_id",
@@ -194,6 +223,15 @@ fn room_routes() -> Router<Arc<AppState>> {
         .route(
             "/:room_id/members/:user_id/role",
             put(room::set_member_role),
+        )
+        // 邀请管理
+        .route(
+            "/:room_id/invitations",
+            get(room::get_room_invitations).post(room::create_invitation),
+        )
+        .route(
+            "/:room_id/invitations/:invitation_id",
+            delete(room::revoke_invitation),
         )
         // 消息
         .route("/:room_id/messages", get(message::get_room_messages))

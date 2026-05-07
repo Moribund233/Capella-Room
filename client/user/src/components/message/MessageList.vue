@@ -18,6 +18,7 @@ const emit = defineEmits<{
   reply: [message: Message]
   edit: [message: Message]
   delete: [message: Message]
+  viewHistory: [message: Message]
   scrollStateChange: [showScrollBtn: boolean]
 }>()
 
@@ -161,6 +162,7 @@ defineExpose({ scrollToBottom })
           @reply="emit('reply', $event)"
           @edit="emit('edit', $event)"
           @delete="emit('delete', $event)"
+          @view-history="emit('viewHistory', $event)"
         />
       </template>
     </template>

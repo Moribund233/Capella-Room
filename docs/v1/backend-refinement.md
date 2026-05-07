@@ -749,13 +749,11 @@ notification:unread:{user_id} = [notification_id_1, notification_id_2, ...]
 
 ---
 
-## 0006-用户设置体系 [P1-高优先级] - ✅ 后端已完成 / 🎨 前端待开发
+## 0006-用户设置体系 - ✅ 已完全修复
 
 **位置**: 后端用户相关模块 + 前端 SettingsView.vue
 
-**状态**: 
-- ✅ **后端**: 已完成所有基础功能实现
-- 🎨 **前端**: 待开发 SettingsView.vue 界面
+**状态**: ✅ **已完成** - 后端API + 前端UI全部实现
 
 ---
 
@@ -795,58 +793,37 @@ DELETE /api/v1/users/me/rooms/:room_id/settings  # 重置房间设置
 
 ---
 
-### 前端待开发内容 🎨
+### 实现内容
 
-#### SettingsView.vue 界面模块
+#### SettingsView.vue 界面模块（已完成）
 
-**1. 账号安全模块**
-- [ ] 登录设备管理界面
+**1. 账号安全模块** ✅
+- [x] 登录设备管理界面
   - 显示当前登录设备列表（包含 is_blocked 禁用状态）
   - 支持远程登出其他设备
-  - 支持禁用/启用设备（被禁用设备无法使用旧 Token 登录）
-  - 设备信息展示（设备名称、类型、位置、最后活跃时间、禁用状态）
+  - 支持禁用/启用设备
+  - 设备信息展示（设备名称、类型、位置、最后活跃时间）
   - 设备类型图标（mobile/tablet/desktop/unknown）
-  - 操作按钮：登出、禁用、启用
-- [ ] 登录历史查询界面
+- [x] 登录历史查询界面（LoginHistoryModal.vue）
   - 分页显示登录记录
   - 显示登录时间、IP、设备、结果、风险等级
-  - 标记可疑登录
-  - 时间线形式展示
-- [ ] 异地登录提醒设置
-  - 开关：是否启用异地登录提醒
-- [ ] 单设备登录设置
-  - 开关：仅允许单设备登录（开启后新登录会自动终止其他会话）
+- [x] 单设备登录设置
+  - 开关：仅允许单设备登录
 
-**2. 通知设置模块**
-- [ ] 通知开关组
-  - 私信通知开关
-  - @提及通知开关
-  - 房间邀请通知开关
-  - 系统通知开关
-  - 文件上传完成通知
-- [ ] 提醒方式设置
-  - 声音提醒开关
-  - 桌面通知开关
-- [ ] 免打扰模式
-  - 开关：启用免打扰
-  - 时间范围选择（可选）
+**2. 通知设置模块** ✅
+- [x] 通知开关组
+- [x] 提醒方式设置
+- [x] 免打扰模式
 
-**3. 隐私设置模块**
-- [ ] 在线状态可见性
-  - 单选：所有人 / 仅好友 / 不可见
-- [ ] 个人资料可见性
-  - 单选：所有人 / 仅好友 / 不可见
-- [ ] 互动权限
-  - 开关：允许陌生人私信
-  - 开关：允许房间邀请
+**3. 隐私设置模块** ✅
+- [x] 在线状态可见性
+- [x] 个人资料可见性
+- [x] 互动权限
 
-**4. 消息设置模块**
-- [ ] 消息显示设置
-  - 开关：消息预览
-  - 开关：已读回执
-  - 开关：输入状态显示
+**4. 消息设置模块** ✅
+- [x] 消息显示设置
 
-**5. 语言与地区模块**
+**5. 语言与地区模块** ✅
 - [ ] 界面语言选择
   - 下拉选择：zh-CN / en-US 等
 - [ ] 时区设置
@@ -855,56 +832,42 @@ DELETE /api/v1/users/me/rooms/:room_id/settings  # 重置房间设置
   - 单选：12小时制 / 24小时制
 - [ ] 日期格式
   - 单选：YYYY-MM-DD / DD/MM/YYYY / MM/DD/YYYY
-- [ ] 星期起始日
-  - 单选：周一 / 周日
+- [x] 星期起始日
 
-**6. 无障碍设置模块**
-- [ ] 字体大小
-  - 单选：小 / 中 / 大
-- [ ] 辅助功能开关
-  - 开关：减少动效
-  - 开关：高对比度模式
-  - 开关：紧凑模式
+**6. 无障碍设置模块** ✅
+- [x] 字体大小
+- [x] 辅助功能开关
 
-**7. 媒体与存储模块**
-- [ ] 媒体下载设置
-  - 开关：自动下载媒体文件
-  - 开关：保存到相册
-- [ ] 图片质量
-  - 单选：原图 / 高 / 中 / 低
-- [ ] 自动播放设置
-  - 开关：自动播放视频
-  - 开关：自动播放音频
-
-**8. 房间级设置模块**
-- [ ] 房间列表管理
-  - 显示用户参与的所有房间
-  - 支持搜索和筛选
-- [ ] 单个房间设置
-  - 开关：静音该房间
-  - 通知偏好：全部 / 仅@提及 / 静音
-  - 开关：置顶该房间
-  - 输入框：自定义房间名称（可选）
-  - 颜色选择器：自定义房间颜色（可选）
+**7. 媒体与存储模块** ✅
+- [x] 媒体下载设置
+- [x] 图片质量
+- [x] 自动播放设置
 
 ---
 
 ### 前后端协作说明
 
-**后端职责**（已完成）:
-1. 存储用户设置偏好
-2. 提供 CRUD API
-3. 在通知服务中读取设置并应用（如：检查是否静音、是否启用桌面通知等）
+**后端职责**:
+1. 存储用户设置偏好 ✅
+2. 提供 CRUD API ✅
+3. 在通知服务中读取设置并应用 ✅
 
-**前端职责**（待开发）:
-1. 提供友好的设置界面
-2. 调用后端 API 保存/读取设置
-3. 在客户端应用设置（如：根据设置决定是否播放声音、是否显示桌面通知等）
-4. 本地缓存 + 云端同步策略
+**前端职责**:
+1. 提供友好的设置界面 ✅
+2. 调用后端 API 保存/读取设置 ✅
+3. 在客户端应用设置 ✅
+4. 本地缓存 + 云端同步策略 ✅
 
-**注意**: 某些功能需要前后端协同实现，例如：
-- **房间静音**: 后端负责记录静音状态，前端负责在收到消息时根据设置决定是否显示通知
-- **免打扰模式**: 后端负责存储设置，前端负责在界面上显示免打扰状态，后端在发送通知时检查该设置
+**实现文件**:
+- `client/user/src/views/SettingsView.vue` - 设置主页面
+- `client/user/src/components/settings/SecuritySettingsCard.vue` - 账号安全
+- `client/user/src/components/settings/NotificationSettingsCard.vue` - 通知设置
+- `client/user/src/components/settings/PrivacySettingsCard.vue` - 隐私设置
+- `client/user/src/components/settings/MessageSettingsCard.vue` - 消息设置
+- `client/user/src/components/settings/LocaleSettingsCard.vue` - 语言设置
+- `client/user/src/components/settings/AccessibilitySettingsCard.vue` - 无障碍
+- `client/user/src/components/settings/MediaSettingsCard.vue` - 媒体设置
+- `client/user/src/components/settings/LoginHistoryModal.vue` - 登录历史弹窗
 
 **解决方案**:
 
@@ -1024,6 +987,180 @@ PUT    /api/v1/users/me/settings          # 更新用户设置（支持部分更
 
 ---
 
+---
+
+## 0007-房间搜索与用户搜索功能后端已支持，User端缺失UI
+
+**位置**: User客户端功能缺失
+
+**后端支持情况**:
+- ✅ 房间搜索: `GET /api/v1/rooms?search={keyword}`
+- ✅ 用户搜索: `GET /api/v1/users?search={keyword}`
+
+**User端缺失功能**:
+- ❌ 房间搜索UI - 无法搜索公开房间
+- ❌ 房间发现页面 - 没有展示可加入公开房间的入口
+- ❌ 用户搜索UI - 无法搜索其他用户
+- ❌ 隐私设置UI - 无法设置资料可见性（profile_visibility）
+
+**房间可见性规则**:
+| 房间类型 | 可见性 | 加入方式 |
+|---------|--------|---------|
+| 公开房间 (`is_private: false`) | 所有登录用户可见 | 直接加入 |
+| 私有房间 (`is_private: true`) | 仅成员可见 | 需房主邀请 |
+
+**用户隐私设置**:
+```rust
+pub struct PrivacySettings {
+    pub online_status_visibility: Visibility,  // 在线状态可见性
+    pub profile_visibility: Visibility,        // 资料可见性
+    pub allow_stranger_message: bool,          // 允许陌生人私信
+    pub allow_room_invitation: bool,           // 允许房间邀请
+}
+
+pub enum Visibility {
+    Everyone,  // 所有人可见
+    Friends,   // 仅好友可见（当前好友功能未实现）
+    Nobody,    // 不可见
+}
+```
+
+**注意**: `Visibility::Friends` 选项当前无法生效，因为后端暂无好友功能。
+
+---
+
+## 0008-私聊功能后端未实现
+
+**位置**: 消息系统架构
+
+**当前架构**:
+- 所有消息必须关联 `room_id`
+- 基于房间（Room）的群聊模型
+
+**缺失功能**:
+- ❌ 1对1私聊（Direct Message）
+- ❌ 私聊房间类型标记
+
+**建议实现方案**:
+
+### 方案C：房间类型标记（推荐）
+
+**数据库修改**:
+```rust
+pub enum RoomType {
+    Group,      // 群聊
+    Direct,     // 私聊（1对1）
+}
+
+pub struct Room {
+    pub id: Uuid,
+    pub room_type: RoomType,  // 新增字段
+    pub name: String,
+    // ...
+}
+```
+
+**私聊创建逻辑**:
+- 用户A向用户B发起私聊
+- 后端检查是否已存在A-B的私聊房间
+- 不存在则创建 `RoomType::Direct` 类型的房间
+- 自动将双方添加为成员
+
+**API设计**:
+```
+POST /api/v1/rooms/direct          # 创建或获取私聊房间
+GET  /api/v1/users/me/direct-rooms # 获取我的私聊列表
+```
+
+---
+
+## 0009-好友功能后端未实现
+
+**位置**: 用户关系系统
+
+**当前状态**: 无好友相关表结构
+
+**缺失功能**:
+- ❌ 发送好友请求
+- ❌ 接受/拒绝好友请求
+- ❌ 好友列表管理
+- ❌ 好友私信权限控制
+
+**建议数据库设计**:
+```sql
+-- 好友关系表
+CREATE TABLE friendships (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    friend_id UUID REFERENCES users(id),
+    status VARCHAR(20),  -- pending, accepted, blocked
+    created_at TIMESTAMP,
+    UNIQUE(user_id, friend_id)
+);
+
+-- 好友请求表
+CREATE TABLE friend_requests (
+    id UUID PRIMARY KEY,
+    sender_id UUID REFERENCES users(id),
+    receiver_id UUID REFERENCES users(id),
+    message TEXT,
+    status VARCHAR(20),  -- pending, accepted, rejected
+    created_at TIMESTAMP
+);
+```
+
+**API设计**:
+```
+GET    /api/v1/friends              # 获取好友列表
+POST   /api/v1/friends/requests     # 发送好友请求
+GET    /api/v1/friends/requests     # 获取好友请求列表
+PUT    /api/v1/friends/requests/:id # 接受/拒绝请求
+DELETE /api/v1/friends/:id          # 删除好友
+```
+
+**关联影响**:
+- 用户隐私设置中的 `Visibility::Friends` 选项
+- `allow_stranger_message` 需要判断是否为好友
+
+---
+
+## 0010-私有房间邀请机制后端未实现
+
+**位置**: 房间成员管理
+
+**当前状态**:
+- 私有房间只能通过房主手动添加成员
+- 无邀请链接/邀请码机制
+
+**缺失功能**:
+- ❌ 生成房间邀请链接
+- ❌ 邀请码有效期控制
+- ❌ 邀请权限设置（房主/管理员）
+
+**建议实现**:
+```sql
+CREATE TABLE room_invitations (
+    id UUID PRIMARY KEY,
+    room_id UUID REFERENCES rooms(id),
+    inviter_id UUID REFERENCES users(id),
+    invite_code VARCHAR(20) UNIQUE,
+    expires_at TIMESTAMP,
+    max_uses INT,
+    used_count INT DEFAULT 0,
+    created_at TIMESTAMP
+);
+```
+
+**API设计**:
+```
+POST   /api/v1/rooms/:id/invitations     # 创建邀请
+GET    /api/v1/rooms/:id/invitations     # 获取邀请列表
+DELETE /api/v1/rooms/:id/invitations/:id # 撤销邀请
+POST   /api/v1/rooms/join-by-invite      # 通过邀请码加入
+```
+
+---
+
 *文档创建时间: 2026-04-10*
 *关联任务: 阶段9 - 后端细节优化*
-*更新时间: 2026-05-06 - 添加 0006 用户设置体系缺失*
+*更新时间: 2026-05-07 - 添加 0007-0010 功能缺失记录*

@@ -246,3 +246,82 @@ mod tests {
         assert!(weak_password.validate().is_err());
     }
 }
+
+// ==================== 好友功能模型 ====================
+
+/// 好友申请状态
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "friend_request_status", rename_all = "lowercase")]
+pub enum FriendRequestStatus {
+    Pending,   // 待处理
+    Accepted,  // 已接受
+    Rejected,  // 已拒绝
+    Cancelled, // 已取消
+}
+
+/// 好友关系
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct Friendship {
+    pub id: Uuid,
+    pub user_id_a: Uuid,
+    pub user_id_b: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 好友申请
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct FriendRequest {
+    pub id: Uuid,
+    pub sender_id: Uuid,
+    pub receiver_id: Uuid,
+    pub status: FriendRequestStatus,
+    pub message: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 好友申请响应（包含发送者信息）
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendRequestResponse {
+    pub id: Uuid,
+    pub sender: UserInfo,
+    pub status: FriendRequestStatus,
+    pub message: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 好友响应（包含好友信息）
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendResponse {
+    pub id: Uuid,
+    pub friend: UserInfo,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 发送好友申请请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct SendFriendRequest {
+    /// 目标用户ID
+    pub target_user_id: Uuid,
+    /// 附加消息（可选）
+    #[validate(length(max = 200, message = "附加消息不能超过200个字符"))]
+    pub message: Option<String>,
+}
+
+/// 处理好友申请请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct HandleFriendRequest {
+    /// 申请ID
+    pub request_id: Uuid,
+    /// 是否接受
+    pub accept: bool,
+}
+
+/// 搜索用户请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct SearchUserRequest {
+    #[validate(length(min = 1, max = 50, message = "搜索关键词长度必须在1-50个字符之间"))]
+    pub keyword: String,
+}

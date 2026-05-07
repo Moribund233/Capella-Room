@@ -21,6 +21,7 @@ import MessageSettingsCard from '@/components/settings/MessageSettingsCard.vue'
 import LocaleSettingsCard from '@/components/settings/LocaleSettingsCard.vue'
 import AccessibilitySettingsCard from '@/components/settings/AccessibilitySettingsCard.vue'
 import MediaSettingsCard from '@/components/settings/MediaSettingsCard.vue'
+import LoginHistoryModal from '@/components/settings/LoginHistoryModal.vue'
 
 import {
   Bell,
@@ -54,6 +55,9 @@ const {
 
 const activeTab = ref('notifications')
 const savingTab = ref<string | null>(null)
+
+// 登录历史弹窗状态
+const showLoginHistory = ref(false)
 
 /**
  * Tab 配置
@@ -302,6 +306,7 @@ onMounted(async () => {
               @logout-device="logoutDevice"
               @block-device="blockDevice"
               @unblock-device="unblockDevice"
+              @view-login-history="showLoginHistory = true"
             />
           </div>
 
@@ -362,6 +367,9 @@ onMounted(async () => {
         </PageTransition>
       </div>
     </div>
+
+    <!-- 登录历史弹窗 -->
+    <LoginHistoryModal v-model:visible="showLoginHistory" />
   </div>
 </template>
 

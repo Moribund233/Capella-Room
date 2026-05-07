@@ -478,6 +478,34 @@ impl AuditService {
         self.log_event(log).await
     }
 
+    /// 记录用户相关操作
+    pub async fn log_user_action(
+        &self,
+        user_id: Uuid,
+        role: UserRole,
+        action: &str,
+        ip: IpAddr,
+    ) -> Result<()> {
+        let event_type = match action {
+            "friend_request_send" => AuditEventType::UserFriendRequestSend,
+            "friend_request_accept" => AuditEventType::UserFriendRequestAccept,
+            "friend_request_reject" => AuditEventType::UserFriendRequestReject,
+            "friend_request_cancel" => AuditEventType::UserFriendRequestCancel,
+            "friend_remove" => AuditEventType::UserFriendRemove,
+            _ => AuditEventType::UserProfileUpdate,
+        };
+
+        let log = CreateAuditLogRequest::new(
+            event_type,
+            action,
+            format!("用户 {} 执行 {} 操作", user_id, action),
+        )
+        .with_actor(user_id, role)
+        .with_metadata(AuditMetadata::new().with_ip(ip));
+
+        self.log_event(log).await
+    }
+
     /// 记录房间操作
     pub async fn log_room_action(
         &self,

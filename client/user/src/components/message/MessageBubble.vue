@@ -13,6 +13,7 @@ const emit = defineEmits<{
   reply: [message: Message]
   edit: [message: Message]
   delete: [message: Message]
+  viewHistory: [message: Message]
 }>()
 
 const showActions = ref(false)
@@ -92,6 +93,11 @@ function handleDelete() {
   showActions.value = false
 }
 
+function handleViewHistory() {
+  emit('viewHistory', props.message)
+  showActions.value = false
+}
+
 onUnmounted(() => {
   if (longPressTimer) {
     clearTimeout(longPressTimer)
@@ -157,6 +163,7 @@ onUnmounted(() => {
           @reply="handleReply"
           @edit="handleEdit"
           @delete="handleDelete"
+          @view-history="handleViewHistory"
           @close="showActions = false"
         />
       </div>

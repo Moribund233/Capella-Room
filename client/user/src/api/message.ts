@@ -32,4 +32,9 @@ export const messageApi = {
   searchMessages(params: SearchMessagesParams): Promise<Message[]> {
     return httpClient.get('/messages/search', { params })
   },
+
+  /** 获取消息编辑历史 */
+  getEditHistory(messageId: string): Promise<ApiResponse<Message[]>> {
+    return httpClient.get(`/messages/${messageId}/history`)
+  },
 }

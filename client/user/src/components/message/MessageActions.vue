@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Reply, Pencil, Trash2 } from 'lucide-vue-next'
+import { Reply, Pencil, Trash2, History } from 'lucide-vue-next'
 import type { Message } from '@/types/message'
 
 const props = defineProps<{
@@ -13,6 +13,7 @@ const emit = defineEmits<{
   reply: [message: Message]
   edit: [message: Message]
   delete: [message: Message]
+  viewHistory: [message: Message]
   close: []
 }>()
 
@@ -30,6 +31,11 @@ function handleEdit() {
 
 function handleDelete() {
   emit('delete', props.message)
+  emit('close')
+}
+
+function handleViewHistory() {
+  emit('viewHistory', props.message)
   emit('close')
 }
 
@@ -58,6 +64,15 @@ onUnmounted(() => {
     <button class="message-actions__item" @click="handleReply">
       <Reply class="message-actions__icon" :size="16" />
       <span class="message-actions__text">回复</span>
+    </button>
+    <!-- 查看编辑历史（仅对已编辑消息显示） -->
+    <button
+      v-if="message.edit_count > 0"
+      class="message-actions__item"
+      @click="handleViewHistory"
+    >
+      <History class="message-actions__icon" :size="16" />
+      <span class="message-actions__text">编辑历史</span>
     </button>
     <template v-if="isOwn && !message.is_deleted">
       <button class="message-actions__item" @click="handleEdit">

@@ -314,12 +314,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /**
    * 加载登录历史
+   * @param params 查询参数（limit/offset）
    */
-  async function loadLoginHistory(limit = 20): Promise<boolean> {
+  async function loadLoginHistory(params?: { limit?: number; offset?: number }): Promise<boolean> {
     securityLoading.value = true
 
     try {
-      const res = await securityApi.getLoginHistory({ limit })
+      const res = await securityApi.getLoginHistory(params)
       if (res.data?.history) {
         loginHistory.value = res.data.history
         return true

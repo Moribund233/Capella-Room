@@ -38,6 +38,15 @@ pub enum MemberRole {
     Member,
 }
 
+/// 房间类型
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "room_type", rename_all = "lowercase")]
+pub enum RoomType {
+    Group,  // 群聊
+    Direct, // 私聊（1对1）
+}
+
 /// 创建聊天室请求
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct CreateRoomRequest {
@@ -105,7 +114,9 @@ impl Room {
 
     /// 检查用户是否是房间成员
     pub fn is_member(&self, user_id: Uuid, members: &[RoomMember]) -> bool {
-        members.iter().any(|m| m.room_id == self.id && m.user_id == user_id)
+        members
+            .iter()
+            .any(|m| m.room_id == self.id && m.user_id == user_id)
     }
 
     /// 检查用户是否是房间所有者
@@ -118,6 +129,107 @@ impl RoomMember {
     /// 检查是否是管理员或所有者
     pub fn is_admin_or_owner(&self) -> bool {
         matches!(self.role, MemberRole::Owner | MemberRole::Admin)
+    }
+}
+
+/// 房间邀请
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct RoomInvitation {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub inviter_id: Uuid,
+    pub invite_code: String,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub max_uses: Option<i32>,
+    pub used_count: i32,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 房间邀请响应（包含邀请者信息）
+#[derive(Debug, Clone, Serialize)]
+pub struct RoomInvitationResponse {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub inviter: UserInfo,
+    pub invite_code: String,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub max_uses: Option<i32>,
+    pub used_count: i32,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 创建房间邀请请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct CreateInvitationRequest {
+    /// 邀请码有效期（小时），null表示永不过期
+    pub expires_in_hours: Option<i32>,
+    /// 最大使用次数，null表示无限制
+    #[validate(range(min = 1, max = 1000, message = "最大使用次数必须在1-1000之间"))]
+    pub max_uses: Option<i32>,
+}
+
+/// 通过邀请码加入房间请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct JoinByInviteRequest {
+    #[validate(length(min = 1, max = 20, message = "邀请码长度必须在1-20个字符之间"))]
+    pub invite_code: String,
+}
+
+/// 创建私聊房间请求
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct CreateDirectRoomRequest {
+    /// 对方用户ID
+    pub target_user_id: Uuid,
+}
+
+/// 私聊房间响应（包含对方用户信息）
+#[derive(Debug, Clone, Serialize)]
+pub struct DirectRoomResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub target_user: UserInfo,
+    pub created_at: DateTime<Utc>,
+}
+
+impl RoomInvitation {
+    /// 检查邀请是否有效
+    pub fn is_valid(&self) -> bool {
+        if !self.is_active {
+            return false;
+        }
+
+        // 检查是否过期
+        if let Some(expires_at) = self.expires_at {
+            if Utc::now() > expires_at {
+                return false;
+            }
+        }
+
+        // 检查使用次数
+        if let Some(max_uses) = self.max_uses {
+            if self.used_count >= max_uses {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// 转换为响应DTO
+    pub fn to_response(&self, inviter: UserInfo) -> RoomInvitationResponse {
+        RoomInvitationResponse {
+            id: self.id,
+            room_id: self.room_id,
+            inviter,
+            invite_code: self.invite_code.clone(),
+            expires_at: self.expires_at,
+            max_uses: self.max_uses,
+            used_count: self.used_count,
+            is_active: self.is_active,
+            created_at: self.created_at,
+        }
     }
 }
 
@@ -149,5 +261,45 @@ mod tests {
             max_members: None,
         };
         assert!(invalid_name.validate().is_err());
+    }
+
+    #[test]
+    fn test_room_invitation_valid() {
+        let invitation = RoomInvitation {
+            id: Uuid::new_v4(),
+            room_id: Uuid::new_v4(),
+            inviter_id: Uuid::new_v4(),
+            invite_code: "ABC123".to_string(),
+            expires_at: None,
+            max_uses: None,
+            used_count: 0,
+            is_active: true,
+            created_at: Utc::now(),
+        };
+        assert!(invitation.is_valid());
+
+        // 测试已停用
+        let mut inactive = invitation.clone();
+        inactive.is_active = false;
+        assert!(!inactive.is_valid());
+
+        // 测试已过期
+        let mut expired = invitation.clone();
+        expired.expires_at = Some(Utc::now() - chrono::Duration::hours(1));
+        assert!(!expired.is_valid());
+
+        // 测试使用次数已满
+        let mut max_used = invitation.clone();
+        max_used.max_uses = Some(5);
+        max_used.used_count = 5;
+        assert!(!max_used.is_valid());
+    }
+
+    #[test]
+    fn test_room_type_serialization() {
+        let group = RoomType::Group;
+        let direct = RoomType::Direct;
+        assert_eq!(serde_json::to_string(&group).unwrap(), "\"group\"");
+        assert_eq!(serde_json::to_string(&direct).unwrap(), "\"direct\"");
     }
 }

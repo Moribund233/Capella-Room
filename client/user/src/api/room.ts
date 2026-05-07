@@ -52,4 +52,14 @@ export const roomApi = {
   getRoomMembers(roomId: string): Promise<ApiResponse<RoomMember[]>> {
     return httpClient.get(`/rooms/${roomId}/members`)
   },
+
+  /** 踢出成员 */
+  kickMember(roomId: string, userId: string): Promise<ApiResponse<unknown>> {
+    return httpClient.delete(`/rooms/${roomId}/members/${userId}`)
+  },
+
+  /** 设置成员角色 */
+  setMemberRole(roomId: string, userId: string, role: 'admin' | 'member'): Promise<ApiResponse<unknown>> {
+    return httpClient.put(`/rooms/${roomId}/members/${userId}/role`, { role })
+  },
 }

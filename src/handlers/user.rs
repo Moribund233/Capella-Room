@@ -1,5 +1,5 @@
 use axum::{
-    extract::{ConnectInfo, Query, State},
+    extract::{ConnectInfo, Path, Query, State},
     Extension, Json,
 };
 use serde::Deserialize;
@@ -11,7 +11,10 @@ use validator::Validate;
 use crate::{
     error::{AppError, Result},
     models::response::ApiResponse,
-    models::user::{ChangePasswordRequest, UpdateUserRequest, UserResponse},
+    models::user::{
+        ChangePasswordRequest, FriendRequestResponse, FriendResponse, HandleFriendRequest,
+        SendFriendRequest, UpdateUserRequest, UserResponse,
+    },
     services::{auth_service::Claims, user_service::UserStats},
     state::AppState,
 };
@@ -231,4 +234,219 @@ pub async fn get_user_stats(
     let stats = state.user_service().get_user_stats(user_id).await?;
 
     Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 搜索用户
+pub async fn search_users(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<SearchUserQuery>,
+) -> Result<Json<ApiResponse<Vec<crate::models::user::UserInfo>>>> {
+    let users = state
+        .user_service()
+        .search_users_by_username(&query.keyword, query.limit)
+        .await?;
+
+    Ok(Json(ApiResponse::success(users)))
+}
+
+/// 搜索用户查询参数
+#[derive(Debug, Deserialize)]
+pub struct SearchUserQuery {
+    /// 搜索关键词（用户名）
+    pub keyword: String,
+    /// 返回数量限制（默认20，最大100）
+    #[serde(default = "default_search_limit")]
+    pub limit: i64,
+}
+
+fn default_search_limit() -> i64 {
+    20
+}
+
+/// 发送好友申请
+pub async fn send_friend_request(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
+    Json(request): Json<SendFriendRequest>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    let request = state
+        .user_service()
+        .send_friend_request(user_id, request)
+        .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_user_action(user_id, role, "friend_request_send", ip)
+            .await;
+    });
+
+    Ok(Json(ApiResponse::success(serde_json::json!({
+        "request_id": request.id,
+        "status": "pending"
+    }))))
+}
+
+/// 获取收到的好友申请列表
+pub async fn get_received_friend_requests(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<Vec<FriendRequestResponse>>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    let requests = state
+        .user_service()
+        .get_received_friend_requests(user_id)
+        .await?;
+
+    Ok(Json(ApiResponse::success(requests)))
+}
+
+/// 获取发送的好友申请列表
+pub async fn get_sent_friend_requests(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<Vec<crate::models::user::FriendRequest>>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    let requests = state
+        .user_service()
+        .get_sent_friend_requests(user_id)
+        .await?;
+
+    Ok(Json(ApiResponse::success(requests)))
+}
+
+/// 处理好友申请（接受或拒绝）
+pub async fn handle_friend_request(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
+    Json(request): Json<HandleFriendRequest>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    state
+        .user_service()
+        .handle_friend_request(user_id, request.request_id, request.accept)
+        .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let action = if request.accept {
+        "friend_request_accept"
+    } else {
+        "friend_request_reject"
+    };
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_user_action(user_id, role, action, ip)
+            .await;
+    });
+
+    let message = if request.accept {
+        "已接受好友申请"
+    } else {
+        "已拒绝好友申请"
+    };
+    Ok(Json(ApiResponse::success_with_message(message)))
+}
+
+/// 取消发送的好友申请
+pub async fn cancel_friend_request(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
+    Path(request_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    state
+        .user_service()
+        .cancel_friend_request(user_id, request_id)
+        .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_user_action(user_id, role, "friend_request_cancel", ip)
+            .await;
+    });
+
+    Ok(Json(ApiResponse::success_with_message("已取消好友申请")))
+}
+
+/// 获取好友列表
+pub async fn get_friends(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<Vec<FriendResponse>>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    let friends = state.user_service().get_friends(user_id).await?;
+
+    Ok(Json(ApiResponse::success(friends)))
+}
+
+/// 删除好友
+pub async fn remove_friend(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
+    Path(friend_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    state
+        .user_service()
+        .remove_friend(user_id, friend_id)
+        .await?;
+
+    // 记录审计日志
+    let ip = addr.ip();
+    let role = claims.role.clone();
+    let audit_service = Arc::clone(&state.audit_service);
+    tokio::spawn(async move {
+        let _ = audit_service
+            .log_user_action(user_id, role, "friend_remove", ip)
+            .await;
+    });
+
+    Ok(Json(ApiResponse::success_with_message("已删除好友")))
 }

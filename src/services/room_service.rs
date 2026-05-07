@@ -3,10 +3,16 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     error::{AppError, Result},
-    models::room::{MemberRole, MessagePreview, Room, RoomMember, RoomResponse},
+    models::room::{
+        DirectRoomResponse, MemberRole, MessagePreview, Room, RoomInvitation,
+        RoomInvitationResponse, RoomMember, RoomResponse, RoomType,
+    },
     models::user::{UserInfo, UserRole},
     utils::logging::PerformanceTimer,
 };
+
+use chrono::Utc;
+use rand::Rng;
 
 /// 聊天室服务
 pub struct RoomService {
@@ -1053,7 +1059,9 @@ impl RoomRow {
                 id,
                 content: self.last_message_content.unwrap_or_default(),
                 sender_name: self.last_message_sender_name.unwrap_or_default(),
-                created_at: self.last_message_created_at.unwrap_or(chrono::DateTime::UNIX_EPOCH),
+                created_at: self
+                    .last_message_created_at
+                    .unwrap_or(chrono::DateTime::UNIX_EPOCH),
             }),
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -1073,4 +1081,432 @@ pub struct RoomMemberWithUser {
     pub avatar_url: Option<String>,
     #[sqlx(rename = "user_status")]
     pub user_status: crate::models::user::UserStatus,
+}
+
+// ==================== 房间邀请相关方法 ====================
+
+impl RoomService {
+    /// 生成随机邀请码（8位字母数字组合）
+    fn generate_invite_code() -> String {
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let mut rng = rand::thread_rng();
+        (0..8)
+            .map(|_| {
+                let idx = rng.gen_range(0..CHARSET.len());
+                CHARSET[idx] as char
+            })
+            .collect()
+    }
+
+    /// 创建房间邀请
+    pub async fn create_invitation(
+        &self,
+        room_id: Uuid,
+        inviter_id: Uuid,
+        expires_in_hours: Option<i32>,
+        max_uses: Option<i32>,
+    ) -> Result<RoomInvitation> {
+        // 检查房间是否存在
+        let room = self.get_room_by_id(room_id).await?;
+        let _room = room.ok_or(AppError::NotFound)?;
+
+        // 检查邀请者权限（只有Owner或Admin可以创建邀请）
+        let can_invite = self.can_manage_room(room_id, inviter_id).await?;
+        if !can_invite {
+            return Err(AppError::Forbidden);
+        }
+
+        // 生成邀请码
+        let invite_code = Self::generate_invite_code();
+
+        // 计算过期时间
+        let expires_at =
+            expires_in_hours.map(|hours| Utc::now() + chrono::Duration::hours(hours as i64));
+
+        // 创建邀请
+        let invitation = sqlx::query_as::<_, RoomInvitation>(
+            r#"
+            INSERT INTO room_invitations (room_id, inviter_id, invite_code, expires_at, max_uses)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            "#,
+        )
+        .bind(room_id)
+        .bind(inviter_id)
+        .bind(&invite_code)
+        .bind(expires_at)
+        .bind(max_uses)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(invitation)
+    }
+
+    /// 获取房间的邀请列表
+    pub async fn get_room_invitations(
+        &self,
+        room_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<RoomInvitationResponse>> {
+        // 检查用户是否有权限查看邀请（成员即可查看）
+        let is_member = self.is_user_in_room(room_id, user_id).await?;
+        if !is_member {
+            return Err(AppError::Forbidden);
+        }
+
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                ri.id,
+                ri.room_id,
+                ri.inviter_id,
+                ri.invite_code,
+                ri.expires_at,
+                ri.max_uses,
+                ri.used_count,
+                ri.is_active,
+                ri.created_at,
+                u.username as inviter_username,
+                u.avatar_url as inviter_avatar_url
+            FROM room_invitations ri
+            JOIN users u ON ri.inviter_id = u.id
+            WHERE ri.room_id = $1
+            ORDER BY ri.created_at DESC
+            "#,
+        )
+        .bind(room_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        let invitations = rows
+            .into_iter()
+            .map(|row| {
+                use sqlx::Row;
+                let invitation = RoomInvitation {
+                    id: row.get("id"),
+                    room_id: row.get("room_id"),
+                    inviter_id: row.get("inviter_id"),
+                    invite_code: row.get("invite_code"),
+                    expires_at: row.get("expires_at"),
+                    max_uses: row.get("max_uses"),
+                    used_count: row.get("used_count"),
+                    is_active: row.get("is_active"),
+                    created_at: row.get("created_at"),
+                };
+                let inviter = UserInfo::new(
+                    row.get("inviter_id"),
+                    row.get("inviter_username"),
+                    row.get("inviter_avatar_url"),
+                );
+                invitation.to_response(inviter)
+            })
+            .collect();
+
+        Ok(invitations)
+    }
+
+    /// 撤销邀请
+    pub async fn revoke_invitation(
+        &self,
+        room_id: Uuid,
+        invitation_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<()> {
+        // 检查用户权限（Owner或Admin可以撤销任何邀请，其他成员只能撤销自己的）
+        let can_manage = self.can_manage_room(room_id, user_id).await?;
+
+        // 获取邀请信息
+        let invitation: Option<RoomInvitation> = sqlx::query_as(
+            r#"
+            SELECT * FROM room_invitations WHERE id = $1 AND room_id = $2
+            "#,
+        )
+        .bind(invitation_id)
+        .bind(room_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let invitation = invitation.ok_or(AppError::NotFound)?;
+
+        // 如果不是管理员，只能撤销自己的邀请
+        if !can_manage && invitation.inviter_id != user_id {
+            return Err(AppError::Forbidden);
+        }
+
+        // 停用邀请
+        let result = sqlx::query(
+            r#"
+            UPDATE room_invitations SET is_active = FALSE WHERE id = $1
+            "#,
+        )
+        .bind(invitation_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// 通过邀请码加入房间
+    pub async fn join_by_invite_code(&self, invite_code: &str, user_id: Uuid) -> Result<Uuid> {
+        // 查找邀请
+        let invitation: Option<RoomInvitation> = sqlx::query_as(
+            r#"
+            SELECT * FROM room_invitations WHERE invite_code = $1
+            "#,
+        )
+        .bind(invite_code)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let invitation = invitation.ok_or_else(|| AppError::NotFound)?;
+
+        // 检查邀请是否有效
+        if !invitation.is_valid() {
+            return Err(AppError::Forbidden);
+        }
+
+        let room_id = invitation.room_id;
+
+        // 检查用户是否已经是成员
+        if self.is_user_in_room(room_id, user_id).await? {
+            return Ok(room_id);
+        }
+
+        // 检查房间是否已满
+        let room = self.get_room_by_id(room_id).await?;
+        let room = room.ok_or(AppError::NotFound)?;
+        let member_count = self.get_room_member_count(room_id).await?;
+        if member_count >= room.max_members as i64 {
+            return Err(AppError::Conflict("聊天室已满".to_string()));
+        }
+
+        // 开启事务
+        let mut tx = self.db.pool().begin().await?;
+
+        // 添加成员
+        sqlx::query(
+            r#"
+            INSERT INTO room_members (room_id, user_id, role)
+            VALUES ($1, $2, 'member')
+            ON CONFLICT (room_id, user_id) DO NOTHING
+            "#,
+        )
+        .bind(room_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // 更新邀请使用次数
+        sqlx::query(
+            r#"
+            UPDATE room_invitations 
+            SET used_count = used_count + 1 
+            WHERE id = $1
+            "#,
+        )
+        .bind(invitation.id)
+        .execute(&mut *tx)
+        .await?;
+
+        // 记录邀请使用
+        sqlx::query(
+            r#"
+            INSERT INTO room_invitation_uses (invitation_id, user_id)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(invitation.id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(room_id)
+    }
+
+    /// 验证邀请码是否有效（不加入，仅验证）
+    pub async fn validate_invite_code(&self, invite_code: &str) -> Result<Option<RoomInvitation>> {
+        let invitation: Option<RoomInvitation> = sqlx::query_as(
+            r#"
+            SELECT * FROM room_invitations WHERE invite_code = $1
+            "#,
+        )
+        .bind(invite_code)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        Ok(invitation.filter(|i| i.is_valid()))
+    }
+
+    // ==================== 私聊功能相关方法 ====================
+
+    /// 获取或创建私聊房间
+    /// 如果两个用户之间已存在私聊房间，则返回现有房间
+    pub async fn get_or_create_direct_room(
+        &self,
+        user_a_id: Uuid,
+        user_b_id: Uuid,
+    ) -> Result<DirectRoomResponse> {
+        // 不能和自己创建私聊
+        if user_a_id == user_b_id {
+            return Err(AppError::Validation("不能和自己创建私聊房间".to_string()));
+        }
+
+        // 检查是否已存在私聊房间
+        if let Some(room) = self.find_direct_room(user_a_id, user_b_id).await? {
+            return self.to_direct_room_response(room, user_a_id).await;
+        }
+
+        // 创建新的私聊房间
+        self.create_direct_room(user_a_id, user_b_id).await
+    }
+
+    /// 查找两个用户之间的私聊房间
+    async fn find_direct_room(&self, user_a_id: Uuid, user_b_id: Uuid) -> Result<Option<Room>> {
+        let room = sqlx::query_as::<_, Room>(
+            r#"
+            SELECT r.* FROM rooms r
+            INNER JOIN room_members rm1 ON r.id = rm1.room_id AND rm1.user_id = $1
+            INNER JOIN room_members rm2 ON r.id = rm2.room_id AND rm2.user_id = $2
+            WHERE r.room_type = 'direct'
+            LIMIT 1
+            "#,
+        )
+        .bind(user_a_id)
+        .bind(user_b_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        Ok(room)
+    }
+
+    /// 创建私聊房间
+    async fn create_direct_room(
+        &self,
+        user_a_id: Uuid,
+        user_b_id: Uuid,
+    ) -> Result<DirectRoomResponse> {
+        // 获取对方用户信息
+        let target_user = self.get_user_info(user_b_id).await?;
+
+        let mut tx = self.db.pool().begin().await?;
+
+        // 创建私聊房间
+        let room = sqlx::query_as::<_, Room>(
+            r#"
+            INSERT INTO rooms (name, description, owner_id, is_private, max_members, room_type)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            "#,
+        )
+        .bind(&target_user.username) // 房间名称为对方用户名
+        .bind(None::<&str>)
+        .bind(user_a_id) // 创建者为房主
+        .bind(true) // 私聊房间总是私有的
+        .bind(2) // 私聊房间最多2人
+        .bind(RoomType::Direct)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // 添加双方为成员
+        sqlx::query(
+            r#"
+            INSERT INTO room_members (room_id, user_id, role)
+            VALUES ($1, $2, 'member'), ($1, $3, 'member')
+            "#,
+        )
+        .bind(room.id)
+        .bind(user_a_id)
+        .bind(user_b_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(DirectRoomResponse {
+            id: room.id,
+            name: target_user.username.clone(),
+            target_user,
+            created_at: room.created_at,
+        })
+    }
+
+    /// 将房间转换为私聊房间响应
+    async fn to_direct_room_response(
+        &self,
+        room: Room,
+        current_user_id: Uuid,
+    ) -> Result<DirectRoomResponse> {
+        // 获取房间成员（排除当前用户）
+        let target_user_id: Option<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT user_id FROM room_members
+            WHERE room_id = $1 AND user_id != $2
+            LIMIT 1
+            "#,
+        )
+        .bind(room.id)
+        .bind(current_user_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        let target_user_id = target_user_id.ok_or(AppError::NotFound)?;
+        let target_user = self.get_user_info(target_user_id).await?;
+
+        Ok(DirectRoomResponse {
+            id: room.id,
+            name: target_user.username.clone(),
+            target_user,
+            created_at: room.created_at,
+        })
+    }
+
+    /// 获取用户信息
+    async fn get_user_info(&self, user_id: Uuid) -> Result<UserInfo> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, username, avatar_url FROM users WHERE id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        use sqlx::Row;
+        Ok(UserInfo::new(
+            row.get("id"),
+            row.get("username"),
+            row.get("avatar_url"),
+        ))
+    }
+
+    /// 获取用户的私聊房间列表
+    pub async fn get_user_direct_rooms(&self, user_id: Uuid) -> Result<Vec<DirectRoomResponse>> {
+        let rooms = sqlx::query_as::<_, Room>(
+            r#"
+            SELECT r.* FROM rooms r
+            INNER JOIN room_members rm ON r.id = rm.room_id
+            WHERE rm.user_id = $1 AND r.room_type = 'direct'
+            ORDER BY r.updated_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        let mut responses = Vec::new();
+        for room in rooms {
+            if let Ok(response) = self.to_direct_room_response(room, user_id).await {
+                responses.push(response);
+            }
+        }
+
+        Ok(responses)
+    }
 }

@@ -19,6 +19,12 @@ pub enum AuditEventType {
     UserRegister,
     UserPasswordChange,
     UserProfileUpdate,
+    // 好友事件
+    UserFriendRequestSend,
+    UserFriendRequestAccept,
+    UserFriendRequestReject,
+    UserFriendRequestCancel,
+    UserFriendRemove,
     // 房间事件
     RoomCreate,
     RoomDelete,
@@ -65,6 +71,11 @@ impl fmt::Display for AuditEventType {
             AuditEventType::UserRegister => "user_register",
             AuditEventType::UserPasswordChange => "user_password_change",
             AuditEventType::UserProfileUpdate => "user_profile_update",
+            AuditEventType::UserFriendRequestSend => "user_friend_request_send",
+            AuditEventType::UserFriendRequestAccept => "user_friend_request_accept",
+            AuditEventType::UserFriendRequestReject => "user_friend_request_reject",
+            AuditEventType::UserFriendRequestCancel => "user_friend_request_cancel",
+            AuditEventType::UserFriendRemove => "user_friend_remove",
             AuditEventType::RoomCreate => "room_create",
             AuditEventType::RoomDelete => "room_delete",
             AuditEventType::RoomMemberAdd => "room_member_add",
@@ -108,7 +119,12 @@ impl AuditEventType {
             | AuditEventType::UserLogout
             | AuditEventType::UserRegister
             | AuditEventType::UserPasswordChange
-            | AuditEventType::UserProfileUpdate => "user",
+            | AuditEventType::UserProfileUpdate
+            | AuditEventType::UserFriendRequestSend
+            | AuditEventType::UserFriendRequestAccept
+            | AuditEventType::UserFriendRequestReject
+            | AuditEventType::UserFriendRequestCancel
+            | AuditEventType::UserFriendRemove => "user",
             AuditEventType::RoomCreate
             | AuditEventType::RoomDelete
             | AuditEventType::RoomMemberAdd

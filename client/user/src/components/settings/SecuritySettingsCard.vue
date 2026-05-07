@@ -14,7 +14,7 @@ import {
   NEmpty,
   NSkeleton,
 } from 'naive-ui'
-import { Shield, AlertTriangle, Smartphone, Laptop, Tablet, Monitor, LogOut, Ban } from 'lucide-vue-next'
+import { Shield, AlertTriangle, Smartphone, Laptop, Tablet, Monitor, LogOut, Ban, History } from 'lucide-vue-next'
 import type { SecuritySettings, LoginDevice, DeviceType } from '@/types/settings'
 import type { Component } from 'vue'
 
@@ -51,6 +51,8 @@ interface Emits {
   (e: 'blockDevice', deviceId: string): void
   /** 启用设备 */
   (e: 'unblockDevice', deviceId: string): void
+  /** 查看登录历史 */
+  (e: 'viewLoginHistory'): void
 }
 
 const emit = defineEmits<Emits>()
@@ -195,6 +197,21 @@ function handleUnblock(device: LoginDevice) {
           </NThing>
         </NListItem>
       </NList>
+
+      <NDivider />
+
+      <NDivider />
+
+      <!-- 登录历史 -->
+      <div class="settings-section">
+        <h4 class="section-title">登录历史</h4>
+        <NButton type="primary" ghost @click="$emit('viewLoginHistory')">
+          <template #icon>
+            <History :size="16" />
+          </template>
+          查看登录历史
+        </NButton>
+      </div>
 
       <NDivider />
 
