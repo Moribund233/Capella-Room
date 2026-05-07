@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import {
   NModal,
+  NTabs,
+  NTabPane,
   NList,
   NListItem,
   NThing,
@@ -17,6 +19,7 @@ import {
 import { Crown, Shield, User, UserX } from 'lucide-vue-next'
 import { roomApi } from '@/api/room'
 import { useAuthStore } from '@/stores/auth'
+import RoomInvitationManager from './RoomInvitationManager.vue'
 import type { RoomMember } from '@/types/room'
 import type { Component } from 'vue'
 
@@ -226,103 +229,111 @@ function handleClose() {
     @mask-click="handleClose"
   >
     <div class="room-member-manager">
-      <!-- 加载中 -->
-      <div v-if="loading" class="room-member-manager__loading">
-        <NSkeleton text :repeat="5" />
-      </div>
+      <NTabs type="line" default-value="members">
+        <NTabPane name="members" tab="成员">
+          <!-- 加载中 -->
+          <div v-if="loading" class="room-member-manager__loading">
+            <NSkeleton text :repeat="5" />
+          </div>
 
-      <!-- 空状态 -->
-      <NEmpty
-        v-else-if="members.length === 0"
-        description="暂无成员"
-      />
+          <!-- 空状态 -->
+          <NEmpty
+            v-else-if="members.length === 0"
+            description="暂无成员"
+          />
 
-      <!-- 成员列表 -->
-      <NList v-else bordered>
-        <NListItem
-          v-for="member in members"
-          :key="member.user_id"
-        >
-          <NThing>
-            <template #avatar>
-              <div class="room-member-manager__avatar">
-                {{ member.username.charAt(0).toUpperCase() }}
-              </div>
-            </template>
+          <!-- 成员列表 -->
+          <NList v-else bordered>
+            <NListItem
+              v-for="member in members"
+              :key="member.user_id"
+            >
+              <NThing>
+                <template #avatar>
+                  <div class="room-member-manager__avatar">
+                    {{ member.username.charAt(0).toUpperCase() }}
+                  </div>
+                </template>
 
-            <template #header>
-              <div class="room-member-manager__header">
-                <span class="room-member-manager__username">
-                  {{ member.username }}
-                  <span
-                    v-if="member.user_id === authStore.user?.id"
-                    class="room-member-manager__self-tag"
-                  >
-                    (我)
-                  </span>
-                </span>
-                <div class="room-member-manager__tags">
-                  <NTag
-                    :type="roleTagTypeMap[member.role]"
-                    size="small"
-                  >
-                    <template #icon>
-                      <component :is="roleIconMap[member.role]" :size="12" />
-                    </template>
-                    {{ roleLabelMap[member.role] }}
-                  </NTag>
-                  <NTag
-                    :type="getStatusType(member.user_status)"
-                    size="small"
-                  >
-                    {{ getStatusLabel(member.user_status) }}
-                  </NTag>
-                </div>
-              </div>
-            </template>
+                <template #header>
+                  <div class="room-member-manager__header">
+                    <span class="room-member-manager__username">
+                      {{ member.username }}
+                      <span
+                        v-if="member.user_id === authStore.user?.id"
+                        class="room-member-manager__self-tag"
+                      >
+                        (我)
+                      </span>
+                    </span>
+                    <div class="room-member-manager__tags">
+                      <NTag
+                        :type="roleTagTypeMap[member.role]"
+                        size="small"
+                      >
+                        <template #icon>
+                          <component :is="roleIconMap[member.role]" :size="12" />
+                        </template>
+                        {{ roleLabelMap[member.role] }}
+                      </NTag>
+                      <NTag
+                        :type="getStatusType(member.user_status)"
+                        size="small"
+                      >
+                        {{ getStatusLabel(member.user_status) }}
+                      </NTag>
+                    </div>
+                  </div>
+                </template>
 
-            <template #description>
-              <span class="room-member-manager__email">{{ member.email }}</span>
-            </template>
+                <template #description>
+                  <span class="room-member-manager__email">{{ member.email }}</span>
+                </template>
 
-            <template #action>
-              <NSpace v-if="canManage(member)">
-                <!-- 角色选择（仅房主可用） -->
-                <NSelect
-                  v-if="canChangeRole(member)"
-                  :value="member.role"
-                  :options="roleOptions"
-                  size="small"
-                  style="width: 100px"
-                  :disabled="actionLoading === member.user_id"
-                  @update:value="(val) => handleRoleChange(member, val)"
-                />
-
-                <!-- 踢出按钮 -->
-                <NPopconfirm
-                  v-if="canKick(member)"
-                  @positive-click="handleKick(member)"
-                >
-                  <template #trigger>
-                    <NButton
+                <template #action>
+                  <NSpace v-if="canManage(member)">
+                    <!-- 角色选择（仅房主可用） -->
+                    <NSelect
+                      v-if="canChangeRole(member)"
+                      :value="member.role"
+                      :options="roleOptions"
                       size="small"
-                      type="error"
-                      ghost
-                      :loading="actionLoading === member.user_id"
+                      style="width: 100px"
+                      :disabled="actionLoading === member.user_id"
+                      @update:value="(val) => handleRoleChange(member, val)"
+                    />
+
+                    <!-- 踢出按钮 -->
+                    <NPopconfirm
+                      v-if="canKick(member)"
+                      @positive-click="handleKick(member)"
                     >
-                      <template #icon>
-                        <UserX :size="14" />
+                      <template #trigger>
+                        <NButton
+                          size="small"
+                          type="error"
+                          ghost
+                          :loading="actionLoading === member.user_id"
+                        >
+                          <template #icon>
+                            <UserX :size="14" />
+                          </template>
+                          移出
+                        </NButton>
                       </template>
-                      移出
-                    </NButton>
-                  </template>
-                  <span>确定要将 {{ member.username }} 移出房间吗？</span>
-                </NPopconfirm>
-              </NSpace>
-            </template>
-          </NThing>
-        </NListItem>
-      </NList>
+                      <span>确定要将 {{ member.username }} 移出房间吗？</span>
+                    </NPopconfirm>
+                  </NSpace>
+                </template>
+              </NThing>
+            </NListItem>
+          </NList>
+        </NTabPane>
+
+        <NTabPane name="invitations" tab="邀请">
+          <RoomInvitationManager :room-id="roomId" />
+        </NTabPane>
+      </NTabs>
     </div>
   </NModal>
 </template>

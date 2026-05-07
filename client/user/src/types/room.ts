@@ -55,3 +55,39 @@ export interface ListRoomsParams {
   limit?: number
   offset?: number
 }
+
+/**
+ * 房间类型枚举
+ */
+export enum RoomType {
+  Group = 'group',
+  Direct = 'direct',
+}
+
+/**
+ * 目标用户信息（用于私聊房间）
+ */
+export interface TargetUser {
+  id: string
+  username: string
+  avatar_url: string | null
+}
+
+/**
+ * 私聊房间接口
+ */
+export interface DirectRoom {
+  id: string
+  name: string
+  target_user: TargetUser
+  created_at: string
+  unread_count?: number
+  last_message?: MessagePreview | null
+}
+
+/**
+ * 创建私聊房间请求数据
+ */
+export interface CreateDirectRoomData {
+  target_user_id: string
+}

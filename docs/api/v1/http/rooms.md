@@ -22,14 +22,21 @@
 | GET | `/api/v1/rooms` | 获取聊天室列表 |
 | POST | `/api/v1/rooms` | 创建聊天室 |
 | GET | `/api/v1/rooms/recent` | 获取最近更新的聊天室 |
+| **POST** | **`/api/v1/rooms/direct`** | **创建或获取私聊房间** |
+| **GET** | **`/api/v1/rooms/direct/list`** | **获取私聊房间列表** |
 | GET | `/api/v1/rooms/:room_id` | 获取聊天室详情 |
 | PUT | `/api/v1/rooms/:room_id` | 更新聊天室信息 |
 | DELETE | `/api/v1/rooms/:room_id` | 删除聊天室 |
 | POST | `/api/v1/rooms/:room_id/join` | 加入聊天室 |
 | DELETE | `/api/v1/rooms/:room_id/leave` | 离开聊天室 |
+| **POST** | **`/api/v1/rooms/join-by-invite`** | **通过邀请码加入房间** |
+| **GET** | **`/api/v1/rooms/validate-invite`** | **验证邀请码** |
 | GET | `/api/v1/rooms/:room_id/members` | 获取成员列表 |
 | DELETE | `/api/v1/rooms/:room_id/members/:user_id` | 踢出成员 |
 | PUT | `/api/v1/rooms/:room_id/members/:user_id/role` | 设置成员角色 |
+| **GET** | **`/api/v1/rooms/:room_id/invitations`** | **获取房间邀请列表** |
+| **POST** | **`/api/v1/rooms/:room_id/invitations`** | **创建房间邀请** |
+| **DELETE** | **`/api/v1/rooms/:room_id/invitations/:invitation_id`** | **撤销房间邀请** |
 | GET | `/api/v1/rooms/:room_id/messages` | 获取房间消息历史 |
 
 ---
@@ -967,6 +974,364 @@ async function loadMoreMessages(roomId, lastMessageId) {
 | `NOT_FOUND` | 404 | 资源不存在 | 检查聊天室 ID 是否正确 |
 | `CONFLICT` | 409 | 资源冲突 | 用户已在聊天室中 |
 | `INTERNAL_ERROR` | 500 | 服务器内部错误 | 稍后重试或联系管理员 |
+
+---
+
+## 创建或获取私聊房间
+
+### 请求
+
+```http
+POST /api/v1/rooms/direct
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 请求体
+
+```json
+{
+  "target_user_id": "550e8400-e29b-41d4-a716-446655440002"
+}
+```
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `target_user_id` | string (UUID) | 是 | 对方用户ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "name": "target_user",
+    "target_user": {
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "username": "target_user",
+      "avatar_url": null
+    },
+    "created_at": "2024-01-20T10:00:00Z"
+  }
+}
+```
+
+**失败 - 不能和自己创建私聊 (400 Bad Request)**
+
+```json
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "error": "请求参数错误",
+  "message": "不能和自己创建私聊"
+}
+```
+
+### 说明
+
+- 如果双方已存在私聊房间，则返回现有房间
+- 私聊房间名称自动设置为目标用户的用户名（动态更新）
+- 私聊房间总是私有的，最多2人
+
+---
+
+## 获取私聊房间列表
+
+### 请求
+
+```http
+GET /api/v1/rooms/direct/list
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440010",
+      "name": "user_b",
+      "target_user": {
+        "id": "550e8400-e29b-41d4-a716-446655440002",
+        "username": "user_b",
+        "avatar_url": null
+      },
+      "created_at": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string (UUID) | 私聊房间ID |
+| `name` | string | 房间名称（对方用户名，动态获取最新） |
+| `target_user` | object | 对方用户信息 |
+| `target_user.id` | string (UUID) | 对方用户ID |
+| `target_user.username` | string | 对方用户名 |
+| `target_user.avatar_url` | string \| null | 对方头像URL |
+| `created_at` | string (ISO 8601) | 创建时间 |
+
+---
+
+## 通过邀请码加入房间
+
+### 请求
+
+```http
+POST /api/v1/rooms/join-by-invite
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 请求体
+
+```json
+{
+  "invite_code": "ABC12345"
+}
+```
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `invite_code` | string | 是 | 邀请码（8位字母数字） |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "成功加入聊天室"
+}
+```
+
+**失败 - 邀请码无效 (403 Forbidden)**
+
+```json
+{
+  "success": false,
+  "code": "FORBIDDEN",
+  "error": "权限不足",
+  "message": "邀请码已过期或已达到使用次数限制"
+}
+```
+
+**失败 - 已在房间 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "成功加入聊天室"
+}
+```
+
+---
+
+## 验证邀请码
+
+### 请求
+
+```http
+GET /api/v1/rooms/validate-invite?invite_code=ABC12345
+Authorization: Bearer {access_token}
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `invite_code` | string | 是 | 邀请码 |
+
+### 响应
+
+**成功 - 邀请码有效 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "valid": true,
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "expires_at": "2024-01-21T10:00:00Z",
+    "max_uses": 5,
+    "used_count": 2
+  }
+}
+```
+
+**成功 - 邀请码无效 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "valid": false
+  }
+}
+```
+
+---
+
+## 获取房间邀请列表
+
+### 请求
+
+```http
+GET /api/v1/rooms/{room_id}/invitations
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `room_id` | string (UUID) | 聊天室唯一标识 |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440020",
+      "room_id": "550e8400-e29b-41d4-a716-446655440000",
+      "inviter": {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "username": "admin",
+        "avatar_url": null
+      },
+      "invite_code": "ABC12345",
+      "expires_at": "2024-01-21T10:00:00Z",
+      "max_uses": 5,
+      "used_count": 2,
+      "is_active": true,
+      "created_at": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 创建房间邀请
+
+### 请求
+
+```http
+POST /api/v1/rooms/{room_id}/invitations
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `room_id` | string (UUID) | 聊天室唯一标识 |
+
+### 请求体
+
+```json
+{
+  "expires_in_hours": 24,
+  "max_uses": 5
+}
+```
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `expires_in_hours` | number | 否 | 有效期（小时），null表示永不过期 |
+| `max_uses` | number | 否 | 最大使用次数，null表示无限制（1-1000） |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440020",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "inviter": {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "username": "admin",
+      "avatar_url": null
+    },
+    "invite_code": "ABC12345",
+    "expires_at": "2024-01-21T10:00:00Z",
+    "max_uses": 5,
+    "used_count": 0,
+    "is_active": true,
+    "created_at": "2024-01-20T10:00:00Z"
+  }
+}
+```
+
+**失败 - 无权限 (403 Forbidden)**
+
+```json
+{
+  "success": false,
+  "code": "FORBIDDEN",
+  "error": "权限不足",
+  "message": "权限不足: 只有房主和管理员可以创建邀请"
+}
+```
+
+---
+
+## 撤销房间邀请
+
+### 请求
+
+```http
+DELETE /api/v1/rooms/{room_id}/invitations/{invitation_id}
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `room_id` | string (UUID) | 聊天室唯一标识 |
+| `invitation_id` | string (UUID) | 邀请ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "邀请已撤销"
+}
+```
+
+### 说明
+
+- 房主和管理员可以撤销任何邀请
+- 普通成员只能撤销自己创建的邀请
 
 ---
 

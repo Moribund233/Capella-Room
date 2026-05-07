@@ -1,19 +1,31 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { Plus, Search, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { useRouter, useRoute } from 'vue-router'
+import { Plus, Search, MessageSquare, ChevronLeft, ChevronRight, Compass, Users, LogIn } from 'lucide-vue-next'
 import { useRoomStore } from '@/stores/room'
+import { useFriendStore } from '@/stores/friend'
 import { useAuthStore } from '@/stores/auth'
+import { ROUTE_PATHS } from '@/constants'
 import ConnectionStatus from '@/components/chat/ConnectionStatus.vue'
 import RoomCard from '@/components/room/RoomCard.vue'
+import JoinByInviteModal from '@/components/room/JoinByInviteModal.vue'
+
+const friendStore = useFriendStore()
+const showJoinModal = ref(false)
 
 const emit = defineEmits<{
   createRoom: []
 }>()
 
 const router = useRouter()
+const route = useRoute()
 const roomStore = useRoomStore()
 const authStore = useAuthStore()
+
+/** 是否在发现页面 */
+const isDiscoverPage = computed(() => {
+  return route.path === ROUTE_PATHS.DISCOVER
+})
 
 const searchQuery = ref('')
 const collapsed = ref(false)
@@ -76,6 +88,45 @@ function toggleCollapse() {
       </div>
     </div>
 
+    <!-- 发现入口 -->
+    <div class="desktop-sidebar__discover">
+      <button
+        class="desktop-sidebar__discover-btn"
+        :class="{
+          'desktop-sidebar__discover-btn--collapsed': collapsed,
+          'desktop-sidebar__discover-btn--active': isDiscoverPage
+        }"
+        @click="router.push(ROUTE_PATHS.DISCOVER)"
+        :title="collapsed ? '发现' : ''"
+      >
+        <Compass :size="collapsed ? 20 : 18" />
+        <span v-if="!collapsed">发现</span>
+      </button>
+    </div>
+
+    <!-- 好友入口 -->
+    <div class="desktop-sidebar__friends">
+      <button
+        class="desktop-sidebar__friends-btn"
+        :class="{ 'desktop-sidebar__friends-btn--collapsed': collapsed }"
+        @click="router.push(ROUTE_PATHS.FRIENDS)"
+        :title="collapsed ? '好友' : ''"
+      >
+        <Users :size="collapsed ? 20 : 18" />
+        <span v-if="!collapsed">好友</span>
+        <span
+          v-if="!collapsed && friendStore.unreadRequestCount > 0"
+          class="desktop-sidebar__friends-badge"
+        >
+          {{ friendStore.unreadRequestCount > 99 ? '99+' : friendStore.unreadRequestCount }}
+        </span>
+        <span
+          v-if="collapsed && friendStore.unreadRequestCount > 0"
+          class="desktop-sidebar__friends-dot"
+        />
+      </button>
+    </div>
+
     <!-- 创建按钮 -->
     <div class="desktop-sidebar__create">
       <button
@@ -121,6 +172,19 @@ function toggleCollapse() {
       </div>
     </nav>
 
+    <!-- 加入房间按钮 -->
+    <div class="desktop-sidebar__join">
+      <button
+        class="desktop-sidebar__join-btn"
+        :class="{ 'desktop-sidebar__join-btn--collapsed': collapsed }"
+        @click="showJoinModal = true"
+        :title="collapsed ? '通过邀请码加入' : ''"
+      >
+        <LogIn :size="collapsed ? 18 : 16" />
+        <span v-if="!collapsed">通过邀请码加入</span>
+      </button>
+    </div>
+
     <!-- 底部用户信息 -->
     <footer v-if="authStore.user" class="desktop-sidebar__footer">
       <div class="desktop-sidebar__user">
@@ -133,6 +197,13 @@ function toggleCollapse() {
         </div>
       </div>
     </footer>
+
+    <!-- 通过邀请码加入弹窗 -->
+    <JoinByInviteModal
+      :show="showJoinModal"
+      @close="showJoinModal = false"
+      @joined="(roomId: string) => { showJoinModal = false; router.push(`/room/${roomId}`) }"
+    />
   </aside>
 </template>
 
@@ -268,6 +339,123 @@ function toggleCollapse() {
   background: var(--color-white);
 }
 
+/* 发现按钮 */
+.desktop-sidebar__discover {
+  padding: 0 var(--space-lg) var(--space-sm);
+  flex-shrink: 0;
+}
+
+.desktop-sidebar--collapsed .desktop-sidebar__discover {
+  padding: 0 var(--space-sm) var(--space-sm);
+}
+
+.desktop-sidebar__discover-btn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  white-space: nowrap;
+}
+
+.desktop-sidebar__discover-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.desktop-sidebar__discover-btn--active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.desktop-sidebar__discover-btn--active:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: white;
+}
+
+/* 好友入口 */
+.desktop-sidebar__friends {
+  padding: 0 var(--space-lg) var(--space-sm);
+  flex-shrink: 0;
+}
+
+.desktop-sidebar--collapsed .desktop-sidebar__friends {
+  padding: 0 var(--space-sm) var(--space-sm);
+}
+
+.desktop-sidebar__friends-btn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  white-space: nowrap;
+  position: relative;
+}
+
+.desktop-sidebar__friends-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.desktop-sidebar__friends-btn--collapsed {
+  padding: var(--space-md);
+  aspect-ratio: 1;
+}
+
+.desktop-sidebar__friends-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-error);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.desktop-sidebar__friends-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-error);
+  border: 2px solid var(--color-white);
+}
+
+.desktop-sidebar__discover-btn--collapsed {
+  padding: var(--space-md);
+  aspect-ratio: 1;
+}
+
 /* 创建按钮 */
 .desktop-sidebar__create {
   padding: 0 var(--space-lg) var(--space-md);
@@ -368,6 +556,43 @@ function toggleCollapse() {
 
 .desktop-sidebar--collapsed .desktop-sidebar__empty-icon {
   margin-bottom: 0;
+}
+
+/* 通过邀请码加入按钮 */
+.desktop-sidebar__join {
+  padding: 0 var(--space-lg) var(--space-sm);
+  flex-shrink: 0;
+}
+
+.desktop-sidebar--collapsed .desktop-sidebar__join {
+  padding: 0 var(--space-sm) var(--space-sm);
+}
+
+.desktop-sidebar__join-btn {
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-small);
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.desktop-sidebar__join-btn:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.desktop-sidebar__join-btn--collapsed {
+  padding: var(--space-sm);
+  aspect-ratio: 1;
 }
 
 /* 底部用户信息 */

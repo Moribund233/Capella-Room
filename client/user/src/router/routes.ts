@@ -43,6 +43,24 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: ROUTE_PATHS.DISCOVER,
+    name: ROUTE_NAMES.DISCOVER,
+    component: () => import('@/views/DiscoverView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: ROUTE_PATHS.FRIENDS,
+    name: ROUTE_NAMES.FRIENDS,
+    component: () => import('@/views/FriendsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: ROUTE_PATHS.INVITE,
+    name: ROUTE_NAMES.INVITE,
+    component: () => import('@/views/InviteValidationView.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: ROUTE_NAMES.NOT_FOUND,
     component: () => import('@/views/NotFoundView.vue'),

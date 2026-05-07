@@ -989,13 +989,17 @@ PUT    /api/v1/users/me/settings          # 更新用户设置（支持部分更
 
 ---
 
-## 0007-房间搜索与用户搜索功能后端已支持，User端缺失UI
+## 0007-房间搜索与用户搜索功能 ✅ 后端已就绪
 
 **位置**: User客户端功能缺失
 
+**后端实现状态**: ✅ **已完成** - 后端API已就绪
+
 **后端支持情况**:
 - ✅ 房间搜索: `GET /api/v1/rooms?search={keyword}`
-- ✅ 用户搜索: `GET /api/v1/users?search={keyword}`
+- ✅ 用户搜索: `GET /api/v1/users/search?keyword={keyword}`
+- ✅ 公开房间列表: `GET /api/v1/rooms`（自动过滤，登录用户可见所有公开房间）
+- ✅ 隐私设置API: `GET/PATCH /api/v1/users/me/settings`
 
 **User端缺失功能**:
 - ❌ 房间搜索UI - 无法搜索公开房间
@@ -1007,7 +1011,7 @@ PUT    /api/v1/users/me/settings          # 更新用户设置（支持部分更
 | 房间类型 | 可见性 | 加入方式 |
 |---------|--------|---------|
 | 公开房间 (`is_private: false`) | 所有登录用户可见 | 直接加入 |
-| 私有房间 (`is_private: true`) | 仅成员可见 | 需房主邀请 |
+| 私有房间 (`is_private: true`) | 仅成员可见 | 需房主邀请/邀请码 |
 
 **用户隐私设置**:
 ```rust
@@ -1020,82 +1024,77 @@ pub struct PrivacySettings {
 
 pub enum Visibility {
     Everyone,  // 所有人可见
-    Friends,   // 仅好友可见（当前好友功能未实现）
+    Friends,   // 仅好友可见（✅ 好友功能已实现）
     Nobody,    // 不可见
 }
 ```
 
-**注意**: `Visibility::Friends` 选项当前无法生效，因为后端暂无好友功能。
+**注意**: ✅ `Visibility::Friends` 选项现在可以生效，因为后端已实现好友功能。
+
+**前端状态**: ⏳ 待实现 - User端需要添加搜索UI和隐私设置UI
 
 ---
 
-## 0008-私聊功能后端未实现
+## 0008-私聊功能 ✅ 已完成后端实现
 
 **位置**: 消息系统架构
 
-**当前架构**:
-- 所有消息必须关联 `room_id`
-- 基于房间（Room）的群聊模型
+**实现状态**: ✅ **已完成** - 后端实现完毕，API已就绪
 
-**缺失功能**:
-- ❌ 1对1私聊（Direct Message）
-- ❌ 私聊房间类型标记
+**实现内容**:
+- ✅ 1对1私聊（Direct Message）
+- ✅ 私聊房间类型标记 `RoomType::Direct`
+- ✅ 自动查找/创建私聊房间
+- ✅ 房间名称动态更新（使用对方最新用户名）
 
-**建议实现方案**:
-
-### 方案C：房间类型标记（推荐）
-
-**数据库修改**:
+**数据库实现**:
 ```rust
 pub enum RoomType {
     Group,      // 群聊
     Direct,     // 私聊（1对1）
 }
-
-pub struct Room {
-    pub id: Uuid,
-    pub room_type: RoomType,  // 新增字段
-    pub name: String,
-    // ...
-}
 ```
 
-**私聊创建逻辑**:
-- 用户A向用户B发起私聊
-- 后端检查是否已存在A-B的私聊房间
-- 不存在则创建 `RoomType::Direct` 类型的房间
-- 自动将双方添加为成员
-
-**API设计**:
+**API端点**:
 ```
 POST /api/v1/rooms/direct          # 创建或获取私聊房间
-GET  /api/v1/users/me/direct-rooms # 获取我的私聊列表
+GET  /api/v1/rooms/direct/list     # 获取我的私聊列表
 ```
+
+**实现文件**:
+- `migrations/009_direct_room.sql` - 数据库迁移
+- `src/models/room.rs` - `RoomType` 枚举, `DirectRoomResponse` 结构体
+- `src/services/room_service.rs` - `get_or_create_direct_room`, `get_user_direct_rooms`
+- `src/handlers/room.rs` - `create_direct_room`, `get_direct_rooms`
+- `tests/direct_room_test.rs` - 单元测试
+
+**前端状态**: ⏳ 待实现 - User端需要添加私聊UI
 
 ---
 
-## 0009-好友功能后端未实现
+## 0009-好友功能 ✅ 已完成后端实现
 
 **位置**: 用户关系系统
 
-**当前状态**: 无好友相关表结构
+**实现状态**: ✅ **已完成** - 后端实现完毕，API已就绪
 
-**缺失功能**:
-- ❌ 发送好友请求
-- ❌ 接受/拒绝好友请求
-- ❌ 好友列表管理
-- ❌ 好友私信权限控制
+**实现内容**:
+- ✅ 发送好友请求（带附加消息）
+- ✅ 接受/拒绝好友请求
+- ✅ 取消发送的好友请求
+- ✅ 好友列表管理
+- ✅ 删除好友
+- ✅ 检查好友关系 `are_friends`
 
-**建议数据库设计**:
+**数据库实现**:
 ```sql
 -- 好友关系表
 CREATE TABLE friendships (
     id UUID PRIMARY KEY,
-    user_id UUID REFERENCES users(id),
-    friend_id UUID REFERENCES users(id),
-    status VARCHAR(20),  -- pending, accepted, blocked
-    created_at TIMESTAMP,
-    UNIQUE(user_id, friend_id)
+    user_id_a UUID REFERENCES users(id),
+    user_id_b UUID REFERENCES users(id),
+    UNIQUE(user_id_a, user_id_b),
+    CHECK (user_id_a < user_id_b)  -- 避免重复记录
 );
 
 -- 好友请求表
@@ -1104,63 +1103,115 @@ CREATE TABLE friend_requests (
     sender_id UUID REFERENCES users(id),
     receiver_id UUID REFERENCES users(id),
     message TEXT,
-    status VARCHAR(20),  -- pending, accepted, rejected
-    created_at TIMESTAMP
+    status VARCHAR(20),  -- pending, accepted, rejected, cancelled
+    UNIQUE(sender_id, receiver_id)
 );
 ```
 
-**API设计**:
+**API端点**:
 ```
-GET    /api/v1/friends              # 获取好友列表
-POST   /api/v1/friends/requests     # 发送好友请求
-GET    /api/v1/friends/requests     # 获取好友请求列表
-PUT    /api/v1/friends/requests/:id # 接受/拒绝请求
-DELETE /api/v1/friends/:id          # 删除好友
+GET    /api/v1/users/friends                    # 获取好友列表
+POST   /api/v1/users/friends/requests           # 发送好友请求
+GET    /api/v1/users/friends/requests/received  # 获取收到的好友请求
+GET    /api/v1/users/friends/requests/sent      # 获取发送的好友请求
+POST   /api/v1/users/friends/requests/handle    # 接受/拒绝请求
+DELETE /api/v1/users/friends/requests/:id       # 取消好友请求
+DELETE /api/v1/users/friends/:id                # 删除好友
 ```
 
+**实现文件**:
+- `migrations/010_friends.sql` - 数据库迁移
+- `src/models/user.rs` - `Friendship`, `FriendRequest`, `FriendRequestStatus` 等模型
+- `src/services/user_service.rs` - 好友相关服务方法
+- `src/handlers/user.rs` - 好友相关API处理器
+- `tests/friendship_test.rs` - 单元测试
+
 **关联影响**:
-- 用户隐私设置中的 `Visibility::Friends` 选项
-- `allow_stranger_message` 需要判断是否为好友
+- ✅ 用户隐私设置中的 `Visibility::Friends` 选项现在可以生效
+- ✅ `allow_stranger_message` 可以基于好友关系判断
+
+**前端状态**: ⏳ 待实现 - User端需要添加好友管理UI
 
 ---
 
-## 0010-私有房间邀请机制后端未实现
+## 0010-私有房间邀请机制 ✅ 已完成后端实现
 
 **位置**: 房间成员管理
 
-**当前状态**:
-- 私有房间只能通过房主手动添加成员
-- 无邀请链接/邀请码机制
+**实现状态**: ✅ **已完成** - 后端实现完毕，API已就绪
 
-**缺失功能**:
-- ❌ 生成房间邀请链接
-- ❌ 邀请码有效期控制
-- ❌ 邀请权限设置（房主/管理员）
+**实现内容**:
+- ✅ 生成房间邀请码（8位字母数字组合）
+- ✅ 邀请码有效期控制（可选）
+- ✅ 邀请码使用次数限制（可选）
+- ✅ 邀请权限控制（仅Owner/Admin可创建）
+- ✅ 撤销邀请
+- ✅ 通过邀请码加入房间
+- ✅ 邀请码冲突自动重试机制（最多3次）
 
-**建议实现**:
+**数据库实现**:
 ```sql
 CREATE TABLE room_invitations (
     id UUID PRIMARY KEY,
     room_id UUID REFERENCES rooms(id),
     inviter_id UUID REFERENCES users(id),
     invite_code VARCHAR(20) UNIQUE,
-    expires_at TIMESTAMP,
-    max_uses INT,
-    used_count INT DEFAULT 0,
+    expires_at TIMESTAMP,        -- 过期时间（可选）
+    max_uses INT,                -- 最大使用次数（可选）
+    used_count INT DEFAULT 0,    -- 已使用次数
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP
+);
+
+-- 邀请使用记录表
+CREATE TABLE room_invitation_uses (
+    id UUID PRIMARY KEY,
+    invitation_id UUID REFERENCES room_invitations(id),
+    user_id UUID REFERENCES users(id),
+    used_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(invitation_id, user_id)  -- 防止重复使用
 );
 ```
 
-**API设计**:
+**API端点**:
 ```
-POST   /api/v1/rooms/:id/invitations     # 创建邀请
-GET    /api/v1/rooms/:id/invitations     # 获取邀请列表
-DELETE /api/v1/rooms/:id/invitations/:id # 撤销邀请
-POST   /api/v1/rooms/join-by-invite      # 通过邀请码加入
+POST   /api/v1/rooms/:id/invitations      # 创建邀请
+GET    /api/v1/rooms/:id/invitations      # 获取邀请列表
+DELETE /api/v1/rooms/:id/invitations/:id  # 撤销邀请
+POST   /api/v1/rooms/join-by-invite       # 通过邀请码加入
+GET    /api/v1/rooms/validate-invite      # 验证邀请码（不加入）
 ```
+
+**实现文件**:
+- `migrations/008_room_invitation.sql` - 数据库迁移
+- `src/models/room.rs` - `RoomInvitation`, `RoomInvitationResponse` 等模型
+- `src/services/room_service.rs` - 邀请相关服务方法（含重试机制）
+- `src/handlers/room.rs` - 邀请相关API处理器
+- `tests/room_invitation_test.rs` - 单元测试
+
+**前端状态**: ⏳ 待实现 - User端需要添加邀请管理UI
+
+---
+
+## 后端开发完成总结
+
+| 问题编号 | 功能 | 后端状态 | 前端状态 |
+|---------|------|---------|---------|
+| 0001 | API响应包含用户信息 | ✅ 已完成 | ✅ 已完成 |
+| 0002 | WebSocket心跳机制 | ✅ 已完成 | ✅ 已完成 |
+| 0003 | WebSocket认证安全 | ✅ 已完成 | ✅ 已完成 |
+| 0004 | 房间列表消息同步 | ✅ 已完成 | ✅ 已完成 |
+| 0005 | 通知系统持久化 | ✅ 已完成 | ✅ 已完成 |
+| 0006 | 用户设置体系 | ✅ 已完成 | ✅ 已完成 |
+| 0007 | 搜索功能 | ✅ 后端就绪 | ⏳ 待实现 |
+| 0008 | 私聊功能 | ✅ 后端就绪 | ⏳ 待实现 |
+| 0009 | 好友系统 | ✅ 后端就绪 | ⏳ 待实现 |
+| 0010 | 房间邀请机制 | ✅ 后端就绪 | ⏳ 待实现 |
+
+**后端开发状态**: ✅ **全部完成**
 
 ---
 
 *文档创建时间: 2026-04-10*
 *关联任务: 阶段9 - 后端细节优化*
-*更新时间: 2026-05-07 - 添加 0007-0010 功能缺失记录*
+*更新时间: 2026-05-07 - 标记 0007-0010 后端开发完成*

@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { X, Plus, Search, MessageSquare } from 'lucide-vue-next'
+import { X, Plus, Search, MessageSquare, Compass, Users } from 'lucide-vue-next'
 import { useRoomStore } from '@/stores/room'
+import { useFriendStore } from '@/stores/friend'
 import { useAuthStore } from '@/stores/auth'
+import { ROUTE_PATHS } from '@/constants'
 import ConnectionStatus from '@/components/chat/ConnectionStatus.vue'
 import RoomCard from '@/components/room/RoomCard.vue'
+
+const friendStore = useFriendStore()
 
 const props = defineProps<{
   show: boolean
@@ -162,6 +166,24 @@ watch(() => props.show, (show) => {
           >
             <Plus :size="20" />
             <span>创建聊天室</span>
+          </button>
+        </div>
+
+        <!-- 快捷导航 -->
+        <div class="mobile-sidebar__quick-nav">
+          <button class="mobile-sidebar__quick-btn" @click="router.push(ROUTE_PATHS.DISCOVER); emit('close')">
+            <Compass :size="18" />
+            <span>发现</span>
+          </button>
+          <button class="mobile-sidebar__quick-btn" @click="router.push(ROUTE_PATHS.FRIENDS); emit('close')">
+            <Users :size="18" />
+            <span>好友</span>
+            <span
+              v-if="friendStore.unreadRequestCount > 0"
+              class="mobile-sidebar__quick-badge"
+            >
+              {{ friendStore.unreadRequestCount > 99 ? '99+' : friendStore.unreadRequestCount }}
+            </span>
           </button>
         </div>
 
@@ -367,6 +389,52 @@ watch(() => props.show, (show) => {
   background: var(--color-primary);
   color: white;
   transform: scale(0.98);
+}
+
+/* 快捷导航 */
+.mobile-sidebar__quick-nav {
+  display: flex;
+  gap: 8px;
+  padding: 0 var(--space-lg) var(--space-md);
+  flex-shrink: 0;
+}
+
+.mobile-sidebar__quick-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  position: relative;
+}
+
+.mobile-sidebar__quick-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.mobile-sidebar__quick-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-error);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 聊天室列表 */

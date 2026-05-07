@@ -1,6 +1,6 @@
 import httpClient from '@/services/http'
 import type { ApiResponse } from '@/types/api'
-import type { Room, RoomMember, CreateRoomData, UpdateRoomData, ListRoomsParams } from '@/types/room'
+import type { Room, RoomMember, CreateRoomData, UpdateRoomData, ListRoomsParams, DirectRoom, CreateDirectRoomData } from '@/types/room'
 
 export const roomApi = {
   /** 获取聊天室列表 */
@@ -61,5 +61,15 @@ export const roomApi = {
   /** 设置成员角色 */
   setMemberRole(roomId: string, userId: string, role: 'admin' | 'member'): Promise<ApiResponse<unknown>> {
     return httpClient.put(`/rooms/${roomId}/members/${userId}/role`, { role })
+  },
+
+  /** 创建私聊房间 */
+  createDirectRoom(data: CreateDirectRoomData): Promise<ApiResponse<DirectRoom>> {
+    return httpClient.post('/rooms/direct', data)
+  },
+
+  /** 获取私聊房间列表 */
+  getDirectRooms(): Promise<ApiResponse<DirectRoom[]>> {
+    return httpClient.get('/rooms/direct/list')
   },
 }

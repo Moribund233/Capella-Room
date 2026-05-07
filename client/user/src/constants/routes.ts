@@ -5,6 +5,9 @@ export const ROUTE_NAMES = {
   CHAT_ROOM: 'chat-room',
   PROFILE: 'profile',
   SETTINGS: 'settings',
+  DISCOVER: 'discover',
+  FRIENDS: 'friends',
+  INVITE: 'invite',
   NOT_FOUND: 'not-found',
 } as const
 
@@ -15,4 +18,7 @@ export const ROUTE_PATHS = {
   CHAT_ROOM: '/room/:roomId',
   PROFILE: '/profile',
   SETTINGS: '/settings',
+  DISCOVER: '/discover',
+  FRIENDS: '/friends',
+  INVITE: '/invite/:code',
 } as const

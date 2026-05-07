@@ -1099,6 +1099,7 @@ impl RoomService {
     }
 
     /// 创建房间邀请
+    /// 如果邀请码冲突会自动重试，最多重试3次
     pub async fn create_invitation(
         &self,
         room_id: Uuid,
@@ -1116,30 +1117,51 @@ impl RoomService {
             return Err(AppError::Forbidden);
         }
 
-        // 生成邀请码
-        let invite_code = Self::generate_invite_code();
-
         // 计算过期时间
         let expires_at =
             expires_in_hours.map(|hours| Utc::now() + chrono::Duration::hours(hours as i64));
 
-        // 创建邀请
-        let invitation = sqlx::query_as::<_, RoomInvitation>(
-            r#"
-            INSERT INTO room_invitations (room_id, inviter_id, invite_code, expires_at, max_uses)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING *
-            "#,
-        )
-        .bind(room_id)
-        .bind(inviter_id)
-        .bind(&invite_code)
-        .bind(expires_at)
-        .bind(max_uses)
-        .fetch_one(self.db.pool())
-        .await?;
+        // 尝试创建邀请，最多重试3次（处理邀请码冲突）
+        const MAX_RETRIES: u32 = 3;
 
-        Ok(invitation)
+        for attempt in 0..MAX_RETRIES {
+            let invite_code = Self::generate_invite_code();
+
+            match sqlx::query_as::<_, RoomInvitation>(
+                r#"
+                INSERT INTO room_invitations (room_id, inviter_id, invite_code, expires_at, max_uses)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING *
+                "#,
+            )
+            .bind(room_id)
+            .bind(inviter_id)
+            .bind(&invite_code)
+            .bind(expires_at)
+            .bind(max_uses)
+            .fetch_one(self.db.pool())
+            .await
+            {
+                Ok(invitation) => return Ok(invitation),
+                Err(sqlx::Error::Database(db_err)) if db_err.is_unique_violation() => {
+                    // 邀请码冲突，记录并继续重试
+                    tracing::warn!(
+                        "Invite code conflict on attempt {}/{}, generating new code",
+                        attempt + 1,
+                        MAX_RETRIES
+                    );
+                    continue;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+
+        // 重试次数用尽，记录错误并返回内部错误
+        tracing::error!(
+            "Failed to generate unique invite code after {} retries",
+            MAX_RETRIES
+        );
+        Err(AppError::Internal)
     }
 
     /// 获取房间的邀请列表
@@ -1387,6 +1409,9 @@ impl RoomService {
     }
 
     /// 创建私聊房间
+    ///
+    /// 注意：数据库中存储的房间名称仅作为初始值，实际展示时
+    /// 通过 to_direct_room_response 方法动态获取目标用户的最新用户名
     async fn create_direct_room(
         &self,
         user_a_id: Uuid,
@@ -1398,6 +1423,7 @@ impl RoomService {
         let mut tx = self.db.pool().begin().await?;
 
         // 创建私聊房间
+        // 数据库中的名称仅作为初始值，实际展示使用动态获取的用户名
         let room = sqlx::query_as::<_, Room>(
             r#"
             INSERT INTO rooms (name, description, owner_id, is_private, max_members, room_type)
@@ -1405,7 +1431,7 @@ impl RoomService {
             RETURNING *
             "#,
         )
-        .bind(&target_user.username) // 房间名称为对方用户名
+        .bind(&target_user.username) // 房间名称为对方用户名（初始值）
         .bind(None::<&str>)
         .bind(user_a_id) // 创建者为房主
         .bind(true) // 私聊房间总是私有的

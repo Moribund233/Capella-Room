@@ -13,7 +13,15 @@
 | GET | `/api/v1/users/me/rooms` | 获取我的聊天室列表 |
 | POST | `/api/v1/users/logout` | 登出 |
 | GET | `/api/v1/users` | 获取用户列表 |
+| **GET** | **`/api/v1/users/search`** | **搜索用户** |
 | GET | `/api/v1/users/:user_id` | 获取指定用户信息 |
+| **GET** | **`/api/v1/users/friends`** | **获取好友列表** |
+| **POST** | **`/api/v1/users/friends/requests`** | **发送好友请求** |
+| **GET** | **`/api/v1/users/friends/requests/received`** | **获取收到的好友请求** |
+| **GET** | **`/api/v1/users/friends/requests/sent`** | **获取发送的好友请求** |
+| **POST** | **`/api/v1/users/friends/requests/handle`** | **处理好友请求** |
+| **DELETE** | **`/api/v1/users/friends/requests/:id`** | **取消好友请求** |
+| **DELETE** | **`/api/v1/users/friends/:id`** | **删除好友** |
 
 ---
 
@@ -1363,5 +1371,358 @@ async function terminateOtherDevices() {
 
 ---
 
-*文档版本: 1.1.0*  
-*最后更新: 2026-05-06*
+## 搜索用户
+
+### 请求
+
+```http
+GET /api/v1/users/search?keyword={keyword}&limit={limit}&offset={offset}
+Authorization: Bearer {access_token}
+```
+
+### 查询参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `keyword` | string | 是 | 搜索关键词（匹配用户名） |
+| `limit` | number | 否 | 每页数量，默认 20，最大 100 |
+| `offset` | number | 否 | 偏移量，默认 0 |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "username": "testuser",
+        "avatar_url": null,
+        "status": "online"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+### 说明
+
+- 搜索结果受目标用户隐私设置影响
+- 如果目标用户的 `profile_visibility` 设置为 `Friends`，则只有好友可见
+- 如果设置为 `Nobody`，则不可搜索到
+
+---
+
+## 获取好友列表
+
+### 请求
+
+```http
+GET /api/v1/users/friends
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "username": "friend_user",
+      "avatar_url": null,
+      "status": "online",
+      "is_friend": true
+    }
+  ]
+}
+```
+
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string (UUID) | 好友用户ID |
+| `username` | string | 好友用户名 |
+| `avatar_url` | string \| null | 好友头像URL |
+| `status` | string | 在线状态：online/offline/away |
+| `is_friend` | boolean | 是否为好友 |
+
+---
+
+## 发送好友请求
+
+### 请求
+
+```http
+POST /api/v1/users/friends/requests
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 请求体
+
+```json
+{
+  "receiver_id": "550e8400-e29b-41d4-a716-446655440002",
+  "message": "你好，我想加你为好友"
+}
+```
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `receiver_id` | string (UUID) | 是 | 接收者用户ID |
+| `message` | string | 否 | 附加消息（最多200字符） |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440030",
+    "sender_id": "550e8400-e29b-41d4-a716-446655440001",
+    "receiver_id": "550e8400-e29b-41d4-a716-446655440002",
+    "message": "你好，我想加你为好友",
+    "status": "pending",
+    "created_at": "2024-01-20T10:00:00Z"
+  }
+}
+```
+
+**失败 - 已经是好友 (409 Conflict)**
+
+```json
+{
+  "success": false,
+  "code": "CONFLICT",
+  "error": "资源已存在",
+  "message": "已经是好友"
+}
+```
+
+**失败 - 请求已存在 (409 Conflict)**
+
+```json
+{
+  "success": false,
+  "code": "CONFLICT",
+  "error": "资源已存在",
+  "message": "已存在待处理的好友请求"
+}
+```
+
+---
+
+## 获取收到的好友请求
+
+### 请求
+
+```http
+GET /api/v1/users/friends/requests/received
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440030",
+      "sender": {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "username": "requester",
+        "avatar_url": null
+      },
+      "message": "你好，我想加你为好友",
+      "status": "pending",
+      "created_at": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 获取发送的好友请求
+
+### 请求
+
+```http
+GET /api/v1/users/friends/requests/sent
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440030",
+      "receiver": {
+        "id": "550e8400-e29b-41d4-a716-446655440002",
+        "username": "target_user",
+        "avatar_url": null
+      },
+      "message": "你好，我想加你为好友",
+      "status": "pending",
+      "created_at": "2024-01-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 处理好友请求
+
+### 请求
+
+```http
+POST /api/v1/users/friends/requests/handle
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 请求体
+
+```json
+{
+  "request_id": "550e8400-e29b-41d4-a716-446655440030",
+  "action": "accept"
+}
+```
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `request_id` | string (UUID) | 是 | 好友请求ID |
+| `action` | string | 是 | 操作：`accept`（接受）或 `reject`（拒绝） |
+
+### 响应
+
+**成功 - 接受 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "好友请求已接受"
+}
+```
+
+**成功 - 拒绝 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "好友请求已拒绝"
+}
+```
+
+**失败 - 请求不存在 (404 Not Found)**
+
+```json
+{
+  "success": false,
+  "code": "NOT_FOUND",
+  "error": "资源不存在",
+  "message": "好友请求不存在"
+}
+```
+
+---
+
+## 取消好友请求
+
+### 请求
+
+```http
+DELETE /api/v1/users/friends/requests/{request_id}
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `request_id` | string (UUID) | 好友请求ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "好友请求已取消"
+}
+```
+
+### 说明
+
+- 只能取消自己发送的待处理请求
+- 已接受或已拒绝的请求不能取消
+
+---
+
+## 删除好友
+
+### 请求
+
+```http
+DELETE /api/v1/users/friends/{user_id}
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `user_id` | string (UUID) | 好友用户ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "好友已删除"
+}
+```
+
+**失败 - 不是好友 (404 Not Found)**
+
+```json
+{
+  "success": false,
+  "code": "NOT_FOUND",
+  "error": "资源不存在",
+  "message": "不是好友关系"
+}
+```
+
+---
+
+*文档版本: 1.2.0*  
+*最后更新: 2026-05-07*

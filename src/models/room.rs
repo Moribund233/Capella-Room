@@ -185,6 +185,9 @@ pub struct CreateDirectRoomRequest {
 }
 
 /// 私聊房间响应（包含对方用户信息）
+/// 
+/// 注意：name 字段动态生成，始终为目标用户的最新用户名
+/// 不依赖数据库中存储的房间名称，确保用户改名后房间名同步更新
 #[derive(Debug, Clone, Serialize)]
 pub struct DirectRoomResponse {
     pub id: Uuid,

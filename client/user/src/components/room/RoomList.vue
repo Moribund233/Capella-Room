@@ -1,18 +1,31 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useRoomStore } from '@/stores/room'
+import { useDirectRoomStore } from '@/stores/directRoom'
+import { RoomType, type Room, type DirectRoom } from '@/types/room'
+import RoomTypeTabs from './RoomTypeTabs.vue'
 import RoomCard from './RoomCard.vue'
+import DirectRoomCard from './DirectRoomCard.vue'
 
 const router = useRouter()
 const route = useRoute()
 const roomStore = useRoomStore()
-const { rooms, loading } = storeToRefs(roomStore)
+const directRoomStore = useDirectRoomStore()
+const { rooms, loading: roomsLoading } = storeToRefs(roomStore)
+const { directRooms, loading: directRoomsLoading } = storeToRefs(directRoomStore)
 
 const searchQuery = ref('')
+const currentRoomType = ref(RoomType.Group)
 
-const filteredRooms = computed(() => {
+const loading = computed(() => {
+  return currentRoomType.value === RoomType.Group
+    ? roomsLoading.value
+    : directRoomsLoading.value
+})
+
+const filteredGroupRooms = computed<Room[]>(() => {
   if (!searchQuery.value.trim()) return rooms.value
   const q = searchQuery.value.toLowerCase()
   return rooms.value.filter(
@@ -22,21 +35,40 @@ const filteredRooms = computed(() => {
   )
 })
 
+const filteredDirectRooms = computed<DirectRoom[]>(() => {
+  if (!searchQuery.value.trim()) return directRooms.value
+  const q = searchQuery.value.toLowerCase()
+  return directRooms.value.filter(
+    (r) => r.target_user.username.toLowerCase().includes(q),
+  )
+})
+
 const currentRoomId = computed(() => route.params.roomId as string | undefined)
 
 function handleRoomClick(roomId: string) {
   router.push(`/room/${roomId}`)
 }
+
+// RoomTypeTabs 组件通过 v-model 自动处理类型切换
+// 不需要额外的事件处理函数
+
+onMounted(() => {
+  // 加载群聊和私聊列表
+  roomStore.fetchMyRooms()
+  directRoomStore.fetchDirectRooms()
+})
 </script>
 
 <template>
   <div class="room-list">
+    <RoomTypeTabs v-model="currentRoomType" />
+
     <div class="room-list__search">
       <input
         v-model="searchQuery"
         type="text"
         class="room-list__search-input"
-        placeholder="搜索聊天室..."
+        :placeholder="currentRoomType === RoomType.Group ? '搜索聊天室...' : '搜索用户...'"
       />
     </div>
 
@@ -45,20 +77,37 @@ function handleRoomClick(roomId: string) {
         <span>加载中...</span>
       </div>
 
-      <template v-else-if="filteredRooms.length > 0">
-        <RoomCard
-          v-for="room in filteredRooms"
-          :key="room.id"
-          :room="room"
-          :active="room.id === currentRoomId"
-          @click="handleRoomClick"
-        />
+      <template v-else-if="currentRoomType === RoomType.Group">
+        <template v-if="filteredGroupRooms.length > 0">
+          <RoomCard
+            v-for="room in filteredGroupRooms"
+            :key="room.id"
+            :room="room"
+            :active="room.id === currentRoomId"
+            @click="handleRoomClick"
+          />
+        </template>
+        <div v-else class="room-list__empty">
+          <p v-if="searchQuery">未找到匹配的聊天室</p>
+          <p v-else>暂无聊天室</p>
+        </div>
       </template>
 
-      <div v-else class="room-list__empty">
-        <p v-if="searchQuery">未找到匹配的聊天室</p>
-        <p v-else>暂无聊天室</p>
-      </div>
+      <template v-else>
+        <template v-if="filteredDirectRooms.length > 0">
+          <DirectRoomCard
+            v-for="room in filteredDirectRooms"
+            :key="room.id"
+            :room="room"
+            :active="room.id === currentRoomId"
+            @click="handleRoomClick"
+          />
+        </template>
+        <div v-else class="room-list__empty">
+          <p v-if="searchQuery">未找到匹配的用户</p>
+          <p v-else>暂无私聊</p>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -73,6 +122,7 @@ function handleRoomClick(roomId: string) {
 .room-list__search {
   padding: 8px 12px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border, #eee);
 }
 
 .room-list__search-input {
