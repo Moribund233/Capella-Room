@@ -71,19 +71,31 @@ function getDisplayType(item: NotificationItem & { displayType?: string }): stri
 
 /**
  * 映射通知类型为显示类型
+ *
+ * 支持新的 HTTP API 类型和旧类型（兼容）
  */
 function mapType(type: string): 'system' | 'security' | 'message' | 'room' {
   switch (type) {
+    // 系统通知类型
+    case 'system':
     case 'system_notification':
     case 'config_reload_required':
       return 'system'
+    // 安全/待办类型
     case 'pending_action':
       return 'security'
+    // 消息相关类型
     case 'private_message':
+    case 'mention':
     case 'mentioned':
       return 'message'
+    // 房间相关类型
     case 'room_invitation':
       return 'room'
+    // 文件上传类型归为系统通知
+    case 'file_upload':
+    case 'file_upload_complete':
+      return 'system'
     default:
       return 'system'
   }
@@ -104,17 +116,22 @@ function getIcon(type: string): FunctionalComponent<LucideProps> {
 
 /**
  * 获取默认标题
+ *
+ * 支持新的 HTTP API 类型和旧类型（兼容）
  */
 function getDefaultTitle(item: NotificationItem): string {
   switch (item.notification_type) {
     case 'private_message':
       return '新私信'
+    case 'mention':
     case 'mentioned':
       return '@提及'
     case 'room_invitation':
       return '房间邀请'
+    case 'system':
     case 'system_notification':
       return '系统通知'
+    case 'file_upload':
     case 'file_upload_complete':
       return '文件上传完成'
     case 'config_reload_required':

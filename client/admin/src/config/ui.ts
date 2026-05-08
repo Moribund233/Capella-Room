@@ -62,6 +62,11 @@ export const sidebarConfig: { items: SidebarItemConfig[] } = {
       path: '/security',
     },
     {
+      name: '系统日志流',
+      icon: 'Terminal',
+      path: '/system-logs',
+    },
+    {
       name: '系统设置',
       icon: 'Settings',
       path: '/setting',

@@ -9,9 +9,271 @@ use axum::{
 use tracing::debug;
 
 use crate::models::audit::{AuditEventType, AuditMetadata, AuditSeverity, CreateAuditLogRequest};
+use crate::models::user::UserRole;
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::Claims;
 use crate::state::AppState;
+
+/// 路由模式定义
+/// 用于匹配请求路径和确定事件类型
+#[derive(Debug, Clone, Copy)]
+enum RoutePattern {
+    /// 认证相关
+    AuthLogin,
+    AuthRegister,
+    /// 用户相关
+    UserProfileUpdate,
+    UserMe,
+    /// 房间相关
+    RoomCreate,
+    RoomDelete,
+    RoomMemberAdd,
+    RoomMemberRemove,
+    RoomMemberRoleChange,
+    /// 消息相关
+    MessageSend,
+    MessageEdit,
+    MessageDelete,
+    /// 通知相关
+    NotificationQuery,
+    /// 管理员 - 用户管理
+    AdminUserDelete,
+    AdminUserRoleChange,
+    AdminUserDisable,
+    AdminUserQuery,
+    /// 管理员 - 房间管理
+    AdminRoomDelete,
+    AdminRoomQuery,
+    /// 管理员 - 消息管理
+    AdminMessageDelete,
+    AdminMessageQuery,
+    /// 管理员 - 配置管理
+    AdminConfigUpdate,
+    AdminConfigQuery,
+    /// 管理员 - 审计系统
+    AdminAuditQuery,
+    AdminAuditExport,
+    AdminAuditStats,
+    AdminAlertQuery,
+    AdminAlertRuleUpdate,
+    AdminAuditCleanup,
+    /// 管理员 - 统计
+    AdminStatsQuery,
+    /// 管理员 - IP安全
+    AdminIpSecurity,
+    /// 管理员 - 其他
+    AdminOtherQuery,
+    /// 未匹配
+    Unknown,
+}
+
+impl RoutePattern {
+    /// 根据路径和方法匹配路由模式
+    fn match_route(path: &str, method: &Method) -> Self {
+        use RoutePattern::*;
+
+        // 使用元组数组定义路由规则，按优先级排序
+        // (路径包含, 方法匹配, 路由模式)
+        let rules: &[(&str, Option<Method>, RoutePattern)] = &[
+            // 认证
+            ("/auth/login", None, AuthLogin),
+            ("/auth/register", None, AuthRegister),
+            // 用户
+            ("/users/me", Some(Method::GET), UserMe),
+            ("/users", Some(Method::PUT), UserProfileUpdate),
+            ("/users", Some(Method::PATCH), UserProfileUpdate),
+            // 房间
+            ("/rooms", Some(Method::POST), RoomCreate),
+            ("/rooms", Some(Method::DELETE), RoomDelete),
+            ("/rooms/join", Some(Method::POST), RoomMemberAdd),
+            ("/rooms/leave", Some(Method::DELETE), RoomMemberRemove),
+            ("/rooms/role", Some(Method::PUT), RoomMemberRoleChange),
+            // 消息
+            ("/messages", Some(Method::POST), MessageSend),
+            ("/messages", Some(Method::PUT), MessageEdit),
+            ("/messages", Some(Method::PATCH), MessageEdit),
+            ("/messages", Some(Method::DELETE), MessageDelete),
+            // 通知
+            ("/notifications", None, NotificationQuery),
+            // 管理员 - 审计系统（优先匹配）
+            ("/admin/audit/export", None, AdminAuditExport),
+            (
+                "/admin/audit/cleanup",
+                Some(Method::POST),
+                AdminAuditCleanup,
+            ),
+            ("/admin/audit/stats", None, AdminAuditStats),
+            (
+                "/admin/audit/alerts",
+                Some(Method::PUT),
+                AdminAlertRuleUpdate,
+            ),
+            (
+                "/admin/audit/alerts",
+                Some(Method::POST),
+                AdminAlertRuleUpdate,
+            ),
+            (
+                "/admin/audit/rules",
+                Some(Method::PUT),
+                AdminAlertRuleUpdate,
+            ),
+            (
+                "/admin/audit/rules",
+                Some(Method::POST),
+                AdminAlertRuleUpdate,
+            ),
+            ("/admin/audit/alerts", None, AdminAlertQuery),
+            ("/admin/audit", None, AdminAuditQuery),
+            // 管理员 - 统计
+            ("/admin/stats", None, AdminStatsQuery),
+            // 管理员 - IP安全
+            ("/admin/ip", None, AdminIpSecurity),
+            ("/admin/security/ip", None, AdminIpSecurity),
+            // 管理员 - 配置
+            ("/admin/configs", Some(Method::PUT), AdminConfigUpdate),
+            ("/admin/configs", Some(Method::PATCH), AdminConfigUpdate),
+            ("/admin/configs", Some(Method::POST), AdminConfigUpdate),
+            ("/admin/configs", None, AdminConfigQuery),
+            // 管理员 - 用户
+            ("/admin/users", Some(Method::DELETE), AdminUserDelete),
+            ("/admin/users/role", Some(Method::PUT), AdminUserRoleChange),
+            (
+                "/admin/users/role",
+                Some(Method::PATCH),
+                AdminUserRoleChange,
+            ),
+            ("/admin/users/status", Some(Method::PUT), AdminUserDisable),
+            ("/admin/users/status", Some(Method::PATCH), AdminUserDisable),
+            ("/admin/users", Some(Method::GET), AdminUserQuery),
+            // 管理员 - 房间
+            ("/admin/rooms", Some(Method::DELETE), AdminRoomDelete),
+            ("/admin/rooms", Some(Method::GET), AdminRoomQuery),
+            // 管理员 - 消息
+            ("/admin/messages", Some(Method::DELETE), AdminMessageDelete),
+            ("/admin/messages", Some(Method::GET), AdminMessageQuery),
+            // 管理员 - 其他GET请求
+            ("/admin", Some(Method::GET), AdminOtherQuery),
+        ];
+
+        for (pattern, method_check, route) in rules {
+            if path.contains(pattern) {
+                // 检查方法是否匹配（如果指定了方法）
+                if let Some(ref expected_method) = *method_check {
+                    if method != expected_method {
+                        continue;
+                    }
+                }
+                return *route;
+            }
+        }
+
+        Unknown
+    }
+
+    /// 将路由模式转换为审计事件类型
+    /// 考虑用户角色来判断是否为未授权访问
+    fn to_event_type(self, user_role: Option<&UserRole>) -> AuditEventType {
+        // 检查是否为管理员路由
+        let is_admin_route = matches!(
+            self,
+            RoutePattern::AdminUserDelete
+                | RoutePattern::AdminUserRoleChange
+                | RoutePattern::AdminUserDisable
+                | RoutePattern::AdminUserQuery
+                | RoutePattern::AdminRoomDelete
+                | RoutePattern::AdminRoomQuery
+                | RoutePattern::AdminMessageDelete
+                | RoutePattern::AdminMessageQuery
+                | RoutePattern::AdminConfigUpdate
+                | RoutePattern::AdminConfigQuery
+                | RoutePattern::AdminAuditQuery
+                | RoutePattern::AdminAuditExport
+                | RoutePattern::AdminAuditStats
+                | RoutePattern::AdminAlertQuery
+                | RoutePattern::AdminAlertRuleUpdate
+                | RoutePattern::AdminAuditCleanup
+                | RoutePattern::AdminStatsQuery
+                | RoutePattern::AdminIpSecurity
+                | RoutePattern::AdminOtherQuery
+        );
+
+        // 如果是管理员路由，检查用户权限
+        if is_admin_route {
+            match user_role {
+                Some(UserRole::SuperAdmin) => {
+                    // 超级管理员可以访问所有端点
+                    self.admin_to_event_type()
+                }
+                Some(UserRole::Admin) => {
+                    // 普通管理员不能访问某些敏感操作
+                    match self {
+                        RoutePattern::AdminUserDelete | RoutePattern::AdminUserRoleChange => {
+                            // 普通管理员不能删除用户或修改角色，记录为未授权尝试
+                            AuditEventType::SystemUnauthorizedAccess
+                        }
+                        _ => self.admin_to_event_type(),
+                    }
+                }
+                _ => {
+                    // 非管理员访问管理员端点，记录为未授权访问
+                    AuditEventType::SystemUnauthorizedAccess
+                }
+            }
+        } else {
+            // 非管理员路由，直接转换
+            self.to_event_type_direct()
+        }
+    }
+
+    /// 管理员路由转换为事件类型
+    fn admin_to_event_type(self) -> AuditEventType {
+        match self {
+            RoutePattern::AdminUserDelete => AuditEventType::AdminUserDelete,
+            RoutePattern::AdminUserRoleChange => AuditEventType::AdminUserRoleChange,
+            RoutePattern::AdminUserDisable => AuditEventType::AdminUserDisable,
+            RoutePattern::AdminUserQuery => AuditEventType::AdminUserRoleChange,
+            RoutePattern::AdminRoomDelete => AuditEventType::AdminRoomDelete,
+            RoutePattern::AdminRoomQuery => AuditEventType::AdminRoomDelete,
+            RoutePattern::AdminMessageDelete => AuditEventType::AdminMessageDelete,
+            RoutePattern::AdminMessageQuery => AuditEventType::AdminMessageDelete,
+            RoutePattern::AdminConfigUpdate => AuditEventType::AdminConfigUpdate,
+            RoutePattern::AdminConfigQuery => AuditEventType::AdminConfigUpdate,
+            RoutePattern::AdminAuditQuery => AuditEventType::AuditQuery,
+            RoutePattern::AdminAuditExport => AuditEventType::AuditExport,
+            RoutePattern::AdminAuditStats => AuditEventType::AuditStatsQuery,
+            RoutePattern::AdminAlertQuery => AuditEventType::AlertQuery,
+            RoutePattern::AdminAlertRuleUpdate => AuditEventType::AlertRuleUpdate,
+            RoutePattern::AdminAuditCleanup => AuditEventType::AuditCleanup,
+            RoutePattern::AdminStatsQuery => AuditEventType::AuditStatsQuery,
+            RoutePattern::AdminIpSecurity => AuditEventType::AdminConfigUpdate,
+            RoutePattern::AdminOtherQuery => AuditEventType::AuditQuery,
+            _ => AuditEventType::SystemUnauthorizedAccess,
+        }
+    }
+
+    /// 直接转换为事件类型（不考虑权限）
+    fn to_event_type_direct(self) -> AuditEventType {
+        match self {
+            RoutePattern::AuthLogin => AuditEventType::UserLogin,
+            RoutePattern::AuthRegister => AuditEventType::UserRegister,
+            RoutePattern::UserProfileUpdate | RoutePattern::UserMe => {
+                AuditEventType::UserProfileUpdate
+            }
+            RoutePattern::RoomCreate => AuditEventType::RoomCreate,
+            RoutePattern::RoomDelete => AuditEventType::RoomDelete,
+            RoutePattern::RoomMemberAdd => AuditEventType::RoomMemberAdd,
+            RoutePattern::RoomMemberRemove => AuditEventType::RoomMemberRemove,
+            RoutePattern::RoomMemberRoleChange => AuditEventType::RoomMemberRoleChange,
+            RoutePattern::MessageSend => AuditEventType::MessageSend,
+            RoutePattern::MessageEdit => AuditEventType::MessageEdit,
+            RoutePattern::MessageDelete => AuditEventType::MessageDelete,
+            RoutePattern::NotificationQuery => AuditEventType::UserProfileUpdate,
+            RoutePattern::Unknown => AuditEventType::SystemUnauthorizedAccess,
+            _ => AuditEventType::SystemUnauthorizedAccess,
+        }
+    }
+}
 
 /// 从路径中提取目标信息
 /// 返回 (target_type, target_id)
@@ -163,8 +425,9 @@ impl AuditMiddleware {
         let _duration = start_time.elapsed();
         let status = response.status();
 
-        // 确定事件类型
-        let event_type = self.determine_event_type(&path, &method);
+        // 确定事件类型（使用新的路由模式系统）
+        let user_role_ref = user_role.as_ref();
+        let event_type = RoutePattern::match_route(&path, &method).to_event_type(user_role_ref);
 
         // 构建审计日志
         let mut log = CreateAuditLogRequest::new(
@@ -223,107 +486,6 @@ impl AuditMiddleware {
         });
 
         response
-    }
-
-    /// 根据请求路径和方法确定事件类型
-    fn determine_event_type(&self, path: &str, method: &Method) -> AuditEventType {
-        // 认证相关
-        if path.contains("/auth/login") {
-            return AuditEventType::UserLogin;
-        }
-        if path.contains("/auth/register") {
-            return AuditEventType::UserRegister;
-        }
-
-        // 用户相关
-        if path.contains("/users") && (method == Method::PUT || method == Method::PATCH) {
-            return AuditEventType::UserProfileUpdate;
-        }
-
-        // 房间相关
-        if path.contains("/rooms") {
-            if method == Method::POST {
-                return AuditEventType::RoomCreate;
-            }
-            if method == Method::DELETE {
-                return AuditEventType::RoomDelete;
-            }
-            if path.contains("/join") && method == Method::POST {
-                return AuditEventType::RoomMemberAdd;
-            }
-            if path.contains("/leave") && method == Method::DELETE {
-                return AuditEventType::RoomMemberRemove;
-            }
-            if path.contains("/role") && method == Method::PUT {
-                return AuditEventType::RoomMemberRoleChange;
-            }
-        }
-
-        // 消息相关
-        if path.contains("/messages") {
-            if method == Method::POST {
-                return AuditEventType::MessageSend;
-            }
-            if method == Method::PUT || method == Method::PATCH {
-                return AuditEventType::MessageEdit;
-            }
-            if method == Method::DELETE {
-                return AuditEventType::MessageDelete;
-            }
-        }
-
-        // 管理员操作
-        if path.contains("/admin") {
-            if path.contains("/users") {
-                if method == Method::DELETE {
-                    return AuditEventType::AdminUserDelete;
-                }
-                if path.contains("/role") && method == Method::PUT {
-                    return AuditEventType::AdminUserRoleChange;
-                }
-                if path.contains("/status") && method == Method::PUT {
-                    return AuditEventType::AdminUserDisable;
-                }
-            }
-            if path.contains("/rooms") && method == Method::DELETE {
-                return AuditEventType::AdminRoomDelete;
-            }
-            if path.contains("/messages") && method == Method::DELETE {
-                return AuditEventType::AdminMessageDelete;
-            }
-            if path.contains("/configs") && method == Method::PUT {
-                return AuditEventType::AdminConfigUpdate;
-            }
-        }
-
-        // 审计系统相关操作
-        if path.contains("/admin/audit") {
-            if path.contains("/export") {
-                return AuditEventType::AuditExport;
-            }
-            if path.contains("/stats") {
-                return AuditEventType::AuditStatsQuery;
-            }
-            if path.contains("/alerts") {
-                if method == Method::PUT {
-                    return AuditEventType::AlertRuleUpdate;
-                }
-                return AuditEventType::AlertQuery;
-            }
-            if path.contains("/rules") && method == Method::PUT {
-                return AuditEventType::AlertRuleUpdate;
-            }
-            if path.contains("/cleanup") && method == Method::POST {
-                return AuditEventType::AuditCleanup;
-            }
-            // 审计日志查询
-            if path.contains("/logs") || path.contains("/admin/audit") {
-                return AuditEventType::AuditQuery;
-            }
-        }
-
-        // 默认返回系统事件
-        AuditEventType::SystemUnauthorizedAccess
     }
 }
 

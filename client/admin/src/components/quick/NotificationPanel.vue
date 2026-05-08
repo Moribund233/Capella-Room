@@ -51,17 +51,27 @@ const activeTab = ref('all')
 
 /**
  * 将后端通知类型映射为前端显示类型
+ *
+ * 支持新的 HTTP API 类型和旧类型（兼容）
  */
 function mapNotificationType(type: string): 'system' | 'security' | 'message' | 'room' {
   switch (type) {
+    // 系统通知类型
+    case 'system':
     case 'system_notification':
     case 'config_reload_required':
+    case 'file_upload':
+    case 'file_upload_complete':
       return 'system'
+    // 安全/待办类型
     case 'pending_action':
       return 'security'
+    // 消息相关类型
     case 'private_message':
+    case 'mention':
     case 'mentioned':
       return 'message'
+    // 房间相关类型
     case 'room_invitation':
       return 'room'
     default:

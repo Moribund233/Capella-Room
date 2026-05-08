@@ -681,6 +681,11 @@ export type WsMessageType =
   | 'SystemNotification'
   | 'FileUploadComplete'
   | 'PendingAction'
+  // 系统日志流消息类型
+  | 'SubscribeLogs'
+  | 'UnsubscribeLogs'
+  | 'LogEntry'
+  | 'LogSubscriptionConfirmed'
 
 /**
  * WebSocket 消息基础接口
@@ -721,15 +726,21 @@ export type WsConnectionState = 'connecting' | 'connected' | 'authenticated' | '
 
 /**
  * 通知数据库类型
+ *
+ * 与后端 HTTP API 返回的 notification_type 字段对应
+ * 详见: docs/api/v1/http/notifications.md
  */
 export type NotificationDbType =
-  | 'private_message'
-  | 'mentioned'
-  | 'room_invitation'
-  | 'system_notification'
-  | 'file_upload_complete'
-  | 'config_reload_required'
-  | 'pending_action'
+  | 'mention'              // @提及通知
+  | 'private_message'      // 私信通知
+  | 'room_invitation'      // 房间邀请
+  | 'system'               // 系统通知
+  | 'file_upload'          // 文件上传完成
+  | 'pending_action'       // 待办通知
+  | 'config_reload_required' // 配置需要重新加载（保留用于兼容）
+  | 'system_notification'  // 系统通知（旧类型，保留用于兼容）
+  | 'file_upload_complete' // 文件上传完成（旧类型，保留用于兼容）
+  | 'mentioned'            // @提及（旧类型，保留用于兼容）
 
 /**
  * 通知项
@@ -841,3 +852,51 @@ export interface PaginatedResponse<T> {
  * 主题类型（用于UI配置）
  */
 export type ThemeType = 'light' | 'dark' | 'system'
+
+// ==================== 系统日志流类型 ====================
+
+/**
+ * 日志级别
+ */
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'all'
+
+/**
+ * 日志模块
+ */
+export type LogModule = 'websocket' | 'room' | 'message' | 'performance' | 'all'
+
+/**
+ * 系统日志条目
+ */
+export interface LogEntry {
+  /** 日志级别 */
+  level: LogLevel
+  /** 日志模块/目标 */
+  target: string
+  /** 日志消息内容 */
+  message: string
+  /** 时间戳 */
+  timestamp: string
+  /** 结构化日志字段 */
+  fields?: Record<string, unknown>
+}
+
+/**
+ * 订阅日志参数
+ */
+export interface SubscribeLogsParams {
+  /** 日志级别过滤 */
+  level?: LogLevel
+  /** 模块过滤 */
+  module?: LogModule
+}
+
+/**
+ * 日志订阅确认
+ */
+export interface LogSubscriptionConfirmedPayload {
+  /** 是否成功 */
+  success: boolean
+  /** 确认消息 */
+  message: string
+}

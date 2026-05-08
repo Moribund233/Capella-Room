@@ -128,6 +128,15 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'system-logs',
+        name: 'SystemLogs',
+        component: () => import('@/views/SystemLogsView.vue'),
+        meta: {
+          title: '系统日志流',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'setting',
         name: 'Setting',
         component: () => import('@/views/SettingView.vue'),

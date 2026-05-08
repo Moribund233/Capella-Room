@@ -34,4 +34,9 @@ export {
   type OfflineNotificationsPayload,
   type MarkNotificationReadParams,
   type NotificationReadConfirmPayload,
+  type LogLevel,
+  type LogModule,
+  type LogEntry,
+  type SubscribeLogsParams,
+  type LogSubscriptionConfirmedPayload,
 } from './types'

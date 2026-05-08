@@ -1229,7 +1229,10 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
     - 使用 Redis Consumer Group 实现多节点负载均衡 ✅
     - 批量消费 Stream 数据，按配置批量写入 PostgreSQL ✅
     - 支持断点续传（Redis Stream 的 ACK 机制）✅
-    - 可独立部署为 Sidecar 进程或集成在主进程中 ✅
+    - ~~可独立部署为 Sidecar 进程或集成在主进程中 ✅~~ **更新：采用集成在主进程中的方案** ✅
+      - 实现 `AuditLogConsumerHandler`（[src/services/audit_log_consumer.rs](file:///d:/Project/Rust/seredeli-room/src/services/audit_log_consumer.rs)）✅
+      - 在 `AppState::new()` 中启动消费者后台任务 ✅
+      - 消费者随主服务生命周期管理，简化部署 ✅
   - **改造 `AuditService`** ✅
     - 将 `log_event` 改为先写入 Redis Stream，而非直接写 DB ✅
     - 保留本地 Buffer 作为降级方案（Redis 不可用时直接写 DB）✅
@@ -1275,6 +1278,7 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
     │   ├── stream.rs           # 新增：StreamProducer、StreamConsumer
     │   └── config_sync.rs      # 新增：ConfigSyncManager
     ├── services/
+    │   ├── audit_log_consumer.rs  # 新增：审计日志 Stream 消费者处理器
     │   └── audit_service.rs    # 改造：集成 Redis Stream
     └── config/
         └── manager.rs          # 改造：集成 Redis 同步

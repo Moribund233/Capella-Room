@@ -1,10 +1,15 @@
 use std::fmt;
 use std::sync::Arc;
 
+use tracing::info;
+
 use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
-use crate::redis::{pubsub::RedisPubSub, RedisManager, StreamManager};
+use crate::redis::{
+    pubsub::RedisPubSub, ConsumerGroupConfig, RedisManager, StreamConsumer, StreamManager,
+};
 use crate::services::account_security_service::AccountSecurityService;
+use crate::services::audit_log_consumer::AuditLogConsumerHandler;
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
 use crate::services::file_service::FileService;
@@ -125,6 +130,20 @@ impl AppState {
             if let Some(redis_pubsub) = RedisPubSub::new(redis_mgr.clone()).await? {
                 ws_manager.set_redis_pubsub(redis_pubsub).await;
             }
+        }
+
+        // 如果 Redis 启用，启动审计日志 Stream 消费者
+        if let Some(ref redis_mgr) = redis_manager {
+            let consumer = Arc::new(StreamConsumer::new(
+                redis_mgr.clone(),
+                ConsumerGroupConfig::default(),
+            ));
+            let handler = Arc::new(AuditLogConsumerHandler::new(db.clone()));
+
+            tokio::spawn(async move {
+                info!("Starting audit log stream consumer...");
+                consumer.start(handler, "seredeli:stream:audit_logs").await;
+            });
         }
 
         let state = Arc::new(Self {
