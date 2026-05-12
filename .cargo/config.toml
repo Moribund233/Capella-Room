@@ -1,0 +1,57 @@
+# =============================================================================
+# Capella Room 项目级 Cargo 配置
+# 优先级高于 ~/.cargo/config.toml，会随 repo 提交，跨设备一致
+#
+# 【不包含以下设备相关配置，请在用户级 ~/.cargo/config.toml 中设置】
+# - source 镜像源 (国内用 aliyun/tuna，海外用 crates.io 直连)
+# - [net] git-fetch-with-cli (设备间 git 版本不同)
+# - [build] jobs (硬件核数不同)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Dev Profile - 优化编译速度
+# ---------------------------------------------------------------------------
+[profile.dev]
+opt-level = 0           # 不优化，编译最快
+debug = true            # 保留调试符号
+lto = false             # 跳过 LTO
+codegen-units = 256     # 拆分为 256 个编译单元，极限并行加速编译
+incremental = true      # 启用增量编译
+split-debuginfo = "packed"  # 打包调试信息，减少 I/O
+
+# 依赖项用二级优化，代码质量更高但编译速度折中
+[profile.dev.package."*"]
+opt-level = 2
+
+# ---------------------------------------------------------------------------
+# Release Profile - 优化产物体积和运行时性能
+# ---------------------------------------------------------------------------
+[profile.release]
+opt-level = 3           # 最大优化
+lto = "fat"             # 全链接时优化，减小体积提升性能
+codegen-units = 1       # 单编译单元，LTO 效果最佳
+strip = "symbols"       # 剥离调试符号，大幅减小体积（等价于 strip = true）
+panic = "abort"         # panic 直接 abort，不展开栈（需项目本身无 catch_unwind）
+incremental = false     # 发行版关闭增量编译以最大化优化
+
+# ---------------------------------------------------------------------------
+# Target-specific 链接器优化（加速链接时间 2-5x）
+# 需要安装对应链接器：
+#   - Windows: 安装 LLVM (winget install LLVM) 使 lld-link.exe 在 PATH 中
+#   - Linux:   apt install mold 或 apt install lld
+#   - macOS:   默认 ld64 已够快，或 brew install lld
+#
+# 如无法安装，注释掉对应平台的 rustflags 即可回退到系统默认链接器。
+# ---------------------------------------------------------------------------
+
+# Windows MSVC - 使用 LLD (需要 LLVM: winget install LLVM)
+# [target.x86_64-pc-windows-msvc]
+# rustflags = ["-C", "linker=lld-link"]
+
+# Linux - 使用 Mold (apt install mold) 或 LLD (apt install lld)
+# [target.x86_64-unknown-linux-gnu]
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# macOS - 使用 LLD (brew install lld)
+# [target.aarch64-apple-darwin]
+# rustflags = ["-C", "linker=lld"]
