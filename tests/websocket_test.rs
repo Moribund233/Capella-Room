@@ -19,7 +19,7 @@ use tokio::time::{sleep, timeout};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
 
-use seredeli_room::{
+use capella_room::{
     config::{ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
@@ -109,20 +109,20 @@ async fn setup_test_server() -> (TestServer, Database) {
 
     if std::env::var("UPLOAD_DIR").is_err() {
         let temp_dir =
-            std::env::temp_dir().join(format!("seredeli_upload_test_{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("capella_upload_test_{}", Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).expect("Failed to create temp upload directory");
         std::env::set_var("UPLOAD_DIR", temp_dir.to_str().unwrap());
     }
 
-    use seredeli_room::utils::logging::MetricsCollector;
+    use capella_room::utils::logging::MetricsCollector;
     use std::sync::Arc;
 
     let ws_manager = WebSocketManager::new();
     let metrics_collector = Arc::new(MetricsCollector::new());
 
-    let config = seredeli_room::config::AppConfig {
+    let config = capella_room::config::AppConfig {
         server: Default::default(),
-        database: seredeli_room::config::DatabaseConfig {
+        database: capella_room::config::DatabaseConfig {
             url: None,
             max_connections: 10,
             acquire_timeout_secs: 30,
@@ -136,7 +136,7 @@ async fn setup_test_server() -> (TestServer, Database) {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
         },
-        websocket: seredeli_room::config::WebSocketConfig {
+        websocket: capella_room::config::WebSocketConfig {
             heartbeat_interval_secs: 30,
             heartbeat_timeout_secs: 60,
             auth_timeout_secs: 10,
@@ -144,7 +144,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         },
         reconnect: Default::default(),
         logging: Default::default(),
-        audit: seredeli_room::config::AuditConfig {
+        audit: capella_room::config::AuditConfig {
             enabled: true,
             log_retention_days: 90,
             buffer_size: 100,
@@ -834,7 +834,7 @@ async fn test_user_status_broadcast() {
 
     // user1 更新状态
     let update_status_msg = WebSocketMessage::UpdateStatus {
-        status: seredeli_room::websocket::protocol::UserStatus::Away,
+        status: capella_room::websocket::protocol::UserStatus::Away,
     };
     user1
         .write
@@ -852,7 +852,7 @@ async fn test_user_status_broadcast() {
         } => {
             // UserStatus 现在已经实现了 PartialEq
             assert_eq!(user_id, user1.user_id);
-            assert_eq!(status, seredeli_room::websocket::protocol::UserStatus::Away);
+            assert_eq!(status, capella_room::websocket::protocol::UserStatus::Away);
             println!("User status broadcast works correctly");
         }
         msg => {

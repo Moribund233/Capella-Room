@@ -39,7 +39,7 @@ pub struct AuditLogStreamMessage {
 
 impl StreamMessage for AuditLogStreamMessage {
     fn stream_name() -> &'static str {
-        "seredeli:stream:audit_logs"
+        "capella:stream:audit_logs"
     }
 
     fn message_id(&self) -> String {
@@ -62,7 +62,7 @@ pub struct MessageStreamMessage {
 
 impl StreamMessage for MessageStreamMessage {
     fn stream_name() -> &'static str {
-        "seredeli:stream:messages"
+        "capella:stream:messages"
     }
 
     fn message_id(&self) -> String {
@@ -180,7 +180,7 @@ pub struct ConsumerGroupConfig {
 impl Default for ConsumerGroupConfig {
     fn default() -> Self {
         Self {
-            group_name: "seredeli-consumers".to_string(),
+            group_name: "capella-consumers".to_string(),
             consumer_name: format!("consumer-{}", Uuid::new_v4()),
             batch_size: 100,
             poll_interval_ms: 1000,
@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn test_consumer_group_config_default() {
         let config = ConsumerGroupConfig::default();
-        assert_eq!(config.group_name, "seredeli-consumers");
+        assert_eq!(config.group_name, "capella-consumers");
         assert_eq!(config.batch_size, 100);
         assert_eq!(config.poll_interval_ms, 1000);
         assert_eq!(config.claim_timeout_ms, 30000);

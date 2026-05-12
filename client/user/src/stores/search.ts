@@ -9,7 +9,7 @@ import type {
 } from '@/types/search'
 import type { Room } from '@/types/room'
 
-const SEARCH_HISTORY_KEY = 'seredeli_search_history'
+const SEARCH_HISTORY_KEY = 'capella_search_history'
 const MAX_HISTORY_ITEMS = 10
 
 /**

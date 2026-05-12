@@ -9,7 +9,7 @@ use serde_json::json;
 use tower::util::ServiceExt;
 use uuid::Uuid;
 
-use seredeli_room::{
+use capella_room::{
     config::{AppConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     models::audit::{AuditEventType, AuditSeverity, CreateAuditLogRequest},
@@ -60,7 +60,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://test:test123@localhost:5432/seredeli_room_test".to_string()
+        "postgres://test:test123@localhost:5432/capella_room_test".to_string()
     });
 
     let db = Database::new(&DatabaseConfig {
@@ -99,7 +99,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         logging: Default::default(),
         system: Default::default(),
         admin: Default::default(),
-        audit: seredeli_room::config::AuditConfig {
+        audit: capella_room::config::AuditConfig {
             enabled: true,
             log_retention_days: 90,
             buffer_size: 10,
@@ -197,9 +197,9 @@ async fn test_audit_service_can_create_log() {
 
     let log_request =
         CreateAuditLogRequest::new(AuditEventType::UserLogin, "user_login", "用户登录成功")
-            .with_actor(user_id, seredeli_room::models::user::UserRole::User)
+            .with_actor(user_id, capella_room::models::user::UserRole::User)
             .with_metadata(
-                seredeli_room::models::audit::AuditMetadata::new()
+                capella_room::models::audit::AuditMetadata::new()
                     .with_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),
             );
 
@@ -220,7 +220,7 @@ async fn test_audit_service_can_query_logs() {
             "user_login",
             format!("用户登录成功 {}", i),
         )
-        .with_actor(user_id, seredeli_room::models::user::UserRole::User);
+        .with_actor(user_id, capella_room::models::user::UserRole::User);
 
         state.audit_service().log_event(log_request).await.unwrap();
     }
@@ -229,7 +229,7 @@ async fn test_audit_service_can_query_logs() {
     state.audit_service().flush_buffer().await.unwrap();
 
     // 查询日志
-    let query = seredeli_room::models::audit::AuditLogQuery {
+    let query = capella_room::models::audit::AuditLogQuery {
         actor_id: Some(user_id),
         ..Default::default()
     };
@@ -251,7 +251,7 @@ async fn test_audit_service_can_get_log_by_id() {
         "user_register",
         "用户注册成功",
     )
-    .with_actor(user_id, seredeli_room::models::user::UserRole::User);
+    .with_actor(user_id, capella_room::models::user::UserRole::User);
 
     state.audit_service().log_event(log_request).await.unwrap();
 
@@ -259,7 +259,7 @@ async fn test_audit_service_can_get_log_by_id() {
     state.audit_service().flush_buffer().await.unwrap();
 
     // 查询所有日志获取ID
-    let query = seredeli_room::models::audit::AuditLogQuery {
+    let query = capella_room::models::audit::AuditLogQuery {
         actor_id: Some(user_id),
         event_type: Some(AuditEventType::UserRegister),
         ..Default::default()
@@ -307,7 +307,7 @@ async fn test_audit_service_can_log_user_login() {
         .audit_service()
         .log_user_login(
             user_id,
-            seredeli_room::models::user::UserRole::User,
+            capella_room::models::user::UserRole::User,
             ip,
             None,
             true,
@@ -334,7 +334,7 @@ async fn test_audit_service_can_get_stats() {
             "user_login",
             format!("登录事件 {:?}", severity),
         )
-        .with_actor(user_id, seredeli_room::models::user::UserRole::User)
+        .with_actor(user_id, capella_room::models::user::UserRole::User)
         .with_severity(severity);
 
         state.audit_service().log_event(log_request).await.unwrap();
@@ -370,12 +370,12 @@ async fn test_audit_service_can_export_logs() {
             "user_login",
             format!("导出测试 {}", i),
         )
-        .with_actor(user_id, seredeli_room::models::user::UserRole::User);
+        .with_actor(user_id, capella_room::models::user::UserRole::User);
 
         state.audit_service().log_event(log_request).await.unwrap();
     }
 
-    let query = seredeli_room::models::audit::AuditLogQuery::default();
+    let query = capella_room::models::audit::AuditLogQuery::default();
 
     // 测试 JSON 导出
     let json_data = state.audit_service().export_logs_json(query.clone()).await;
@@ -400,7 +400,7 @@ async fn test_admin_can_list_audit_logs() {
     let (user_id, _token) = create_test_user(&state, "audituser7", "audituser7@test.com").await;
     let log_request =
         CreateAuditLogRequest::new(AuditEventType::UserLogin, "user_login", "测试日志")
-            .with_actor(user_id, seredeli_room::models::user::UserRole::User);
+            .with_actor(user_id, capella_room::models::user::UserRole::User);
     state.audit_service().log_event(log_request).await.unwrap();
 
     let response = app
@@ -534,7 +534,7 @@ async fn test_login_creates_audit_log() {
     // 再等待一下确保 spawned 任务完成
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
-    let query = seredeli_room::models::audit::AuditLogQuery {
+    let query = capella_room::models::audit::AuditLogQuery {
         actor_id: Some(user.id),
         event_type: Some(AuditEventType::UserLogin),
         ..Default::default()
@@ -582,7 +582,7 @@ async fn test_admin_action_creates_audit_log() {
     // 再等待一下确保 spawned 任务完成
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
-    let query = seredeli_room::models::audit::AuditLogQuery {
+    let query = capella_room::models::audit::AuditLogQuery {
         event_type: Some(AuditEventType::AdminUserRoleChange),
         ..Default::default()
     };
@@ -626,7 +626,7 @@ async fn test_audit_log_query_by_event_type() {
     // 创建不同类型的事件
     let login_request =
         CreateAuditLogRequest::new(AuditEventType::UserLogin, "user_login", "用户登录")
-            .with_actor(user_id, seredeli_room::models::user::UserRole::User);
+            .with_actor(user_id, capella_room::models::user::UserRole::User);
     state
         .audit_service()
         .log_event(login_request)
@@ -635,7 +635,7 @@ async fn test_audit_log_query_by_event_type() {
 
     let register_request =
         CreateAuditLogRequest::new(AuditEventType::UserRegister, "user_register", "用户注册")
-            .with_actor(user_id, seredeli_room::models::user::UserRole::User);
+            .with_actor(user_id, capella_room::models::user::UserRole::User);
     state
         .audit_service()
         .log_event(register_request)
@@ -648,7 +648,7 @@ async fn test_audit_log_query_by_event_type() {
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
     // 按事件类型查询
-    let query = seredeli_room::models::audit::AuditLogQuery {
+    let query = capella_room::models::audit::AuditLogQuery {
         event_type: Some(AuditEventType::UserLogin),
         ..Default::default()
     };
@@ -669,7 +669,7 @@ async fn test_audit_log_query_by_severity() {
     // 创建不同严重级别的日志
     let info_request =
         CreateAuditLogRequest::new(AuditEventType::UserLogin, "user_login", "普通登录")
-            .with_actor(user_id, seredeli_room::models::user::UserRole::User)
+            .with_actor(user_id, capella_room::models::user::UserRole::User)
             .with_severity(AuditSeverity::Info);
     state.audit_service().log_event(info_request).await.unwrap();
 
@@ -678,7 +678,7 @@ async fn test_audit_log_query_by_severity() {
         "login_failure",
         "登录失败",
     )
-    .with_actor(user_id, seredeli_room::models::user::UserRole::User)
+    .with_actor(user_id, capella_room::models::user::UserRole::User)
     .with_severity(AuditSeverity::Error);
     state
         .audit_service()
@@ -690,7 +690,7 @@ async fn test_audit_log_query_by_severity() {
     state.audit_service().flush_buffer().await.unwrap();
 
     // 按严重级别查询
-    let query = seredeli_room::models::audit::AuditLogQuery {
+    let query = capella_room::models::audit::AuditLogQuery {
         severity: Some(AuditSeverity::Error),
         ..Default::default()
     };

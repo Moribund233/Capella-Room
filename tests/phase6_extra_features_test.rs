@@ -7,7 +7,7 @@
 
 use std::env;
 
-use seredeli_room::{
+use capella_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     services::{
@@ -581,7 +581,7 @@ async fn test_edit_system_message_forbidden() {
             room.id,
             user_id,
             "系统消息",
-            seredeli_room::models::message::MessageType::System,
+            capella_room::models::message::MessageType::System,
             None,
         )
         .await

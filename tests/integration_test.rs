@@ -24,7 +24,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
 
 // 引入被测模块
-use seredeli_room::{
+use capella_room::{
     config::{ConfigLoader, ConfigManager},
     db::Database,
     routes::create_router,

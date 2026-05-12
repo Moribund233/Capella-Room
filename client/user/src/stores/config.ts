@@ -22,7 +22,7 @@ const DEFAULT_CONFIG: ClientConfig = {
     max_file_size_human: '10 MB',
   },
   system: {
-    name: 'Seredeli Room',
+    name: 'Capella Room',
     version: '1.0.0',
     maintenance_mode: false,
     maintenance_message: '',

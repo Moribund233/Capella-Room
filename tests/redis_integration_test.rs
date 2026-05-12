@@ -5,8 +5,8 @@
 //! - 消息序列化/反序列化
 //! - 跨节点消息广播（模拟）
 
-use seredeli_room::config::RedisConfig;
-use seredeli_room::redis::pubsub::RoomBroadcastMessage;
+use capella_room::config::RedisConfig;
+use capella_room::redis::pubsub::RoomBroadcastMessage;
 use uuid::Uuid;
 
 /// 测试 Redis 配置默认值

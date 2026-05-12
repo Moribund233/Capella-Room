@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::Result;
 use tracing::{info, warn};
 
-use seredeli_room::{
+use capella_room::{
     config::{ConfigLoader, ConfigManager},
     db::Database,
     redis::{ConfigSyncManager, RedisManager},
@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     // 初始化日志系统（维护模式下打印更详细的日志）
     init_logging(config.system.maintenance_mode);
 
-    info!("Starting Seredeli Room server...");
+    info!("Starting Capella Room server...");
     info!("Configuration loaded successfully");
     info!(
         "Server will run on {}:{}",
@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
 
 async fn initialize_super_admin(
     state: &AppState,
-    admin_config: &seredeli_room::config::InitialAdminConfig,
+    admin_config: &capella_room::config::InitialAdminConfig,
 ) -> Result<()> {
     if !admin_config.enabled {
         info!("Initial super admin creation is disabled");

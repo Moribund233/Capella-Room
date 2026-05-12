@@ -2,7 +2,7 @@
 
 ## 设计理念
 
-SeredeliUI 采用**配置驱动**的设计理念，将UI的呈现与业务逻辑分离。开发者只需通过简单的配置对象，即可定义整个应用的界面结构，而无需深入修改组件代码。
+CapellaUI 采用**配置驱动**的设计理念，将UI的呈现与业务逻辑分离。开发者只需通过简单的配置对象，即可定义整个应用的界面结构，而无需深入修改组件代码。
 
 ### 核心思想
 
@@ -151,7 +151,7 @@ setTheme('dark') // 或 'light'
 
 ## 与类似框架对比
 
-| 特性       | SeredeliUI    | Ant Design Pro | Vue-Vben-Admin |
+| 特性       | CapellaUI    | Ant Design Pro | Vue-Vben-Admin |
 | ---------- | ------------- | -------------- | -------------- |
 | 配置驱动   | ✅ 核心设计   | ⚠️ 部分支持    | ⚠️ 部分支持    |
 | 类型安全   | ✅ TypeScript | ✅ TypeScript  | ✅ TypeScript  |

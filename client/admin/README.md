@@ -1,4 +1,4 @@
-# SeredeliUI
+# CapellaUI
 
 一个基于 Naive UI、Lucide Vue 和 ECharts 的现代化 UI 框架，采用配置驱动的设计理念，快速构建移动端、平板端、桌面端三端通用的单页应用界面。
 
@@ -45,7 +45,7 @@ npm run dev
 ## 项目结构
 
 ```
-SeredeliUI/
+CapellaUI/
 ├── src/
 │   ├── api/           # API 接口层
 │   ├── components/    # 组件目录

@@ -2,7 +2,7 @@
 
 ## 概述
 
-在 SeredeliUI 中开发页面遵循**配置驱动**的理念。标准流程包括：
+在 CapellaUI 中开发页面遵循**配置驱动**的理念。标准流程包括：
 
 1. 创建页面组件
 2. 配置路由
@@ -392,7 +392,7 @@ console.log('Dock:', uiStore.dockConfig)
 
 ## 图表组件使用
 
-SeredeliUI 封装了基于 ECharts 的图表组件，位于 `src/components/common/charts/`，支持自动主题适配。
+CapellaUI 封装了基于 ECharts 的图表组件，位于 `src/components/common/charts/`，支持自动主题适配。
 
 ### 支持的图表类型
 

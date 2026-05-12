@@ -9,8 +9,8 @@ const { isMobile } = useResponsive()
     <div class="auth-layout__container">
       <div v-if="!isMobile" class="auth-layout__banner">
         <div class="auth-layout__banner-content">
-          <img src="/favicon.svg" alt="Seredeli Room" class="auth-layout__logo" />
-          <h1 class="auth-layout__title">Seredeli Room</h1>
+          <img src="/favicon.svg" alt="Capella Room" class="auth-layout__logo" />
+          <h1 class="auth-layout__title">Capella Room</h1>
           <p class="auth-layout__subtitle">现代化实时聊天室</p>
         </div>
       </div>

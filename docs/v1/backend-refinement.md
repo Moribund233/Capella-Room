@@ -296,7 +296,7 @@ const interval = serverConfig.websocket.heartbeat_interval_secs * 1000;
 
 **日志证据**:
 ```
-2026-04-13T14:07:39.163688Z  WARN seredeli_room::websocket::handler: 
+2026-04-13T14:07:39.163688Z  WARN capella_room::websocket::handler: 
   First message must be authentication or reconnect, got: ChatMessage { 
     room_id: 4bfa11aa-b30d-46ad-8b62-9c17b8dd82ae, 
     content: "这个功能好用", 

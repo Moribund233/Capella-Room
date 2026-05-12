@@ -118,7 +118,7 @@
 ### 后端服务
 
 ```yaml
-服务: seredeli-room-prod
+服务: capella-room-prod
 框架: Rust + Axum
 数据库: PostgreSQL
 缓存: Redis

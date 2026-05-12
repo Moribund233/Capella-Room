@@ -1,9 +1,9 @@
 {
-  "name": "seredeli-debug",
+  "name": "capella-debug",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Seredeli Room 调试工具端 - 提供多用户测试、WebSocket测试、API测试等开发调试功能",
+  "description": "Capella Room 调试工具端 - 提供多用户测试、WebSocket测试、API测试等开发调试功能",
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",

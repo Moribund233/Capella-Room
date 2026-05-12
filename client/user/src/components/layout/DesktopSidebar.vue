@@ -60,7 +60,7 @@ function toggleCollapse() {
         <div class="desktop-sidebar__logo">
           <MessageSquare :size="collapsed ? 20 : 24" />
         </div>
-        <h1 v-if="!collapsed" class="desktop-sidebar__title">Seredeli</h1>
+        <h1 v-if="!collapsed" class="desktop-sidebar__title">Capella</h1>
       </div>
       <div class="desktop-sidebar__actions">
         <ConnectionStatus v-if="!collapsed" />

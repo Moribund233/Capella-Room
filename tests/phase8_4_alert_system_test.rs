@@ -5,8 +5,8 @@
 use chrono::Timelike;
 use chrono::Utc;
 
-use seredeli_room::models::audit::{AuditEventType, AuditSeverity};
-use seredeli_room::services::alert_engine::{
+use capella_room::models::audit::{AuditEventType, AuditSeverity};
+use capella_room::services::alert_engine::{
     create_abnormal_login_rule, create_brute_force_rule, create_unauthorized_access_rule,
     AlertCondition, ConditionType,
 };
@@ -159,7 +159,7 @@ fn test_preset_rules() {
 /// 测试 AlertStatus 枚举
 #[test]
 fn test_alert_status() {
-    use seredeli_room::models::audit::AlertStatus;
+    use capella_room::models::audit::AlertStatus;
 
     let new_status = AlertStatus::New;
     let acknowledged_status = AlertStatus::Acknowledged;

@@ -13,12 +13,12 @@ use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 
-use seredeli_room::services::notification_service::{
+use capella_room::services::notification_service::{
     FileInfo, MentionInfo, PrivateMessageInfo, RoomInvitationInfo, SystemNotificationInfo,
 };
-use seredeli_room::utils::mention;
-use seredeli_room::websocket::manager::WebSocketManager;
-use seredeli_room::websocket::protocol::{NotificationDbType, NotificationType, WebSocketMessage};
+use capella_room::utils::mention;
+use capella_room::websocket::manager::WebSocketManager;
+use capella_room::websocket::protocol::{NotificationDbType, NotificationType, WebSocketMessage};
 
 /// ==================== @提及检测测试 ====================
 

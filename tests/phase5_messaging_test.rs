@@ -15,7 +15,7 @@
 
 use std::env;
 
-use seredeli_room::{
+use capella_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,
@@ -73,7 +73,7 @@ async fn create_test_user(
     auth_service: &AuthService,
     username: &str,
 ) -> (Uuid, String) {
-    let email = format!("{}_msg_test@seredeli.com", username);
+    let email = format!("{}_msg_test@capella.com", username);
     let password = "TestPassword123";
 
     // 检查用户是否已存在

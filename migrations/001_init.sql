@@ -1,4 +1,4 @@
--- Seredeli Room 数据库初始化脚本
+-- Capella Room 数据库初始化脚本
 -- 整合所有开发阶段的数据库迁移
 -- 阶段 1-8.6 完整数据库结构
 
@@ -434,7 +434,7 @@ INSERT INTO system_configs (key, value, value_type, description, category, is_ed
     ('logging.structured', 'true', 'bool', '是否启用结构化日志', 'logging', true, true),
     
     -- 系统配置
-    ('system.name', 'Seredeli Room', 'string', '系统名称', 'system', true, true),
+    ('system.name', 'Capella Room', 'string', '系统名称', 'system', true, true),
     ('system.version', '1.0.0', 'string', '系统版本', 'system', false, false),
     ('system.maintenance_mode', 'false', 'bool', '维护模式', 'system', true, true),
     ('system.maintenance_message', 'System is under maintenance, please try again later.', 'string', '维护模式提示信息', 'system', true, true)

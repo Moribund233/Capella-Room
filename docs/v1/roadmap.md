@@ -1,8 +1,8 @@
-# Seredeli Room 开发路线文档
+# Capella Room 开发路线文档
 
 ## 项目概述
 
-Seredeli Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时聊天室应用。本文档规划了项目的开发阶段和里程碑。
+Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时聊天室应用。本文档规划了项目的开发阶段和里程碑。
 
 ### 阶段总览
 
@@ -1008,7 +1008,7 @@ CREATE TABLE system_configs (
     - `REDIS_URL`：Redis 连接地址（启用时必须设置）
     - `REDIS_POOL_SIZE`：连接池大小（默认 `10`）
     - `REDIS_TIMEOUT_SECS`：连接超时时间（秒，默认 `5`）
-    - `REDIS_CHANNEL_PREFIX`：Pub/Sub 频道前缀（默认 `seredeli`）
+    - `REDIS_CHANNEL_PREFIX`：Pub/Sub 频道前缀（默认 `capella`）
     - `REDIS_STREAM_MAX_LEN`：Stream 最大长度（默认 `100000`）
     - `REDIS_CONSUMER_BATCH_SIZE`：Consumer 批量消费大小（默认 `100`）
     - `REDIS_CONSUMER_POLL_INTERVAL_MS`：Consumer 消费间隔（毫秒，默认 `1000`）
@@ -1083,7 +1083,7 @@ CREATE TABLE system_configs (
 | `REDIS_URL` | 启用时必填 | - | Redis 连接地址，启用 Redis 时必须设置 |
 | `REDIS_POOL_SIZE` | 否 | `10` | 连接池大小 |
 | `REDIS_TIMEOUT_SECS` | 否 | `5` | 连接超时时间（秒） |
-| `REDIS_CHANNEL_PREFIX` | 否 | `seredeli` | Pub/Sub 频道前缀 |
+| `REDIS_CHANNEL_PREFIX` | 否 | `capella` | Pub/Sub 频道前缀 |
 | `REDIS_STREAM_MAX_LEN` | 否 | `100000` | Stream 最大长度（防止无限增长） |
 | `REDIS_CONSUMER_BATCH_SIZE` | 否 | `100` | Consumer 批量消费大小 |
 | `REDIS_CONSUMER_POLL_INTERVAL_MS` | 否 | `1000` | Consumer 消费间隔（毫秒） |
@@ -1195,12 +1195,12 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
 经过代码分析，发现以下两个性能瓶颈：
 
 **问题 1：数据库写入压力**
-- **现状**：审计日志与消息高并发写入直接打向 PostgreSQL 主库，[src/services/audit_service.rs](file:///d:/Project/Rust/seredeli-room/src/services/audit_service.rs#L1200-L1237) 中 `flush_logs` 直接执行批量 INSERT
+- **现状**：审计日志与消息高并发写入直接打向 PostgreSQL 主库，[src/services/audit_service.rs](file:///d:/Project/Rust/capella-room/src/services/audit_service.rs#L1200-L1237) 中 `flush_logs` 直接执行批量 INSERT
 - **瓶颈**：万级 QPS 下批量写入可能阻塞主业务；节点数增加导致 DB 连接数线性增长
 - **已有基础**：阶段 8.5 已实现 `RedisManager`、`RedisPubSub` 和频道命名规范
 
 **问题 2：配置热更新的多节点同步**
-- **现状**：配置变更通过 `tokio::sync::broadcast` 在进程内广播（[src/config/manager.rs](file:///d:/Project/Rust/seredeli-room/src/config/manager.rs#L35-L45)）
+- **现状**：配置变更通过 `tokio::sync::broadcast` 在进程内广播（[src/config/manager.rs](file:///d:/Project/Rust/capella-room/src/config/manager.rs#L35-L45)）
 - **瓶颈**：仅单节点生效，其他节点无法感知；多节点部署时配置不一致
 - **已有基础**：Redis Pub/Sub 已在阶段 8.5 中验证可用
 
@@ -1212,7 +1212,7 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Redis 中间件层                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  seredeli:room:{id}      seredeli:stream:audit      seredeli:config:sync │
+│  capella:room:{id}      capella:stream:audit      capella:config:sync │
 │  (WebSocket广播)          (审计日志流)               (配置同步)          │
 │       ✅ 已有                 🆕 新增                   🆕 新增            │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -1221,16 +1221,16 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
 #### 任务清单
 
 - [✅] **8.6.1 Redis Stream 异步写入架构**
-  - **新增 `RedisStreamProducer`**（[src/redis/stream.rs](file:///d:/Project/Rust/seredeli-room/src/redis/stream.rs)）✅
+  - **新增 `RedisStreamProducer`**（[src/redis/stream.rs](file:///d:/Project/Rust/capella-room/src/redis/stream.rs)）✅
     - 封装 Redis Stream 写入接口 ✅
-    - 频道设计：`seredeli:stream:audit_logs`、`seredeli:stream:messages` ✅
+    - 频道设计：`capella:stream:audit_logs`、`capella:stream:messages` ✅
     - 消息格式支持 JSON 序列化，包含时间戳、节点 ID、数据 payload ✅
   - **新增 `RedisStreamConsumer`** ✅
     - 使用 Redis Consumer Group 实现多节点负载均衡 ✅
     - 批量消费 Stream 数据，按配置批量写入 PostgreSQL ✅
     - 支持断点续传（Redis Stream 的 ACK 机制）✅
     - ~~可独立部署为 Sidecar 进程或集成在主进程中 ✅~~ **更新：采用集成在主进程中的方案** ✅
-      - 实现 `AuditLogConsumerHandler`（[src/services/audit_log_consumer.rs](file:///d:/Project/Rust/seredeli-room/src/services/audit_log_consumer.rs)）✅
+      - 实现 `AuditLogConsumerHandler`（[src/services/audit_log_consumer.rs](file:///d:/Project/Rust/capella-room/src/services/audit_log_consumer.rs)）✅
       - 在 `AppState::new()` 中启动消费者后台任务 ✅
       - 消费者随主服务生命周期管理，简化部署 ✅
   - **改造 `AuditService`** ✅
@@ -1242,9 +1242,9 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
     ```
 
 - [✅] **8.6.2 Redis Pub/Sub 配置热更新同步**
-  - **新增 `ConfigSyncManager`**（[src/redis/config_sync.rs](file:///d:/Project/Rust/seredeli-room/src/redis/config_sync.rs)）✅
+  - **新增 `ConfigSyncManager`**（[src/redis/config_sync.rs](file:///d:/Project/Rust/capella-room/src/redis/config_sync.rs)）✅
     - 封装配置变更消息的发布和订阅 ✅
-    - 频道设计：`seredeli:config:sync` ✅
+    - 频道设计：`capella:config:sync` ✅
     - 消息格式：✅
       ```rust
       ConfigChangeMessage {
@@ -1255,8 +1255,8 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
           timestamp: DateTime<Utc>,
       }
       ```
-  - **改造 `ConfigManager`**（[src/config/manager.rs](file:///d:/Project/Rust/seredeli-room/src/config/manager.rs)）✅
-    - `set_config()` 成功后发布 Redis 消息到 `seredeli:config:sync` ✅
+  - **改造 `ConfigManager`**（[src/config/manager.rs](file:///d:/Project/Rust/capella-room/src/config/manager.rs)）✅
+    - `set_config()` 成功后发布 Redis 消息到 `capella:config:sync` ✅
     - 启动订阅任务监听配置变更，收到其他节点消息时触发本地配置重载 ✅
     - 添加节点标识过滤，避免重复处理本节点发出的消息 ✅
   - **同步流程**：
@@ -1283,7 +1283,7 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
     └── config/
         └── manager.rs          # 改造：集成 Redis 同步
     ```
-  - **配置扩展**（[src/config/mod.rs](file:///d:/Project/Rust/seredeli-room/src/config/mod.rs)）：✅
+  - **配置扩展**（[src/config/mod.rs](file:///d:/Project/Rust/capella-room/src/config/mod.rs)）：✅
     ```rust
     pub struct RedisConfig {
         // 现有字段...
@@ -1336,18 +1336,18 @@ pub async fn broadcast_to_room(&self, room_id: Uuid, message: String, exclude_us
 
 - [✅] **8.7.1 IP 黑名单/白名单系统**
   - **数据库设计**：✅
-    - 创建 `ip_lists` 表存储 IP 黑白名单（[migrations/002_ip_security.sql](file:///d:/Project/Rust/seredeli-room/migrations/002_ip_security.sql)）✅
+    - 创建 `ip_lists` 表存储 IP 黑白名单（[migrations/002_ip_security.sql](file:///d:/Project/Rust/capella-room/migrations/002_ip_security.sql)）✅
     - 支持 IPv4/IPv6 地址和 CIDR 范围 ✅
     - 支持设置过期时间 ✅
     - 支持白名单模式和黑名单模式切换 ✅
   - **核心服务实现**：✅
-    - 新增 `IpSecurityService`（[src/services/ip_security_service.rs](file:///d:/Project/Rust/seredeli-room/src/services/ip_security_service.rs)）✅
+    - 新增 `IpSecurityService`（[src/services/ip_security_service.rs](file:///d:/Project/Rust/capella-room/src/services/ip_security_service.rs)）✅
     - 实现 IP 地址匹配（支持单 IP 和 CIDR 范围）✅
     - 使用 `ipnet` crate 进行准确的 CIDR 验证和匹配 ✅
     - 内存缓存机制，定期刷新（60秒）✅
     - 支持白名单模式（只允许特定 IP）和黑名单模式（只阻止特定 IP）✅
   - **WebSocket 集成**：✅
-    - 在 WebSocket 连接建立时进行 IP 检查（[src/websocket/handler.rs](file:///d:/Project/Rust/seredeli-room/src/websocket/handler.rs)）✅
+    - 在 WebSocket 连接建立时进行 IP 检查（[src/websocket/handler.rs](file:///d:/Project/Rust/capella-room/src/websocket/handler.rs)）✅
     - 被阻止的 IP 直接断开连接并记录审计日志 ✅
     - 支持获取真实 IP（考虑 X-Forwarded-For 等代理头）✅
   - **管理 API 实现**：✅
@@ -1403,7 +1403,7 @@ CREATE UNIQUE INDEX idx_ip_lists_address_type ON ip_lists(ip_address, list_type)
 - [✅] WebSocket 连接时进行 IP 安全检查
 - [✅] 管理员可以通过 API 管理 IP 列表
 - [✅] 所有 IP 安全事件记录到审计系统
-- [✅] 测试覆盖：新增 15 个 IP 安全相关测试（[tests/ip_security_test.rs](file:///d:/Project/Rust/seredeli-room/tests/ip_security_test.rs)）
+- [✅] 测试覆盖：新增 15 个 IP 安全相关测试（[tests/ip_security_test.rs](file:///d:/Project/Rust/capella-room/tests/ip_security_test.rs)）
 
 #### 完成情况
 - ✅ 数据库设计：`ip_lists` 表支持 IP/CIDR、过期时间、白名单/黑名单模式
@@ -1578,7 +1578,7 @@ CREATE UNIQUE INDEX idx_ip_lists_address_type ON ip_lists(ip_address, list_type)
 ## 项目结构
 
 ```
-SeredeliRoom/
+CapellaRoom/
 ├── Cargo.toml              # 项目配置和依赖
 ├── .env.example            # 环境变量示例
 ├── src/
@@ -1689,7 +1689,7 @@ SeredeliRoom/
 APP_ENV=development
 
 # 数据库（敏感）
-DATABASE_URL=postgres://username:password@localhost:5432/seredeli_room
+DATABASE_URL=postgres://username:password@localhost:5432/capella_room
 
 # JWT（敏感）
 JWT_SECRET=your-super-secret-jwt-key
@@ -1752,7 +1752,7 @@ structured = true
 
 # 系统配置
 [system]
-name = "Seredeli Room"
+name = "Capella Room"
 description = "Real-time chat room application"
 version = "1.0.0"
 maintenance_mode = false
@@ -1781,7 +1781,7 @@ archive_hour = 3
 enabled = false
 pool_size = 10
 timeout_secs = 5
-channel_prefix = "seredeli"
+channel_prefix = "capella"
 stream_max_len = 100000
 consumer_batch_size = 100
 consumer_poll_interval_ms = 1000

@@ -472,7 +472,7 @@ async fn api_version() -> axum::Json<serde_json::Value> {
         "success": true,
         "data": {
             "version": API_VERSION,
-            "name": "Seredeli Room API",
+            "name": "Capella Room API",
             "description": "Real-time chat room API",
             "deprecated_routes": ["/api/*"],
             "recommended_routes": ["/api/v1/*"]

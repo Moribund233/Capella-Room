@@ -498,7 +498,7 @@ impl ConfigManager {
             ),
             (
                 "system.name",
-                "Seredeli Room",
+                "Capella Room",
                 "string",
                 "系统名称",
                 "system",

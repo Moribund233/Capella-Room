@@ -1,5 +1,5 @@
 # =============================================================================
-# Seredeli Room 配置文件
+# Capella Room 配置文件
 # =============================================================================
 # 此文件仅存储非敏感配置的默认值
 #
@@ -22,7 +22,7 @@
 # -----------------------------------------------------------------------------
 [database]
 # 数据库连接 URL（必须通过环境变量 DATABASE_URL 设置）
-# url = "postgres://username:password@localhost:5432/seredeli_room"
+# url = "postgres://username:password@localhost:5432/capella_room"
 # 数据库连接池大小
 max_connections = 10
 # 连接超时时间（秒）
@@ -92,7 +92,7 @@ structured = true
 # -----------------------------------------------------------------------------
 [system]
 # 系统名称
-name = "Seredeli Room"
+name = "Capella Room"
 # 系统描述
 description = "Real-time chat room application"
 # 系统版本

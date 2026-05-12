@@ -259,7 +259,7 @@ class StressTester:
         import subprocess
         try:
             result = subprocess.run(
-                ['wsl', 'docker', 'stats', '--no-stream', 'seredeli-room-prod'],
+                ['wsl', 'docker', 'stats', '--no-stream', 'capella-room-prod'],
                 capture_output=True,
                 text=True
             )

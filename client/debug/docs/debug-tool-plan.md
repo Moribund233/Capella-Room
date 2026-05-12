@@ -4,9 +4,9 @@
 
 ## 概述
 
-原debug端包含的WebSocket测试、多用户认证等工具具有重要价值，但代码实现与现有SeredeliUI规范和后端API不完全匹配。本规划遵循以下原则：
+原debug端包含的WebSocket测试、多用户认证等工具具有重要价值，但代码实现与现有CapellaUI规范和后端API不完全匹配。本规划遵循以下原则：
 
-- **遵循SeredeliUI规范** - 使用配置驱动、组合式函数架构
+- **遵循CapellaUI规范** - 使用配置驱动、组合式函数架构
 - **参考最新API文档** - 确保与后端API完全对齐
 - **重写而非迁移** - 按新规范重新实现，不复制旧代码
 - **保留核心功能** - 批量认证、WebSocket测试、API测试
@@ -358,7 +358,7 @@ export const dockBarConfig: DockItemConfig[] = [
 
 ## 参考文档
 
-- [页面开发指南](./page-development.md) - SeredeliUI页面开发规范
+- [页面开发指南](./page-development.md) - CapellaUI页面开发规范
 - [QuickBar开发指南](./quickbar-development.md) - Dock栏配置说明
 - [后端集成指南](./backend-integration.md) - API集成说明
 - [API文档](../../docs/api/v1/) - 后端API文档

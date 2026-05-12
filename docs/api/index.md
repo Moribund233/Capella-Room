@@ -1,4 +1,4 @@
-# Seredeli Room API 文档
+# Capella Room API 文档
 
 > **版本**: v1  
 > **API 前缀**: `/api/v1`
@@ -22,7 +22,7 @@
 
 ## 概述
 
-Seredeli Room 是一个基于 Rust + Axum 构建的实时聊天室后端服务，提供以下核心功能：
+Capella Room 是一个基于 Rust + Axum 构建的实时聊天室后端服务，提供以下核心功能：
 
 - **用户管理**: 注册、登录、资料管理
 - **用户设置**: 通知、隐私、消息、语言、无障碍、媒体设置

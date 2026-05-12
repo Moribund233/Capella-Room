@@ -7,8 +7,8 @@ use std::sync::Arc;
 use tempfile::NamedTempFile;
 use tokio::sync::broadcast;
 
-use seredeli_room::config::{ConfigChangeEvent, ConfigLoader};
-use seredeli_room::websocket::manager::WebSocketManager;
+use capella_room::config::{ConfigChangeEvent, ConfigLoader};
+use capella_room::websocket::manager::WebSocketManager;
 
 /// 创建临时配置文件
 fn create_temp_config(content: &str) -> NamedTempFile {

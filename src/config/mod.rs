@@ -162,7 +162,7 @@ pub struct RedisConfig {
     /// 连接超时时间（秒）（通过环境变量 REDIS_TIMEOUT_SECS 设置，默认 5）
     #[serde(default)]
     pub timeout_secs: u64,
-    /// Pub/Sub 频道前缀（通过环境变量 REDIS_CHANNEL_PREFIX 设置，默认 "seredeli"）
+    /// Pub/Sub 频道前缀（通过环境变量 REDIS_CHANNEL_PREFIX 设置，默认 "capella"）
     #[serde(default)]
     pub channel_prefix: String,
     /// Stream 最大长度（通过环境变量 REDIS_STREAM_MAX_LEN 设置，默认 100000）

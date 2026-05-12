@@ -32,7 +32,7 @@ mod tests {
     /// 测试 IP 检查结果的逻辑
     #[test]
     fn test_ip_check_result() {
-        use seredeli_room::models::security::IpCheckResult;
+        use capella_room::models::security::IpCheckResult;
 
         // 允许连接
         let allowed = IpCheckResult::Allowed;
@@ -66,7 +66,7 @@ mod tests {
     /// 测试创建 IP 列表请求构建器
     #[test]
     fn test_create_ip_list_request_builder() {
-        use seredeli_room::models::security::{CreateIpListRequest, IpListType};
+        use capella_room::models::security::{CreateIpListRequest, IpListType};
 
         let ip = IpAddr::from_str("192.168.1.1").unwrap();
         let request = CreateIpListRequest::new(ip, IpListType::Blacklist)

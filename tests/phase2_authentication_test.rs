@@ -17,7 +17,7 @@
 use std::env;
 
 // 引入被测模块
-use seredeli_room::{
+use capella_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,

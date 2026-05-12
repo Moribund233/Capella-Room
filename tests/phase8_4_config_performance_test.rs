@@ -5,8 +5,8 @@
 use chrono::Utc;
 use serde_json::json;
 
-use seredeli_room::config::AuditConfig;
-use seredeli_room::models::audit::{AuditEventType, AuditLog, AuditSeverity};
+use capella_room::config::AuditConfig;
+use capella_room::models::audit::{AuditEventType, AuditLog, AuditSeverity};
 
 /// 测试审计配置结构
 #[test]
@@ -173,7 +173,7 @@ fn test_audit_log_query_performance() {
 /// 测试配置热更新事件
 #[test]
 fn test_config_hot_reload_event() {
-    use seredeli_room::config::ConfigChangeEvent;
+    use capella_room::config::ConfigChangeEvent;
 
     let event = ConfigChangeEvent::ConfigUpdated {
         key: "audit.buffer_size".to_string(),

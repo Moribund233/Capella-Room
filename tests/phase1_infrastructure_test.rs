@@ -18,7 +18,7 @@ use std::env;
 use std::sync::Arc;
 
 // 引入被测模块
-use seredeli_room::{
+use capella_room::{
     config::{AppConfig, DatabaseConfig, JwtConfig, ServerConfig, UploadConfig, WebSocketConfig},
     db::Database,
     error::AppError,
@@ -332,14 +332,14 @@ mod route_tests {
         // 实际测试需要完整的服务器
 
         // 验证 API 版本常量存在
-        assert!(!seredeli_room::routes::API_VERSION.is_empty());
+        assert!(!capella_room::routes::API_VERSION.is_empty());
     }
 
     /// 测试 API 版本端点
     #[tokio::test]
     async fn test_api_version() {
         // 验证 API 版本常量
-        assert_eq!(seredeli_room::routes::API_VERSION, "v1");
+        assert_eq!(capella_room::routes::API_VERSION, "v1");
     }
 }
 
@@ -395,7 +395,7 @@ mod integration_tests {
                 port: 3000,
             },
             database: DatabaseConfig {
-                url: Some("postgres://localhost:5432/seredeli_room".to_string()),
+                url: Some("postgres://localhost:5432/capella_room".to_string()),
                 max_connections: 10,
                 acquire_timeout_secs: 30,
                 idle_timeout_secs: 600,

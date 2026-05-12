@@ -58,7 +58,7 @@ export interface ExportedUserCredential {
   createdAt: number
 }
 
-const STORAGE_KEY = 'seredeli_test_users'
+const STORAGE_KEY = 'capella_test_users'
 
 export const useTestUsersStore = defineStore('testUsers', () => {
   // ========== State ==========

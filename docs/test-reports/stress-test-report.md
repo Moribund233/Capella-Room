@@ -224,10 +224,10 @@ cd script/python
 python stress_test.py
 
 # 查看容器内存
-docker stats seredeli-room-prod --no-stream
+docker stats capella-room-prod --no-stream
 
 # 重启容器清理内存
-docker restart seredeli-room-prod
+docker restart capella-room-prod
 ```
 
 ### 相关文档

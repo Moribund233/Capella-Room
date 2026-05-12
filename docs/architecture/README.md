@@ -1,4 +1,4 @@
-# Seredeli Room 架构文档
+# Capella Room 架构文档
 
 > **文档范围**: 阶段 8.5 - 8.7 高级架构功能  
 > **目标读者**: 运维人员、架构师、高级开发者
@@ -16,7 +16,7 @@
 
 ## 概述
 
-本文档详细介绍 Seredeli Room 的高级架构特性，包括分布式部署、数据库优化和安全加固。
+本文档详细介绍 Capella Room 的高级架构特性，包括分布式部署、数据库优化和安全加固。
 
 ### 架构演进
 
@@ -82,7 +82,7 @@
         │           │           │
         ▼           ▼           ▼
    本地广播    Redis 发布    数据库写入
-   (Node 1)   (seredeli:room:id)
+   (Node 1)   (capella:room:id)
                     │
                     ▼
               Redis Pub/Sub
@@ -127,7 +127,7 @@ pub struct RoomBroadcastMessage {
 REDIS_ENABLED=true
 REDIS_URL=redis://127.0.0.1:6379
 REDIS_POOL_SIZE=10
-REDIS_CHANNEL_PREFIX=seredeli
+REDIS_CHANNEL_PREFIX=capella
 ```
 
 ---
@@ -151,7 +151,7 @@ REDIS_CHANNEL_PREFIX=seredeli
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
 │  业务逻辑    │────►│ Redis Stream │────►│  Consumer Group │
-│  (Audit Log)│     │(seredeli:   │     │  (多节点负载均衡) │
+│  (Audit Log)│     │(capella:   │     │  (多节点负载均衡) │
 └─────────────┘     │ stream:audit)│     └────────┬────────┘
                     └─────────────┘              │
                                                   ▼

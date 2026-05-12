@@ -16,7 +16,7 @@ import type {
  * 应用基础配置
  */
 export const appConfig: AppConfig = {
-  name: 'Seredeli Debug',
+  name: 'Capella Debug',
   logo: '/favicon.svg',
   version: '1.0.0',
 }

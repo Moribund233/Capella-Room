@@ -1,6 +1,6 @@
-# Seredeli Debug
+# Capella Debug
 
-Seredeli Room 调试工具端，提供多用户测试、WebSocket测试、API测试等开发调试功能。基于 SeredeliUI 框架构建，采用配置驱动的设计理念。
+Capella Room 调试工具端，提供多用户测试、WebSocket测试、API测试等开发调试功能。基于 CapellaUI 框架构建，采用配置驱动的设计理念。
 
 ## 文档目录
 
@@ -45,7 +45,7 @@ npm run dev
 ## 项目结构
 
 ```
-SeredeliUI/
+CapellaUI/
 ├── src/
 │   ├── api/           # API 接口层
 │   ├── components/    # 组件目录

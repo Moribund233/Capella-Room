@@ -4,7 +4,7 @@
       <div class="about-logo">
         <span class="logo-text">S</span>
       </div>
-      <h2 class="about-title">SeredeliUI</h2>
+      <h2 class="about-title">CapellaUI</h2>
       <p class="about-subtitle">现代化的 Vue3 管理后台框架</p>
     </div>
 
@@ -31,7 +31,7 @@
       <n-divider />
 
       <div class="about-footer">
-        <p class="copyright">© 2025 SeredeliUI. All rights reserved.</p>
+        <p class="copyright">© 2025 CapellaUI. All rights reserved.</p>
         <p class="license">Released under MIT License</p>
       </div>
     </div>

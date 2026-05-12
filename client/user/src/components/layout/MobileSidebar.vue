@@ -131,7 +131,7 @@ watch(() => props.show, (show) => {
             <div class="mobile-sidebar__logo">
               <MessageSquare :size="24" />
             </div>
-            <h1 class="mobile-sidebar__title">Seredeli</h1>
+            <h1 class="mobile-sidebar__title">Capella</h1>
           </div>
           <div class="mobile-sidebar__actions">
             <ConnectionStatus />

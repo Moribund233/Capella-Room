@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use tower::util::ServiceExt;
 use uuid::Uuid;
 
-use seredeli_room::{
+use capella_room::{
     config::{AppConfig, AuditConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
@@ -53,7 +53,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://test:test123@localhost:5432/seredeli_room_test".to_string()
+        "postgres://test:test123@localhost:5432/capella_room_test".to_string()
     });
 
     let db = Database::new(&DatabaseConfig {
@@ -87,7 +87,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
         },
-        websocket: seredeli_room::config::WebSocketConfig {
+        websocket: capella_room::config::WebSocketConfig {
             heartbeat_interval_secs: 30,
             heartbeat_timeout_secs: 60,
             auth_timeout_secs: 10,

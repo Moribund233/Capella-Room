@@ -8,7 +8,7 @@
 
 use std::env;
 
-use seredeli_room::{
+use capella_room::{
     config::DatabaseConfig,
     db::Database,
     error::AppError,

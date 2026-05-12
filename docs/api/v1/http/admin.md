@@ -941,7 +941,7 @@ GET /api/v1/admin/configs?category=general
   "data": [
     {
       "key": "system.name",
-      "value": "Seredeli Room",
+      "value": "Capella Room",
       "value_type": "string",
       "description": "系统名称",
       "category": "system",
@@ -994,7 +994,7 @@ GET /api/v1/admin/configs/system.name
   "success": true,
   "data": {
     "key": "system.name",
-    "value": "Seredeli Room",
+    "value": "Capella Room",
     "value_type": "string",
     "description": "系统名称",
     "category": "system",
@@ -1163,7 +1163,7 @@ POST /api/v1/admin/configs/reset
   "data": [
     {
       "key": "system.name",
-      "value": "Seredeli Room",
+      "value": "Capella Room",
       "value_type": "string",
       "description": "系统名称",
       "category": "system",
@@ -1802,7 +1802,7 @@ Content-Type: application/json
 {
   "days": 90,
   "archive": true,
-  "archive_dir": "/var/log/seredeli/archive"
+  "archive_dir": "/var/log/capella/archive"
 }
 ```
 

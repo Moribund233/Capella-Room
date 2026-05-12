@@ -5,8 +5,8 @@
       <n-card class="login-card" :bordered="false">
         <!-- Logo Section -->
         <div class="logo-section">
-          <img src="/favicon.svg" alt="Seredeli Logo" class="logo-image" />
-          <h1 class="logo-title">Seredeli Admin</h1>
+          <img src="/favicon.svg" alt="Capella Logo" class="logo-image" />
+          <h1 class="logo-title">Capella Admin</h1>
         </div>
 
         <n-tabs v-model:value="activeTab" type="line" animated class="login-tabs">

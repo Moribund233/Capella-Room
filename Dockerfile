@@ -1,5 +1,5 @@
 # =============================================================================
-# Seredeli Room - Production Dockerfile
+# Capella Room - Production Dockerfile
 # 使用 cargo-chef + sparse 索引加速构建
 # 镜像源: 阿里云
 # =============================================================================
@@ -96,7 +96,7 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuse
 RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/target/release/seredeli-room /app/server
+COPY --from=builder /app/target/release/capella-room /app/server
 
 # 复制配置文件
 COPY --from=builder /app/config.toml /app/config.toml

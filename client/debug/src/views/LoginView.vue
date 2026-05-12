@@ -5,8 +5,8 @@
       <n-card class="login-card" :bordered="false">
         <!-- Logo Section -->
         <div class="logo-section">
-          <img src="/favicon.svg" alt="Seredeli Logo" class="logo-image" />
-          <h1 class="logo-title">Seredeli Debug</h1>
+          <img src="/favicon.svg" alt="Capella Logo" class="logo-image" />
+          <h1 class="logo-title">Capella Debug</h1>
           <p class="logo-subtitle">调试工具端</p>
         </div>
 

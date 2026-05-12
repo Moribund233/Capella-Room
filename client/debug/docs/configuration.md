@@ -2,7 +2,7 @@
 
 ## 概述
 
-SeredeliUI 采用**配置驱动**的设计理念，通过集中式的配置文件定义整个应用的 UI 结构。这种设计让开发者无需深入组件代码，即可快速调整界面布局和样式。
+CapellaUI 采用**配置驱动**的设计理念，通过集中式的配置文件定义整个应用的 UI 结构。这种设计让开发者无需深入组件代码，即可快速调整界面布局和样式。
 
 ## 配置文件
 
@@ -27,7 +27,7 @@ export const uiConfig = {
 
 ```typescript
 export const appConfig: AppConfig = {
-  name: 'SeredeliUI',      // 应用名称
+  name: 'CapellaUI',      // 应用名称
   logo: '/favicon.svg',    // Logo 路径
   version: '1.0.0',        // 版本号
 }

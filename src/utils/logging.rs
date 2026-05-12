@@ -52,7 +52,7 @@ pub fn init_logging(is_maintenance_mode: bool) {
     }
 
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        tracing_subscriber::EnvFilter::new("info,seredeli_room=debug,tower_http=debug")
+        tracing_subscriber::EnvFilter::new("info,capella_room=debug,tower_http=debug")
     });
 
     // 创建日志文件

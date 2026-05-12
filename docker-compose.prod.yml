@@ -1,5 +1,5 @@
 # =============================================================================
-# Seredeli Room - Docker Compose 配置 (生产环境)
+# Capella Room - Docker Compose 配置 (生产环境)
 # =============================================================================
 
 services:
@@ -7,8 +7,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: seredeli-room:latest
-    container_name: seredeli-room-prod
+    image: capella-room:latest
+    container_name: capella-room-prod
     ports:
       - "3000:3000"
     env_file:

@@ -24,7 +24,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
 
 // 引入被测模块
-use seredeli_room::{
+use capella_room::{
     config::{ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
@@ -117,16 +117,16 @@ async fn setup_test_server() -> (TestServer, Database) {
     // 设置 UPLOAD_DIR 环境变量（如果不存在）
     if std::env::var("UPLOAD_DIR").is_err() {
         let temp_dir =
-            std::env::temp_dir().join(format!("seredeli_upload_test_{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("capella_upload_test_{}", Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).expect("Failed to create temp upload directory");
         std::env::set_var("UPLOAD_DIR", temp_dir.to_str().unwrap());
     }
 
     let ws_manager = WebSocketManager::new();
 
-    let config = seredeli_room::config::AppConfig {
+    let config = capella_room::config::AppConfig {
         server: Default::default(),
-        database: seredeli_room::config::DatabaseConfig {
+        database: capella_room::config::DatabaseConfig {
             url: None,
             max_connections: 10,
             acquire_timeout_secs: 30,
@@ -140,7 +140,7 @@ async fn setup_test_server() -> (TestServer, Database) {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
         },
-        websocket: seredeli_room::config::WebSocketConfig {
+        websocket: capella_room::config::WebSocketConfig {
             heartbeat_interval_secs: 30,
             heartbeat_timeout_secs: 60,
             auth_timeout_secs: 10,
@@ -150,7 +150,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         logging: Default::default(),
         system: Default::default(),
         admin: Default::default(),
-        audit: seredeli_room::config::AuditConfig {
+        audit: capella_room::config::AuditConfig {
             enabled: true,
             log_retention_days: 90,
             buffer_size: 100,

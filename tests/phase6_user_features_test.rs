@@ -12,7 +12,7 @@
 
 use std::env;
 
-use seredeli_room::{
+use capella_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,
@@ -73,7 +73,7 @@ async fn create_test_user(
     auth_service: &AuthService,
     username: &str,
 ) -> (Uuid, String) {
-    let email = format!("{}_user_test@seredeli.com", username);
+    let email = format!("{}_user_test@capella.com", username);
     let password = "TestPassword123";
 
     // 检查用户是否已存在
@@ -450,7 +450,7 @@ async fn test_6_3_search_users_by_email() {
 
     // 通过邮箱域名搜索
     let (results, total) = user_service
-        .search_users("seredeli.com", 10, 0)
+        .search_users("capella.com", 10, 0)
         .await
         .unwrap();
     assert!(total >= 1);

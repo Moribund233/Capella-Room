@@ -1,6 +1,6 @@
-# Seredeli Room 文档中心
+# Capella Room 文档中心
 
-> 本文档中心包含 Seredeli Room 项目的所有技术文档
+> 本文档中心包含 Capella Room 项目的所有技术文档
 
 ---
 

@@ -12,7 +12,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use seredeli_room::{
+use capella_room::{
     config::{DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     models::file::{is_allowed_mime_type, FileCategory, FileQueryParams, FileUsageType},
@@ -60,7 +60,7 @@ async fn setup_test_db() -> Database {
 
 /// 创建测试上传目录
 fn setup_test_upload_dir() -> PathBuf {
-    let test_dir = std::env::temp_dir().join(format!("seredeli_test_{}", Uuid::new_v4()));
+    let test_dir = std::env::temp_dir().join(format!("capella_test_{}", Uuid::new_v4()));
     std::fs::create_dir_all(&test_dir).expect("Failed to create test upload directory");
     test_dir
 }
@@ -234,7 +234,7 @@ async fn test_upload_invalid_file_type() {
     // 尝试上传不允许的文件类型 (可执行文件)
     let exe_data = b"MZ executable content".to_vec();
 
-    let result: Result<_, seredeli_room::error::AppError> = file_service
+    let result: Result<_, capella_room::error::AppError> = file_service
         .upload_file(
             user_id,
             exe_data,
@@ -280,7 +280,7 @@ async fn test_upload_oversized_file() {
     // 创建超过限制大小的文件 (2KB)
     let large_data = vec![0u8; 2048];
 
-    let result: Result<_, seredeli_room::error::AppError> = file_service
+    let result: Result<_, capella_room::error::AppError> = file_service
         .upload_file(
             user_id,
             large_data,

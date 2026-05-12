@@ -16,7 +16,7 @@
 use std::env;
 
 // 引入被测模块
-use seredeli_room::{
+use capella_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,
@@ -73,7 +73,7 @@ async fn create_test_user(
 ) -> (
     Uuid,
     String,
-    seredeli_room::services::auth_service::TokenPair,
+    capella_room::services::auth_service::TokenPair,
 ) {
     let email = format!("{}@test.com", username);
     let password = "TestPassword123";
@@ -838,7 +838,7 @@ mod room_service_tests {
     /// 验证删除房间时同时清理房间成员和消息
     #[tokio::test]
     async fn test_delete_room_cascading_cleanup() {
-        use seredeli_room::services::message_service::MessageService;
+        use capella_room::services::message_service::MessageService;
 
         let db = setup_test_db().await;
         let room_service = RoomService::new(db.clone());

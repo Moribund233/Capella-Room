@@ -138,7 +138,7 @@
   "type": "LogEntry",
   "payload": {
     "level": "info",
-    "target": "seredeli_room::websocket::handler",
+    "target": "capella_room::websocket::handler",
     "message": "User joined room: 550e8400-e29b-41d4-a716-446655440000",
     "timestamp": "2026-04-26T10:30:00.000Z",
     "fields": {

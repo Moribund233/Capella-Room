@@ -60,8 +60,8 @@ function goRegister() {
 <template>
   <div class="login-view">
     <div v-if="isMobile" class="login-view__header">
-      <img src="/favicon.svg" alt="Seredeli Room" class="login-view__logo" />
-      <span class="login-view__app-name">Seredeli Room</span>
+      <img src="/favicon.svg" alt="Capella Room" class="login-view__logo" />
+      <span class="login-view__app-name">Capella Room</span>
     </div>
     <h2 class="login-view__title">欢迎回来</h2>
     <p class="login-view__subtitle">请登录你的账号</p>

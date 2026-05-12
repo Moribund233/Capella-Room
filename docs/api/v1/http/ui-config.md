@@ -2,7 +2,7 @@
 
 > **认证要求**: 所有接口均需要认证（需要携带 Access Token）
 > 
-> **适用说明**: 此接口专为 SeredeliUI 前端框架设计，用于云端同步用户界面配置。其他客户端开发可选择性实现。
+> **适用说明**: 此接口专为 CapellaUI 前端框架设计，用于云端同步用户界面配置。其他客户端开发可选择性实现。
 
 ## 接口列表
 
@@ -50,7 +50,7 @@ Authorization: Bearer {access_token}
   "success": true,
   "data": {
     "app": {
-      "name": "Seredeli Room",
+      "name": "Capella Room",
       "logo": "/logo.svg",
       "version": "1.0.0"
     },
@@ -588,7 +588,7 @@ export function useUIConfig() {
 function getDefaultConfig() {
   return {
     app: {
-      name: 'Seredeli Room',
+      name: 'Capella Room',
       logo: '/logo.svg',
       version: '1.0.0'
     },
@@ -667,9 +667,9 @@ function getDefaultConfig() {
 
 ---
 
-## 与 SeredeliUI 的集成
+## 与 CapellaUI 的集成
 
-此接口专为 [SeredeliUI](../../../../../client/admin/README.md) 设计，支持：
+此接口专为 [CapellaUI](../../../../../client/admin/README.md) 设计，支持：
 
 - **配置驱动 UI**: 通过云端配置动态渲染界面
 - **多端同步**: 同一账号在不同设备上配置同步
@@ -679,11 +679,11 @@ function getDefaultConfig() {
 ### 前端集成示例
 
 ```typescript
-// SeredeliUI 配置示例
-export const useSeredeliConfig = () => {
+// CapellaUI 配置示例
+export const useCapellaConfig = () => {
   const { config, saveConfig } = useUIConfig();
   
-  // 将云端配置转换为 SeredeliUI 格式
+  // 将云端配置转换为 CapellaUI 格式
   const uiConfig = computed(() => ({
     app: config.value.app,
     theme: config.value.theme,
@@ -703,4 +703,4 @@ export const useSeredeliConfig = () => {
 
 *文档版本: 1.0.0*  
 *最后更新: 2026-04-26*  
-*适用客户端: SeredeliUI 管理后台*
+*适用客户端: CapellaUI 管理后台*

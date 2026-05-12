@@ -142,7 +142,7 @@ impl AppState {
 
             tokio::spawn(async move {
                 info!("Starting audit log stream consumer...");
-                consumer.start(handler, "seredeli:stream:audit_logs").await;
+                consumer.start(handler, "capella:stream:audit_logs").await;
             });
         }
 

@@ -4,8 +4,8 @@
       <div class="about-logo">
         <span class="logo-text">S</span>
       </div>
-      <h2 class="about-title">Seredeli Debug</h2>
-      <p class="about-subtitle">Seredeli Room 调试工具端</p>
+      <h2 class="about-title">Capella Debug</h2>
+      <p class="about-subtitle">Capella Room 调试工具端</p>
     </div>
 
     <div class="about-content">
@@ -31,7 +31,7 @@
       <n-divider />
 
       <div class="about-footer">
-        <p class="copyright">© 2025 Seredeli. All rights reserved.</p>
+        <p class="copyright">© 2025 Capella. All rights reserved.</p>
         <p class="license">Released under MIT License</p>
       </div>
     </div>

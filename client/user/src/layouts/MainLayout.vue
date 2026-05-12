@@ -256,7 +256,7 @@ onUnmounted(() => {
         >
           <ArrowLeft :size="24" />
         </button>
-        <h1 class="main-layout__mobile-title">Seredeli</h1>
+        <h1 class="main-layout__mobile-title">Capella</h1>
         <!-- 移动端 QuickBar -->
         <div class="main-layout__mobile-quick">
           <QuickBar :items="mobileQuickItems" position="mobile-header" />

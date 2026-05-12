@@ -1,4 +1,4 @@
-# Seredeli Room
+# Capella Room
 
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org)
 [![Axum](https://img.shields.io/badge/Axum-0.7+-blue.svg)](https://github.com/tokio-rs/axum)
@@ -45,7 +45,7 @@
 ```bash
 # 克隆项目
 git clone <repository-url>
-cd seredeli-room
+cd capella-room
 
 # 创建数据库
 sqlx database create
@@ -72,7 +72,7 @@ curl http://localhost:3000/health
 ## 项目结构
 
 ```
-seredeli-room/
+capella-room/
 ├── Cargo.toml              # Rust 项目配置
 ├── config.toml             # 应用配置文件
 ├── .env.example            # 环境变量示例

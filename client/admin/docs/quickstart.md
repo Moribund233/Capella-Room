@@ -13,7 +13,7 @@
 ```bash
 # 克隆项目
 git clone <your-repo-url>
-cd SeredeliUI
+cd CapellaUI
 
 # 安装依赖
 npm install
@@ -80,7 +80,7 @@ quickActionBus.on('quick-action', (event) => {
 <template>
   <div class="my-page">
     <h1>我的页面</h1>
-    <p>这是使用 SeredeliUI 创建的第一个页面</p>
+    <p>这是使用 CapellaUI 创建的第一个页面</p>
   </div>
 </template>
 

@@ -210,7 +210,7 @@ GET /api/version
   "success": true,
   "data": {
     "version": "v1",
-    "name": "Seredeli Room API",
+    "name": "Capella Room API",
     "description": "Real-time chat room API",
     "deprecated_routes": ["/api/*"],
     "recommended_routes": ["/api/v1/*"]
@@ -268,7 +268,7 @@ GET /api/config/client
       "max_file_size_human": "10 MB"
     },
     "system": {
-      "name": "Seredeli Room",
+      "name": "Capella Room",
       "version": "0.1.0",
       "maintenance_mode": false,
       "maintenance_message": ""
@@ -395,8 +395,8 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-    - name: seredeli-room
-      image: seredeli-room:latest
+    - name: capella-room
+      image: capella-room:latest
       livenessProbe:
         httpGet:
           path: /health/live

@@ -1,6 +1,6 @@
 # 部署文档
 
-本文档说明 Seredeli Room 用户端的生产环境部署方式。
+本文档说明 Capella Room 用户端的生产环境部署方式。
 
 ## 部署方式
 
@@ -99,10 +99,10 @@ EXPOSE 80
 
 ```bash
 # 构建镜像
-docker build -t seredeli-room-user .
+docker build -t capella-room-user .
 
 # 运行容器
-docker run -d -p 80:80 --name seredeli-user seredeli-room-user
+docker run -d -p 80:80 --name capella-user capella-room-user
 ```
 
 #### 3. Docker Compose
