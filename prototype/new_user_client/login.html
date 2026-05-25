@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in · Wave</title>
+  <style>
+    :root {
+      --bg:      #0b0b14;
+      --surface: #141420;
+      --fg:      #ececf1;
+      --muted:   #8b8b9e;
+      --border:  #262636;
+      --accent:  #7c5cfc;
+      --accent-soft: color-mix(in oklch, var(--accent) 18%, transparent);
+      --accent-pink: #e85d9a;
+      --accent-green: #3ba55d;
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      --radius: 10px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { height: 100%; }
+    body {
+      margin: 0; min-height: 100%;
+      background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      display: grid; place-items: center;
+      padding: 24px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    p { margin: 0; }
+    h1 { margin: 0; }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    .auth-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-pink));
+    }
+
+    .auth-logo {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 28px;
+    }
+    .auth-logo-mark {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+      border-radius: 10px;
+      display: grid; place-items: center;
+      font-size: 17px; color: #fff; font-weight: 700;
+    }
+    .auth-logo span { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+
+    .auth-tabs {
+      display: flex;
+      background: var(--bg);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      border-radius: 8px;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      border: none; background: none; color: var(--muted); font-family: inherit;
+    }
+    .auth-tab.active { background: var(--surface); color: var(--fg); }
+
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .field label { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--fg);
+      font: inherit;
+      font-size: 15px;
+      transition: border-color 0.15s;
+    }
+    .input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .input::placeholder { color: var(--muted); opacity: 0.6; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 12px;
+      border-radius: var(--radius-full);
+      border: 1px solid transparent;
+      font-size: 15px; font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: #fff; border: none; }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 88%, black); }
+    .btn-outline { background: transparent; color: var(--fg); border-color: var(--border); }
+    .btn-outline:hover { border-color: var(--fg); }
+    .btn-icon svg { width: 18px; height: 18px; }
+
+    .divider {
+      display: flex; align-items: center; gap: 16px;
+      margin: 20px 0; color: var(--muted); font-size: 12px;
+    }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .social-row { display: flex; gap: 12px; }
+    .social-row .btn { flex: 1; font-size: 13px; }
+
+    .auth-footer { text-align: center; margin-top: 24px; font-size: 13px; color: var(--muted); }
+    .auth-footer a { color: var(--accent); }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--muted); font-size: 13px; margin-bottom: 24px;
+    }
+    .back-link:hover { color: var(--fg); text-decoration: none; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .inline-flex { display: flex; align-items: center; gap: 8px; }
+
+    .checkbox-field {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 18px; font-size: 13px; color: var(--muted);
+    }
+    .checkbox-field input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: var(--accent);
+    }
+
+    .forgot-link { float: right; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <a href="index.html" class="back-link">← Back</a>
+
+    <div class="auth-logo">
+      <div class="auth-logo-mark">W</div>
+      <span>Wave</span>
+    </div>
+
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab active" data-tab="login" role="tab">Sign in</button>
+      <button class="auth-tab" data-tab="register" role="tab">Create account</button>
+    </div>
+
+    <!-- Sign In -->
+    <div class="tab-content active" id="tab-login">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" class="input" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <div class="inline-flex" style="justify-content: space-between;">
+          <label for="password">Password</label>
+          <a href="#" class="forgot-link">Forgot?</a>
+        </div>
+        <input type="password" id="password" class="input" placeholder="Enter your password" />
+      </div>
+      <button class="btn btn-primary" onclick="handleSignIn()">Sign in</button>
+
+      <div class="divider">or continue with</div>
+
+      <div class="social-row">
+        <button class="btn btn-outline btn-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M22 5l-10 7L2 5"/></svg>
+          Google
+        </button>
+        <button class="btn btn-outline btn-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 016-6v6a6 6 0 01-6 6"/><path d="M2 16a6 6 0 016-6v6a6 6 0 01-6 6"/><circle cx="8" cy="8" r="2"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="8" r="2"/></svg>
+          GitHub
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        No account yet? <a href="#" onclick="switchTab('register'); return false;">Create one</a>
+      </div>
+    </div>
+
+    <!-- Register -->
+    <div class="tab-content" id="tab-register">
+      <div class="field">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" class="input" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label for="reg-username">Username</label>
+        <input type="text" id="reg-username" class="input" placeholder="yourusername" />
+      </div>
+      <div class="field">
+        <label for="reg-password">Password</label>
+        <input type="password" id="reg-password" class="input" placeholder="At least 8 characters" />
+      </div>
+      <div class="checkbox-field">
+        <input type="checkbox" id="terms" />
+        <label for="terms">I agree to the Terms of Service and Privacy Policy</label>
+      </div>
+      <button class="btn btn-primary" onclick="handleRegister()">Create account</button>
+
+      <div class="divider">or continue with</div>
+
+      <div class="social-row">
+        <button class="btn btn-outline btn-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M22 5l-10 7L2 5"/></svg>
+          Google
+        </button>
+        <button class="btn btn-outline btn-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 016-6v6a6 6 0 01-6 6"/><path d="M2 16a6 6 0 016-6v6a6 6 0 01-6 6"/><circle cx="8" cy="8" r="2"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="8" r="2"/></svg>
+          GitHub
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        Already have an account? <a href="#" onclick="switchTab('login'); return false;">Sign in</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+      document.getElementById(`tab-${tabId}`).classList.add('active');
+    }
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    function handleSignIn() {
+      const email = document.getElementById('email').value.trim();
+      if (!email) {
+        alert('Please enter your email.');
+        return;
+      }
+      window.location.href = 'app.html';
+    }
+    function handleRegister() {
+      const email = document.getElementById('reg-email').value.trim();
+      const terms = document.getElementById('terms').checked;
+      if (!email) {
+        alert('Please enter your email.');
+        return;
+      }
+      if (!terms) {
+        alert('Please agree to the Terms of Service.');
+        return;
+      }
+      window.location.href = 'app.html';
+    }
+  </script>
+</body>
+</html>

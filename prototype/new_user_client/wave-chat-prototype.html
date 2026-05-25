@@ -1,0 +1,204 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wave · social chat</title>
+  <style>
+    :root {
+      --bg:      #0b0b14;
+      --surface: #141420;
+      --fg:      #ececf1;
+      --muted:   #8b8b9e;
+      --border:  #262636;
+      --accent:  #7c5cfc;
+      --accent-soft: color-mix(in oklch, var(--accent) 18%, transparent);
+      --accent-pink: #e85d9a;
+      --accent-green: #3ba55d;
+      --accent-soft-pink: color-mix(in oklch, var(--accent-pink) 18%, transparent);
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      --radius: 12px;
+      --radius-lg: 18px;
+      --radius-full: 9999px;
+      --container: 1120px;
+      --gutter: 32px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+
+    .container { max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
+    .section { padding-block: clamp(48px, 8vw, 96px); }
+
+    .h1 { font-family: var(--font-display); font-size: clamp(36px, 5vw, 60px); line-height: 1.08; letter-spacing: -0.025em; margin: 0; }
+    .h2 { font-family: var(--font-display); font-size: clamp(28px, 3.5vw, 42px); line-height: 1.12; letter-spacing: -0.02em; margin: 0; }
+    .h3 { font-size: 20px; font-weight: 600; line-height: 1.3; margin: 0; }
+    .lead { font-size: 18px; line-height: 1.5; color: var(--muted); max-width: 56ch; margin: 16px 0 0; }
+    .meta { font-size: 13px; color: var(--muted); font-family: var(--font-mono); }
+
+    .row-between { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    @media (max-width: 840px) { .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 22px; border-radius: var(--radius-full);
+      border: 1px solid transparent;
+      font-size: 15px; font-weight: 500;
+      transition: transform 0.05s ease, background 0.15s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 88%, black); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--fg); color: var(--fg); }
+
+    .hero {
+      min-height: 60vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 30%, color-mix(in oklch, var(--accent) 10%, transparent), transparent);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 1; max-width: 600px; }
+    .hero .logo-icon {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+      border-radius: 18px;
+      display: grid; place-items: center;
+      margin: 0 auto 24px;
+      font-size: 28px; color: #fff; font-weight: 700;
+    }
+    .hero h1 { margin-bottom: 12px; }
+    .hero .lead { margin-inline: auto; }
+
+    .screen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+    .screen-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+      display: block;
+    }
+    .screen-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .screen-card-preview {
+      height: 180px;
+      background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 8%, var(--surface)), color-mix(in oklch, var(--accent-pink) 6%, var(--surface)));
+      display: grid; place-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .screen-card-preview svg { width: 48px; height: 48px; opacity: 0.5; }
+    .screen-card-body { padding: 20px; }
+    .screen-card-body h3 { font-size: 17px; margin-bottom: 4px; }
+    .screen-card-body p { font-size: 14px; color: var(--muted); margin: 0; }
+    .screen-card-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px; font-weight: 500;
+      background: var(--accent-soft);
+      color: var(--accent);
+      margin-top: 12px;
+    }
+
+    .pagefoot { padding-block: 48px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <div class="hero-content">
+      <div class="logo-icon">W</div>
+      <h1 class="h1">Wave</h1>
+      <p class="lead">A social chat space where conversations flow naturally — channels, threads, and the people you care about.</p>
+      <div style="margin-top: 32px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <a href="landing.html" class="btn btn-primary">Marketing site →</a>
+        <a href="login.html" class="btn btn-ghost">Open app →</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="h2" style="margin-bottom: 8px;">Explore the prototype</h2>
+      <p class="lead" style="margin-bottom: 40px;">Each screen is a standalone HTML file — open any to jump in.</p>
+      <div class="screen-grid">
+        <a href="landing.html" class="screen-card">
+          <div class="screen-card-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="screen-card-body">
+            <h3>Landing page</h3>
+            <p>Marketing site — hero, features, CTA.</p>
+            <span class="screen-card-tag">Marketing</span>
+          </div>
+        </a>
+        <a href="login.html" class="screen-card">
+          <div class="screen-card-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div class="screen-card-body">
+            <h3>Login / Auth</h3>
+            <p>Sign in or create a new account.</p>
+            <span class="screen-card-tag">Auth</span>
+          </div>
+        </a>
+        <a href="app.html" class="screen-card">
+          <div class="screen-card-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="screen-card-body">
+            <h3>Chat app</h3>
+            <p>Channel sidebar + conversation + message input.</p>
+            <span class="screen-card-tag">Core</span>
+          </div>
+        </a>
+        <a href="thread.html" class="screen-card">
+          <div class="screen-card-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 12a5 5 0 01-5 5M7 12a5 5 0 015-5"/><path d="M12 17a5 5 0 005-5M12 7a5 5 0 00-5 5"/></svg>
+          </div>
+          <div class="screen-card-body">
+            <h3>Thread view</h3>
+            <p>Inline threaded replies on messages.</p>
+            <span class="screen-card-tag">Detail</span>
+          </div>
+        </a>
+        <a href="profile.html" class="screen-card">
+          <div class="screen-card-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="screen-card-body">
+            <h3>User profile</h3>
+            <p>Profile info, status, preferences.</p>
+            <span class="screen-card-tag">Account</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="pagefoot">
+    <div class="container">Wave · social chat prototype · Open Design</div>
+  </footer>
+</body>
+</html>

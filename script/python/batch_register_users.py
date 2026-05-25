@@ -142,7 +142,7 @@ def batch_register_users(base_url: str, start_num: int = 1, count: int = 10, ski
         current_num += 1
         
         # 添加短暂延迟，避免请求过快
-        time.sleep(0.2)
+        time.sleep(0.02)
     
     return results
 

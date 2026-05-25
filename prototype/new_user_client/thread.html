@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thread · Wave</title>
+  <style>
+    :root {
+      --bg:          #0b0b14;
+      --sidebar-bg:  #11111c;
+      --surface:     #141420;
+      --fg:          #ececf1;
+      --muted:       #8b8b9e;
+      --border:      #262636;
+      --accent:      #7c5cfc;
+      --accent-soft: color-mix(in oklch, var(--accent) 20%, transparent);
+      --accent-pink: #e85d9a;
+      --accent-green: #3ba55d;
+      --accent-orange: #f09042;
+      --accent-blue:  #4a9eff;
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --mention-bg:  color-mix(in oklch, var(--accent) 14%, transparent);
+      --message-hover: color-mix(in oklch, var(--fg) 3%, transparent);
+      --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      --radius: 8px;
+      --radius-full: 9999px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      overflow: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    p { margin: 0; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    .back-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px;
+      background: color-mix(in oklch, var(--bg) 95%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .back-bar a {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--muted);
+    }
+    .back-bar a:hover { color: var(--fg); }
+    .back-bar svg { width: 18px; height: 18px; }
+
+    .thread-container {
+      max-width: 800px;
+      width: 100%;
+      margin: 60px auto 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .thread-original {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 12px;
+    }
+    .thread-avatar {
+      width: 40px; height: 40px; min-width: 40px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 16px; font-weight: 600; color: #fff;
+    }
+    .thread-original-body { flex: 1; min-width: 0; }
+    .thread-original-header {
+      display: flex; align-items: baseline; gap: 8px;
+      margin-bottom: 4px;
+    }
+    .thread-original-header .name { font-weight: 600; }
+    .thread-original-header .time { font-size: 12px; color: var(--muted); }
+    .thread-original-header .channel { font-size: 12px; color: var(--accent); }
+    .thread-original-content { font-size: 15px; line-height: 1.5; }
+
+    .thread-replies {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .reply {
+      display: flex; gap: 12px;
+      padding: 8px 20px;
+      transition: background 0.1s;
+    }
+    .reply:hover { background: var(--message-hover); }
+
+    .reply-avatar {
+      width: 36px; height: 36px; min-width: 36px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 14px; font-weight: 600; color: #fff;
+      margin-top: 2px;
+    }
+    .reply-body { flex: 1; min-width: 0; }
+    .reply-header {
+      display: flex; align-items: baseline; gap: 8px;
+      margin-bottom: 2px;
+    }
+    .reply-header .name { font-size: 14px; font-weight: 600; }
+    .reply-header .time { font-size: 11px; color: var(--muted); }
+    .reply-header .badge {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      padding: 1px 6px; border-radius: 4px;
+    }
+    .reply-content { font-size: 14px; line-height: 1.5; }
+    .reply-content .mention {
+      background: var(--mention-bg);
+      color: var(--accent);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    .reply-actions {
+      display: flex; gap: 12px; margin-top: 4px;
+      font-size: 12px; color: var(--muted);
+    }
+    .reply-actions span { cursor: pointer; }
+    .reply-actions span:hover { color: var(--fg); }
+    .reply-reactions {
+      display: flex; gap: 3px; margin-top: 4px;
+    }
+    .reply-reactions .reaction {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 1px 6px; border-radius: var(--radius-full);
+      background: var(--accent-soft); font-size: 12px; cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .reply-reactions .reaction:hover { border-color: var(--accent); }
+
+    .thread-input-area {
+      padding: 12px 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .thread-input-wrapper {
+      display: flex; align-items: flex-end; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 8px;
+    }
+    .thread-input-wrapper:focus-within { border-color: var(--accent); }
+    .thread-input-wrapper textarea {
+      flex: 1;
+      background: none; border: none; color: var(--fg);
+      font: inherit; font-size: 14px;
+      padding: 8px 4px;
+      resize: none;
+      max-height: 120px;
+      line-height: 1.4;
+    }
+    .thread-input-wrapper textarea:focus { outline: none; }
+    .thread-input-wrapper textarea::placeholder { color: var(--muted); }
+    .thread-input-tools button {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 6px; border-radius: 6px;
+      display: grid; place-items: center;
+    }
+    .thread-input-tools button:hover { color: var(--fg); background: var(--message-hover); }
+    .thread-input-tools svg { width: 18px; height: 18px; }
+
+    .thread-side-info {
+      width: 320px; min-width: 320px;
+      background: var(--sidebar-bg);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+    }
+    .side-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .side-header h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .side-header p { font-size: 13px; color: var(--muted); }
+    .side-messages { flex: 1; overflow-y: auto; padding: 12px; }
+
+    @media (max-width: 900px) {
+      .thread-side-info { display: none; }
+    }
+    @media (max-width: 640px) {
+      .thread-container { margin-top: 52px; }
+      .back-bar { padding: 8px 12px; font-size: 13px; }
+      .thread-original { padding: 16px 12px; }
+      .reply { padding: 8px 12px; }
+      .thread-input-area { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="back-bar">
+    <a href="app.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to #general
+    </a>
+  </div>
+
+  <div class="thread-container">
+    <!-- Original message -->
+    <div class="thread-original">
+      <div class="thread-avatar" style="background: var(--accent);">A</div>
+      <div class="thread-original-body">
+        <div class="thread-original-header">
+          <span class="name">alex</span>
+          <span class="time">9:42 AM</span>
+          <span class="channel">in #general</span>
+        </div>
+        <div class="thread-original-content">
+          <p>Hey team! 🎉 Just pushed the new design system updates to staging. Would love for everyone to take a look before we ship it live.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Replies -->
+    <div class="thread-replies">
+      <div class="reply">
+        <div class="reply-avatar" style="background: var(--accent-green);">J</div>
+        <div class="reply-body">
+          <div class="reply-header">
+            <span class="name">jordan</span>
+            <span class="time">9:48 AM</span>
+          </div>
+          <div class="reply-content">
+            <p>Looking great! I noticed the button component's hover state is a bit subtle — might want to bump the contrast there. Otherwise ship it! 🚀</p>
+          </div>
+          <div class="reply-actions">
+            <span>Reply</span>
+            <span>React 😊</span>
+            <span>Share</span>
+          </div>
+          <div class="reply-reactions">
+            <span class="reaction">👍 3</span>
+            <span class="reaction">🔥 1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reply">
+        <div class="reply-avatar" style="background: var(--accent-pink);">M</div>
+        <div class="reply-body">
+          <div class="reply-header">
+            <span class="name">mira</span>
+            <span class="time">9:55 AM</span>
+            <span class="badge" style="background: var(--accent-soft); color: var(--accent);">op</span>
+          </div>
+          <div class="reply-content">
+            <p>Agreed with <span class="mention">@jordan</span>! Also the <span class="mention">@alex</span> spacing on mobile cards feels a bit tight. I left a comment in Figma.</p>
+          </div>
+          <div class="reply-actions">
+            <span>Reply</span>
+            <span>React 😊</span>
+            <span>Share</span>
+          </div>
+          <div class="reply-reactions">
+            <span class="reaction">👀 4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reply">
+        <div class="reply-avatar" style="background: var(--accent-blue);">K</div>
+        <div class="reply-body">
+          <div class="reply-header">
+            <span class="name">kaito</span>
+            <span class="time">10:12 AM</span>
+          </div>
+          <div class="reply-content">
+            <p>Tested on staging — looks solid on Chrome and Safari. There's a minor layout shift on Firefox at 1024px, but I think it's just a missing <span class="mention">@supports</span> query. I can patch that today.</p>
+          </div>
+          <div class="reply-actions">
+            <span>Reply</span>
+            <span>React 😊</span>
+            <span>Share</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reply">
+        <div class="reply-avatar" style="background: var(--accent-orange);">T</div>
+        <div class="reply-body">
+          <div class="reply-header">
+            <span class="name">taylor</span>
+            <span class="time">10:28 AM</span>
+          </div>
+          <div class="reply-content">
+            <p>I can help with the Firefox fix after standup. Also — should we update the changelog before pushing or do it after?</p>
+          </div>
+          <div class="reply-actions">
+            <span>Reply</span>
+            <span>React 😊</span>
+            <span>Share</span>
+          </div>
+          <div class="reply-reactions">
+            <span class="reaction">💯 2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reply">
+        <div class="reply-avatar" style="background: var(--accent);">A</div>
+        <div class="reply-body">
+          <div class="reply-header">
+            <span class="name">alex</span>
+            <span class="time">10:35 AM</span>
+            <span class="badge" style="background: var(--accent-soft); color: var(--accent);">op</span>
+          </div>
+          <div class="reply-content">
+            <p>Great feedback everyone! <span class="mention">@kaito</span> go for it on the Firefox fix. <span class="mention">@taylor</span> let's do the changelog post-launch this time — I want to ship by EOD. I'll address the button hover and spacing comments.</p>
+          </div>
+          <div class="reply-actions">
+            <span>Reply</span>
+            <span>React 😊</span>
+            <span>Share</span>
+          </div>
+          <div class="reply-reactions">
+            <span class="reaction">🎉 6</span>
+            <span class="reaction">🔥 3</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reply" style="opacity: 0.6;">
+        <div class="reply-avatar" style="background: var(--accent); width: 28px; height: 28px; min-width: 28px; font-size: 12px;">W</div>
+        <div class="reply-body">
+          <div class="reply-header">
+            <span class="name" style="font-size: 13px;">Wave Bot</span>
+            <span class="time">10:36 AM</span>
+          </div>
+          <div class="reply-content" style="font-size: 13px; color: var(--muted);">
+            <p>Thread marked as resolved by <strong>alex</strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reply input -->
+    <div class="thread-input-area">
+      <div class="thread-input-wrapper">
+        <div class="thread-input-tools">
+          <button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          </button>
+        </div>
+        <textarea placeholder="Reply to this thread…" rows="1"></textarea>
+        <div class="thread-input-tools">
+          <button style="color: var(--accent);">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side info panel -->
+  <aside class="thread-side-info">
+    <div class="side-header">
+      <h2>Thread details</h2>
+      <p>Design system updates · #general</p>
+    </div>
+    <div class="side-messages">
+      <div style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span>Started by</span>
+          <span style="color: var(--fg);">alex</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span>Participants</span>
+          <span style="color: var(--fg);">5</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span>Replies</span>
+          <span style="color: var(--fg);">6</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Last reply</span>
+          <span style="color: var(--fg);">10:36 AM</span>
+        </div>
+      </div>
+      <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+        <p style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Participants</p>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; font-size: 11px; color: #fff; font-weight: 600;">A</span>
+            <span style="font-size: 14px;">alex</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-green); display: grid; place-items: center; font-size: 11px; color: #fff; font-weight: 600;">J</span>
+            <span style="font-size: 14px;">jordan</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-pink); display: grid; place-items: center; font-size: 11px; color: #fff; font-weight: 600;">M</span>
+            <span style="font-size: 14px;">mira</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-blue); display: grid; place-items: center; font-size: 11px; color: #fff; font-weight: 600;">K</span>
+            <span style="font-size: 14px;">kaito</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-orange); display: grid; place-items: center; font-size: 11px; color: #fff; font-weight: 600;">T</span>
+            <span style="font-size: 14px;">taylor</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    const ta = document.querySelector('.thread-input-wrapper textarea');
+    if (ta) {
+      ta.addEventListener('input', () => {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+      });
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const val = ta.value.trim();
+          if (val) {
+            ta.value = '';
+            ta.style.height = 'auto';
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

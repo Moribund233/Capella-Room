@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>#general · Wave</title>
+  <style>
+    :root {
+      --bg:          #0b0b14;
+      --sidebar-bg:  #11111c;
+      --surface:     #141420;
+      --fg:          #ececf1;
+      --muted:       #8b8b9e;
+      --border:      #262636;
+      --accent:      #7c5cfc;
+      --accent-soft: color-mix(in oklch, var(--accent) 20%, transparent);
+      --accent-pink: #e85d9a;
+      --accent-green: #3ba55d;
+      --accent-orange: #f09042;
+      --accent-blue:  #4a9eff;
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --mention-bg:  color-mix(in oklch, var(--accent) 14%, transparent);
+      --message-hover: color-mix(in oklch, var(--fg) 3%, transparent);
+      --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      --radius: 8px;
+      --radius-full: 9999px;
+      --sidebar-w: 260px;
+      --header-h: 52px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      overflow: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; }
+    p { margin: 0; }
+
+    /* ─── scrollbar ─── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ─── sidebar ─── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+    .sidebar-header {
+      height: var(--header-h);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-display);
+      font-size: 16px; font-weight: 600;
+      cursor: pointer;
+    }
+    .sidebar-header:hover { background: var(--message-hover); }
+    .sidebar-header svg { width: 16px; height: 16px; color: var(--muted); }
+
+    .sidebar-search {
+      padding: 12px;
+    }
+    .sidebar-search input {
+      width: 100%;
+      padding: 8px 12px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--fg);
+      font: inherit;
+      font-size: 13px;
+    }
+    .sidebar-search input::placeholder { color: var(--muted); }
+    .sidebar-search input:focus { outline: 1px solid var(--accent); }
+
+    .channel-category {
+      padding: 16px 16px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer;
+    }
+    .channel-category:hover { color: var(--fg); }
+
+    .channels { flex: 1; overflow-y: auto; padding: 4px 8px; }
+
+    .channel {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 12px;
+      border-radius: var(--radius);
+      font-size: 15px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .channel:hover { background: var(--message-hover); color: var(--fg); }
+    .channel.active { background: var(--accent-soft); color: var(--fg); }
+    .channel.active .channel-hash { color: var(--accent); }
+    .channel-hash { color: var(--muted); opacity: 0.6; font-weight: 300; }
+    .channel-name { flex: 1; }
+    .channel-badge {
+      background: var(--accent); color: #fff;
+      font-size: 11px; font-weight: 600;
+      padding: 1px 7px; border-radius: var(--radius-full);
+      min-width: 20px; text-align: center;
+    }
+    .channel-lock svg { width: 14px; height: 14px; opacity: 0.5; }
+
+    .user-section {
+      border-top: 1px solid var(--border);
+      padding: 10px 12px;
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer;
+    }
+    .user-section:hover { background: var(--message-hover); }
+    .user-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+      display: grid; place-items: center;
+      font-size: 14px; font-weight: 600; color: #fff;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .user-avatar .status-dot {
+      position: absolute; bottom: 0; right: 0;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      border: 2px solid var(--sidebar-bg);
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-info .name { font-size: 14px; font-weight: 600; }
+    .user-info .status { font-size: 12px; color: var(--muted); }
+    .user-controls { display: flex; gap: 6px; }
+    .user-controls button {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 4px; border-radius: 4px;
+      display: grid; place-items: center;
+    }
+    .user-controls button:hover { color: var(--fg); background: var(--message-hover); }
+    .user-controls svg { width: 18px; height: 18px; }
+
+    /* ─── main content ─── */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    .chat-header {
+      height: var(--header-h);
+      display: flex; align-items: center;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+    .chat-header .channel-info { display: flex; align-items: center; gap: 8px; }
+    .chat-header .channel-name { font-size: 16px; font-weight: 600; }
+    .chat-header .channel-topic { font-size: 13px; color: var(--muted); }
+    .chat-header .channel-hash { color: var(--muted); font-weight: 300; }
+    .chat-header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .header-btn {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 6px; border-radius: 6px;
+      display: grid; place-items: center;
+    }
+    .header-btn:hover { color: var(--fg); background: var(--message-hover); }
+    .header-btn svg { width: 20px; height: 20px; }
+
+    .member-avatars { display: flex; }
+    .member-avatars .mini-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+      margin-left: -6px;
+      display: grid; place-items: center;
+      font-size: 11px; font-weight: 600; color: #fff;
+    }
+    .member-avatars .mini-avatar:first-child { margin-left: 0; }
+    .member-count { font-size: 13px; color: var(--muted); }
+
+    .search-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 12px;
+    }
+    .search-bar input {
+      background: none; border: none; color: var(--fg);
+      font: inherit; font-size: 13px; width: 140px;
+      padding: 4px 0;
+    }
+    .search-bar input::placeholder { color: var(--muted); }
+    .search-bar input:focus { outline: none; }
+    .search-bar svg { width: 16px; height: 16px; color: var(--muted); }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px 8px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .message-divider {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+      padding-top: 8px;
+    }
+    .message-divider span {
+      background: var(--bg);
+      padding: 0 12px;
+      position: relative;
+      top: -16px;
+    }
+
+    .message {
+      display: flex; gap: 12px;
+      padding: 6px 12px;
+      border-radius: var(--radius);
+      transition: background 0.1s;
+      position: relative;
+    }
+    .message:hover { background: var(--message-hover); }
+    .message:hover .message-actions { opacity: 1; }
+
+    .message-avatar {
+      width: 40px; height: 40px; min-width: 40px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 16px; font-weight: 600; color: #fff;
+      margin-top: 2px;
+    }
+
+    .message-body { flex: 1; min-width: 0; }
+    .message-header {
+      display: flex; align-items: baseline; gap: 8px;
+      margin-bottom: 2px;
+    }
+    .message-author { font-size: 15px; font-weight: 600; }
+    .message-author:hover { text-decoration: underline; cursor: pointer; }
+    .message-timestamp { font-size: 11px; color: var(--muted); }
+    .message-content { font-size: 15px; line-height: 1.5; }
+    .message-content p { margin: 0; }
+    .message-content .mention {
+      background: var(--mention-bg);
+      color: var(--accent);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    .message-actions {
+      position: absolute; right: 12px; top: 0;
+      display: flex; gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2px;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .message-actions button {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 4px 6px; border-radius: 4px;
+      font-size: 13px; display: flex; align-items: center; gap: 4px;
+    }
+    .message-actions button:hover { color: var(--fg); background: var(--message-hover); }
+    .message-actions svg { width: 16px; height: 16px; }
+
+    .message-reactions {
+      display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;
+    }
+    .reaction {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      background: var(--accent-soft);
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .reaction:hover { border-color: var(--accent); }
+    .reaction.active { background: var(--mention-bg); border-color: var(--accent); }
+    .reaction-count { font-size: 12px; color: var(--muted); }
+
+    .message-attachment {
+      margin-top: 8px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    .message-attachment:hover { border-color: var(--muted); }
+    .attachment-icon { width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; }
+    .attachment-info { flex: 1; }
+    .attachment-name { font-size: 14px; font-weight: 500; }
+    .attachment-size { font-size: 12px; color: var(--muted); }
+
+    .message-thread-preview {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--accent);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .message-thread-preview:hover { text-decoration: underline; }
+
+    .new-message-bar {
+      display: flex; align-items: center; gap: 4px;
+      padding: 2px 0;
+      font-size: 12px; color: var(--accent);
+      cursor: pointer;
+      opacity: 0;
+    }
+    .new-message-bar:hover { opacity: 1; }
+
+    /* ─── message input ─── */
+    .input-area {
+      padding: 0 20px 20px;
+      margin-top: auto;
+    }
+    .input-wrapper {
+      display: flex; align-items: flex-end; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 8px;
+      transition: border-color 0.15s;
+    }
+    .input-wrapper:focus-within { border-color: var(--accent); }
+    .input-wrapper textarea {
+      flex: 1;
+      background: none; border: none; color: var(--fg);
+      font: inherit; font-size: 15px;
+      padding: 8px 4px;
+      resize: none;
+      max-height: 144px;
+      line-height: 1.4;
+    }
+    .input-wrapper textarea:focus { outline: none; }
+    .input-wrapper textarea::placeholder { color: var(--muted); }
+    .input-tools { display: flex; align-items: center; gap: 2px; }
+    .input-tools button {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 6px; border-radius: 6px;
+      display: grid; place-items: center;
+    }
+    .input-tools button:hover { color: var(--fg); background: var(--message-hover); }
+    .input-tools svg { width: 20px; height: 20px; }
+
+    /* ─── right panel toggle ─── */
+    .right-panel {
+      width: 280px; min-width: 280px;
+      background: var(--sidebar-bg);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+    }
+    .panel-header {
+      height: var(--header-h);
+      display: flex; align-items: center;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600; font-size: 14px;
+    }
+    .member-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .member-group { margin-bottom: 16px; }
+    .member-group-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted);
+      padding: 8px 8px 4px;
+    }
+    .member-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 8px;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    .member-item:hover { background: var(--message-hover); }
+    .member-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .member-item .name { font-size: 14px; flex: 1; }
+    .member-item .role-tag {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 4px;
+    }
+
+    /* ─── responsive ─── */
+    @media (max-width: 860px) { .right-panel { display: none; } }
+    @media (max-width: 640px) {
+      .sidebar { display: none; }
+      .sidebar.open {
+        display: flex;
+        position: fixed; left: 0; top: 0; bottom: 0; z-index: 20;
+        box-shadow: 0 0 40px rgba(0,0,0,0.5);
+      }
+      .chat-header { padding: 0 12px; }
+      .messages { padding: 12px; }
+      .input-area { padding: 0 12px 12px; }
+      .search-bar { display: none; }
+    }
+
+    .mobile-toggle {
+      display: none;
+      background: none; border: none; color: var(--muted);
+      padding: 6px; border-radius: 6px; cursor: pointer;
+    }
+    .mobile-toggle svg { width: 22px; height: 22px; }
+    @media (max-width: 640px) { .mobile-toggle { display: grid; place-items: center; } }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Sidebar ─── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header" onclick="window.location.href='index.html'">
+      <span>Wave Community</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" placeholder="Find a channel…" />
+    </div>
+    <div class="channels">
+      <div class="channel-category">
+        <span>Channels</span>
+        <span>+</span>
+      </div>
+      <div class="channel active">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">general</span>
+        <span class="channel-badge">3</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">introductions</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">random</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">show-and-tell</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">events</span>
+        <span class="channel-badge">5</span>
+      </div>
+
+      <div class="channel-category">
+        <span>Projects</span>
+        <span>+</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">design-system</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">frontend</span>
+      </div>
+      <div class="channel">
+        <span class="channel-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
+        <span class="channel-name">backend</span>
+      </div>
+      <div class="channel">
+        <span class="channel-hash">#</span>
+        <span class="channel-name">product-feedback</span>
+      </div>
+    </div>
+
+    <div class="user-section" onclick="window.location.href='profile.html'">
+      <div class="user-avatar">
+        A
+        <span class="status-dot"></span>
+      </div>
+      <div class="user-info">
+        <div class="name">alex</div>
+        <div class="status">Online</div>
+      </div>
+      <div class="user-controls">
+        <button title="Mute" onclick="event.stopPropagation();">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+        </button>
+        <button title="Settings" onclick="event.stopPropagation();">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── Main chat ─── -->
+  <div class="main">
+    <div class="chat-header">
+      <button class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="channel-info">
+        <span class="channel-hash" style="font-size: 20px;">#</span>
+        <span class="channel-name">general</span>
+        <span class="channel-topic">·  Community updates &amp; announcements</span>
+      </div>
+      <div class="chat-header-right">
+        <div class="member-avatars">
+          <div class="mini-avatar" style="background: var(--accent);">A</div>
+          <div class="mini-avatar" style="background: var(--accent-pink);">M</div>
+          <div class="mini-avatar" style="background: var(--accent-green);">J</div>
+          <div class="mini-avatar" style="background: var(--accent-orange);">T</div>
+          <div class="mini-avatar" style="background: var(--accent-blue);">K</div>
+        </div>
+        <span class="member-count">18 online</span>
+        <button class="header-btn" title="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="header-btn" title="Threads" onclick="window.location.href='thread.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 12a5 5 0 01-5 5M7 12a5 5 0 015-5"/><path d="M12 17a5 5 0 005-5M12 7a5 5 0 00-5 5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="message-divider"><span>Today</span></div>
+
+      <!-- message 1 -->
+      <div class="message">
+        <div class="message-avatar" style="background: var(--accent);">A</div>
+        <div class="message-body">
+          <div class="message-header">
+            <span class="message-author">alex</span>
+            <span class="message-timestamp">9:42 AM</span>
+          </div>
+          <div class="message-content">
+            <p>Hey team! 🎉 Just pushed the new design system updates to staging. Would love for everyone to take a look before we ship it live.</p>
+          </div>
+          <div class="message-reactions">
+            <span class="reaction active">🔥 <span class="reaction-count">5</span></span>
+            <span class="reaction">🎉 <span class="reaction-count">3</span></span>
+            <span class="reaction">👍 <span class="reaction-count">8</span></span>
+          </div>
+          <a href="thread.html" class="message-thread-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M17 12a5 5 0 01-5 5M7 12a5 5 0 015-5"/><path d="M12 17a5 5 0 005-5M12 7a5 5 0 00-5 5"/></svg>
+            6 replies · Last reply by mira
+          </a>
+          <div class="message-actions">
+            <button title="Add reaction">😊</button>
+            <button title="Reply" onclick="window.location.href='thread.html'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </button>
+            <button title="More">⋯</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- message 2 -->
+      <div class="message">
+        <div class="message-avatar" style="background: var(--accent-pink);">M</div>
+        <div class="message-body">
+          <div class="message-header">
+            <span class="message-author">mira</span>
+            <span class="message-timestamp">10:15 AM</span>
+          </div>
+          <div class="message-content">
+            <p>The new color tokens look amazing! One thing — the <span class="mention">@alex</span> secondary accent might need a touch more contrast against the surface. Let me share a quick mockup.</p>
+          </div>
+          <div class="message-attachment">
+            <div class="attachment-icon" style="background: var(--accent-soft); color: var(--accent);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="attachment-info">
+              <div class="attachment-name">color-tokens-v2.png</div>
+              <div class="attachment-size">1.2 MB · PNG</div>
+            </div>
+          </div>
+          <div class="message-reactions">
+            <span class="reaction">👀 <span class="reaction-count">2</span></span>
+          </div>
+          <div class="message-actions">
+            <button title="Add reaction">😊</button>
+            <button title="Reply">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </button>
+            <button title="More">⋯</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- message 3 -->
+      <div class="message">
+        <div class="message-avatar" style="background: var(--accent-green);">J</div>
+        <div class="message-body">
+          <div class="message-header">
+            <span class="message-author">jordan</span>
+            <span class="message-timestamp">10:32 AM</span>
+          </div>
+          <div class="message-content">
+            <p>Agreed! Also, should we add a dark mode toggle to the settings? Some folks were asking about it in #product-feedback.</p>
+          </div>
+          <div class="message-reactions">
+            <span class="reaction">+1 <span class="reaction-count">12</span></span>
+          </div>
+          <a href="thread.html" class="message-thread-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M17 12a5 5 0 01-5 5M7 12a5 5 0 015-5"/><path d="M12 17a5 5 0 005-5M12 7a5 5 0 00-5 5"/></svg>
+            3 replies
+          </a>
+          <div class="message-actions">
+            <button title="Add reaction">😊</button>
+            <button title="Reply">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </button>
+            <button title="More">⋯</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- message 4 -->
+      <div class="message">
+        <div class="message-avatar" style="background: var(--accent-orange);">T</div>
+        <div class="message-body">
+          <div class="message-header">
+            <span class="message-author">taylor</span>
+            <span class="message-timestamp">11:04 AM</span>
+          </div>
+          <div class="message-content">
+            <p>I've started working on the mobile responsive layout. Planning to have a first draft by end of week. The sidebar collapse is looking clean so far!</p>
+          </div>
+          <div class="message-actions">
+            <button title="Add reaction">😊</button>
+            <button title="Reply">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </button>
+            <button title="More">⋯</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- system message -->
+      <div class="message" style="opacity: 0.7;">
+        <div class="message-avatar" style="background: var(--accent); font-size: 12px; width: 28px; height: 28px; min-width: 28px;">W</div>
+        <div class="message-body">
+          <div class="message-header">
+            <span class="message-author" style="font-size: 13px; color: var(--muted);">Wave Bot</span>
+            <span class="message-timestamp">11:15 AM</span>
+          </div>
+          <div class="message-content" style="font-size: 14px; color: var(--muted);">
+            <p>Reminder: Design sync at 2 PM today in the Events channel.</p>
+          </div>
+          <div class="message-actions">
+            <button title="Add reaction">😊</button>
+            <button title="Reply">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrapper">
+        <div class="input-tools">
+          <button title="Upload file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </button>
+          <button title="Emoji">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          </button>
+        </div>
+        <textarea placeholder="Message #general …" rows="1"></textarea>
+        <div class="input-tools">
+          <button title="GIF">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12h6"/></svg>
+          </button>
+          <button title="Send" style="color: var(--accent);">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Right panel ─── -->
+  <aside class="right-panel">
+    <div class="panel-header">Members — 23</div>
+    <div class="member-list">
+      <div class="member-group">
+        <div class="member-group-label">Online — 18</div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">alex</span>
+          <span class="role-tag" style="color: var(--accent);">admin</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">mira</span>
+          <span class="role-tag" style="color: var(--accent-pink);">mod</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">jordan</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">taylor</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">sam</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">priya</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--accent-green);"></span>
+          <span class="name">kaito</span>
+        </div>
+      </div>
+      <div class="member-group">
+        <div class="member-group-label">Offline — 5</div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--muted);"></span>
+          <span class="name">chris</span>
+        </div>
+        <div class="member-item">
+          <span class="member-dot" style="background: var(--muted);"></span>
+          <span class="name">nina</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    // Auto-resize textarea
+    const ta = document.querySelector('.input-wrapper textarea');
+    if (ta) {
+      ta.addEventListener('input', () => {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 144) + 'px';
+      });
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const val = ta.value.trim();
+          if (val) {
+            // Simulate sending
+            ta.value = '';
+            ta.style.height = 'auto';
+          }
+        }
+      });
+    }
+    // Close sidebar on mobile when clicking outside
+    document.addEventListener('click', (e) => {
+      const sidebar = document.getElementById('sidebar');
+      const toggle = document.querySelector('.mobile-toggle');
+      if (window.innerWidth <= 640 && sidebar.classList.contains('open')) {
+        if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+          sidebar.classList.remove('open');
+        }
+      }
+    });
+  </script>
+</body>
+</html>
