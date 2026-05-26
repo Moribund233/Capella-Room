@@ -1,0 +1,198 @@
+// Element Plus 主题变量覆盖
+// 基于原型设计提取的配色方案
+
+// 主色调 - 紫色
+$--color-primary: #7c5cfc;
+$--color-primary-light-3: #9a85fd;
+$--color-primary-light-5: #b8aafe;
+$--color-primary-light-7: #d6d0ff;
+$--color-primary-light-8: #e5e2ff;
+$--color-primary-light-9: #f3f1ff;
+$--color-primary-dark-2: #634ad0;
+
+// 辅助色
+$--color-success: #3ba55d;
+$--color-warning: #f09042;
+$--color-danger: #e85d9a;
+$--color-info: #4a9eff;
+
+// 背景色
+$--color-bg: #0b0b14;
+$--color-surface: #141420;
+$--color-sidebar-bg: #11111c;
+
+// 文字色
+$--color-text-primary: #ececf1;
+$--color-text-regular: #ececf1;
+$--color-text-secondary: #8b8b9e;
+$--color-text-placeholder: #8b8b9e;
+
+// 边框色
+$--border-color-base: #262636;
+$--border-color-light: #2f2f42;
+$--border-color-lighter: #3a3a52;
+$--border-color-extra-light: #454560;
+
+// 填充色
+$--fill-color-base: #141420;
+$--fill-color-light: #1a1a2e;
+$--fill-color-lighter: #202036;
+$--fill-color-extra-light: #262640;
+
+// 圆角
+$--border-radius-base: 8px;
+$--border-radius-small: 6px;
+$--border-radius-round: 9999px;
+
+// 字体
+$--font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+$--font-family-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+$--font-family-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+// 暗黑模式变量
+html.dark {
+  --el-bg-color: #{$--color-bg};
+  --el-bg-color-page: #{$--color-bg};
+  --el-bg-color-overlay: #{$--color-surface};
+
+  --el-text-color-primary: #{$--color-text-primary};
+  --el-text-color-regular: #{$--color-text-regular};
+  --el-text-color-secondary: #{$--color-text-secondary};
+  --el-text-color-placeholder: #{$--color-text-placeholder};
+  --el-text-color-disabled: #6b6b7b;
+
+  --el-border-color: #{$--border-color-base};
+  --el-border-color-light: #{$--border-color-light};
+  --el-border-color-lighter: #{$--border-color-lighter};
+  --el-border-color-extra-light: #{$--border-color-extra-light};
+  --el-border-color-dark: #1a1a2e;
+  --el-border-color-darker: #11111c;
+
+  --el-fill-color: #{$--fill-color-base};
+  --el-fill-color-light: #{$--fill-color-light};
+  --el-fill-color-lighter: #{$--fill-color-lighter};
+  --el-fill-color-extra-light: #{$--fill-color-extra-light};
+  --el-fill-color-dark: #0f0f1a;
+  --el-fill-color-darker: #08080f;
+  --el-fill-color-blank: #{$--color-surface};
+
+  --el-color-primary: #{$--color-primary};
+  --el-color-primary-light-3: #{$--color-primary-light-3};
+  --el-color-primary-light-5: #{$--color-primary-light-5};
+  --el-color-primary-light-7: #{$--color-primary-light-7};
+  --el-color-primary-light-8: #{$--color-primary-light-8};
+  --el-color-primary-light-9: #{$--color-primary-light-9};
+  --el-color-primary-dark-2: #{$--color-primary-dark-2};
+
+  --el-color-success: #{$--color-success};
+  --el-color-warning: #{$--color-warning};
+  --el-color-danger: #{$--color-danger};
+  --el-color-info: #{$--color-info};
+}
+
+// CSS 变量定义（用于自定义组件）
+:root {
+  --wave-bg: #0b0b14;
+  --wave-surface: #141420;
+  --wave-sidebar-bg: #11111c;
+  --wave-fg: #ececf1;
+  --wave-muted: #8b8b9e;
+  --wave-border: #262636;
+  --wave-accent: #7c5cfc;
+  --wave-accent-soft: rgba(124, 92, 252, 0.18);
+  --wave-accent-pink: #e85d9a;
+  --wave-accent-green: #3ba55d;
+  --wave-accent-orange: #f09042;
+  --wave-accent-blue: #4a9eff;
+  --wave-fg-soft: rgba(236, 236, 241, 0.06);
+  --wave-mention-bg: rgba(124, 92, 252, 0.14);
+  --wave-message-hover: rgba(236, 236, 241, 0.03);
+
+  --wave-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  --wave-font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --wave-font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  --wave-radius: 8px;
+  --wave-radius-lg: 16px;
+  --wave-radius-full: 9999px;
+  --wave-sidebar-w: 260px;
+  --wave-header-h: 52px;
+}
+
+// 全局样式
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--wave-font-body);
+  background-color: var(--wave-bg);
+  color: var(--wave-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--wave-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wave-muted);
+}
+
+// Element Plus 组件覆盖
+.el-button {
+  font-weight: 500;
+
+  &--primary {
+    background: var(--wave-accent);
+    border-color: var(--wave-accent);
+
+    &:hover {
+      background: color-mix(in oklch, var(--wave-accent) 88%, black);
+      border-color: color-mix(in oklch, var(--wave-accent) 88%, black);
+    }
+  }
+}
+
+.el-input {
+  &__wrapper {
+    background-color: var(--wave-bg);
+    box-shadow: 0 0 0 1px var(--wave-border) inset;
+
+    &.is-focus {
+      box-shadow: 0 0 0 1px var(--wave-accent) inset;
+    }
+  }
+
+  &__inner {
+    color: var(--wave-fg);
+
+    &::placeholder {
+      color: var(--wave-muted);
+    }
+  }
+}
+
+.el-card {
+  background-color: var(--wave-surface);
+  border-color: var(--wave-border);
+}
+
+.el-menu {
+  background-color: transparent;
+  border-right: none;
+}
+
+.el-divider {
+  background-color: var(--wave-border);
+}

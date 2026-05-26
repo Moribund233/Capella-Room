@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "Wave",
+    "back": "Back",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning"
+  },
+  "nav": {
+    "signIn": "Sign in",
+    "getStarted": "Get started",
+    "features": "Features",
+    "community": "Community"
+  },
+  "landing": {
+    "hero": {
+      "eyebrow": "Social · Reimagined",
+      "title": "Where your community comes alive.",
+      "description": "Channels for every topic, threads that keep conversations organized, and a space that feels like home. Wave is the modern home for your community.",
+      "startFree": "Start for free",
+      "seeFeatures": "See features"
+    },
+    "features": {
+      "eyebrow": "Everything you need",
+      "title": "Built for real conversations.",
+      "channels": {
+        "title": "Topic-based channels",
+        "description": "Organize conversations by topic, project, or interest. Keep everything findable."
+      },
+      "threads": {
+        "title": "Threaded replies",
+        "description": "Reply in-thread to keep main channels clean. Threads stay attached to the original message."
+      },
+      "expressions": {
+        "title": "Rich expressions",
+        "description": "Reactions, mentions, file sharing, and inline media — express yourself freely."
+      }
+    },
+    "stats": {
+      "eyebrow": "Growing fast · 2026",
+      "communities": "active communities using Wave to stay connected.",
+      "messages": "messages sent daily across channels and threads.",
+      "satisfaction": "of members say conversations feel more organized."
+    },
+    "cta": {
+      "title": "Your community is waiting.",
+      "description": "Free for small communities. Premium plans for growing spaces.",
+      "getStarted": "Get started free",
+      "viewDemo": "View demo"
+    },
+    "footer": {
+      "copyright": "© Wave · Social spaces, reimagined"
+    }
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "username": "Username",
+    "forgotPassword": "Forgot?",
+    "orContinueWith": "or continue with",
+    "google": "Google",
+    "github": "GitHub",
+    "noAccount": "No account yet?",
+    "hasAccount": "Already have an account?",
+    "agreeTerms": "I agree to the Terms of Service and Privacy Policy",
+    "passwordPlaceholder": "Enter your password",
+    "usernamePlaceholder": "yourusername",
+    "passwordMinLength": "At least 8 characters",
+    "validation": {
+      "emailRequired": "Please enter your email",
+      "passwordRequired": "Please enter your password",
+      "usernameRequired": "Please enter your username",
+      "termsRequired": "Please agree to the Terms of Service"
+    }
+  },
+  "chat": {
+    "findChannel": "Find a channel...",
+    "channels": "Channels",
+    "projects": "Projects",
+    "online": "online",
+    "messagePlaceholder": "Message #{channel}...",
+    "reply": "Reply",
+    "react": "React",
+    "share": "Share",
+    "replies": "replies",
+    "members": "Members"
+  },
+  "profile": {
+    "title": "Profile",
+    "backToWave": "Back to Wave",
+    "message": "Message",
+    "shareProfile": "Share profile",
+    "joined": "Joined",
+    "mutualServers": "mutual servers",
+    "admin": "Admin",
+    "preferences": {
+      "title": "Preferences",
+      "notifications": {
+        "title": "Notifications",
+        "description": "Receive notifications for mentions and replies"
+      },
+      "messagePreviews": {
+        "title": "Message previews",
+        "description": "Show message content in push notifications"
+      },
+      "soundEffects": {
+        "title": "Sound effects",
+        "description": "Play sounds for messages, mentions, and joins"
+      },
+      "onlineStatus": {
+        "title": "Show online status",
+        "description": "Let others see when you're active"
+      }
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": {
+        "title": "Theme",
+        "description": "Choose between dark, light, or system theme",
+        "dark": "Dark",
+        "light": "Light",
+        "system": "System"
+      },
+      "messageDensity": {
+        "title": "Message density",
+        "description": "Control how much space between messages",
+        "comfortable": "Comfortable",
+        "compact": "Compact"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Interface language"
+      }
+    },
+    "connectedAccounts": {
+      "title": "Connected accounts",
+      "connected": "Connected",
+      "disconnect": "Disconnect"
+    },
+    "dangerZone": {
+      "title": "Danger zone",
+      "description": "Permanently delete your account and all associated data. This action cannot be undone.",
+      "deleteAccount": "Delete account",
+      "confirmDelete": "This action cannot be undone. All your data will be permanently deleted."
+    }
+  },
+  "thread": {
+    "title": "Thread",
+    "backToChannel": "Back to #{channel}",
+    "inChannel": "in #{channel}",
+    "replyPlaceholder": "Reply to this thread...",
+    "details": {
+      "title": "Thread details",
+      "startedBy": "Started by",
+      "participants": "Participants",
+      "replies": "Replies",
+      "lastReply": "Last reply"
+    },
+    "op": "op"
+  }
+}

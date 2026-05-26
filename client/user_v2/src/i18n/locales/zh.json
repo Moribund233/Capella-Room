@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "Wave",
+    "back": "返回",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "close": "关闭",
+    "search": "搜索",
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "warning": "警告"
+  },
+  "nav": {
+    "signIn": "登录",
+    "getStarted": "开始使用",
+    "features": "功能",
+    "community": "社区"
+  },
+  "landing": {
+    "hero": {
+      "eyebrow": "社交 · 重新构想",
+      "title": "让你的社区焕发生机",
+      "description": "为每个话题提供频道，让对话井然有序的线程，以及像家一样的空间。Wave 是你社区的现代家园。",
+      "startFree": "免费开始",
+      "seeFeatures": "查看功能"
+    },
+    "features": {
+      "eyebrow": "你需要的一切",
+      "title": "为真实对话而构建",
+      "channels": {
+        "title": "话题频道",
+        "description": "按话题、项目或兴趣组织对话。让一切都能被找到。"
+      },
+      "threads": {
+        "title": "线程回复",
+        "description": "在线程中回复以保持主频道整洁。线程始终附属于原始消息。"
+      },
+      "expressions": {
+        "title": "丰富表达",
+        "description": "表情反应、提及、文件分享和内联媒体——自由表达自己。"
+      }
+    },
+    "stats": {
+      "eyebrow": "快速增长 · 2026",
+      "communities": "个活跃社区使用 Wave 保持联系",
+      "messages": "条消息每天在频道和线程中发送",
+      "satisfaction": "的成员表示对话更加有条理"
+    },
+    "cta": {
+      "title": "你的社区正在等待",
+      "description": "小型社区免费使用。成长型空间提供高级方案。",
+      "getStarted": "免费开始使用",
+      "viewDemo": "查看演示"
+    },
+    "footer": {
+      "copyright": "© Wave · 社交空间，重新构想"
+    }
+  },
+  "auth": {
+    "signIn": "登录",
+    "createAccount": "创建账户",
+    "email": "邮箱",
+    "password": "密码",
+    "username": "用户名",
+    "forgotPassword": "忘记密码？",
+    "orContinueWith": "或使用以下方式继续",
+    "google": "谷歌",
+    "github": "GitHub",
+    "noAccount": "还没有账户？",
+    "hasAccount": "已有账户？",
+    "agreeTerms": "我同意服务条款和隐私政策",
+    "passwordPlaceholder": "输入密码",
+    "usernamePlaceholder": "用户名",
+    "passwordMinLength": "至少8个字符",
+    "validation": {
+      "emailRequired": "请输入邮箱",
+      "passwordRequired": "请输入密码",
+      "usernameRequired": "请输入用户名",
+      "termsRequired": "请同意服务条款"
+    }
+  },
+  "chat": {
+    "findChannel": "查找频道...",
+    "channels": "频道",
+    "projects": "项目",
+    "online": "在线",
+    "messagePlaceholder": "发送消息到 #{channel}...",
+    "reply": "回复",
+    "react": "反应",
+    "share": "分享",
+    "replies": "条回复",
+    "members": "成员"
+  },
+  "profile": {
+    "title": "个人资料",
+    "backToWave": "返回 Wave",
+    "message": "发送消息",
+    "shareProfile": "分享资料",
+    "joined": "加入于",
+    "mutualServers": "个共同服务器",
+    "admin": "管理员",
+    "preferences": {
+      "title": "偏好设置",
+      "notifications": {
+        "title": "通知",
+        "description": "接收提及和回复的通知"
+      },
+      "messagePreviews": {
+        "title": "消息预览",
+        "description": "在推送通知中显示消息内容"
+      },
+      "soundEffects": {
+        "title": "音效",
+        "description": "为消息、提及和加入播放声音"
+      },
+      "onlineStatus": {
+        "title": "显示在线状态",
+        "description": "让其他人看到你何时在线"
+      }
+    },
+    "appearance": {
+      "title": "外观",
+      "theme": {
+        "title": "主题",
+        "description": "在深色、浅色或系统主题之间选择",
+        "dark": "深色",
+        "light": "浅色",
+        "system": "跟随系统"
+      },
+      "messageDensity": {
+        "title": "消息密度",
+        "description": "控制消息之间的间距",
+        "comfortable": "舒适",
+        "compact": "紧凑"
+      },
+      "language": {
+        "title": "语言",
+        "description": "界面语言"
+      }
+    },
+    "connectedAccounts": {
+      "title": "已连接账户",
+      "connected": "已连接",
+      "disconnect": "断开连接"
+    },
+    "dangerZone": {
+      "title": "危险区域",
+      "description": "永久删除你的账户和所有相关数据。此操作无法撤销。",
+      "deleteAccount": "删除账户",
+      "confirmDelete": "此操作无法撤销。你的所有数据将被永久删除。"
+    }
+  },
+  "thread": {
+    "title": "线程",
+    "backToChannel": "返回 #{channel}",
+    "inChannel": "在 #{channel}",
+    "replyPlaceholder": "回复此线程...",
+    "details": {
+      "title": "线程详情",
+      "startedBy": "发起者",
+      "participants": "参与者",
+      "replies": "回复",
+      "lastReply": "最后回复"
+    },
+    "op": "楼主"
+  }
+}
