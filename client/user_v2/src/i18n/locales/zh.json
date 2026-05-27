@@ -82,7 +82,11 @@
       "passwordRequired": "请输入密码",
       "usernameRequired": "请输入用户名",
       "termsRequired": "请同意服务条款"
-    }
+    },
+    "loginSuccess": "登录成功",
+    "loginFailed": "登录失败，请检查邮箱和密码",
+    "registerSuccess": "注册成功，请登录",
+    "registerFailed": "注册失败，请稍后重试"
   },
   "chat": {
     "findRoom": "查找房间...",
@@ -95,7 +99,11 @@
     "react": "反应",
     "share": "分享",
     "replies": "条回复",
-    "members": "成员"
+    "members": "成员",
+    "noRooms": "暂无房间",
+    "noMessages": "暂无消息",
+    "noMembers": "暂无成员",
+    "selectRoom": "选择一个房间开始聊天"
   },
   "profile": {
     "title": "个人资料",
@@ -154,7 +162,8 @@
       "description": "永久删除你的账户和所有相关数据。此操作无法撤销。",
       "deleteAccount": "删除账户",
       "confirmDelete": "此操作无法撤销。你的所有数据将被永久删除。"
-    }
+    },
+    "noBio": "暂无个人简介"
   },
   "thread": {
     "title": "线程",
@@ -170,42 +179,6 @@
     },
     "op": "楼主"
   },
-  "settings": {
-    "title": "设置",
-    "notifications": {
-      "title": "通知",
-      "description": "管理你的通知偏好",
-      "pushNotifications": "推送通知",
-      "replies": "回复通知",
-      "repliesDesc": "当有人回复你的消息时通知你",
-      "directMessages": "私信通知",
-      "directMessagesDesc": "当收到私信时通知你",
-      "roomInvites": "房间邀请",
-      "roomInvitesDesc": "当被邀请加入房间时通知你"
-    },
-    "privacy": {
-      "title": "隐私",
-      "description": "管理你的隐私设置",
-      "friendRequests": "允许好友请求",
-      "friendRequestsDesc": "允许其他用户向你发送好友请求",
-      "roomInvites": "允许房间邀请",
-      "roomInvitesDesc": "允许其他用户邀请你加入房间"
-    },
-    "messages": {
-      "title": "消息",
-      "description": "自定义你的消息体验",
-      "enterToSend": "按 Enter 发送",
-      "enterToSendDesc": "按 Enter 键发送消息，Shift+Enter 换行",
-      "showTimestamps": "显示时间戳",
-      "showTimestampsDesc": "在消息旁显示发送时间",
-      "compactMode": "紧凑模式",
-      "compactModeDesc": "减少消息之间的间距以显示更多内容"
-    },
-    "appearance": {
-      "title": "外观",
-      "description": "自定义 CapellaRoom 的外观"
-    }
-  },
   "discover": {
     "title": "发现",
     "subtitle": "探索社区，找到属于你的空间",
@@ -220,6 +193,12 @@
     "trending": "趋势",
     "join": "加入",
     "view": "查看"
+  },
+  "quick": {
+    "notifications": "通知",
+    "themeDark": "深色主题",
+    "themeLight": "浅色主题",
+    "personalization": "个性化"
   },
   "notFound": {
     "title": "页面未找到",

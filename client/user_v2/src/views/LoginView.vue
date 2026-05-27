@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElLoading } from 'element-plus'
 import { User, Lock, Message, ArrowLeft } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
+const authStore = useAuthStore()
 const activeTab = ref<'login' | 'register'>('login')
+const loading = ref(false)
 
 // 登录表单
 const loginForm = ref({
@@ -26,7 +30,7 @@ const registerForm = ref({
 /**
  * 处理登录
  */
-function handleLogin() {
+async function handleLogin() {
   if (!loginForm.value.email) {
     ElMessage.warning(t('auth.validation.emailRequired'))
     return
@@ -35,14 +39,43 @@ function handleLogin() {
     ElMessage.warning(t('auth.validation.passwordRequired'))
     return
   }
-  // TODO: 调用登录API
-  router.push('/app')
+
+  loading.value = true
+  try {
+    const result = await authStore.login({
+      email: loginForm.value.email,
+      password: loginForm.value.password,
+    })
+
+    if (result.data) {
+      ElMessage.success(t('auth.loginSuccess'))
+      // 跳转到之前的页面或应用首页
+      const redirect = route.query.redirect as string
+      router.push(redirect || '/app')
+    } else {
+      ElMessage.error(result.message || t('auth.loginFailed'))
+    }
+  } catch (error: any) {
+    // 显示后端返回的具体错误消息
+    console.error('[Login] Error:', error)
+    const errorMessage = error?.response?.data?.message
+      || error?.response?.data?.error
+      || error?.message
+      || t('auth.loginFailed')
+    ElMessage.error({
+      message: errorMessage,
+      duration: 3000,
+      showClose: true,
+    })
+  } finally {
+    loading.value = false
+  }
 }
 
 /**
  * 处理注册
  */
-function handleRegister() {
+async function handleRegister() {
   if (!registerForm.value.email) {
     ElMessage.warning(t('auth.validation.emailRequired'))
     return
@@ -59,8 +92,38 @@ function handleRegister() {
     ElMessage.warning(t('auth.validation.termsRequired'))
     return
   }
-  // TODO: 调用注册API
-  router.push('/app')
+
+  loading.value = true
+  try {
+    const result = await authStore.register({
+      email: registerForm.value.email,
+      username: registerForm.value.username,
+      password: registerForm.value.password,
+    })
+
+    if (result.data) {
+      ElMessage.success(t('auth.registerSuccess'))
+      // 注册成功后切换到登录页
+      activeTab.value = 'login'
+      loginForm.value.email = registerForm.value.email
+    } else {
+      ElMessage.error(result.message || t('auth.registerFailed'))
+    }
+  } catch (error: any) {
+    // 显示后端返回的具体错误消息
+    console.error('[Register] Error:', error)
+    const errorMessage = error?.response?.data?.message
+      || error?.response?.data?.error
+      || error?.message
+      || t('auth.registerFailed')
+    ElMessage.error({
+      message: errorMessage,
+      duration: 3000,
+      showClose: true,
+    })
+  } finally {
+    loading.value = false
+  }
 }
 
 /**
@@ -83,7 +146,7 @@ function switchTab(tab: 'login' | 'register') {
 
       <!-- Logo -->
       <div class="auth-logo">
-        <div class="auth-logo-mark">W</div>
+        <img src="/favicon.svg" alt="Logo" class="auth-logo-img" />
         <span>{{ t('common.appName') }}</span>
       </div>
 
@@ -114,6 +177,7 @@ function switchTab(tab: 'login' | 'register') {
             placeholder="your@example.com"
             :prefix-icon="Message"
             size="large"
+            @keyup.enter="handleLogin"
           />
         </div>
         <div class="form-field">
@@ -128,23 +192,30 @@ function switchTab(tab: 'login' | 'register') {
             :prefix-icon="Lock"
             size="large"
             show-password
+            @keyup.enter="handleLogin"
           />
         </div>
-        <el-button type="primary" size="large" class="submit-btn" @click="handleLogin">
+        <el-button
+          type="primary"
+          size="large"
+          class="submit-btn"
+          :loading="loading"
+          @click="handleLogin"
+        >
           {{ t('auth.signIn') }}
         </el-button>
 
         <el-divider>{{ t('auth.orContinueWith') }}</el-divider>
 
         <div class="social-row">
-          <el-button size="large" class="social-btn">
+          <el-button size="large" class="social-btn" disabled>
             <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="3" width="20" height="14" rx="2"/>
               <path d="M22 5l-10 7L2 5"/>
             </svg>
             {{ t('auth.google') }}
           </el-button>
-          <el-button size="large" class="social-btn">
+          <el-button size="large" class="social-btn" disabled>
             <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M16 8a6 6 0 016-6v6a6 6 0 01-6 6"/>
               <path d="M2 16a6 6 0 016-6v6a6 6 0 01-6 6"/>
@@ -197,31 +268,15 @@ function switchTab(tab: 'login' | 'register') {
             {{ t('auth.agreeTerms') }}
           </el-checkbox>
         </div>
-        <el-button type="primary" size="large" class="submit-btn" @click="handleRegister">
+        <el-button
+          type="primary"
+          size="large"
+          class="submit-btn"
+          :loading="loading"
+          @click="handleRegister"
+        >
           {{ t('auth.createAccount') }}
         </el-button>
-
-        <el-divider>{{ t('auth.orContinueWith') }}</el-divider>
-
-        <div class="social-row">
-          <el-button size="large" class="social-btn">
-            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2"/>
-              <path d="M22 5l-10 7L2 5"/>
-            </svg>
-            {{ t('auth.google') }}
-          </el-button>
-          <el-button size="large" class="social-btn">
-            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 8a6 6 0 016-6v6a6 6 0 01-6 6"/>
-              <path d="M2 16a6 6 0 016-6v6a6 6 0 01-6 6"/>
-              <circle cx="8" cy="8" r="2"/>
-              <circle cx="8" cy="16" r="2"/>
-              <circle cx="16" cy="8" r="2"/>
-            </svg>
-            {{ t('auth.github') }}
-          </el-button>
-        </div>
 
         <div class="auth-footer">
           {{ t('auth.hasAccount') }} <a href="#" @click.prevent="switchTab('login')">{{ t('auth.signIn') }}</a>
@@ -231,156 +286,130 @@ function switchTab(tab: 'login' | 'register') {
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 .login-page {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: var(--wave-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--el-bg-color-page);
+  padding: 20px;
 }
 
 .auth-card {
   width: 100%;
   max-width: 420px;
-  background: var(--wave-surface);
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius-lg);
-  padding: 40px 36px;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--wave-accent), var(--wave-accent-pink));
-  }
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .back-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--wave-muted);
-  font-size: 13px;
-  margin-bottom: 24px;
+  gap: 4px;
+  color: var(--el-text-color-secondary);
   text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
 
-  &:hover {
-    color: var(--wave-fg);
-  }
+.back-link:hover {
+  color: var(--el-color-primary);
 }
 
 .auth-logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 28px;
+  gap: 12px;
+  margin-bottom: 32px;
 }
 
-.auth-logo-mark {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
+.auth-logo-img {
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
-  display: grid;
-  place-items: center;
-  font-size: 17px;
-  color: #fff;
-  font-weight: 700;
+  object-fit: contain;
+  filter: var(--logo-filter);
 }
 
 .auth-logo span {
-  font-family: var(--wave-font-display);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 .auth-tabs {
   display: flex;
-  background: var(--wave-bg);
-  border-radius: var(--wave-radius);
+  gap: 8px;
+  margin-bottom: 24px;
+  background: var(--el-fill-color-light);
   padding: 4px;
-  margin-bottom: 28px;
+  border-radius: 8px;
 }
 
 .auth-tab {
   flex: 1;
-  text-align: center;
-  padding: 8px 0;
-  border-radius: 8px;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  border: none;
-  background: none;
-  color: var(--wave-muted);
-  font-family: inherit;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
 
-  &.active {
-    background: var(--wave-surface);
-    color: var(--wave-fg);
-  }
-
-  &:hover:not(.active) {
-    color: var(--wave-fg);
-  }
+.auth-tab.active {
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  box-shadow: var(--el-box-shadow-lighter);
 }
 
 .tab-content {
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .form-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 18px;
+}
 
-  label {
-    font-size: 13px;
-    color: var(--wave-muted);
-    font-weight: 500;
-  }
+.form-field label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
 }
 
 .field-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
 }
 
 .forgot-link {
   font-size: 13px;
-  color: var(--wave-muted);
+  color: var(--el-color-primary);
   text-decoration: none;
+}
 
-  &:hover {
-    color: var(--wave-accent);
-  }
+.forgot-link:hover {
+  text-decoration: underline;
 }
 
 .submit-btn {
   width: 100%;
-  border-radius: var(--wave-radius-full);
-  font-weight: 500;
+  margin-top: 8px;
+}
+
+.checkbox-field {
+  margin-top: 4px;
 }
 
 .social-row {
@@ -394,15 +423,6 @@ function switchTab(tab: 'login' | 'register') {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 13px;
-  background: transparent;
-  border-color: var(--wave-border);
-  color: var(--wave-fg);
-
-  &:hover {
-    border-color: var(--wave-fg);
-    color: var(--wave-fg);
-  }
 }
 
 .social-icon {
@@ -410,47 +430,19 @@ function switchTab(tab: 'login' | 'register') {
   height: 18px;
 }
 
-.checkbox-field {
-  margin-bottom: 18px;
-
-  :deep(.el-checkbox__label) {
-    font-size: 13px;
-    color: var(--wave-muted);
-
-    a {
-      color: var(--wave-accent);
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-}
-
 .auth-footer {
   text-align: center;
-  margin-top: 24px;
-  font-size: 13px;
-  color: var(--wave-muted);
-
-  a {
-    color: var(--wave-accent);
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+  margin-top: 16px;
 }
 
-:deep(.el-divider__text) {
-  background: var(--wave-surface);
-  color: var(--wave-muted);
-  font-size: 12px;
+.auth-footer a {
+  color: var(--el-color-primary);
+  text-decoration: none;
 }
 
-:deep(.el-input__wrapper) {
-  background-color: var(--wave-bg);
+.auth-footer a:hover {
+  text-decoration: underline;
 }
 </style>

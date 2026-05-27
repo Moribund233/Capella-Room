@@ -15,7 +15,7 @@ const { t } = useI18n()
 const originalMessage = {
   author: 'alex',
   avatar: 'A',
-  avatarColor: 'var(--wave-accent)',
+  avatarColor: 'var(--accent)',
   time: '9:42 AM',
   channel: 'general',
   content: 'Hey team! 🎉 Just pushed the new design system updates to staging. Would love for everyone to take a look before we ship it live.',
@@ -27,7 +27,7 @@ const replies = [
     id: 1,
     author: 'jordan',
     avatar: 'J',
-    avatarColor: 'var(--wave-accent-green)',
+    avatarColor: 'var(--accent-green)',
     time: '9:48 AM',
     content: 'Looking great! I noticed the button component\'s hover state is a bit subtle — might want to bump the contrast there. Otherwise ship it! 🚀',
     reactions: [
@@ -39,7 +39,7 @@ const replies = [
     id: 2,
     author: 'mira',
     avatar: 'M',
-    avatarColor: 'var(--wave-accent-pink)',
+    avatarColor: 'var(--accent-pink)',
     time: '9:55 AM',
     isOP: true,
     content: 'Agreed with @jordan! Also the @alex spacing on mobile cards feels a bit tight. I left a comment in Figma.',
@@ -51,7 +51,7 @@ const replies = [
     id: 3,
     author: 'kaito',
     avatar: 'K',
-    avatarColor: 'var(--wave-accent-blue)',
+    avatarColor: 'var(--accent-blue)',
     time: '10:12 AM',
     content: 'Tested on staging — looks solid on Chrome and Safari. There\'s a minor layout shift on Firefox at 1024px, but I think it\'s just a missing @supports query. I can patch that today.',
     reactions: [],
@@ -60,7 +60,7 @@ const replies = [
     id: 4,
     author: 'taylor',
     avatar: 'T',
-    avatarColor: 'var(--wave-accent-orange)',
+    avatarColor: 'var(--accent-orange)',
     time: '10:28 AM',
     content: 'I can help with the Firefox fix after standup. Also — should we update the changelog before pushing or do it after?',
     reactions: [
@@ -71,7 +71,7 @@ const replies = [
     id: 5,
     author: 'alex',
     avatar: 'A',
-    avatarColor: 'var(--wave-accent)',
+    avatarColor: 'var(--accent)',
     time: '10:35 AM',
     isOP: true,
     content: 'Great feedback everyone! @kaito go for it on the Firefox fix. @taylor let\'s do the changelog post-launch this time — I want to ship by EOD. I\'ll address the button hover and spacing comments.',
@@ -84,11 +84,11 @@ const replies = [
 
 // 参与者
 const participants = [
-  { name: 'alex', color: 'var(--wave-accent)' },
-  { name: 'jordan', color: 'var(--wave-accent-green)' },
-  { name: 'mira', color: 'var(--wave-accent-pink)' },
-  { name: 'kaito', color: 'var(--wave-accent-blue)' },
-  { name: 'taylor', color: 'var(--wave-accent-orange)' },
+  { name: 'alex', color: 'var(--accent)' },
+  { name: 'jordan', color: 'var(--accent-green)' },
+  { name: 'mira', color: 'var(--accent-pink)' },
+  { name: 'kaito', color: 'var(--accent-blue)' },
+  { name: 'taylor', color: 'var(--accent-orange)' },
 ]
 
 // 回复输入
@@ -181,7 +181,7 @@ function sendReply() {
         <div class="reply system-message">
           <div
             class="reply-avatar"
-            style="background: var(--wave-accent); width: 28px; height: 28px; min-width: 28px; font-size: 12px;"
+            style="background: var(--accent); width: 28px; height: 28px; min-width: 28px; font-size: 12px;"
           >
             W
           </div>
@@ -190,7 +190,7 @@ function sendReply() {
               <span class="name" style="font-size: 13px;">Wave Bot</span>
               <span class="time">10:36 AM</span>
             </div>
-            <div class="reply-content" style="font-size: 13px; color: var(--wave-muted);">
+            <div class="reply-content" style="font-size: 13px; color: var(--muted);">
               Thread marked as resolved by <strong>alex</strong>
             </div>
           </div>
@@ -283,8 +283,8 @@ function sendReply() {
 .thread-page {
   display: flex;
   height: 100vh;
-  background: var(--wave-bg);
-  color: var(--wave-fg);
+  background: var(--bg);
+  color: var(--fg);
   overflow: hidden;
 }
 
@@ -298,20 +298,20 @@ function sendReply() {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: color-mix(in oklch, var(--wave-bg) 95%, transparent);
+  background: color-mix(in oklch, var(--bg) 95%, transparent);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--wave-border);
+  border-bottom: 1px solid var(--border);
   font-size: 14px;
 
   a {
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--wave-muted);
+    color: var(--muted);
     text-decoration: none;
 
     &:hover {
-      color: var(--wave-fg);
+      color: var(--fg);
     }
   }
 }
@@ -328,7 +328,7 @@ function sendReply() {
 // 原始消息
 .thread-original {
   padding: 20px 20px 16px;
-  border-bottom: 1px solid var(--wave-border);
+  border-bottom: 1px solid var(--border);
   display: flex;
   gap: 12px;
 }
@@ -362,12 +362,12 @@ function sendReply() {
 
   .time {
     font-size: 12px;
-    color: var(--wave-muted);
+    color: var(--muted);
   }
 
   .channel {
     font-size: 12px;
-    color: var(--wave-accent);
+    color: var(--accent);
   }
 }
 
@@ -390,7 +390,7 @@ function sendReply() {
   transition: background 0.1s;
 
   &:hover {
-    background: var(--wave-message-hover);
+    background: var(--message-hover);
   }
 
   &.system-message {
@@ -429,7 +429,7 @@ function sendReply() {
 
   .time {
     font-size: 11px;
-    color: var(--wave-muted);
+    color: var(--muted);
   }
 
   .badge {
@@ -438,8 +438,8 @@ function sendReply() {
     text-transform: uppercase;
     padding: 1px 6px;
     border-radius: 4px;
-    background: var(--wave-accent-soft);
-    color: var(--wave-accent);
+    background: var(--accent-soft);
+    color: var(--accent);
   }
 }
 
@@ -453,13 +453,13 @@ function sendReply() {
   gap: 12px;
   margin-top: 4px;
   font-size: 12px;
-  color: var(--wave-muted);
+  color: var(--muted);
 
   span {
     cursor: pointer;
 
     &:hover {
-      color: var(--wave-fg);
+      color: var(--fg);
     }
   }
 }
@@ -474,14 +474,14 @@ function sendReply() {
     align-items: center;
     gap: 3px;
     padding: 1px 6px;
-    border-radius: var(--wave-radius-full);
-    background: var(--wave-accent-soft);
+    border-radius: var(--radius-full);
+    background: var(--accent-soft);
     font-size: 12px;
     cursor: pointer;
     border: 1px solid transparent;
 
     &:hover {
-      border-color: var(--wave-accent);
+      border-color: var(--accent);
     }
   }
 }
@@ -489,27 +489,27 @@ function sendReply() {
 // 回复输入
 .thread-input-area {
   padding: 12px 20px 20px;
-  border-top: 1px solid var(--wave-border);
+  border-top: 1px solid var(--border);
 }
 
 .thread-input-wrapper {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  background: var(--wave-surface);
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 8px 12px;
   transition: border-color 0.15s;
 
   &:focus-within {
-    border-color: var(--wave-accent);
+    border-color: var(--accent);
   }
 
   :deep(.el-textarea__inner) {
     background: none;
     border: none;
-    color: var(--wave-fg);
+    color: var(--fg);
     padding: 8px 4px;
     resize: none;
     max-height: 120px;
@@ -517,7 +517,7 @@ function sendReply() {
     box-shadow: none;
 
     &::placeholder {
-      color: var(--wave-muted);
+      color: var(--muted);
     }
 
     &:focus {
@@ -532,11 +532,11 @@ function sendReply() {
   gap: 4px;
 
   .el-button {
-    color: var(--wave-muted);
+    color: var(--muted);
 
     &:hover {
-      color: var(--wave-fg);
-      background: var(--wave-message-hover);
+      color: var(--fg);
+      background: var(--message-hover);
     }
   }
 }
@@ -545,8 +545,8 @@ function sendReply() {
 .thread-side-info {
   width: 320px;
   min-width: 320px;
-  background: var(--wave-sidebar-bg);
-  border-left: 1px solid var(--wave-border);
+  background: var(--sidebar-bg);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 
@@ -557,7 +557,7 @@ function sendReply() {
 
 .side-header {
   padding: 20px;
-  border-bottom: 1px solid var(--wave-border);
+  border-bottom: 1px solid var(--border);
 
   h2 {
     font-size: 16px;
@@ -567,7 +567,7 @@ function sendReply() {
 
   p {
     font-size: 13px;
-    color: var(--wave-muted);
+    color: var(--muted);
     margin: 0;
   }
 }
@@ -580,7 +580,7 @@ function sendReply() {
 
 .thread-stats {
   font-size: 13px;
-  color: var(--wave-muted);
+  color: var(--muted);
   margin-bottom: 16px;
 }
 
@@ -590,12 +590,12 @@ function sendReply() {
   margin-bottom: 8px;
 
   .stat-value {
-    color: var(--wave-fg);
+    color: var(--fg);
   }
 }
 
 .participants-section {
-  border-top: 1px solid var(--wave-border);
+  border-top: 1px solid var(--border);
   padding-top: 12px;
 }
 

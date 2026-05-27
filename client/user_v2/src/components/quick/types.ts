@@ -22,6 +22,13 @@ export interface QuickChildItem {
 export type QuickDisplayMode = 'visible' | 'dropdown'
 
 /**
+ * Quick 按钮类型
+ * - action: 直接执行动作
+ * - menu: 有子菜单
+ */
+export type QuickItemType = 'action' | 'menu'
+
+/**
  * Quick 配置项
  */
 export interface QuickItem {
@@ -29,6 +36,8 @@ export interface QuickItem {
   key: string
   /** 显示模式：外显或下拉菜单 */
   display: QuickDisplayMode
+  /** 类型：直接执行或有子菜单 */
+  type: QuickItemType
   /** 图标组件 */
   icon: unknown
   /** 显示标签 */

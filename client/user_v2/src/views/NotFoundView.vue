@@ -62,8 +62,8 @@ function goBack() {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: var(--wave-bg);
-  color: var(--wave-fg);
+  background: var(--bg);
+  color: var(--fg);
   position: relative;
   overflow: hidden;
 }
@@ -84,11 +84,11 @@ function goBack() {
 }
 
 .digit {
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: 120px;
   font-weight: 700;
   line-height: 1;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -107,7 +107,7 @@ function goBack() {
   width: 80px;
   height: 80px;
   border-radius: 20px;
-  filter: var(--wave-logo-filter);
+  filter: var(--logo-filter);
   animation: float 3s ease-in-out infinite;
   animation-delay: 0.25s;
 }
@@ -122,7 +122,7 @@ function goBack() {
 }
 
 .error-title {
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: 32px;
   font-weight: 600;
   margin: 0 0 12px;
@@ -130,7 +130,7 @@ function goBack() {
 
 .error-description {
   font-size: 16px;
-  color: var(--wave-muted);
+  color: var(--muted);
   margin: 0 0 32px;
   max-width: 400px;
 }
@@ -150,7 +150,7 @@ function goBack() {
 
 .orbit {
   position: absolute;
-  border: 1px solid var(--wave-border);
+  border: 1px solid var(--border);
   border-radius: 50%;
   top: 50%;
   left: 50%;
@@ -161,7 +161,7 @@ function goBack() {
     position: absolute;
     width: 8px;
     height: 8px;
-    background: var(--wave-accent);
+    background: var(--accent);
     border-radius: 50%;
     top: -4px;
     left: 50%;
@@ -175,7 +175,7 @@ function goBack() {
   animation: rotate 20s linear infinite;
 
   &::before {
-    background: var(--wave-accent);
+    background: var(--accent);
   }
 }
 
@@ -185,7 +185,7 @@ function goBack() {
   animation: rotate 30s linear infinite reverse;
 
   &::before {
-    background: var(--wave-accent-pink);
+    background: var(--accent-pink);
     top: auto;
     bottom: -4px;
   }
@@ -197,7 +197,7 @@ function goBack() {
   animation: rotate 40s linear infinite;
 
   &::before {
-    background: var(--wave-accent-green);
+    background: var(--accent-green);
     left: -4px;
     top: 50%;
     transform: translateY(-50%);

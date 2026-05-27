@@ -81,7 +81,11 @@
       "passwordRequired": "パスワードを入力してください",
       "usernameRequired": "ユーザー名を入力してください",
       "termsRequired": "サービス規約に同意してください"
-    }
+    },
+    "loginSuccess": "ログイン成功",
+    "loginFailed": "ログインに失敗しました。メールアドレスとパスワードを確認してください",
+    "registerSuccess": "登録成功。ログインしてください",
+    "registerFailed": "登録に失敗しました。後でもう一度お試しください"
   },
   "chat": {
     "findRoom": "ルームを検索...",
@@ -94,7 +98,11 @@
     "react": "リアクション",
     "share": "共有",
     "replies": "件の返信",
-    "members": "メンバー"
+    "members": "メンバー",
+    "noRooms": "ルームがありません",
+    "noMessages": "メッセージがありません",
+    "noMembers": "メンバーがいません",
+    "selectRoom": "チャットを開始するルームを選択してください"
   },
   "profile": {
     "title": "プロフィール",
@@ -153,7 +161,8 @@
       "description": "アカウントとすべての関連データを永久に削除します。この操作は元に戻せません。",
       "deleteAccount": "アカウントを削除",
       "confirmDelete": "この操作は元に戻せません。すべてのデータが永久に削除されます。"
-    }
+    },
+    "noBio": "自己紹介はありません"
   },
   "thread": {
     "title": "スレッド",
@@ -168,5 +177,11 @@
       "lastReply": "最後の返信"
     },
     "op": "投稿者"
+  },
+  "quick": {
+    "notifications": "通知",
+    "themeDark": "ダークテーマ",
+    "themeLight": "ライトテーマ",
+    "personalization": "パーソナライゼーション"
   }
 }

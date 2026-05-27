@@ -82,7 +82,11 @@
       "passwordRequired": "Please enter your password",
       "usernameRequired": "Please enter your username",
       "termsRequired": "Please agree to the Terms of Service"
-    }
+    },
+    "loginSuccess": "Login successful",
+    "loginFailed": "Login failed, please check your email and password",
+    "registerSuccess": "Registration successful, please sign in",
+    "registerFailed": "Registration failed, please try again later"
   },
   "chat": {
     "findRoom": "Find a room...",
@@ -95,7 +99,11 @@
     "react": "React",
     "share": "Share",
     "replies": "replies",
-    "members": "Members"
+    "members": "Members",
+    "noRooms": "No rooms yet",
+    "noMessages": "No messages yet",
+    "noMembers": "No members yet",
+    "selectRoom": "Select a room to start chatting"
   },
   "profile": {
     "title": "Profile",
@@ -154,7 +162,8 @@
       "description": "Permanently delete your account and all associated data. This action cannot be undone.",
       "deleteAccount": "Delete account",
       "confirmDelete": "This action cannot be undone. All your data will be permanently deleted."
-    }
+    },
+    "noBio": "No bio yet"
   },
   "thread": {
     "title": "Thread",
@@ -169,5 +178,11 @@
       "lastReply": "Last reply"
     },
     "op": "op"
+  },
+  "quick": {
+    "notifications": "Notifications",
+    "themeDark": "Dark Theme",
+    "themeLight": "Light Theme",
+    "personalization": "Personalization"
   }
 }

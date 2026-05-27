@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
+import { MainLayout } from '@/layouts'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -20,40 +21,38 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
-    path: '/app',
-    name: 'app',
-    component: () => import('@/views/AppView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/profile',
-    name: 'profile',
-    component: () => import('@/views/ProfileView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/settings',
-    name: 'settings',
-    component: () => import('@/views/SettingsView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/discover',
-    name: 'discover',
-    component: () => import('@/views/DiscoverView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/thread',
-    name: 'thread',
-    component: () => import('@/views/ThreadView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/invite/:code',
     name: 'invite',
     component: () => import('@/views/InviteValidationView.vue'),
     meta: { public: true },
+  },
+  // 需要认证的页面使用 MainLayout
+  {
+    path: '/',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: 'app',
+        name: 'app',
+        component: () => import('@/views/AppView.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'profile',
+        component: () => import('@/views/ProfileView.vue'),
+      },
+      {
+        path: 'discover',
+        name: 'discover',
+        component: () => import('@/views/DiscoverView.vue'),
+      },
+      {
+        path: 'thread',
+        name: 'thread',
+        component: () => import('@/views/ThreadView.vue'),
+      },
+    ],
   },
   {
     path: '/:pathMatch(.*)*',

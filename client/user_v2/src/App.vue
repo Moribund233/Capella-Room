@@ -1,15 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-
-/**
- * 初始化主题
- * 从 localStorage 读取用户主题偏好，默认为 dark
- */
-onMounted(() => {
-  const savedTheme = localStorage.getItem('theme') || 'dark'
-  document.documentElement.classList.remove('dark', 'light')
-  document.documentElement.classList.add(savedTheme)
-})
+// 主题初始化已在 main.ts 中的 themeStore.initTheme() 完成
+// 避免重复初始化造成冲突
 </script>
 
 <template>
@@ -32,7 +23,7 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--wave-font-body);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
 

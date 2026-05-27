@@ -37,6 +37,15 @@ function getSystemTheme(): 'light' | 'dark' {
 function applyThemeToDocument(theme: ThemeType): void {
   const effectiveTheme = theme === 'system' ? getSystemTheme() : theme
   document.documentElement.setAttribute('data-theme', effectiveTheme)
+
+  // 同步 Element Plus 和自定义 CSS 的 dark/light 类
+  if (effectiveTheme === 'dark') {
+    document.documentElement.classList.add('dark')
+    document.documentElement.classList.remove('light')
+  } else {
+    document.documentElement.classList.add('light')
+    document.documentElement.classList.remove('dark')
+  }
 }
 
 /**

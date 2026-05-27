@@ -23,7 +23,7 @@ export const defaultLocale = 'zh'
  */
 function getSavedLocale(): string {
   if (typeof localStorage !== 'undefined') {
-    const saved = localStorage.getItem('wave-locale')
+    const saved = localStorage.getItem('locale')
     if (saved && supportedLocales.some(l => l.code === saved)) {
       return saved
     }
@@ -37,7 +37,7 @@ function getSavedLocale(): string {
  */
 export function saveLocale(locale: string): void {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('wave-locale', locale)
+    localStorage.setItem('locale', locale)
   }
 }
 

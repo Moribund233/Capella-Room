@@ -8,7 +8,9 @@ import i18n from './i18n'
 import { useConfigStore, useThemeStore, usePersonalizationStore } from './stores'
 import { initErrorHandler } from './services/error'
 
-// Element Plus 样式
+// Element Plus 基础样式（必须在自定义变量之前）
+import 'element-plus/dist/index.css'
+// Element Plus 自定义变量
 import '@/styles/element-variables.scss'
 
 async function bootstrap() {

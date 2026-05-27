@@ -1,154 +1,91 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NavBar } from '@/components/nav'
-import { QuickBar } from '@/components/quick'
-import type { QuickItem } from '@/components/quick'
-import { useTheme } from '@/composables/useTheme'
+import { useRoomStore } from '@/stores/room'
+import { useMessageStore } from '@/stores/message'
+import { useAuthStore } from '@/stores/auth'
+import { useWebSocketStore } from '@/stores/websocket'
 import {
   Search,
-  Setting,
-  Microphone,
-  MoreFilled,
   Plus,
   Lock,
   ArrowRight,
-  Bell,
-  Moon,
-  Sunny,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const { t } = useI18n()
-const { isDark, toggleTheme } = useTheme()
+const roomStore = useRoomStore()
+const messageStore = useMessageStore()
+const authStore = useAuthStore()
+const wsStore = useWebSocketStore()
 
-// QuickBar 配置 - 使用 shallowRef 避免组件被 reactive 包裹
-// 主题图标根据当前主题动态变化
-const quickItems = computed<QuickItem[]>(() => [
-  {
-    key: 'notifications',
-    display: 'visible',
-    icon: Bell,
-    label: t('profile.preferences.notifications.title'),
-    badge: 3,
-    onClick: () => {
-      // TODO: 打开通知面板
-    },
-  },
-  {
-    key: 'theme',
-    display: 'visible',
-    icon: isDark.value ? Moon : Sunny,
-    label: isDark.value ? t('profile.appearance.theme.dark') : t('profile.appearance.theme.light'),
-    onClick: toggleTheme,
-  },
-])
+// 加载状态
+const loadingRooms = ref(false)
+const loadingMessages = ref(false)
 
-// 当前选中的房间
-const activeRoom = ref('general')
+// 当前选中的房间ID
+const activeRoomId = ref<string | null>(null)
 
-// 房间列表
-const roomCategories = [
-  {
-    name: 'Public Rooms',
-    rooms: [
-      { id: 'general', name: 'general', unread: 3, type: 'public' },
-      { id: 'introductions', name: 'introductions', unread: 0, type: 'public' },
-      { id: 'random', name: 'random', unread: 0, type: 'public' },
-      { id: 'show-and-tell', name: 'show-and-tell', unread: 0, type: 'public' },
-      { id: 'events', name: 'events', unread: 5, type: 'public' },
-    ],
-  },
-  {
-    name: 'My Rooms',
-    rooms: [
-      { id: 'design-system', name: 'design-system', unread: 0, type: 'private' },
-      { id: 'frontend', name: 'frontend', unread: 0, type: 'private' },
-      { id: 'backend', name: 'backend', unread: 0, type: 'private', locked: true },
-      { id: 'product-feedback', name: 'product-feedback', unread: 0, type: 'private' },
-    ],
-  },
-]
+// 当前房间
+const activeRoom = computed(() => {
+  if (!activeRoomId.value) return null
+  return roomStore.roomMap.get(activeRoomId.value) || null
+})
+
+// 房间列表 - 按公开/私有分类
+const publicRooms = computed(() => {
+  return roomStore.rooms.filter(room => !room.is_private)
+})
+
+const privateRooms = computed(() => {
+  return roomStore.rooms.filter(room => room.is_private)
+})
 
 // 消息列表
-const messages = [
-  {
-    id: 1,
-    author: 'alex',
-    avatar: 'A',
-    avatarColor: 'var(--wave-accent)',
-    time: '9:42 AM',
-    content: 'Hey team! 🎉 Just pushed the new design system updates to staging. Would love for everyone to take a look before we ship it live.',
-    reactions: [
-      { emoji: '🎉', count: 6 },
-      { emoji: '🔥', count: 3 },
-    ],
-    threadCount: 5,
-  },
-  {
-    id: 2,
-    author: 'jordan',
-    avatar: 'J',
-    avatarColor: 'var(--wave-accent-green)',
-    time: '9:48 AM',
-    content: 'Looking great! I noticed the button component\'s hover state is a bit subtle — might want to bump the contrast there. Otherwise ship it! 🚀',
-    reactions: [
-      { emoji: '👍', count: 3 },
-    ],
-  },
-  {
-    id: 3,
-    author: 'mira',
-    avatar: 'M',
-    avatarColor: 'var(--wave-accent-pink)',
-    time: '9:55 AM',
-    content: 'Agreed with @jordan! Also the spacing on mobile cards feels a bit tight. I left a comment in Figma.',
-    reactions: [
-      { emoji: '👀', count: 4 },
-    ],
-  },
-  {
-    id: 4,
-    author: 'kaito',
-    avatar: 'K',
-    avatarColor: 'var(--wave-accent-blue)',
-    time: '10:12 AM',
-    content: 'Tested on staging — looks solid on Chrome and Safari. There\'s a minor layout shift on Firefox at 1024px, but I think it\'s just a missing @supports query. I can patch that today.',
-    reactions: [],
-  },
-]
+const messages = computed(() => messageStore.messages)
 
-// 成员列表
-const memberGroups = [
-  {
-    label: 'Online',
-    members: [
-      { name: 'alex', color: 'var(--wave-accent)', status: 'online' },
-      { name: 'jordan', color: 'var(--wave-accent-green)', status: 'online' },
-      { name: 'mira', color: 'var(--wave-accent-pink)', status: 'online' },
-      { name: 'kaito', color: 'var(--wave-accent-blue)', status: 'online' },
-      { name: 'taylor', color: 'var(--wave-accent-orange)', status: 'online' },
-    ],
-  },
-  {
-    label: 'Offline',
-    members: [
-      { name: 'sam', color: 'var(--wave-accent)', status: 'offline' },
-      { name: 'riley', color: 'var(--wave-accent-green)', status: 'offline' },
-    ],
-  },
-]
+// 当前用户
+const currentUser = computed(() => authStore.user)
 
 // 输入框内容
 const messageInput = ref('')
+
+// 初始化
+onMounted(async () => {
+  // 连接WebSocket
+  wsStore.connect()
+
+  // 加载房间列表
+  loadingRooms.value = true
+  await roomStore.fetchMyRooms()
+  loadingRooms.value = false
+
+  // 如果有房间，默认选中第一个
+  if (roomStore.rooms.length > 0 && !activeRoomId.value) {
+    selectRoom(roomStore.rooms[0]!.id)
+  }
+})
+
+// 监听房间变化，加载消息
+watch(activeRoomId, async (newRoomId) => {
+  if (newRoomId) {
+    loadingMessages.value = true
+    await messageStore.fetchMessages(newRoomId)
+    loadingMessages.value = false
+
+    // 加载房间成员
+    await roomStore.fetchMembers(newRoomId)
+  }
+})
 
 /**
  * 选择房间
  * @param roomId - 房间ID
  */
 function selectRoom(roomId: string) {
-  activeRoom.value = roomId
+  activeRoomId.value = roomId
+  roomStore.currentRoom = roomStore.roomMap.get(roomId) || null
 }
 
 /**
@@ -159,194 +96,204 @@ function goToProfile() {
 }
 
 /**
- * 跳转到线程页面
+ * 发送消息
  */
-function goToThread() {
-  router.push('/thread')
+async function sendMessage() {
+  if (!messageInput.value.trim() || !activeRoomId.value) return
+
+  const content = messageInput.value.trim()
+
+  // 通过WebSocket发送消息
+  wsStore.send('ChatMessage', {
+    room_id: activeRoomId.value,
+    content: content,
+  })
+
+  messageInput.value = ''
 }
 
 /**
- * 发送消息
+ * 获取用户头像颜色
+ * @param userId - 用户ID
  */
-function sendMessage() {
-  if (!messageInput.value.trim()) return
-  // TODO: 发送消息逻辑
-  messageInput.value = ''
+function getAvatarColor(userId: string): string {
+  const colors: string[] = [
+    'var(--accent)',
+    'var(--accent-green)',
+    'var(--accent-pink)',
+    'var(--accent-blue)',
+    'var(--accent-orange)',
+  ]
+  let hash = 0
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const index = Math.abs(hash) % colors.length
+  return colors[index]!
+}
+
+/**
+ * 获取用户首字母
+ * @param name - 用户名
+ */
+function getInitials(name: string): string {
+  return name ? name.charAt(0).toUpperCase() : '?'
+}
+
+/**
+ * 格式化时间
+ * @param date - 日期字符串
+ */
+function formatTime(date: string): string {
+  return new Date(date).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 </script>
 
 <template>
   <div class="app-layout">
-    <!-- 窄边导航栏 -->
-    <NavBar>
-      <template #quick-bar>
-        <QuickBar :items="quickItems" />
-      </template>
-    </NavBar>
-
-    <!-- 侧边栏 -->
-    <aside class="sidebar">
-      <div class="sidebar-header" @click="$router.push('/')">
-        <span>CapellaRoom</span>
-        <el-icon><ArrowRight /></el-icon>
-      </div>
-
-      <div class="sidebar-search">
-        <el-input
-          :placeholder="t('chat.findRoom')"
-          :prefix-icon="Search"
-          size="small"
-        />
-      </div>
-
-      <div class="rooms">
-        <div
-          v-for="category in roomCategories"
-          :key="category.name"
-          class="room-category"
-        >
-          <div class="category-header">
-            <span>{{ category.name }}</span>
-            <el-icon class="add-icon"><Plus /></el-icon>
-          </div>
-          <div
-            v-for="room in category.rooms"
-            :key="room.id"
-            class="room"
-            :class="{ active: activeRoom === room.id }"
-            @click="selectRoom(room.id)"
-          >
-            <span class="room-prefix">
-              <el-icon v-if="room.locked || room.type === 'private'"><Lock /></el-icon>
-              <span v-else>#</span>
-            </span>
-            <span class="room-name">{{ room.name }}</span>
-            <span v-if="room.unread > 0" class="room-badge">
-              {{ room.unread }}
-            </span>
-          </div>
+      <!-- 侧边栏 -->
+      <aside class="sidebar">
+        <div class="sidebar-header" @click="$router.push('/')">
+          <span>CapellaRoom</span>
+          <el-icon><ArrowRight /></el-icon>
         </div>
-      </div>
 
-      <!-- 用户信息 -->
-      <div class="user-section" @click="goToProfile">
-        <div class="user-avatar">
-          <span>A</span>
-          <span class="status-dot"></span>
-        </div>
-        <div class="user-info">
-          <div class="user-name">alex</div>
-          <div class="user-status">{{ t('chat.online') }}</div>
-        </div>
-        <div class="user-controls">
-          <el-button text circle size="small">
-            <el-icon><Microphone /></el-icon>
-          </el-button>
-          <el-button text circle size="small">
-            <el-icon><Setting /></el-icon>
-          </el-button>
-        </div>
-      </div>
-    </aside>
-
-    <!-- 主内容区 -->
-    <main class="main">
-      <!-- 聊天头部 -->
-      <header class="chat-header">
-        <div class="room-info">
-          <span class="room-hash">#</span>
-          <span class="room-title">{{ activeRoom }}</span>
-          <span class="room-topic">· Community updates & announcements</span>
-        </div>
-        <div class="chat-header-right">
-          <div class="member-avatars">
-            <div
-              v-for="i in 5"
-              :key="i"
-              class="mini-avatar"
-              :style="{
-                background: [
-                  'var(--wave-accent)',
-                  'var(--wave-accent-pink)',
-                  'var(--wave-accent-green)',
-                  'var(--wave-accent-orange)',
-                  'var(--wave-accent-blue)',
-                ][i - 1],
-              }"
-            >
-              {{ ['A', 'M', 'J', 'T', 'K'][i - 1] }}
-            </div>
-          </div>
-          <span class="member-count">18 {{ t('chat.online') }}</span>
-          <el-button text circle>
-            <el-icon><Search /></el-icon>
-          </el-button>
-          <el-button text circle @click="goToThread">
-            <el-icon><MoreFilled /></el-icon>
-          </el-button>
-        </div>
-      </header>
-
-      <!-- 消息列表 -->
-      <div class="messages">
-        <div
-          v-for="message in messages"
-          :key="message.id"
-          class="message"
-        >
-          <div
-            class="message-avatar"
-            :style="{ background: message.avatarColor }"
-          >
-            {{ message.avatar }}
-          </div>
-          <div class="message-body">
-            <div class="message-header">
-              <span class="message-author">{{ message.author }}</span>
-              <span class="message-time">{{ message.time }}</span>
-            </div>
-            <div class="message-content">{{ message.content }}</div>
-            <div v-if="message.reactions.length > 0" class="message-reactions">
-              <span
-                v-for="(reaction, idx) in message.reactions"
-                :key="idx"
-                class="reaction"
-              >
-                {{ reaction.emoji }} {{ reaction.count }}
-              </span>
-            </div>
-            <div
-              v-if="message.threadCount"
-              class="message-thread"
-              @click="goToThread"
-            >
-              {{ message.threadCount }} {{ t('chat.replies') }}
-              <el-icon><ArrowRight /></el-icon>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 输入框 -->
-      <div class="input-area">
-        <div class="input-wrapper">
-          <div class="input-tools">
-            <el-button text circle size="small">
-              <el-icon><Plus /></el-icon>
-            </el-button>
-            <el-button text circle size="small">
-              <el-icon><Microphone /></el-icon>
-            </el-button>
-          </div>
+        <div class="sidebar-search">
           <el-input
-            v-model="messageInput"
-            type="textarea"
-            :rows="1"
-            :placeholder="t('chat.messagePlaceholder', { room: activeRoom })"
-            resize="none"
-            @keydown.enter.prevent="sendMessage"
+            :placeholder="t('chat.findRoom')"
+            :prefix-icon="Search"
+            size="small"
           />
-          <div class="input-tools">
+        </div>
+
+        <div v-if="loadingRooms" class="rooms-loading">
+          <el-skeleton :rows="5" animated />
+        </div>
+
+        <div v-else class="rooms">
+          <!-- 公开房间 -->
+          <div v-if="publicRooms.length > 0" class="room-category">
+            <div class="category-header">
+              <span>{{ t('chat.publicRooms') }}</span>
+              <el-icon class="add-icon"><Plus /></el-icon>
+            </div>
+            <div
+              v-for="room in publicRooms"
+              :key="room.id"
+              class="room"
+              :class="{ active: activeRoomId === room.id }"
+              @click="selectRoom(room.id)"
+            >
+              <span class="room-prefix">#</span>
+              <span class="room-name">{{ room.name }}</span>
+            </div>
+          </div>
+
+          <!-- 私有房间 -->
+          <div v-if="privateRooms.length > 0" class="room-category">
+            <div class="category-header">
+              <span>{{ t('chat.myRooms') }}</span>
+              <el-icon class="add-icon"><Plus /></el-icon>
+            </div>
+            <div
+              v-for="room in privateRooms"
+              :key="room.id"
+              class="room"
+              :class="{ active: activeRoomId === room.id }"
+              @click="selectRoom(room.id)"
+            >
+              <span class="room-prefix">
+                <el-icon><Lock /></el-icon>
+              </span>
+              <span class="room-name">{{ room.name }}</span>
+            </div>
+          </div>
+
+          <!-- 没有房间时显示 -->
+          <div v-if="publicRooms.length === 0 && privateRooms.length === 0" class="no-rooms">
+            <el-empty :description="t('chat.noRooms')" />
+          </div>
+        </div>
+
+        <!-- 用户信息 -->
+        <div class="user-section" @click="goToProfile">
+          <div class="user-avatar">
+            <span>{{ getInitials(currentUser?.username || '') }}</span>
+            <span class="status-dot"></span>
+          </div>
+          <div class="user-info">
+            <div class="user-name">{{ currentUser?.username || 'User' }}</div>
+            <div class="user-status">{{ t('chat.online') }}</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 主内容区 -->
+      <main class="main">
+        <!-- 聊天头部 -->
+        <header v-if="activeRoom" class="chat-header">
+          <div class="room-info">
+            <span class="room-hash">#</span>
+            <span class="room-title">{{ activeRoom.name }}</span>
+            <span v-if="activeRoom.description" class="room-topic">· {{ activeRoom.description }}</span>
+          </div>
+          <div class="chat-header-right">
+            <span class="member-count">{{ roomStore.members.length }} {{ t('chat.members') }}</span>
+          </div>
+        </header>
+
+        <!-- 消息列表 -->
+        <div v-if="activeRoom" class="messages">
+          <div v-if="loadingMessages" class="messages-loading">
+            <el-skeleton :rows="10" animated />
+          </div>
+
+          <template v-else>
+            <div
+              v-for="message in messages"
+              :key="message.id"
+              class="message"
+            >
+              <div
+                class="message-avatar"
+                :style="{ background: getAvatarColor(message.sender.id) }"
+              >
+                {{ getInitials(message.sender.username) }}
+              </div>
+              <div class="message-body">
+                <div class="message-header">
+                  <span class="message-author">{{ message.sender.username }}</span>
+                  <span class="message-time">{{ formatTime(message.created_at) }}</span>
+                </div>
+                <div class="message-content">{{ message.content }}</div>
+              </div>
+            </div>
+
+            <div v-if="messages.length === 0" class="no-messages">
+              <el-empty :description="t('chat.noMessages')" />
+            </div>
+          </template>
+        </div>
+
+        <!-- 未选择房间时显示 -->
+        <div v-else class="no-room-selected">
+          <el-empty :description="t('chat.selectRoom')" />
+        </div>
+
+        <!-- 输入框 -->
+        <div v-if="activeRoom" class="input-area">
+          <div class="input-wrapper">
+            <el-input
+              v-model="messageInput"
+              type="textarea"
+              :rows="1"
+              :placeholder="t('chat.messagePlaceholder', { room: activeRoom.name })"
+              resize="none"
+              @keydown.enter.prevent="sendMessage"
+            />
             <el-button
               type="primary"
               circle
@@ -358,81 +305,45 @@ function sendMessage() {
             </el-button>
           </div>
         </div>
-      </div>
-    </main>
-
-    <!-- 右侧面板 -->
-    <aside class="right-panel">
-      <div class="panel-header">{{ t('chat.members') }}</div>
-      <div class="member-list">
-        <div
-          v-for="group in memberGroups"
-          :key="group.label"
-          class="member-group"
-        >
-          <div class="member-group-label">{{ group.label }} — {{ group.members.length }}</div>
-          <div
-            v-for="member in group.members"
-            :key="member.name"
-            class="member-item"
-          >
-            <div
-              class="member-dot"
-              :style="{
-                background: member.status === 'online' ? 'var(--wave-accent-green)' : 'var(--wave-muted)',
-              }"
-            />
-            <div
-              class="member-avatar-mini"
-              :style="{ background: member.color }"
-            >
-              {{ member.name.charAt(0).toUpperCase() }}
-            </div>
-            <span class="member-name">{{ member.name }}</span>
-          </div>
-        </div>
-      </div>
-    </aside>
-  </div>
+      </main>
+    </div>
 </template>
 
 <style scoped lang="scss">
 .app-layout {
   display: flex;
-  height: 100vh;
-  background: var(--wave-bg);
-  color: var(--wave-fg);
+  flex: 1;
   overflow: hidden;
 }
 
 // 侧边栏
 .sidebar {
-  width: var(--wave-sidebar-w);
-  min-width: var(--wave-sidebar-w);
-  background: var(--wave-sidebar-bg);
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--wave-border);
+  border-right: 1px solid var(--border);
 }
 
 .sidebar-header {
-  height: var(--wave-header-h);
+  height: var(--header-h);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  border-bottom: 1px solid var(--wave-border);
-  font-family: var(--wave-font-display);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
 
   &:hover {
-    background: var(--wave-message-hover);
+    background: var(--message-hover);
   }
 
   .el-icon {
-    color: var(--wave-muted);
+    color: var(--muted);
   }
 }
 
@@ -440,8 +351,13 @@ function sendMessage() {
   padding: 12px;
 
   :deep(.el-input__wrapper) {
-    background-color: var(--wave-bg);
+    background-color: var(--bg);
   }
+}
+
+.rooms-loading {
+  flex: 1;
+  padding: 16px;
 }
 
 .rooms {
@@ -460,14 +376,14 @@ function sendMessage() {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--wave-muted);
+  color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
 
   &:hover {
-    color: var(--wave-fg);
+    color: var(--fg);
   }
 }
 
@@ -480,29 +396,29 @@ function sendMessage() {
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  border-radius: var(--wave-radius);
+  border-radius: var(--radius);
   font-size: 15px;
-  color: var(--wave-muted);
+  color: var(--muted);
   cursor: pointer;
   transition: background 0.1s;
 
   &:hover {
-    background: var(--wave-message-hover);
-    color: var(--wave-fg);
+    background: var(--message-hover);
+    color: var(--fg);
   }
 
   &.active {
-    background: var(--wave-accent-soft);
-    color: var(--wave-fg);
+    background: var(--accent-soft);
+    color: var(--fg);
 
     .room-prefix {
-      color: var(--wave-accent);
+      color: var(--accent);
     }
   }
 }
 
 .room-prefix {
-  color: var(--wave-muted);
+  color: var(--muted);
   opacity: 0.6;
   font-weight: 300;
   font-size: 16px;
@@ -518,20 +434,13 @@ function sendMessage() {
   flex: 1;
 }
 
-.room-badge {
-  background: var(--wave-accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: var(--wave-radius-full);
-  min-width: 20px;
-  text-align: center;
+.no-rooms {
+  padding: 32px 16px;
 }
 
 // 用户信息
 .user-section {
-  border-top: 1px solid var(--wave-border);
+  border-top: 1px solid var(--border);
   padding: 10px 12px;
   display: flex;
   align-items: center;
@@ -539,7 +448,7 @@ function sendMessage() {
   cursor: pointer;
 
   &:hover {
-    background: var(--wave-message-hover);
+    background: var(--message-hover);
   }
 }
 
@@ -547,7 +456,7 @@ function sendMessage() {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
   display: grid;
   place-items: center;
   font-size: 14px;
@@ -564,8 +473,8 @@ function sendMessage() {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--wave-accent-green);
-  border: 2px solid var(--wave-sidebar-bg);
+  background: var(--accent-green);
+  border: 2px solid var(--sidebar-bg);
 }
 
 .user-info {
@@ -580,20 +489,7 @@ function sendMessage() {
 
 .user-status {
   font-size: 12px;
-  color: var(--wave-muted);
-}
-
-.user-controls {
-  display: flex;
-  gap: 4px;
-
-  .el-button {
-    color: var(--wave-muted);
-
-    &:hover {
-      color: var(--wave-fg);
-    }
-  }
+  color: var(--muted);
 }
 
 // 主内容区
@@ -602,105 +498,90 @@ function sendMessage() {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  background: var(--bg);
 }
 
 .chat-header {
-  height: var(--wave-header-h);
+  height: var(--header-h);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 20px;
-  border-bottom: 1px solid var(--wave-border);
-  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .room-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 15px;
 }
 
 .room-hash {
-  color: var(--wave-muted);
+  color: var(--muted);
   font-weight: 300;
-  font-size: 20px;
 }
 
 .room-title {
-  font-size: 16px;
   font-weight: 600;
 }
 
 .room-topic {
+  color: var(--muted);
   font-size: 13px;
-  color: var(--wave-muted);
 }
 
 .chat-header-right {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.member-avatars {
-  display: flex;
-}
-
-.mini-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid var(--wave-bg);
-  margin-left: -6px;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-
-  &:first-child {
-    margin-left: 0;
-  }
-}
-
 .member-count {
   font-size: 13px;
-  color: var(--wave-muted);
+  color: var(--muted);
 }
 
 // 消息列表
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px 8px;
+  padding: 20px;
+}
+
+.messages-loading {
+  padding: 20px;
+}
+
+.no-messages,
+.no-room-selected {
+  height: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
 }
 
 .message {
   display: flex;
   gap: 12px;
-  padding: 6px 12px;
-  border-radius: var(--wave-radius);
-  transition: background 0.1s;
+  padding: 8px 0;
 
   &:hover {
-    background: var(--wave-message-hover);
+    background: var(--message-hover);
   }
 }
 
 .message-avatar {
   width: 40px;
   height: 40px;
-  min-width: 40px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-size: 16px;
   font-weight: 600;
   color: #fff;
-  margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .message-body {
@@ -710,202 +591,55 @@ function sendMessage() {
 
 .message-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .message-author {
-  font-size: 15px;
   font-weight: 600;
-
-  &:hover {
-    text-decoration: underline;
-    cursor: pointer;
-  }
+  font-size: 15px;
 }
 
 .message-time {
-  font-size: 11px;
-  color: var(--wave-muted);
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .message-content {
   font-size: 15px;
   line-height: 1.5;
-}
-
-.message-reactions {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.reaction {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 7px;
-  border-radius: var(--wave-radius-full);
-  background: var(--wave-accent-soft);
-  font-size: 13px;
-  cursor: pointer;
-  border: 1px solid transparent;
-
-  &:hover {
-    border-color: var(--wave-accent);
-  }
-}
-
-.message-thread {
-  margin-top: 6px;
-  font-size: 13px;
-  color: var(--wave-accent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover {
-    text-decoration: underline;
-  }
+  color: var(--fg);
+  word-break: break-word;
 }
 
 // 输入框
 .input-area {
-  padding: 0 20px 20px;
-  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .input-wrapper {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  background: var(--wave-surface);
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius);
+  gap: 12px;
+  background: var(--sidebar-bg);
+  border-radius: var(--radius);
   padding: 8px 12px;
-  transition: border-color 0.15s;
-
-  &:focus-within {
-    border-color: var(--wave-accent);
-  }
-
-  :deep(.el-textarea__inner) {
-    background: none;
-    border: none;
-    color: var(--wave-fg);
-    padding: 8px 4px;
-    resize: none;
-    max-height: 144px;
-    line-height: 1.4;
-    box-shadow: none;
-
-    &::placeholder {
-      color: var(--wave-muted);
-    }
-
-    &:focus {
-      box-shadow: none;
-    }
-  }
 }
 
-.input-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-
-  .el-button {
-    color: var(--wave-muted);
-
-    &:hover {
-      color: var(--wave-fg);
-      background: var(--wave-message-hover);
-    }
-
-    &.is-disabled {
-      color: var(--wave-muted);
-    }
-  }
+:deep(.el-input__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
-// 右侧面板
-.right-panel {
-  width: 280px;
-  min-width: 280px;
-  background: var(--wave-sidebar-bg);
-  border-left: 1px solid var(--wave-border);
-  display: flex;
-  flex-direction: column;
-
-  @media (max-width: 860px) {
-    display: none;
-  }
-}
-
-.panel-header {
-  height: var(--wave-header-h);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--wave-border);
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.member-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.member-group {
-  margin-bottom: 16px;
-}
-
-.member-group-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--wave-muted);
-  padding: 8px 8px 4px;
-}
-
-.member-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: var(--wave-radius);
-  cursor: pointer;
-
-  &:hover {
-    background: var(--wave-message-hover);
-  }
-}
-
-.member-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.member-avatar-mini {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.member-name {
-  font-size: 14px;
-  flex: 1;
+:deep(.el-textarea__inner) {
+  background: transparent;
+  border: none;
+  resize: none;
+  min-height: 36px;
+  max-height: 200px;
 }
 </style>

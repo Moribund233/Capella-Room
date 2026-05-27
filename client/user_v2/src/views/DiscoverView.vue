@@ -2,16 +2,9 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NavBar } from '@/components/nav'
-import { QuickBar } from '@/components/quick'
-import type { QuickItem } from '@/components/quick'
 import { useTheme } from '@/composables/useTheme'
 import {
   Search,
-  Bell,
-  Moon,
-  Sunny,
-  User,
   TrendCharts,
   CollectionTag,
   Lock,
@@ -20,26 +13,7 @@ import {
 
 const router = useRouter()
 const { t } = useI18n()
-const { isDark, toggleTheme } = useTheme()
-
-// QuickBar 配置 - 主题图标根据当前主题动态变化
-const quickItems = computed<QuickItem[]>(() => [
-  {
-    key: 'notifications',
-    display: 'visible',
-    icon: Bell,
-    label: t('profile.preferences.notifications.title'),
-    badge: 3,
-    onClick: () => {},
-  },
-  {
-    key: 'theme',
-    display: 'visible',
-    icon: isDark.value ? Moon : Sunny,
-    label: isDark.value ? t('profile.appearance.theme.dark') : t('profile.appearance.theme.light'),
-    onClick: toggleTheme,
-  },
-])
+const { isDark } = useTheme()
 
 // 搜索关键词
 const searchQuery = ref('')
@@ -66,7 +40,7 @@ const featuredRooms = [
     tags: ['tech', 'javascript', 'vue'],
     type: 'public',
     icon: 'V',
-    iconColor: 'var(--wave-accent-green)',
+    iconColor: 'var(--accent-green)',
   },
   {
     id: 'rust-lang',
@@ -76,7 +50,7 @@ const featuredRooms = [
     tags: ['tech', 'rust', 'systems'],
     type: 'public',
     icon: 'R',
-    iconColor: 'var(--wave-accent-orange)',
+    iconColor: 'var(--accent-orange)',
   },
   {
     id: 'design-systems',
@@ -86,7 +60,7 @@ const featuredRooms = [
     tags: ['design', 'ui', 'ux'],
     type: 'public',
     icon: 'D',
-    iconColor: 'var(--wave-accent-pink)',
+    iconColor: 'var(--accent-pink)',
   },
 ]
 
@@ -144,13 +118,6 @@ function viewRoom() {
 
 <template>
   <div class="discover-layout">
-    <!-- 窄边导航栏 -->
-    <NavBar>
-      <template #quick-bar>
-        <QuickBar :items="quickItems" />
-      </template>
-    </NavBar>
-
     <!-- 主内容区 -->
     <main class="discover-main">
       <!-- 头部 -->
@@ -271,8 +238,8 @@ function viewRoom() {
 .discover-layout {
   display: flex;
   height: 100vh;
-  background: var(--wave-bg);
-  color: var(--wave-fg);
+  background: var(--bg);
+  color: var(--fg);
   overflow: hidden;
 }
 
@@ -285,10 +252,10 @@ function viewRoom() {
   padding: 48px 48px 32px;
   background: linear-gradient(
     180deg,
-    color-mix(in oklch, var(--wave-accent) 8%, var(--wave-bg)) 0%,
-    var(--wave-bg) 100%
+    color-mix(in oklch, var(--accent) 8%, var(--bg)) 0%,
+    var(--bg) 100%
   );
-  border-bottom: 1px solid var(--wave-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .header-content {
@@ -297,11 +264,11 @@ function viewRoom() {
 }
 
 .discover-title {
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: 36px;
   font-weight: 700;
   margin: 0 0 8px;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -309,7 +276,7 @@ function viewRoom() {
 
 .discover-subtitle {
   font-size: 16px;
-  color: var(--wave-muted);
+  color: var(--muted);
   margin: 0 0 24px;
 }
 
@@ -319,14 +286,14 @@ function viewRoom() {
 
 .search-input {
   :deep(.el-input__wrapper) {
-    background-color: var(--wave-surface);
-    border: 1px solid var(--wave-border);
-    border-radius: var(--wave-radius-lg);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 8px 16px;
     box-shadow: none;
 
     &.is-focus {
-      border-color: var(--wave-accent);
+      border-color: var(--accent);
     }
   }
 
@@ -344,22 +311,22 @@ function viewRoom() {
 
 .category-tab {
   padding: 8px 16px;
-  border-radius: var(--wave-radius-full);
-  border: 1px solid var(--wave-border);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--wave-muted);
+  color: var(--muted);
   font-size: 14px;
   cursor: pointer;
   transition: all 0.15s;
 
   &:hover {
-    border-color: var(--wave-fg);
-    color: var(--wave-fg);
+    border-color: var(--fg);
+    color: var(--fg);
   }
 
   &.active {
-    background: var(--wave-accent);
-    border-color: var(--wave-accent);
+    background: var(--accent);
+    border-color: var(--accent);
     color: #fff;
   }
 }
@@ -385,7 +352,7 @@ function viewRoom() {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 20px;
-  color: var(--wave-fg);
+  color: var(--fg);
 }
 
 .featured-grid {
@@ -395,9 +362,9 @@ function viewRoom() {
 }
 
 .room-card {
-  background: var(--wave-surface);
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 
   :deep(.el-card__body) {
     padding: 20px;
@@ -439,7 +406,7 @@ function viewRoom() {
       align-items: center;
       gap: 8px;
       font-size: 13px;
-      color: var(--wave-muted);
+      color: var(--muted);
 
       .el-icon {
         font-size: 14px;
@@ -448,7 +415,7 @@ function viewRoom() {
 
     .room-description {
       font-size: 14px;
-      color: var(--wave-muted);
+      color: var(--muted);
       margin: 0 0 12px;
       line-height: 1.5;
     }
@@ -460,9 +427,9 @@ function viewRoom() {
       margin-bottom: 16px;
 
       .el-tag {
-        background: var(--wave-bg);
-        border-color: var(--wave-border);
-        color: var(--wave-muted);
+        background: var(--bg);
+        border-color: var(--border);
+        color: var(--muted);
       }
     }
 
@@ -503,7 +470,7 @@ function viewRoom() {
 
   .room-description {
     font-size: 13px;
-    color: var(--wave-muted);
+    color: var(--muted);
     margin: 0 0 8px;
     line-height: 1.4;
   }
@@ -513,14 +480,14 @@ function viewRoom() {
     align-items: center;
     gap: 12px;
     font-size: 13px;
-    color: var(--wave-muted);
+    color: var(--muted);
 
     .el-icon {
       font-size: 14px;
     }
 
     .growth {
-      color: var(--wave-accent-green);
+      color: var(--accent-green);
       font-weight: 500;
     }
   }

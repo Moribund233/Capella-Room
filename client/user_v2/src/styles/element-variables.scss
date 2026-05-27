@@ -90,59 +90,100 @@ html.dark {
   --el-color-info: #{$--color-info};
 }
 
+// 亮色主题 Element Plus 变量
+html.light {
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f8f8fa;
+  --el-bg-color-overlay: #ffffff;
+
+  --el-text-color-primary: #1a1a2e;
+  --el-text-color-regular: #1a1a2e;
+  --el-text-color-secondary: #6b6b7b;
+  --el-text-color-placeholder: #8b8b9e;
+  --el-text-color-disabled: #b0b0bc;
+
+  --el-border-color: #e0e0e8;
+  --el-border-color-light: #e8e8f0;
+  --el-border-color-lighter: #f0f0f5;
+  --el-border-color-extra-light: #f5f5fa;
+  --el-border-color-dark: #d0d0dc;
+  --el-border-color-darker: #c0c0cc;
+
+  --el-fill-color: #f5f5fa;
+  --el-fill-color-light: #f8f8fc;
+  --el-fill-color-lighter: #fafafd;
+  --el-fill-color-extra-light: #fcfcff;
+  --el-fill-color-dark: #ebebf0;
+  --el-fill-color-darker: #e0e0e8;
+  --el-fill-color-blank: #ffffff;
+
+  --el-color-primary: #{$--color-primary};
+  --el-color-primary-light-3: #{$--color-primary-light-3};
+  --el-color-primary-light-5: #{$--color-primary-light-5};
+  --el-color-primary-light-7: #{$--color-primary-light-7};
+  --el-color-primary-light-8: #{$--color-primary-light-8};
+  --el-color-primary-light-9: #f3f1ff;
+  --el-color-primary-dark-2: #{$--color-primary-dark-2};
+
+  --el-color-success: #{$--color-success};
+  --el-color-warning: #{$--color-warning};
+  --el-color-danger: #{$--color-danger};
+  --el-color-info: #{$--color-info};
+}
+
 // CSS 变量定义（用于自定义组件）
 // 深色主题（默认）
 :root {
-  --wave-bg: #0b0b14;
-  --wave-surface: #141420;
-  --wave-sidebar-bg: #11111c;
-  --wave-fg: #ececf1;
-  --wave-muted: #8b8b9e;
-  --wave-border: #262636;
-  --wave-accent: #7c5cfc;
-  --wave-accent-soft: rgba(124, 92, 252, 0.18);
-  --wave-accent-pink: #e85d9a;
-  --wave-accent-green: #3ba55d;
-  --wave-accent-orange: #f09042;
-  --wave-accent-blue: #4a9eff;
-  --wave-fg-soft: rgba(236, 236, 241, 0.06);
-  --wave-mention-bg: rgba(124, 92, 252, 0.14);
-  --wave-message-hover: rgba(236, 236, 241, 0.03);
+  --bg: #0b0b14;
+  --surface: #141420;
+  --sidebar-bg: #11111c;
+  --fg: #ececf1;
+  --muted: #8b8b9e;
+  --border: #262636;
+  --accent: #7c5cfc;
+  --accent-soft: rgba(124, 92, 252, 0.18);
+  --accent-pink: #e85d9a;
+  --accent-green: #3ba55d;
+  --accent-orange: #f09042;
+  --accent-blue: #4a9eff;
+  --fg-soft: rgba(236, 236, 241, 0.06);
+  --mention-bg: rgba(124, 92, 252, 0.14);
+  --message-hover: rgba(236, 236, 241, 0.03);
 
-  --wave-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
-  --wave-font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  --wave-font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
 
-  --wave-radius: 8px;
-  --wave-radius-lg: 16px;
-  --wave-radius-full: 9999px;
-  --wave-sidebar-w: 260px;
-  --wave-header-h: 52px;
+  --radius: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --sidebar-w: 260px;
+  --header-h: 52px;
 
   // Logo/SVG 图标滤镜 - 深色主题下将深色图标转为白色
-  --wave-logo-filter: brightness(0) invert(1);
+  --logo-filter: brightness(0) invert(1);
 }
 
 // 浅色主题
 html.light {
-  --wave-bg: #ffffff;
-  --wave-surface: #f8f8fa;
-  --wave-sidebar-bg: #f0f0f5;
-  --wave-fg: #1a1a2e;
-  --wave-muted: #6b6b7b;
-  --wave-border: #e0e0e8;
-  --wave-accent: #7c5cfc;
-  --wave-accent-soft: rgba(124, 92, 252, 0.12);
-  --wave-accent-pink: #e85d9a;
-  --wave-accent-green: #3ba55d;
-  --wave-accent-orange: #f09042;
-  --wave-accent-blue: #4a9eff;
-  --wave-fg-soft: rgba(26, 26, 46, 0.04);
-  --wave-mention-bg: rgba(124, 92, 252, 0.10);
-  --wave-message-hover: rgba(26, 26, 46, 0.02);
+  --bg: #ffffff;
+  --surface: #f8f8fa;
+  --sidebar-bg: #f0f0f5;
+  --fg: #1a1a2e;
+  --muted: #6b6b7b;
+  --border: #e0e0e8;
+  --accent: #7c5cfc;
+  --accent-soft: rgba(124, 92, 252, 0.12);
+  --accent-pink: #e85d9a;
+  --accent-green: #3ba55d;
+  --accent-orange: #f09042;
+  --accent-blue: #4a9eff;
+  --fg-soft: rgba(26, 26, 46, 0.04);
+  --mention-bg: rgba(124, 92, 252, 0.10);
+  --message-hover: rgba(26, 26, 46, 0.02);
 
   // Logo/SVG 图标滤镜 - 浅色主题下保持原样（深色图标在浅色背景上）
-  --wave-logo-filter: none;
+  --logo-filter: none;
 }
 
 // 全局样式
@@ -150,9 +191,9 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: var(--wave-font-body);
-  background-color: var(--wave-bg);
-  color: var(--wave-fg);
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  color: var(--fg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -167,12 +208,12 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--wave-border);
+  background: var(--border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--wave-muted);
+  background: var(--muted);
 }
 
 // Element Plus 组件覆盖
@@ -180,38 +221,38 @@ html, body {
   font-weight: 500;
 
   &--primary {
-    background: var(--wave-accent);
-    border-color: var(--wave-accent);
+    background: var(--accent);
+    border-color: var(--accent);
 
     &:hover {
-      background: color-mix(in oklch, var(--wave-accent) 88%, black);
-      border-color: color-mix(in oklch, var(--wave-accent) 88%, black);
+      background: color-mix(in oklch, var(--accent) 88%, black);
+      border-color: color-mix(in oklch, var(--accent) 88%, black);
     }
   }
 }
 
 .el-input {
   &__wrapper {
-    background-color: var(--wave-bg);
-    box-shadow: 0 0 0 1px var(--wave-border) inset;
+    background-color: var(--bg);
+    box-shadow: 0 0 0 1px var(--border) inset;
 
     &.is-focus {
-      box-shadow: 0 0 0 1px var(--wave-accent) inset;
+      box-shadow: 0 0 0 1px var(--accent) inset;
     }
   }
 
   &__inner {
-    color: var(--wave-fg);
+    color: var(--fg);
 
     &::placeholder {
-      color: var(--wave-muted);
+      color: var(--muted);
     }
   }
 }
 
 .el-card {
-  background-color: var(--wave-surface);
-  border-color: var(--wave-border);
+  background-color: var(--surface);
+  border-color: var(--border);
 }
 
 .el-menu {
@@ -220,5 +261,5 @@ html, body {
 }
 
 .el-divider {
-  background-color: var(--wave-border);
+  background-color: var(--border);
 }

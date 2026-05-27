@@ -25,7 +25,7 @@ const langMenuVisible = ref(false)
 function switchLanguage(code: string) {
   locale.value = code
   currentLang.value = code
-  localStorage.setItem('wave-locale', code)
+  localStorage.setItem('locale', code)
   langMenuVisible.value = false
 }
 </script>
@@ -192,8 +192,8 @@ function switchLanguage(code: string) {
 
 <style scoped lang="scss">
 .landing-page {
-  background: var(--wave-bg);
-  color: var(--wave-fg);
+  background: var(--bg);
+  color: var(--fg);
   min-height: 100vh;
 }
 
@@ -212,9 +212,9 @@ function switchLanguage(code: string) {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in oklch, var(--wave-bg) 92%, transparent);
+  background: color-mix(in oklch, var(--bg) 92%, transparent);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--wave-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .topnav-inner {
@@ -228,7 +228,7 @@ function switchLanguage(code: string) {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: 19px;
   font-weight: 600;
 }
@@ -237,7 +237,7 @@ function switchLanguage(code: string) {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  filter: var(--wave-logo-filter);
+  filter: var(--logo-filter);
   transition: filter 0.2s ease;
 }
 
@@ -249,12 +249,12 @@ function switchLanguage(code: string) {
 
 .topnav nav a {
   font-size: 14px;
-  color: var(--wave-muted);
+  color: var(--muted);
   transition: color 0.15s;
   text-decoration: none;
 
   &:hover {
-    color: var(--wave-fg);
+    color: var(--fg);
   }
 }
 
@@ -269,16 +269,16 @@ function switchLanguage(code: string) {
   gap: 4px;
   padding: 6px 12px;
   background: transparent;
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius);
-  color: var(--wave-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
   font-size: 14px;
   cursor: pointer;
   transition: all 0.15s ease;
 
   &:hover {
-    color: var(--wave-fg);
-    border-color: var(--wave-fg);
+    color: var(--fg);
+    border-color: var(--fg);
   }
 }
 
@@ -296,9 +296,9 @@ function switchLanguage(code: string) {
   top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--wave-surface);
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 4px;
   min-width: 100px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -312,19 +312,19 @@ function switchLanguage(code: string) {
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: var(--wave-muted);
+  color: var(--muted);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
   transition: all 0.15s ease;
 
   &:hover {
-    background: var(--wave-fg-soft);
-    color: var(--wave-fg);
+    background: var(--fg-soft);
+    color: var(--fg);
   }
 
   &.active {
-    color: var(--wave-accent);
+    color: var(--accent);
     font-weight: 500;
   }
 }
@@ -347,7 +347,7 @@ function switchLanguage(code: string) {
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  border-radius: var(--wave-radius-full);
+  border-radius: var(--radius-full);
   border: 1px solid transparent;
   font-size: 15px;
   font-weight: 500;
@@ -361,21 +361,21 @@ function switchLanguage(code: string) {
 }
 
 .btn-primary {
-  background: var(--wave-accent);
+  background: var(--accent);
   color: #fff;
 
   &:hover {
-    background: color-mix(in oklch, var(--wave-accent) 88%, black);
+    background: color-mix(in oklch, var(--accent) 88%, black);
   }
 }
 
 .btn-secondary {
   background: transparent;
-  color: var(--wave-fg);
-  border-color: var(--wave-border);
+  color: var(--fg);
+  border-color: var(--border);
 
   &:hover {
-    border-color: var(--wave-fg);
+    border-color: var(--fg);
   }
 }
 
@@ -389,7 +389,7 @@ function switchLanguage(code: string) {
 
 // 排版
 .h1 {
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: clamp(40px, 6vw, 72px);
   line-height: 1.04;
   letter-spacing: -0.025em;
@@ -397,7 +397,7 @@ function switchLanguage(code: string) {
 }
 
 .h2 {
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: clamp(30px, 4vw, 48px);
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -414,17 +414,17 @@ function switchLanguage(code: string) {
 .lead {
   font-size: 19px;
   line-height: 1.5;
-  color: var(--wave-muted);
+  color: var(--muted);
   max-width: 60ch;
   margin: 16px 0 0;
 }
 
 .eyebrow {
-  font-family: var(--wave-font-mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--wave-accent);
+  color: var(--accent);
   margin: 0 0 16px;
 }
 
@@ -454,9 +454,9 @@ function switchLanguage(code: string) {
 }
 
 .hero-visual {
-  background: linear-gradient(135deg, color-mix(in oklch, var(--wave-accent) 12%, var(--wave-surface)), color-mix(in oklch, var(--wave-accent-pink) 8%, var(--wave-surface)));
-  border-radius: var(--wave-radius-lg);
-  border: 1px solid var(--wave-border);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 12%, var(--surface)), color-mix(in oklch, var(--accent-pink) 8%, var(--surface)));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   aspect-ratio: 4/3;
   display: grid;
   place-items: center;
@@ -467,7 +467,7 @@ function switchLanguage(code: string) {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 40% 50%, color-mix(in oklch, var(--wave-accent) 15%, transparent) 0%, transparent 70%);
+    background: radial-gradient(circle at 40% 50%, color-mix(in oklch, var(--accent) 15%, transparent) 0%, transparent 70%);
   }
 }
 
@@ -488,23 +488,23 @@ function switchLanguage(code: string) {
   animation: float 3s ease-in-out infinite;
 
   &:nth-child(1) {
-    background: var(--wave-accent);
+    background: var(--accent);
     color: #fff;
     align-self: flex-start;
     animation-delay: 0s;
   }
 
   &:nth-child(2) {
-    background: var(--wave-surface);
-    border: 1px solid var(--wave-border);
-    color: var(--wave-fg);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--fg);
     align-self: flex-end;
     animation-delay: 0.5s;
   }
 
   &:nth-child(3) {
-    background: var(--wave-accent-soft);
-    color: var(--wave-fg);
+    background: var(--accent-soft);
+    color: var(--fg);
     align-self: flex-start;
     animation-delay: 1s;
   }
@@ -543,9 +543,9 @@ function switchLanguage(code: string) {
 }
 
 .feature-card {
-  background: var(--wave-surface);
-  border: 1px solid var(--wave-border);
-  border-radius: var(--wave-radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 32px;
 
   :deep(.el-card__body) {
@@ -556,11 +556,11 @@ function switchLanguage(code: string) {
 .feature-icon {
   width: 44px;
   height: 44px;
-  background: var(--wave-accent-soft);
+  background: var(--accent-soft);
   border-radius: 12px;
   display: grid;
   place-items: center;
-  color: var(--wave-accent);
+  color: var(--accent);
   margin-bottom: 16px;
 
   svg {
@@ -570,14 +570,14 @@ function switchLanguage(code: string) {
 }
 
 .feature-desc {
-  color: var(--wave-muted);
+  color: var(--muted);
   font-size: 15px;
   margin: 8px 0 0;
 }
 
 // 统计数据
 .stats-section {
-  background: color-mix(in oklch, var(--wave-accent) 3%, var(--wave-bg));
+  background: color-mix(in oklch, var(--accent) 3%, var(--bg));
 }
 
 .stat-row {
@@ -594,18 +594,18 @@ function switchLanguage(code: string) {
 }
 
 .stat-num {
-  font-family: var(--wave-font-display);
+  font-family: var(--font-display);
   font-size: clamp(48px, 7vw, 80px);
   line-height: 0.95;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .stat-label {
-  color: var(--wave-muted);
+  color: var(--muted);
   font-size: 15px;
   margin-top: 8px;
 }
@@ -619,7 +619,7 @@ function switchLanguage(code: string) {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 60% 50% at 50% 50%, color-mix(in oklch, var(--wave-accent) 8%, transparent), transparent);
+    background: radial-gradient(ellipse 60% 50% at 50% 50%, color-mix(in oklch, var(--accent) 8%, transparent), transparent);
     pointer-events: none;
   }
 }
@@ -641,7 +641,7 @@ function switchLanguage(code: string) {
 // 页脚
 .pagefoot {
   padding-block: 48px;
-  border-top: 1px solid var(--wave-border);
+  border-top: 1px solid var(--border);
 }
 
 .pagefoot-inner {
@@ -654,7 +654,7 @@ function switchLanguage(code: string) {
 
 .copyright {
   font-size: 13px;
-  color: var(--wave-muted);
+  color: var(--muted);
 }
 
 .pagefoot-socials {
@@ -662,12 +662,12 @@ function switchLanguage(code: string) {
   gap: 16px;
 
   a {
-    color: var(--wave-muted);
+    color: var(--muted);
     font-size: 13px;
     text-decoration: none;
 
     &:hover {
-      color: var(--wave-fg);
+      color: var(--fg);
     }
   }
 }

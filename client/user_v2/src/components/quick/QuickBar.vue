@@ -182,23 +182,23 @@ function handleChildSelect(parentKey: string, childKey: string): void {
   justify-content: center;
   background: transparent;
   border: none;
-  color: var(--wave-muted);
+  color: var(--muted);
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
 
   &:hover {
-    background: var(--wave-message-hover);
-    color: var(--wave-fg);
+    background: var(--message-hover);
+    color: var(--fg);
   }
 
   &--active {
-    color: var(--wave-accent);
-    background: var(--wave-accent-light);
+    color: var(--accent);
+    background: var(--accent-light);
 
     &:hover {
-      color: var(--wave-accent);
-      background: var(--wave-accent-light);
+      color: var(--accent);
+      background: var(--accent-light);
     }
   }
 }
@@ -211,7 +211,7 @@ function handleChildSelect(parentKey: string, childKey: string): void {
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--wave-accent);
+  background: var(--accent);
   color: #fff;
   font-size: 10px;
   font-weight: 600;

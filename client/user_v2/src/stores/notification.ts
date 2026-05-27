@@ -33,6 +33,8 @@ export const useNotificationStore = defineStore('notification', () => {
   const hasMoreOffline = ref(false)
   /** 从服务器获取的未读计数 */
   const serverUnreadCount = ref(0)
+  /** 通知面板是否显示 */
+  const isPanelOpen = ref(false)
 
   // ========== Getters ==========
   /** 本地未读通知数量（基于内存中的通知） */
@@ -41,6 +43,8 @@ export const useNotificationStore = defineStore('notification', () => {
   const pendingCount = computed(() => pendingActions.value.length)
   /** 总未读数量（使用服务器计数，更准确） */
   const totalUnreadCount = computed(() => serverUnreadCount.value + pendingCount.value)
+  /** 未读计数（用于徽标显示） */
+  const unreadCount = computed(() => serverUnreadCount.value)
   /** 按日期分组的通知 */
   const groupedNotifications = computed(() => {
     const groups: Record<string, NotificationItem[]> = {}
@@ -484,6 +488,27 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
+  /**
+   * 切换通知面板显示状态
+   */
+  function togglePanel() {
+    isPanelOpen.value = !isPanelOpen.value
+  }
+
+  /**
+   * 打开通知面板
+   */
+  function openPanel() {
+    isPanelOpen.value = true
+  }
+
+  /**
+   * 关闭通知面板
+   */
+  function closePanel() {
+    isPanelOpen.value = false
+  }
+
   return {
     // State
     notifications,
@@ -491,10 +516,12 @@ export const useNotificationStore = defineStore('notification', () => {
     loading,
     initialized,
     hasMoreOffline,
+    isPanelOpen,
     // Getters
     localUnreadCount,
     pendingCount,
     totalUnreadCount,
+    unreadCount,
     groupedNotifications,
     // Actions
     initialize,
@@ -508,5 +535,8 @@ export const useNotificationStore = defineStore('notification', () => {
     clearAll,
     fetchPendingActions,
     respondPendingAction,
+    togglePanel,
+    openPanel,
+    closePanel,
   }
 })
