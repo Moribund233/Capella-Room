@@ -91,6 +91,7 @@ html.dark {
 }
 
 // CSS 变量定义（用于自定义组件）
+// 深色主题（默认）
 :root {
   --wave-bg: #0b0b14;
   --wave-surface: #141420;
@@ -117,6 +118,31 @@ html.dark {
   --wave-radius-full: 9999px;
   --wave-sidebar-w: 260px;
   --wave-header-h: 52px;
+
+  // Logo/SVG 图标滤镜 - 深色主题下将深色图标转为白色
+  --wave-logo-filter: brightness(0) invert(1);
+}
+
+// 浅色主题
+html.light {
+  --wave-bg: #ffffff;
+  --wave-surface: #f8f8fa;
+  --wave-sidebar-bg: #f0f0f5;
+  --wave-fg: #1a1a2e;
+  --wave-muted: #6b6b7b;
+  --wave-border: #e0e0e8;
+  --wave-accent: #7c5cfc;
+  --wave-accent-soft: rgba(124, 92, 252, 0.12);
+  --wave-accent-pink: #e85d9a;
+  --wave-accent-green: #3ba55d;
+  --wave-accent-orange: #f09042;
+  --wave-accent-blue: #4a9eff;
+  --wave-fg-soft: rgba(26, 26, 46, 0.04);
+  --wave-mention-bg: rgba(124, 92, 252, 0.10);
+  --wave-message-hover: rgba(26, 26, 46, 0.02);
+
+  // Logo/SVG 图标滤镜 - 浅色主题下保持原样（深色图标在浅色背景上）
+  --wave-logo-filter: none;
 }
 
 // 全局样式

@@ -6,6 +6,7 @@ import {
   User,
   Setting,
   SwitchButton,
+  Compass,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -16,9 +17,10 @@ const { t } = useI18n()
  * 导航项配置
  */
 const navItems = [
-  { name: 'chat', path: '/app', icon: ChatRound, labelKey: 'chat.channels' },
+  { name: 'chat', path: '/app', icon: ChatRound, labelKey: 'chat.rooms' },
+  { name: 'discover', path: '/discover', icon: Compass, labelKey: 'discover.title' },
   { name: 'profile', path: '/profile', icon: User, labelKey: 'profile.title' },
-  { name: 'settings', path: '/settings', icon: Setting, labelKey: 'profile.preferences.title' },
+  { name: 'settings', path: '/settings', icon: Setting, labelKey: 'settings.title' },
 ]
 
 /**
@@ -29,6 +31,9 @@ const navItems = [
 function isActive(item: (typeof navItems)[0]): boolean {
   if (item.name === 'chat') {
     return route.path === '/app' || route.path.startsWith('/app/')
+  }
+  if (item.name === 'discover') {
+    return route.path === '/discover' || route.path.startsWith('/discover/')
   }
   return route.path === item.path
 }
@@ -54,7 +59,7 @@ function handleLogout(): void {
   <nav class="nav-bar">
     <!-- Logo区域 -->
     <div class="nav-bar__logo">
-      <div class="logo-mark">W</div>
+      <img src="/favicon.svg" alt="CapellaRoom" class="logo-img" />
     </div>
 
     <!-- 导航项 -->
@@ -113,17 +118,12 @@ function handleLogout(): void {
   justify-content: center;
 }
 
-.logo-mark {
+.logo-img {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
-  display: grid;
-  place-items: center;
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-  font-family: var(--wave-font-display);
+  filter: var(--wave-logo-filter);
+  transition: filter 0.2s ease;
 }
 
 .nav-bar__items {

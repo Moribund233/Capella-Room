@@ -3,10 +3,12 @@ import { onMounted } from 'vue'
 
 /**
  * 初始化主题
- * 添加 dark 类到 html 元素以启用暗黑模式
+ * 从 localStorage 读取用户主题偏好，默认为 dark
  */
 onMounted(() => {
-  document.documentElement.classList.add('dark')
+  const savedTheme = localStorage.getItem('theme') || 'dark'
+  document.documentElement.classList.remove('dark', 'light')
+  document.documentElement.classList.add(savedTheme)
 })
 </script>
 

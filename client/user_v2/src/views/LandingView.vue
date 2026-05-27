@@ -1,8 +1,33 @@
 <script setup lang="ts">
-import { ArrowRight } from '@element-plus/icons-vue'
+import { ArrowRight, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
+import { ref } from 'vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// 语言选项
+const languages = [
+  { code: 'zh', label: '中文' },
+  { code: 'en', label: 'English' },
+  { code: 'ja', label: '日本語' },
+]
+
+// 当前语言
+const currentLang = ref(locale.value)
+
+// 语言下拉菜单显示状态
+const langMenuVisible = ref(false)
+
+/**
+ * 切换语言
+ * @param code - 语言代码
+ */
+function switchLanguage(code: string) {
+  locale.value = code
+  currentLang.value = code
+  localStorage.setItem('wave-locale', code)
+  langMenuVisible.value = false
+}
 </script>
 
 <template>
@@ -11,12 +36,34 @@ const { t } = useI18n()
     <header class="topnav">
       <div class="container topnav-inner">
         <span class="logo">
-          <span class="logo-mark">W</span>
+          <img src="/favicon.svg" alt="" class="logo-mark" />
           {{ t('common.appName') }}
         </span>
         <nav>
           <a href="#features">{{ t('nav.features') }}</a>
           <a href="#stats">{{ t('nav.community') }}</a>
+          
+          <!-- 语言切换 -->
+          <div class="lang-switcher" @mouseenter="langMenuVisible = true" @mouseleave="langMenuVisible = false">
+            <button class="lang-btn">
+              {{ languages.find(l => l.code === currentLang)?.label }}
+              <el-icon class="lang-icon" :class="{ 'is-open': langMenuVisible }"><ArrowDown /></el-icon>
+            </button>
+            <transition name="lang-menu">
+              <div v-show="langMenuVisible" class="lang-menu">
+                <button
+                  v-for="lang in languages"
+                  :key="lang.code"
+                  class="lang-option"
+                  :class="{ active: currentLang === lang.code }"
+                  @click="switchLanguage(lang.code)"
+                >
+                  {{ lang.label }}
+                </button>
+              </div>
+            </transition>
+          </div>
+          
           <router-link to="/login">{{ t('nav.signIn') }}</router-link>
           <router-link to="/login" class="btn btn-primary" style="padding: 8px 20px;">{{ t('nav.getStarted') }}</router-link>
         </nav>
@@ -189,13 +236,9 @@ const { t } = useI18n()
 .logo-mark {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--wave-accent), var(--wave-accent-pink));
   border-radius: 10px;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  color: #fff;
-  font-weight: 700;
+  filter: var(--wave-logo-filter);
+  transition: filter 0.2s ease;
 }
 
 .topnav nav {
@@ -213,6 +256,89 @@ const { t } = useI18n()
   &:hover {
     color: var(--wave-fg);
   }
+}
+
+// 语言切换器
+.lang-switcher {
+  position: relative;
+}
+
+.lang-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--wave-border);
+  border-radius: var(--wave-radius);
+  color: var(--wave-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--wave-fg);
+    border-color: var(--wave-fg);
+  }
+}
+
+.lang-icon {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+
+  &.is-open {
+    transform: rotate(180deg);
+  }
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--wave-surface);
+  border: 1px solid var(--wave-border);
+  border-radius: var(--wave-radius);
+  padding: 4px;
+  min-width: 100px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.lang-option {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--wave-muted);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--wave-fg-soft);
+    color: var(--wave-fg);
+  }
+
+  &.active {
+    color: var(--wave-accent);
+    font-weight: 500;
+  }
+}
+
+// 语言菜单动画
+.lang-menu-enter-active,
+.lang-menu-leave-active {
+  transition: all 0.2s ease;
+}
+
+.lang-menu-enter-from,
+.lang-menu-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
 }
 
 // 按钮样式

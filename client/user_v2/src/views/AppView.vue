@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NavBar } from '@/components/nav'
 import { QuickBar } from '@/components/quick'
 import type { QuickItem } from '@/components/quick'
+import { useTheme } from '@/composables/useTheme'
 import {
   Search,
   Setting,
@@ -15,13 +16,16 @@ import {
   ArrowRight,
   Bell,
   Moon,
+  Sunny,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const { t } = useI18n()
+const { isDark, toggleTheme } = useTheme()
 
-// QuickBar 配置
-const quickItems = ref<QuickItem[]>([
+// QuickBar 配置 - 使用 shallowRef 避免组件被 reactive 包裹
+// 主题图标根据当前主题动态变化
+const quickItems = computed<QuickItem[]>(() => [
   {
     key: 'notifications',
     display: 'visible',
@@ -35,36 +39,34 @@ const quickItems = ref<QuickItem[]>([
   {
     key: 'theme',
     display: 'visible',
-    icon: Moon,
-    label: t('profile.appearance.theme.title'),
-    onClick: () => {
-      // TODO: 切换主题
-    },
+    icon: isDark.value ? Moon : Sunny,
+    label: isDark.value ? t('profile.appearance.theme.dark') : t('profile.appearance.theme.light'),
+    onClick: toggleTheme,
   },
 ])
 
-// 当前选中的频道
-const activeChannel = ref('general')
+// 当前选中的房间
+const activeRoom = ref('general')
 
-// 频道列表
-const channelCategories = [
+// 房间列表
+const roomCategories = [
   {
-    name: 'Channels',
-    channels: [
-      { id: 'general', name: 'general', unread: 3 },
-      { id: 'introductions', name: 'introductions', unread: 0 },
-      { id: 'random', name: 'random', unread: 0 },
-      { id: 'show-and-tell', name: 'show-and-tell', unread: 0 },
-      { id: 'events', name: 'events', unread: 5 },
+    name: 'Public Rooms',
+    rooms: [
+      { id: 'general', name: 'general', unread: 3, type: 'public' },
+      { id: 'introductions', name: 'introductions', unread: 0, type: 'public' },
+      { id: 'random', name: 'random', unread: 0, type: 'public' },
+      { id: 'show-and-tell', name: 'show-and-tell', unread: 0, type: 'public' },
+      { id: 'events', name: 'events', unread: 5, type: 'public' },
     ],
   },
   {
-    name: 'Projects',
-    channels: [
-      { id: 'design-system', name: 'design-system', unread: 0 },
-      { id: 'frontend', name: 'frontend', unread: 0 },
-      { id: 'backend', name: 'backend', unread: 0, locked: true },
-      { id: 'product-feedback', name: 'product-feedback', unread: 0 },
+    name: 'My Rooms',
+    rooms: [
+      { id: 'design-system', name: 'design-system', unread: 0, type: 'private' },
+      { id: 'frontend', name: 'frontend', unread: 0, type: 'private' },
+      { id: 'backend', name: 'backend', unread: 0, type: 'private', locked: true },
+      { id: 'product-feedback', name: 'product-feedback', unread: 0, type: 'private' },
     ],
   },
 ]
@@ -142,11 +144,11 @@ const memberGroups = [
 const messageInput = ref('')
 
 /**
- * 选择频道
- * @param channelId - 频道ID
+ * 选择房间
+ * @param roomId - 房间ID
  */
-function selectChannel(channelId: string) {
-  activeChannel.value = channelId
+function selectRoom(roomId: string) {
+  activeRoom.value = roomId
 }
 
 /**
@@ -185,42 +187,42 @@ function sendMessage() {
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <div class="sidebar-header" @click="$router.push('/')">
-        <span>Wave Community</span>
+        <span>CapellaRoom</span>
         <el-icon><ArrowRight /></el-icon>
       </div>
 
       <div class="sidebar-search">
         <el-input
-          :placeholder="t('chat.findChannel')"
+          :placeholder="t('chat.findRoom')"
           :prefix-icon="Search"
           size="small"
         />
       </div>
 
-      <div class="channels">
+      <div class="rooms">
         <div
-          v-for="category in channelCategories"
+          v-for="category in roomCategories"
           :key="category.name"
-          class="channel-category"
+          class="room-category"
         >
           <div class="category-header">
             <span>{{ category.name }}</span>
             <el-icon class="add-icon"><Plus /></el-icon>
           </div>
           <div
-            v-for="channel in category.channels"
-            :key="channel.id"
-            class="channel"
-            :class="{ active: activeChannel === channel.id }"
-            @click="selectChannel(channel.id)"
+            v-for="room in category.rooms"
+            :key="room.id"
+            class="room"
+            :class="{ active: activeRoom === room.id }"
+            @click="selectRoom(room.id)"
           >
-            <span class="channel-prefix">
-              <el-icon v-if="channel.locked"><Lock /></el-icon>
+            <span class="room-prefix">
+              <el-icon v-if="room.locked || room.type === 'private'"><Lock /></el-icon>
               <span v-else>#</span>
             </span>
-            <span class="channel-name">{{ channel.name }}</span>
-            <span v-if="channel.unread > 0" class="channel-badge">
-              {{ channel.unread }}
+            <span class="room-name">{{ room.name }}</span>
+            <span v-if="room.unread > 0" class="room-badge">
+              {{ room.unread }}
             </span>
           </div>
         </div>
@@ -251,10 +253,10 @@ function sendMessage() {
     <main class="main">
       <!-- 聊天头部 -->
       <header class="chat-header">
-        <div class="channel-info">
-          <span class="channel-hash">#</span>
-          <span class="channel-title">{{ activeChannel }}</span>
-          <span class="channel-topic">· Community updates & announcements</span>
+        <div class="room-info">
+          <span class="room-hash">#</span>
+          <span class="room-title">{{ activeRoom }}</span>
+          <span class="room-topic">· Community updates & announcements</span>
         </div>
         <div class="chat-header-right">
           <div class="member-avatars">
@@ -340,7 +342,7 @@ function sendMessage() {
             v-model="messageInput"
             type="textarea"
             :rows="1"
-            :placeholder="t('chat.messagePlaceholder', { channel: activeChannel })"
+            :placeholder="t('chat.messagePlaceholder', { room: activeRoom })"
             resize="none"
             @keydown.enter.prevent="sendMessage"
           />
@@ -442,13 +444,13 @@ function sendMessage() {
   }
 }
 
-.channels {
+.rooms {
   flex: 1;
   overflow-y: auto;
   padding: 4px 8px;
 }
 
-.channel-category {
+.room-category {
   margin-bottom: 8px;
 }
 
@@ -473,7 +475,7 @@ function sendMessage() {
   font-size: 12px;
 }
 
-.channel {
+.room {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -493,13 +495,13 @@ function sendMessage() {
     background: var(--wave-accent-soft);
     color: var(--wave-fg);
 
-    .channel-prefix {
+    .room-prefix {
       color: var(--wave-accent);
     }
   }
 }
 
-.channel-prefix {
+.room-prefix {
   color: var(--wave-muted);
   opacity: 0.6;
   font-weight: 300;
@@ -512,11 +514,11 @@ function sendMessage() {
   }
 }
 
-.channel-name {
+.room-name {
   flex: 1;
 }
 
-.channel-badge {
+.room-badge {
   background: var(--wave-accent);
   color: #fff;
   font-size: 11px;
@@ -611,24 +613,24 @@ function sendMessage() {
   gap: 12px;
 }
 
-.channel-info {
+.room-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.channel-hash {
+.room-hash {
   color: var(--wave-muted);
   font-weight: 300;
   font-size: 20px;
 }
 
-.channel-title {
+.room-title {
   font-size: 16px;
   font-weight: 600;
 }
 
-.channel-topic {
+.room-topic {
   font-size: 13px;
   color: var(--wave-muted);
 }

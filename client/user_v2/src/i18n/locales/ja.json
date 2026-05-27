@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Wave",
+    "appName": "CapellaRoom",
     "back": "戻る",
     "cancel": "キャンセル",
     "confirm": "確認",
@@ -24,7 +24,7 @@
     "hero": {
       "eyebrow": "ソーシャル · 再構想",
       "title": "あなたのコミュニティが息づく場所",
-      "description": "あらゆるトピックのチャンネル、会話を整理するスレッド、そしてまるで家のような空間。Waveは、あなたのコミュニティのための現代的な拠点です。",
+      "description": "専用のルームを作成し、友達を招待して、シームレスなリアルタイム会話を楽しみましょう。CapellaRoomは、あなたとあなたのコミュニティのための現代的な空間です。",
       "startFree": "無料で始める",
       "seeFeatures": "機能を見る"
     },
@@ -32,12 +32,12 @@
       "eyebrow": "必要なものすべて",
       "title": "本物の会話のために構築",
       "channels": {
-        "title": "トピックベースのチャンネル",
-        "description": "トピック、プロジェクト、または興味ごとに会話を整理。すべてが見つけやすくなります。"
+        "title": "ルームシステム",
+        "description": "トピック別に整理された公開またはプライベートルームを作成。柔軟な権限管理でコミュニティを整然と保ちます。"
       },
       "threads": {
-        "title": "スレッド返信",
-        "description": "メインチャンネルをきれいに保つためにスレッド内で返信。スレッドは元のメッセージに紐づきます。"
+        "title": "リアルタイムメッセージ",
+        "description": "返信、リアクション、リッチメディア共有を備えたスムーズなリアルタイムメッセージング。会話がこれまでにないほど自然に感じられます。"
       },
       "expressions": {
         "title": "豊かな表現",
@@ -46,9 +46,9 @@
     },
     "stats": {
       "eyebrow": "急速に成長中 · 2026",
-      "communities": "のアクティブなコミュニティがWaveを使用",
-      "messages": "件のメッセージが毎日送信されています",
-      "satisfaction": "のメンバーが会話がより整理されていると回答"
+      "communities": "のアクティブなルームがCapellaRoomで交流",
+      "messages": "件のメッセージが毎日ルームで送信されています",
+      "satisfaction": "のユーザーがコミュニケーションがより効率的だと回答"
     },
     "cta": {
       "title": "あなたのコミュニティが待っています",
@@ -57,7 +57,7 @@
       "viewDemo": "デモを見る"
     },
     "footer": {
-      "copyright": "© Wave · ソーシャルスペース、再構想"
+      "copyright": "© CapellaRoom · ソーシャルスペース、再構想"
     }
   },
   "auth": {
@@ -84,11 +84,12 @@
     }
   },
   "chat": {
-    "findChannel": "チャンネルを検索...",
-    "channels": "チャンネル",
-    "projects": "プロジェクト",
+    "findRoom": "ルームを検索...",
+    "rooms": "ルーム",
+    "publicRooms": "公開ルーム",
+    "myRooms": "マイルーム",
     "online": "オンライン",
-    "messagePlaceholder": "#{channel}にメッセージを送信...",
+    "messagePlaceholder": "#{room}にメッセージを送信...",
     "reply": "返信",
     "react": "リアクション",
     "share": "共有",

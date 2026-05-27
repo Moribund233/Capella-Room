@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Wave",
+    "appName": "CapellaRoom",
     "back": "Back",
     "cancel": "Cancel",
     "confirm": "Confirm",
@@ -12,7 +12,8 @@
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
-    "warning": "Warning"
+    "warning": "Warning",
+    "logout": "Logout"
   },
   "nav": {
     "signIn": "Sign in",
@@ -24,7 +25,7 @@
     "hero": {
       "eyebrow": "Social · Reimagined",
       "title": "Where your community comes alive.",
-      "description": "Channels for every topic, threads that keep conversations organized, and a space that feels like home. Wave is the modern home for your community.",
+      "description": "Create your own rooms, invite friends, and enjoy seamless real-time conversations. CapellaRoom is the modern space for you and your community.",
       "startFree": "Start for free",
       "seeFeatures": "See features"
     },
@@ -32,12 +33,12 @@
       "eyebrow": "Everything you need",
       "title": "Built for real conversations.",
       "channels": {
-        "title": "Topic-based channels",
-        "description": "Organize conversations by topic, project, or interest. Keep everything findable."
+        "title": "Room System",
+        "description": "Create public or private rooms organized by topic. Flexible permission management keeps your community organized."
       },
       "threads": {
-        "title": "Threaded replies",
-        "description": "Reply in-thread to keep main channels clean. Threads stay attached to the original message."
+        "title": "Real-time Messaging",
+        "description": "Smooth real-time messaging with replies, reactions, and rich media sharing. Conversations have never felt so natural."
       },
       "expressions": {
         "title": "Rich expressions",
@@ -46,9 +47,9 @@
     },
     "stats": {
       "eyebrow": "Growing fast · 2026",
-      "communities": "active communities using Wave to stay connected.",
-      "messages": "messages sent daily across channels and threads.",
-      "satisfaction": "of members say conversations feel more organized."
+      "communities": "active rooms on CapellaRoom connecting people.",
+      "messages": "messages sent daily across rooms.",
+      "satisfaction": "of users say communication feels more efficient."
     },
     "cta": {
       "title": "Your community is waiting.",
@@ -57,7 +58,7 @@
       "viewDemo": "View demo"
     },
     "footer": {
-      "copyright": "© Wave · Social spaces, reimagined"
+      "copyright": "© CapellaRoom · Social spaces, reimagined"
     }
   },
   "auth": {
@@ -84,11 +85,12 @@
     }
   },
   "chat": {
-    "findChannel": "Find a channel...",
-    "channels": "Channels",
-    "projects": "Projects",
+    "findRoom": "Find a room...",
+    "rooms": "Rooms",
+    "publicRooms": "Public Rooms",
+    "myRooms": "My Rooms",
     "online": "online",
-    "messagePlaceholder": "Message #{channel}...",
+    "messagePlaceholder": "Message #{room}...",
     "reply": "Reply",
     "react": "React",
     "share": "Share",
