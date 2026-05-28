@@ -7,18 +7,42 @@ import type {
   LoginHistory,
   RoomUserSettings,
 } from '@/types/settings'
+import {
+  toBackendSettings,
+  fromBackendSettings,
+  type BackendUserSettings,
+} from '@/utils/settingsTransform'
 
 /**
  * 用户设置 API
  * 提供用户个性化设置的 CRUD 操作
+ * 自动处理 camelCase <-> snake_case 字段转换
  */
 export const settingsApi = {
   /**
    * 获取当前用户的完整设置
    * @returns 用户设置
    */
-  getSettings(): Promise<ApiResponse<UserSettings>> {
-    return httpClient.get('/users/me/settings')
+  async getSettings(): Promise<ApiResponse<UserSettings>> {
+    // 注意：httpClient 的响应拦截器已经提取了 response.data
+    const response = (await httpClient.get<unknown>('/users/me/settings')) as unknown as ApiResponse<BackendUserSettings>
+    // 转换后端字段为前端字段
+    if (response.data) {
+      return {
+        success: response.success,
+        data: fromBackendSettings(response.data) as UserSettings,
+        code: response.code,
+        message: response.message,
+      }
+    }
+    // 如果 response.data 不存在，说明后端返回了错误
+    return {
+      success: response.success ?? false,
+      data: undefined as unknown as UserSettings,
+      code: response.code,
+      error: response.error || response.message || '获取设置失败',
+      message: response.message,
+    }
   },
 
   /**
@@ -26,16 +50,60 @@ export const settingsApi = {
    * @param settings 部分设置对象
    * @returns 更新后的设置
    */
-  updateSettings(settings: PartialUserSettings): Promise<ApiResponse<UserSettings>> {
-    return httpClient.patch('/users/me/settings', settings)
+  async updateSettings(settings: PartialUserSettings): Promise<ApiResponse<UserSettings>> {
+    // 转换前端字段为后端字段
+    const backendSettings = toBackendSettings(settings)
+    console.log('[API] Sending settings update:', backendSettings)
+    // 注意：httpClient 的响应拦截器已经提取了 response.data
+    // 所以这里的 response 实际上是 ApiResponse<BackendUserSettings>
+    const response = (await httpClient.patch<unknown>(
+      '/users/me/settings',
+      backendSettings
+    )) as unknown as ApiResponse<BackendUserSettings>
+    console.log('[API] Received response:', response)
+    // 转换后端响应为前端字段
+    if (response.data) {
+      return {
+        success: response.success,
+        data: fromBackendSettings(response.data) as UserSettings,
+        code: response.code,
+        message: response.message,
+      }
+    }
+    // 如果 response.data 不存在，说明后端返回了错误
+    return {
+      success: response.success ?? false,
+      data: undefined as unknown as UserSettings,
+      code: response.code,
+      error: response.error || response.message || '保存设置失败',
+      message: response.message,
+    }
   },
 
   /**
    * 重置用户设置为默认值
    * @returns 重置后的默认设置
    */
-  resetSettings(): Promise<ApiResponse<UserSettings>> {
-    return httpClient.delete('/users/me/settings')
+  async resetSettings(): Promise<ApiResponse<UserSettings>> {
+    // 注意：httpClient 的响应拦截器已经提取了 response.data
+    const response = (await httpClient.delete<unknown>('/users/me/settings')) as unknown as ApiResponse<BackendUserSettings>
+    // 转换后端字段为前端字段
+    if (response.data) {
+      return {
+        success: response.success,
+        data: fromBackendSettings(response.data) as UserSettings,
+        code: response.code,
+        message: response.message,
+      }
+    }
+    // 如果 response.data 不存在，说明后端返回了错误
+    return {
+      success: response.success ?? false,
+      data: undefined as unknown as UserSettings,
+      code: response.code,
+      error: response.error || response.message || '重置设置失败',
+      message: response.message,
+    }
   },
 }
 

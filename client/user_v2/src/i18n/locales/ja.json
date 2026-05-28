@@ -12,7 +12,8 @@
     "loading": "読み込み中...",
     "error": "エラー",
     "success": "成功",
-    "warning": "警告"
+    "warning": "警告",
+    "logout": "ログアウト"
   },
   "nav": {
     "signIn": "ログイン",
@@ -88,12 +89,15 @@
     "registerFailed": "登録に失敗しました。後でもう一度お試しください"
   },
   "chat": {
-    "findRoom": "ルームを検索...",
+    "findRoom": "チャンネルを検索…",
     "rooms": "ルーム",
     "publicRooms": "公開ルーム",
     "myRooms": "マイルーム",
+    "channels": "チャンネル",
+    "projects": "プロジェクト",
     "online": "オンライン",
-    "messagePlaceholder": "#{room}にメッセージを送信...",
+    "offline": "オフライン",
+    "messagePlaceholder": "#{room} にメッセージを送信…",
     "reply": "返信",
     "react": "リアクション",
     "share": "共有",
@@ -102,7 +106,33 @@
     "noRooms": "ルームがありません",
     "noMessages": "メッセージがありません",
     "noMembers": "メンバーがいません",
-    "selectRoom": "チャットを開始するルームを選択してください"
+    "selectRoom": "チャットを開始するルームを選択してください",
+    "searchMessages": "メッセージを検索",
+    "threads": "スレッド",
+    "showMemberList": "メンバー一覧を表示",
+    "hideMemberList": "メンバー一覧を非表示",
+    "noDescription": "説明なし",
+    "send": "送信",
+    "uploadFile": "ファイルをアップロード",
+    "emoji": "絵文字",
+    "gif": "GIF",
+    "replyingTo": "返信先",
+    "editingMessage": "メッセージを編集中",
+    "edited": "編集済",
+    "sending": "送信中…",
+    "sendFailed": "送信失敗",
+    "messageDeleted": "このメッセージは削除されました",
+    "loadMore": "さらにメッセージを読み込む",
+    "newMessages": "件の新着メッセージ",
+    "today": "今日",
+    "yesterday": "昨日",
+    "confirmDelete": "このメッセージを削除してもよろしいですか？",
+    "owner": "所有者",
+    "admin": "管理者",
+    "welcome": {
+      "title": "Wave へようこそ",
+      "description": "サイドバーからチャンネルを選択して会話を始めましょう"
+    }
   },
   "profile": {
     "title": "プロフィール",
@@ -140,7 +170,7 @@
         "light": "ライト",
         "system": "システム"
       },
-      "messageDensity": {
+      "density": {
         "title": "メッセージ密度",
         "description": "メッセージ間のスペースを調整",
         "comfortable": "快適",
@@ -153,6 +183,7 @@
     },
     "connectedAccounts": {
       "title": "接続済みアカウント",
+      "email": "メール",
       "connected": "接続済み",
       "disconnect": "接続解除"
     },
@@ -162,7 +193,98 @@
       "deleteAccount": "アカウントを削除",
       "confirmDelete": "この操作は元に戻せません。すべてのデータが永久に削除されます。"
     },
-    "noBio": "自己紹介はありません"
+    "noBio": "自己紹介はありません",
+    "settings": {
+      "basicInfo": {
+        "title": "基本情報",
+        "username": "ユーザー名",
+        "email": "メール",
+        "role": "役割"
+      },
+      "notifications": {
+        "title": "通知",
+        "enable": "通知を有効にする",
+        "enableDesc": "すべてのタイプの通知を受け取る",
+        "directMessage": "ダイレクトメッセージ",
+        "directMessageDesc": "ダイレクトメッセージを受け取ったときに通知",
+        "mention": "＠メンション",
+        "mentionDesc": "誰かが私をメンションしたときに通知",
+        "roomInvitation": "ルーム招待",
+        "roomInvitationDesc": "ルーム招待を受け取ったときに通知",
+        "system": "システム通知",
+        "systemDesc": "システムのアナウンスと更新を受け取る",
+        "sound": "サウンドアラート",
+        "soundDesc": "通知音を再生",
+        "desktop": "デスクトップ通知",
+        "desktopDesc": "デスクトップポップアップ通知を表示"
+      },
+      "privacy": {
+        "title": "プライバシー",
+        "onlineStatus": "オンライン状態の表示",
+        "onlineStatusDesc": "誰が私のオンライン状態を見られるか",
+        "profile": "プロフィールの表示",
+        "profileDesc": "誰が私のプロフィールを見られるか",
+        "strangerMessage": "見知らぬ人からのメッセージを許可",
+        "strangerMessageDesc": "フレンド以外のユーザーがメッセージを送信可能",
+        "roomInvite": "ルーム招待を許可",
+        "roomInviteDesc": "他の人が私をルームに招待可能"
+      },
+      "message": {
+        "title": "メッセージ",
+        "preview": "メッセージプレビュー",
+        "previewDesc": "通知にメッセージ内容を表示",
+        "readReceipt": "既読確認",
+        "readReceiptDesc": "他の人にメッセージを読んだことを知らせる",
+        "typing": "入力状態",
+        "typingDesc": "入力インジケーターを表示"
+      },
+      "locale": {
+        "title": "言語と地域",
+        "language": "インターフェース言語",
+        "languageDesc": "アプリの表示言語を選択",
+        "timezone": "タイムゾーン",
+        "timezoneDesc": "現地のタイムゾーンを設定",
+        "timeFormat": "時刻形式",
+        "timeFormatDesc": "時刻の表示形式を選択",
+        "dateFormat": "日付形式",
+        "dateFormatDesc": "日付の表示形式を選択"
+      },
+      "accessibility": {
+        "title": "アクセシビリティ",
+        "fontSize": "フォントサイズ",
+        "fontSizeDesc": "インターフェースの文字サイズを調整",
+        "highContrast": "高コントラスト",
+        "highContrastDesc": "色のコントラストを強化",
+        "reduceMotion": "動きを減らす",
+        "reduceMotionDesc": "インターフェースのアニメーションを減らす",
+        "compactMode": "コンパクトモード",
+        "compactModeDesc": "インターフェース要素の間隔を縮小"
+      },
+      "media": {
+        "title": "メディア",
+        "autoDownload": "メディアを自動ダウンロード",
+        "autoDownloadDesc": "画像と動画を自動的にダウンロード",
+        "saveGallery": "ギャラリーに保存",
+        "saveGalleryDesc": "ダウンロードしたメディアをデバイスのギャラリーに保存",
+        "imageQuality": "画像品質",
+        "imageQualityDesc": "画像の読み込み品質を選択",
+        "autoPlayVideo": "動画を自動再生",
+        "autoPlayVideoDesc": "動画コンテンツを自動的に再生"
+      },
+      "security": {
+        "title": "セキュリティ",
+        "abnormalLogin": "異常ログインアラート",
+        "abnormalLoginDesc": "異常なログインを検出したときに通知",
+        "singleDevice": "単一デバイスログイン",
+        "singleDeviceDesc": "同時に1つのデバイスのみログインを許可"
+      },
+      "dangerZone": {
+        "title": "危険区域",
+        "description": "アカウントとすべてのデータを永久に削除します。この操作は元に戻せません。",
+        "logout": "ログアウト",
+        "deleteAccount": "アカウント削除"
+      }
+    }
   },
   "thread": {
     "title": "スレッド",
@@ -177,6 +299,21 @@
       "lastReply": "最後の返信"
     },
     "op": "投稿者"
+  },
+  "discover": {
+    "title": "発見",
+    "subtitle": "コミュニティを探索して、あなたの空間を見つけよう",
+    "searchPlaceholder": "ルームを検索...",
+    "all": "すべて",
+    "popular": "人気",
+    "tech": "テック",
+    "gaming": "ゲーム",
+    "music": "音楽",
+    "art": "アート",
+    "featured": "おすすめ",
+    "trending": "トレンド",
+    "join": "参加",
+    "view": "表示"
   },
   "quick": {
     "notifications": "通知",

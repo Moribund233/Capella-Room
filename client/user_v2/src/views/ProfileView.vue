@@ -6,6 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
 import { useSettingsStore } from '@/stores/settings'
+import type { LocaleSettings } from '@/types/settings'
 import {
   Clock,
   User,
@@ -24,7 +25,6 @@ const settingsStore = useSettingsStore()
 
 // 加载状态
 const loading = ref(false)
-const saving = ref(false)
 
 // 当前用户
 const currentUser = computed(() => authStore.user)
@@ -37,56 +37,101 @@ const userStats = computed(() => ({
     : '-',
 }))
 
-// 设置项 - 使用 settings store
-const preferences = computed({
-  get: () => ({
-    notifications: settingsStore.notificationSettings.enableNotification,
-    messagePreview: settingsStore.notificationSettings.enableDesktopNotification,
-    soundEffects: settingsStore.notificationSettings.enableSound,
-    showOnlineStatus: settingsStore.privacySettings.onlineStatusVisibility !== 'none',
-  }),
-  set: async (val) => {
-    saving.value = true
-    await settingsStore.updateSettings({
-      notifications: {
-        ...settingsStore.notificationSettings,
-        enableNotification: val.notifications,
-        enableDesktopNotification: val.messagePreview,
-        enableSound: val.soundEffects,
-      },
-      privacy: {
-        ...settingsStore.privacySettings,
-        onlineStatusVisibility: val.showOnlineStatus ? 'everyone' : 'none',
-      },
-    })
-    saving.value = false
-  },
-})
+// ========== 通知设置 ==========
+const notificationSettings = computed(() => settingsStore.notificationSettings)
 
-const appearance = computed({
-  get: () => ({
-    theme: settingsStore.localeSettings.language === 'zh-CN' ? 'Dark' : 'Dark',
-    messageDensity: settingsStore.accessibilitySettings.compactMode ? 'Compact' : 'Comfortable',
-    language: settingsStore.localeSettings.language === 'zh-CN' ? 'Chinese' : 'English',
-  }),
-  set: async (val) => {
-    saving.value = true
-    const newLocale = val.language === 'Chinese' ? 'zh-CN' : val.language === 'Japanese' ? 'ja-JP' : 'en-US'
-    locale.value = newLocale === 'zh-CN' ? 'zh' : newLocale === 'ja-JP' ? 'ja' : 'en'
-    
-    await settingsStore.updateSettings({
-      locale: {
-        ...settingsStore.localeSettings,
-        language: newLocale,
-      },
-      accessibility: {
-        ...settingsStore.accessibilitySettings,
-        compactMode: val.messageDensity === 'Compact',
-      },
-    })
-    saving.value = false
-  },
-})
+async function updateNotification(key: keyof typeof notificationSettings.value, value: boolean) {
+  // 乐观更新：只传递修改的字段，store 会立即更新本地状态并同步到服务端
+  const result = await settingsStore.updateNotificationSettings({ [key]: value } as Partial<typeof notificationSettings.value>)
+  if (!result.success) {
+    console.error('[ProfileView] Update notification failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
+
+// ========== 隐私设置 ==========
+const privacySettings = computed(() => settingsStore.privacySettings)
+
+async function updatePrivacy(key: keyof typeof privacySettings.value, value: string | boolean) {
+  // 乐观更新：只传递修改的字段
+  const result = await settingsStore.updatePrivacySettings({ [key]: value } as Partial<typeof privacySettings.value>)
+  if (!result.success) {
+    console.error('[ProfileView] Update privacy failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
+
+// ========== 消息设置 ==========
+const messageSettings = computed(() => settingsStore.messageSettings)
+
+async function updateMessage(key: keyof typeof messageSettings.value, value: boolean) {
+  // 乐观更新：只传递修改的字段
+  const result = await settingsStore.updateMessageSettings({ [key]: value } as Partial<typeof messageSettings.value>)
+  if (!result.success) {
+    console.error('[ProfileView] Update message failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
+
+// ========== 安全设置 ==========
+const securitySettings = computed(() => settingsStore.securitySettings)
+
+async function updateSecurity(key: keyof typeof securitySettings.value, value: boolean) {
+  // 乐观更新：只传递修改的字段
+  const result = await settingsStore.updateSecuritySettings({ [key]: value } as Partial<typeof securitySettings.value>)
+  if (!result.success) {
+    console.error('[ProfileView] Update security failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
+
+// ========== 语言与地区设置 ==========
+async function updateLocale(key: keyof LocaleSettings, value: string) {
+  // 如果修改了语言，立即更新 i18n locale（乐观更新）
+  if (key === 'language') {
+    const newI18nLocale = value === 'zh-CN' ? 'zh' : value === 'ja-JP' ? 'ja' : 'en'
+    locale.value = newI18nLocale
+    localStorage.setItem('locale', newI18nLocale)
+  }
+
+  // 乐观更新：只传递修改的字段
+  const result = await settingsStore.updateLocaleSettings({ [key]: value } as Partial<LocaleSettings>)
+  if (!result.success) {
+    console.error('[ProfileView] Update locale failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
+
+// ========== 无障碍设置 ==========
+const accessibilitySettings = computed(() => settingsStore.accessibilitySettings)
+
+async function updateAccessibility(key: keyof typeof accessibilitySettings.value, value: string | boolean) {
+  // 乐观更新：只传递修改的字段
+  const result = await settingsStore.updateAccessibilitySettings({ [key]: value } as Partial<typeof accessibilitySettings.value>)
+  if (!result.success) {
+    console.error('[ProfileView] Update accessibility failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
+
+// ========== 媒体设置 ==========
+const mediaSettings = computed(() => settingsStore.mediaSettings)
+
+async function updateMedia(key: keyof typeof mediaSettings.value, value: boolean | string) {
+  // 乐观更新：只传递修改的字段
+  const result = await settingsStore.updateMediaSettings({ [key]: value } as Partial<typeof mediaSettings.value>)
+  if (!result.success) {
+    console.error('[ProfileView] Update media failed:', result)
+    const errorMsg = typeof result.error === 'string' ? result.error.trim() : '保存失败，请重试'
+    ElMessage.error({ message: errorMsg, duration: 3000 })
+  }
+}
 
 // 初始化
 onMounted(async () => {
@@ -94,6 +139,14 @@ onMounted(async () => {
   await authStore.fetchUser()
   await roomStore.fetchMyRooms()
   await settingsStore.loadSettings()
+
+  // 同步 i18n locale 与 store 中的语言设置
+  const storeLang = settingsStore.localeSettings.language
+  const i18nLang = storeLang === 'zh-CN' ? 'zh' : storeLang === 'ja-JP' ? 'ja' : 'en'
+  if (locale.value !== i18nLang) {
+    locale.value = i18nLang
+  }
+
   loading.value = false
 })
 
@@ -152,24 +205,48 @@ function deleteAccount() {
   }).catch(() => {})
 }
 
-// 语言选项
+// 选项数据
 const languageOptions = [
-  { label: 'English', value: 'English' },
-  { label: '简体中文', value: 'Chinese' },
-  { label: '日本語', value: 'Japanese' },
+  { label: 'English', value: 'en-US' },
+  { label: '简体中文', value: 'zh-CN' },
+  { label: '日本語', value: 'ja-JP' },
 ]
 
-// 主题选项
-const themeOptions = [
-  { label: t('profile.appearance.theme.dark'), value: 'Dark' },
-  { label: t('profile.appearance.theme.light'), value: 'Light' },
-  { label: t('profile.appearance.theme.system'), value: 'System' },
+const timezoneOptions = [
+  { label: 'Asia/Shanghai (UTC+8)', value: 'Asia/Shanghai' },
+  { label: 'Asia/Tokyo (UTC+9)', value: 'Asia/Tokyo' },
+  { label: 'America/New_York (UTC-5)', value: 'America/New_York' },
+  { label: 'Europe/London (UTC+0)', value: 'Europe/London' },
 ]
 
-// 密度选项
-const densityOptions = [
-  { label: t('profile.appearance.density.comfortable'), value: 'Comfortable' },
-  { label: t('profile.appearance.density.compact'), value: 'Compact' },
+const timeFormatOptions = [
+  { label: '24小时制', value: '24h' },
+  { label: '12小时制', value: '12h' },
+]
+
+const dateFormatOptions = [
+  { label: 'YYYY-MM-DD', value: 'YYYY-MM-DD' },
+  { label: 'DD/MM/YYYY', value: 'DD/MM/YYYY' },
+  { label: 'MM/DD/YYYY', value: 'MM/DD/YYYY' },
+]
+
+const visibilityOptions = [
+  { label: '所有人', value: 'everyone' },
+  { label: '仅好友', value: 'friends' },
+  { label: '不可见', value: 'none' },
+]
+
+const fontSizeOptions = [
+  { label: '小', value: 'small' },
+  { label: '中', value: 'medium' },
+  { label: '大', value: 'large' },
+]
+
+const imageQualityOptions = [
+  { label: '原图', value: 'original' },
+  { label: '高', value: 'high' },
+  { label: '中', value: 'medium' },
+  { label: '低', value: 'low' },
 ]
 </script>
 
@@ -219,123 +296,414 @@ const densityOptions = [
           </div>
         </div>
 
-        <!-- Preferences -->
+        <!-- 基本信息 -->
         <div class="section">
-          <div class="section-title">{{ t('profile.preferences.title') }}</div>
-
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.preferences.notifications.title') }}</h3>
-              <p>{{ t('profile.preferences.notifications.description') }}</p>
-            </div>
-            <el-switch v-model="preferences.notifications" :loading="saving" />
+          <div class="section-title">{{ t('profile.settings.basicInfo.title') }}</div>
+          <div class="info-item">
+            <span class="info-label">{{ t('profile.settings.basicInfo.username') }}</span>
+            <span class="info-value">{{ currentUser?.username }}</span>
           </div>
-
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.preferences.messagePreviews.title') }}</h3>
-              <p>{{ t('profile.preferences.messagePreviews.description') }}</p>
-            </div>
-            <el-switch v-model="preferences.messagePreview" :loading="saving" />
+          <div class="info-item">
+            <span class="info-label">{{ t('profile.settings.basicInfo.email') }}</span>
+            <span class="info-value">{{ currentUser?.email }}</span>
           </div>
-
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.preferences.soundEffects.title') }}</h3>
-              <p>{{ t('profile.preferences.soundEffects.description') }}</p>
-            </div>
-            <el-switch v-model="preferences.soundEffects" :loading="saving" />
-          </div>
-
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.preferences.onlineStatus.title') }}</h3>
-              <p>{{ t('profile.preferences.onlineStatus.description') }}</p>
-            </div>
-            <el-switch v-model="preferences.showOnlineStatus" :loading="saving" />
+          <div class="info-item">
+            <span class="info-label">{{ t('profile.settings.basicInfo.role') }}</span>
+            <span class="info-value">{{ currentUser?.role || 'user' }}</span>
           </div>
         </div>
 
-        <!-- Appearance -->
+        <!-- 通知设置 -->
         <div class="section">
-          <div class="section-title">{{ t('profile.appearance.title') }}</div>
-
+          <div class="section-title">{{ t('profile.settings.notifications.title') }}</div>
           <div class="pref-group">
             <div class="pref-label">
-              <h3>{{ t('profile.appearance.theme.title') }}</h3>
-              <p>{{ t('profile.appearance.theme.description') }}</p>
+              <h3>{{ t('profile.settings.notifications.enable') }}</h3>
+              <p>{{ t('profile.settings.notifications.enableDesc') }}</p>
             </div>
-            <el-select v-model="appearance.theme" :disabled="saving" class="select-input">
-              <el-option
-                v-for="opt in themeOptions"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableNotification }"
+              @click="updateNotification('enableNotification', !notificationSettings.enableNotification)"
+            ></button>
           </div>
-
           <div class="pref-group">
             <div class="pref-label">
-              <h3>{{ t('profile.appearance.density.title') }}</h3>
-              <p>{{ t('profile.appearance.density.description') }}</p>
+              <h3>{{ t('profile.settings.notifications.directMessage') }}</h3>
+              <p>{{ t('profile.settings.notifications.directMessageDesc') }}</p>
             </div>
-            <el-select v-model="appearance.messageDensity" :disabled="saving" class="select-input">
-              <el-option
-                v-for="opt in densityOptions"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableDirectMessage }"
+              :disabled="!notificationSettings.enableNotification"
+              @click="updateNotification('enableDirectMessage', !notificationSettings.enableDirectMessage)"
+            ></button>
           </div>
-
           <div class="pref-group">
             <div class="pref-label">
-              <h3>{{ t('profile.appearance.language.title') }}</h3>
-              <p>{{ t('profile.appearance.language.description') }}</p>
+              <h3>{{ t('profile.settings.notifications.mention') }}</h3>
+              <p>{{ t('profile.settings.notifications.mentionDesc') }}</p>
             </div>
-            <el-select v-model="appearance.language" :disabled="saving" class="select-input">
-              <el-option
-                v-for="opt in languageOptions"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableMention }"
+              :disabled="!notificationSettings.enableNotification"
+              @click="updateNotification('enableMention', !notificationSettings.enableMention)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.notifications.roomInvitation') }}</h3>
+              <p>{{ t('profile.settings.notifications.roomInvitationDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableRoomInvitation }"
+              :disabled="!notificationSettings.enableNotification"
+              @click="updateNotification('enableRoomInvitation', !notificationSettings.enableRoomInvitation)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.notifications.system') }}</h3>
+              <p>{{ t('profile.settings.notifications.systemDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableSystemNotification }"
+              :disabled="!notificationSettings.enableNotification"
+              @click="updateNotification('enableSystemNotification', !notificationSettings.enableSystemNotification)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.notifications.sound') }}</h3>
+              <p>{{ t('profile.settings.notifications.soundDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableSound }"
+              @click="updateNotification('enableSound', !notificationSettings.enableSound)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.notifications.desktop') }}</h3>
+              <p>{{ t('profile.settings.notifications.desktopDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: notificationSettings.enableDesktopNotification }"
+              @click="updateNotification('enableDesktopNotification', !notificationSettings.enableDesktopNotification)"
+            ></button>
           </div>
         </div>
 
-        <!-- Connected Accounts -->
+        <!-- 隐私设置 -->
         <div class="section">
-          <div class="section-title">{{ t('profile.connectedAccounts.title') }}</div>
-
-          <div class="connected-account">
-            <div class="connected-account-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-              </svg>
+          <div class="section-title">{{ t('profile.settings.privacy.title') }}</div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.privacy.onlineStatus') }}</h3>
+              <p>{{ t('profile.settings.privacy.onlineStatusDesc') }}</p>
             </div>
-            <div class="connected-account-info">
-              <div class="name">{{ t('profile.connectedAccounts.email') }}</div>
-              <div class="detail">{{ currentUser?.email }}</div>
+            <select
+              class="select-input"
+              :value="privacySettings.onlineStatusVisibility"
+              @change="updatePrivacy('onlineStatusVisibility', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in visibilityOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.privacy.profile') }}</h3>
+              <p>{{ t('profile.settings.privacy.profileDesc') }}</p>
             </div>
-            <span class="connected-status">● {{ t('profile.connectedAccounts.connected') }}</span>
+            <select
+              class="select-input"
+              :value="privacySettings.profileVisibility"
+              @change="updatePrivacy('profileVisibility', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in visibilityOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.privacy.strangerMessage') }}</h3>
+              <p>{{ t('profile.settings.privacy.strangerMessageDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: privacySettings.allowStrangerMessage }"
+              @click="updatePrivacy('allowStrangerMessage', !privacySettings.allowStrangerMessage)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.privacy.roomInvite') }}</h3>
+              <p>{{ t('profile.settings.privacy.roomInviteDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: privacySettings.allowRoomInvitation }"
+              @click="updatePrivacy('allowRoomInvitation', !privacySettings.allowRoomInvitation)"
+            ></button>
           </div>
         </div>
 
-        <!-- Danger Zone -->
+        <!-- 消息设置 -->
+        <div class="section">
+          <div class="section-title">{{ t('profile.settings.message.title') }}</div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.message.preview') }}</h3>
+              <p>{{ t('profile.settings.message.previewDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: messageSettings.showMessagePreview }"
+              @click="updateMessage('showMessagePreview', !messageSettings.showMessagePreview)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.message.readReceipt') }}</h3>
+              <p>{{ t('profile.settings.message.readReceiptDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: messageSettings.enableReadReceipt }"
+              @click="updateMessage('enableReadReceipt', !messageSettings.enableReadReceipt)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.message.typing') }}</h3>
+              <p>{{ t('profile.settings.message.typingDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: messageSettings.showTypingStatus }"
+              @click="updateMessage('showTypingStatus', !messageSettings.showTypingStatus)"
+            ></button>
+          </div>
+        </div>
+
+        <!-- 语言与地区 -->
+        <div class="section">
+          <div class="section-title">{{ t('profile.settings.locale.title') }}</div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.locale.language') }}</h3>
+              <p>{{ t('profile.settings.locale.languageDesc') }}</p>
+            </div>
+            <select
+              class="select-input"
+              :value="settingsStore.localeSettings.language"
+              @change="updateLocale('language', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.locale.timezone') }}</h3>
+              <p>{{ t('profile.settings.locale.timezoneDesc') }}</p>
+            </div>
+            <select
+              class="select-input"
+              :value="settingsStore.localeSettings.timezone"
+              @change="updateLocale('timezone', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.locale.timeFormat') }}</h3>
+              <p>{{ t('profile.settings.locale.timeFormatDesc') }}</p>
+            </div>
+            <select
+              class="select-input"
+              :value="settingsStore.localeSettings.timeFormat"
+              @change="updateLocale('timeFormat', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in timeFormatOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.locale.dateFormat') }}</h3>
+              <p>{{ t('profile.settings.locale.dateFormatDesc') }}</p>
+            </div>
+            <select
+              class="select-input"
+              :value="settingsStore.localeSettings.dateFormat"
+              @change="updateLocale('dateFormat', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in dateFormatOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 无障碍设置 -->
+        <div class="section">
+          <div class="section-title">{{ t('profile.settings.accessibility.title') }}</div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.accessibility.fontSize') }}</h3>
+              <p>{{ t('profile.settings.accessibility.fontSizeDesc') }}</p>
+            </div>
+            <select
+              class="select-input"
+              :value="accessibilitySettings.fontSize"
+              @change="updateAccessibility('fontSize', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in fontSizeOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.accessibility.highContrast') }}</h3>
+              <p>{{ t('profile.settings.accessibility.highContrastDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: accessibilitySettings.highContrast }"
+              @click="updateAccessibility('highContrast', !accessibilitySettings.highContrast)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.accessibility.reduceMotion') }}</h3>
+              <p>{{ t('profile.settings.accessibility.reduceMotionDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: accessibilitySettings.reduceMotion }"
+              @click="updateAccessibility('reduceMotion', !accessibilitySettings.reduceMotion)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.accessibility.compactMode') }}</h3>
+              <p>{{ t('profile.settings.accessibility.compactModeDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: accessibilitySettings.compactMode }"
+              @click="updateAccessibility('compactMode', !accessibilitySettings.compactMode)"
+            ></button>
+          </div>
+        </div>
+
+        <!-- 媒体设置 -->
+        <div class="section">
+          <div class="section-title">{{ t('profile.settings.media.title') }}</div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.media.autoDownload') }}</h3>
+              <p>{{ t('profile.settings.media.autoDownloadDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: mediaSettings.autoDownloadMedia }"
+              @click="updateMedia('autoDownloadMedia', !mediaSettings.autoDownloadMedia)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.media.saveGallery') }}</h3>
+              <p>{{ t('profile.settings.media.saveGalleryDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: mediaSettings.saveMediaGallery }"
+              @click="updateMedia('saveMediaGallery', !mediaSettings.saveMediaGallery)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.media.imageQuality') }}</h3>
+              <p>{{ t('profile.settings.media.imageQualityDesc') }}</p>
+            </div>
+            <select
+              class="select-input"
+              :value="mediaSettings.imageQuality"
+              @change="updateMedia('imageQuality', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in imageQualityOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.media.autoPlayVideo') }}</h3>
+              <p>{{ t('profile.settings.media.autoPlayVideoDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: mediaSettings.autoPlayVideo }"
+              @click="updateMedia('autoPlayVideo', !mediaSettings.autoPlayVideo)"
+            ></button>
+          </div>
+        </div>
+
+        <!-- 安全设置 -->
+        <div class="section">
+          <div class="section-title">{{ t('profile.settings.security.title') }}</div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.security.abnormalLogin') }}</h3>
+              <p>{{ t('profile.settings.security.abnormalLoginDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: securitySettings.enableAbnormalLoginAlert }"
+              @click="updateSecurity('enableAbnormalLoginAlert', !securitySettings.enableAbnormalLoginAlert)"
+            ></button>
+          </div>
+          <div class="pref-group">
+            <div class="pref-label">
+              <h3>{{ t('profile.settings.security.singleDevice') }}</h3>
+              <p>{{ t('profile.settings.security.singleDeviceDesc') }}</p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: securitySettings.enableSingleDeviceLogin }"
+              @click="updateSecurity('enableSingleDeviceLogin', !securitySettings.enableSingleDeviceLogin)"
+            ></button>
+          </div>
+        </div>
+
+        <!-- 危险区域 -->
         <div class="danger-zone">
-          <h3>{{ t('profile.dangerZone.title') }}</h3>
-          <p>{{ t('profile.dangerZone.description') }}</p>
+          <h3>{{ t('profile.settings.dangerZone.title') }}</h3>
+          <p>{{ t('profile.settings.dangerZone.description') }}</p>
           <div class="danger-actions">
             <el-button type="danger" plain @click="handleLogout">
               <el-icon><SwitchButton /></el-icon>
-              {{ t('common.logout') }}
+              {{ t('profile.settings.dangerZone.logout') }}
             </el-button>
             <el-button type="danger" plain @click="deleteAccount">
               <el-icon><Delete /></el-icon>
-              {{ t('profile.dangerZone.deleteAccount') }}
+              {{ t('profile.settings.dangerZone.deleteAccount') }}
             </el-button>
           </div>
         </div>
@@ -484,71 +852,95 @@ const densityOptions = [
   }
 }
 
-.select-input {
-  width: 160px;
+// 自定义开关样式
+.toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--border);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
 
-  :deep(.el-input__wrapper) {
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: none;
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+  }
 
-    &.is-focus {
-      border-color: var(--accent);
+  &.on {
+    background: var(--accent);
+
+    &::after {
+      transform: translateX(20px);
     }
   }
 
-  :deep(.el-input__inner) {
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// 自定义选择框样式
+.select-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  min-width: 160px;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  option {
+    background: var(--surface);
     color: var(--fg);
   }
 }
 
-// Connected Accounts
-.connected-account {
+// 信息项
+.info-item {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  justify-content: space-between;
   padding: 16px 0;
+  border-bottom: 1px solid var(--border);
 
-  & + .connected-account {
-    border-top: 1px solid var(--border);
+  &:last-child {
+    border-bottom: none;
   }
 }
 
-.connected-account-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius);
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
+.info-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
   color: var(--muted);
-  font-size: 20px;
 }
 
-.connected-account-info {
-  flex: 1;
-
-  .name {
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  .detail {
-    font-size: 12px;
-    color: var(--muted);
-  }
-}
-
-.connected-status {
-  font-size: 12px;
-  color: var(--accent-green);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-// Danger Zone
+// 危险区域
 .danger-zone {
   padding: 20px;
   border: 1px solid color-mix(in oklch, var(--accent-orange) 40%, transparent);
@@ -565,7 +957,7 @@ const densityOptions = [
   p {
     font-size: 13px;
     color: var(--muted);
-    margin-bottom: 12px;
+    margin-bottom: 16px;
   }
 }
 
@@ -580,7 +972,6 @@ const densityOptions = [
   .profile-header {
     flex-direction: column;
     align-items: flex-start;
-    text-align: left;
   }
 
   .profile-meta {
@@ -590,11 +981,11 @@ const densityOptions = [
   .pref-group {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
   }
 
   .select-input {
     width: 100%;
   }
-
 }
 </style>

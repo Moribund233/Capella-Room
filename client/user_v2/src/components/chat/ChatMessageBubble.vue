@@ -1,0 +1,520 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
+import { formatTime } from '@/utils/date'
+import type { Message } from '@/types/message'
+import { ElMessageBox } from 'element-plus'
+
+const { t } = useI18n()
+const authStore = useAuthStore()
+
+const props = defineProps<{
+  message: Message
+  isOwn: boolean
+}>()
+
+const emit = defineEmits<{
+  reply: [message: Message]
+  edit: [message: Message]
+  delete: [id: string]
+  jumpToThread: [messageId: string]
+}>()
+
+const displayName = computed(() => props.message.sender.username)
+const displayTime = computed(() => formatTime(props.message.created_at))
+const isDeleted = computed(() => props.message.is_deleted)
+const isSending = computed(() => props.message.sending)
+const isError = computed(() => props.message.error)
+const isEdited = computed(() => (props.message.edit_count || 0) > 0)
+
+function getAvatarColor(name: string): string {
+  const colors = ['var(--accent)', 'var(--accent-pink)', 'var(--accent-green)', 'var(--accent-orange)', 'var(--accent-blue)']
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return colors[Math.abs(hash) % colors.length]
+}
+
+function getInitial(name: string): string {
+  return name.charAt(0).toUpperCase()
+}
+
+function handleDelete() {
+  ElMessageBox.confirm(t('chat.confirmDelete'), t('common.confirm'), {
+    confirmButtonText: t('common.delete'),
+    cancelButtonText: t('common.cancel'),
+    type: 'warning',
+  }).then(() => {
+    emit('delete', props.message.id)
+  }).catch(() => {
+    // 取消删除
+  })
+}
+
+function handleEdit() {
+  emit('edit', props.message)
+}
+</script>
+
+<template>
+  <div
+    class="bubble-row"
+    :class="{
+      'bubble-row--own': isOwn,
+      'bubble-row--deleted': isDeleted,
+      'bubble-row--sending': isSending,
+      'bubble-row--error': isError,
+      'bubble-row--system': displayName === 'Wave Bot' || displayName === 'System',
+    }"
+  >
+    <!-- 系统消息（居中简约） -->
+    <template v-if="displayName === 'Wave Bot' || displayName === 'System'">
+      <div class="bubble-system">
+        <span class="bubble-system__dot" />
+        <span class="bubble-system__text">{{ message.content }}</span>
+        <span class="bubble-system__time">{{ displayTime }}</span>
+      </div>
+    </template>
+
+    <!-- 普通消息气泡 -->
+    <template v-else>
+      <!-- 他人消息：左侧头像 -->
+      <div v-if="!isOwn" class="bubble-avatar">
+        <div
+          class="bubble-avatar__circle"
+          :style="{ background: getAvatarColor(displayName) }"
+        >
+          {{ getInitial(displayName) }}
+        </div>
+      </div>
+
+      <!-- 气泡主体 -->
+      <div class="bubble-content" :class="{ 'bubble-content--own': isOwn }">
+        <!-- 操作栏（悬停显示） -->
+        <div class="bubble-actions">
+          <button :title="t('chat.react')" @click="emit('reply', message)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          </button>
+          <button :title="t('chat.reply')" @click="emit('reply', message)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          </button>
+          <button
+            v-if="isOwn && !isDeleted"
+            :title="t('common.edit')"
+            @click="handleEdit"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button v-if="isOwn && !isDeleted" title="More" class="more-btn">
+            <el-dropdown trigger="click" placement="bottom-end" @command="(cmd: string) => {
+              if (cmd === 'delete') handleDelete()
+            }">
+              <span class="more-trigger">⋯</span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="delete">{{ t('common.delete') }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </button>
+        </div>
+
+        <!-- 气泡本体 -->
+        <div class="bubble" :class="{ 'bubble--own': isOwn }">
+          <!-- 发送失败标记 -->
+          <div v-if="isError" class="bubble-error-icon" :title="t('chat.sendFailed')">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          </div>
+
+          <!-- 头部：名字 + 时间 -->
+          <div class="bubble-header">
+            <span class="bubble-author">{{ isOwn ? t('chat.you') : displayName }}</span>
+            <span class="bubble-time">{{ displayTime }}</span>
+            <span v-if="isEdited" class="bubble-edited">({{ t('chat.edited') }})</span>
+          </div>
+
+          <!-- 回复引用 -->
+          <div v-if="message.reply_to_message" class="bubble-reply">
+            <span class="bubble-reply__line" />
+            <div class="bubble-reply__body">
+              <span class="bubble-reply__author">{{ message.reply_to_message.sender.username }}</span>
+              <span class="bubble-reply__text">{{ message.reply_to_message.content }}</span>
+            </div>
+          </div>
+
+          <!-- 消息正文 -->
+          <div v-if="isDeleted" class="bubble-text bubble-text--deleted">
+            {{ t('chat.messageDeleted') }}
+          </div>
+          <div v-else class="bubble-text">
+            <p>{{ message.content }}</p>
+          </div>
+
+          <!-- 已删除&自己消息下的操作 -->
+          <div v-if="isDeleted && isOwn" class="bubble-deleted-actions">
+            <button @click="handleDelete">{{ t('common.delete') }}</button>
+          </div>
+        </div>
+
+        <!-- 发送中状态指示 -->
+        <div v-if="isSending" class="bubble-sending-indicator">
+          <span class="sending-dot" />
+          <span class="sending-dot" />
+          <span class="sending-dot" />
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.bubble-row {
+  display: flex;
+  gap: 10px;
+  padding: 4px 16px;
+  position: relative;
+  transition: background 0.1s;
+
+  &:hover {
+    background: var(--message-hover);
+
+    .bubble-actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  &--deleted {
+    .bubble {
+      opacity: 0.55;
+    }
+  }
+
+  &--sending {
+    .bubble {
+      opacity: 0.7;
+    }
+  }
+
+  &--error {
+    .bubble {
+      border-color: var(--accent-pink);
+    }
+  }
+}
+
+// ─── 头像 ───────────────────────────────────────
+.bubble-avatar {
+  flex-shrink: 0;
+  padding-top: 8px;
+
+  &__circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+  }
+}
+
+// ─── 气泡容器 ────────────────────────────────────
+.bubble-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 75%;
+  position: relative;
+
+  &--own {
+    margin-left: auto;
+    align-items: flex-end;
+  }
+}
+
+// ─── 悬停操作栏 ─────────────────────────────────
+.bubble-actions {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+  align-self: flex-end;
+
+  button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+
+    &:hover {
+      color: var(--fg);
+      background: var(--message-hover);
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .more-trigger {
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+
+  :deep(.el-dropdown) {
+    display: flex;
+    align-items: center;
+  }
+}
+
+// ─── 气泡本体 ────────────────────────────────────
+.bubble {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px 16px 16px 16px;
+  padding: 8px 14px;
+  min-width: 80px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 12px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 7px solid var(--border);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 13px;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-right: 6px solid var(--surface);
+  }
+
+  &--own {
+    background: color-mix(in oklch, var(--accent) 18%, var(--surface));
+    border-color: color-mix(in oklch, var(--accent) 30%, var(--border));
+    border-radius: 16px 6px 16px 16px;
+
+    &::before {
+      left: auto;
+      right: -7px;
+      border-right: none;
+      border-left: 7px solid color-mix(in oklch, var(--accent) 30%, var(--border));
+    }
+
+    &::after {
+      left: auto;
+      right: -5px;
+      border-right: none;
+      border-left: 6px solid color-mix(in oklch, var(--accent) 18%, var(--surface));
+    }
+  }
+}
+
+// ─── 发送失败图标 ──────────────────────────────
+.bubble-error-icon {
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent-pink);
+  cursor: help;
+}
+
+// ─── 头部 ─────────────────────────────────────
+.bubble-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.bubble-author {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+
+  &:hover {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
+
+.bubble--own .bubble-author {
+  color: var(--accent-pink);
+}
+
+.bubble-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.bubble-edited {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+// ─── 回复引用 ────────────────────────────────
+.bubble-reply {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  background: color-mix(in oklch, var(--fg) 4%, transparent);
+  border-radius: 4px;
+
+  &__line {
+    width: 3px;
+    min-height: 30px;
+    border-radius: 2px;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__author {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    display: block;
+  }
+
+  &__text {
+    font-size: 12px;
+    color: var(--muted);
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.bubble--own .bubble-reply {
+  &__line {
+    background: var(--accent-pink);
+  }
+  &__author {
+    color: var(--accent-pink);
+  }
+}
+
+// ─── 正文 ─────────────────────────────────────
+.bubble-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fg);
+
+  p {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  &--deleted {
+    font-style: italic;
+    color: var(--muted);
+    font-size: 13px;
+  }
+}
+
+// ─── 删除消息操作 ─────────────────────────────
+.bubble-deleted-actions {
+  margin-top: 4px;
+
+  button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+
+    &:hover {
+      color: var(--accent-pink);
+    }
+  }
+}
+
+// ─── 发送中动画 ─────────────────────────────
+.bubble-sending-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.sending-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: sendingPulse 1.2s ease-in-out infinite;
+
+  &:nth-child(2) { animation-delay: 0.2s; }
+  &:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes sendingPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+// ─── 系统消息 ─────────────────────────────────
+.bubble-system {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0;
+  justify-content: center;
+
+  &__dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+
+  &__text {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  &__time {
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+}
+</style>

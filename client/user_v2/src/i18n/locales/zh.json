@@ -89,12 +89,15 @@
     "registerFailed": "注册失败，请稍后重试"
   },
   "chat": {
-    "findRoom": "查找房间...",
+    "findRoom": "查找频道…",
     "rooms": "房间",
     "publicRooms": "公开房间",
     "myRooms": "我的房间",
+    "channels": "频道",
+    "projects": "项目",
     "online": "在线",
-    "messagePlaceholder": "发送消息到 #{room}...",
+    "offline": "离线",
+    "messagePlaceholder": "发送消息到 #{room} …",
     "reply": "回复",
     "react": "反应",
     "share": "分享",
@@ -103,7 +106,33 @@
     "noRooms": "暂无房间",
     "noMessages": "暂无消息",
     "noMembers": "暂无成员",
-    "selectRoom": "选择一个房间开始聊天"
+    "selectRoom": "选择一个房间开始聊天",
+    "searchMessages": "搜索消息",
+    "threads": "线程",
+    "showMemberList": "显示成员列表",
+    "hideMemberList": "隐藏成员列表",
+    "noDescription": "暂无描述",
+    "send": "发送",
+    "uploadFile": "上传文件",
+    "emoji": "表情",
+    "gif": "GIF",
+    "replyingTo": "回复",
+    "editingMessage": "编辑消息",
+    "edited": "已编辑",
+    "sending": "发送中…",
+    "sendFailed": "发送失败",
+    "messageDeleted": "此消息已被删除",
+    "loadMore": "加载更多消息",
+    "newMessages": "条新消息",
+    "today": "今天",
+    "yesterday": "昨天",
+    "confirmDelete": "确定要删除此消息吗？",
+    "owner": "创建者",
+    "admin": "管理员",
+    "welcome": {
+      "title": "欢迎来到 Wave",
+      "description": "从侧边栏选择一个频道开始聊天"
+    }
   },
   "profile": {
     "title": "个人资料",
@@ -141,7 +170,7 @@
         "light": "浅色",
         "system": "跟随系统"
       },
-      "messageDensity": {
+      "density": {
         "title": "消息密度",
         "description": "控制消息之间的间距",
         "comfortable": "舒适",
@@ -163,7 +192,98 @@
       "deleteAccount": "删除账户",
       "confirmDelete": "此操作无法撤销。你的所有数据将被永久删除。"
     },
-    "noBio": "暂无个人简介"
+    "noBio": "暂无个人简介",
+    "settings": {
+      "basicInfo": {
+        "title": "基本信息",
+        "username": "用户名",
+        "email": "邮箱",
+        "role": "角色"
+      },
+      "notifications": {
+        "title": "通知",
+        "enable": "启用通知",
+        "enableDesc": "接收所有类型的通知",
+        "directMessage": "私信通知",
+        "directMessageDesc": "收到私信时通知我",
+        "mention": "＠提及通知",
+        "mentionDesc": "有人＠我时通知",
+        "roomInvitation": "房间邀请",
+        "roomInvitationDesc": "收到房间邀请时通知",
+        "system": "系统通知",
+        "systemDesc": "接收系统公告和更新",
+        "sound": "声音提醒",
+        "soundDesc": "播放提示音",
+        "desktop": "桌面通知",
+        "desktopDesc": "显示桌面弹窗通知"
+      },
+      "privacy": {
+        "title": "隐私",
+        "onlineStatus": "在线状态可见性",
+        "onlineStatusDesc": "谁可以看到我的在线状态",
+        "profile": "个人资料可见性",
+        "profileDesc": "谁可以查看我的个人资料",
+        "strangerMessage": "允许陌生人私信",
+        "strangerMessageDesc": "非好友用户可以给我发消息",
+        "roomInvite": "允许房间邀请",
+        "roomInviteDesc": "其他人可以邀请我加入房间"
+      },
+      "message": {
+        "title": "消息",
+        "preview": "消息预览",
+        "previewDesc": "在通知中显示消息内容",
+        "readReceipt": "已读回执",
+        "readReceiptDesc": "让对方知道我已读消息",
+        "typing": "输入状态",
+        "typingDesc": "显示正在输入状态"
+      },
+      "locale": {
+        "title": "语言与地区",
+        "language": "界面语言",
+        "languageDesc": "选择应用显示语言",
+        "timezone": "时区",
+        "timezoneDesc": "设置您的本地时区",
+        "timeFormat": "时间格式",
+        "timeFormatDesc": "选择时间显示格式",
+        "dateFormat": "日期格式",
+        "dateFormatDesc": "选择日期显示格式"
+      },
+      "accessibility": {
+        "title": "无障碍",
+        "fontSize": "字体大小",
+        "fontSizeDesc": "调整界面文字大小",
+        "highContrast": "高对比度",
+        "highContrastDesc": "增强颜色对比度",
+        "reduceMotion": "减少动效",
+        "reduceMotionDesc": "降低界面动画效果",
+        "compactMode": "紧凑模式",
+        "compactModeDesc": "减小界面元素间距"
+      },
+      "media": {
+        "title": "媒体",
+        "autoDownload": "自动下载媒体",
+        "autoDownloadDesc": "自动下载图片和视频",
+        "saveGallery": "保存到相册",
+        "saveGalleryDesc": "将下载的媒体保存到设备相册",
+        "imageQuality": "图片质量",
+        "imageQualityDesc": "选择图片加载质量",
+        "autoPlayVideo": "自动播放视频",
+        "autoPlayVideoDesc": "自动播放视频内容"
+      },
+      "security": {
+        "title": "安全",
+        "abnormalLogin": "异地登录提醒",
+        "abnormalLoginDesc": "检测到异常登录时通知我",
+        "singleDevice": "单设备登录",
+        "singleDeviceDesc": "仅允许一个设备同时登录"
+      },
+      "dangerZone": {
+        "title": "危险区域",
+        "description": "永久删除您的账号和所有数据。此操作不可恢复。",
+        "logout": "退出登录",
+        "deleteAccount": "删除账号"
+      }
+    }
   },
   "thread": {
     "title": "线程",

@@ -23,8 +23,10 @@ const DEFAULT_SETTINGS: UserSettings = {
     enableMention: true,
     enableRoomInvitation: true,
     enableSystemNotification: true,
+    enableFileUploadComplete: true,
     enableSound: true,
     enableDesktopNotification: true,
+    enableDoNotDisturb: false,
   },
   privacy: {
     onlineStatusVisibility: 'everyone',
@@ -57,14 +59,17 @@ const DEFAULT_SETTINGS: UserSettings = {
   },
   media: {
     autoDownloadMedia: true,
+    saveMediaGallery: false,
     imageQuality: 'high',
-    autoPlayVideo: 'wifi',
+    autoPlayVideo: true,
+    autoPlayAudio: false,
   },
 }
 
 /**
  * 用户设置状态管理 Store
  * 负责管理用户个性化设置的加载、更新和同步
+ * 采用乐观更新策略：先更新本地状态，再异步同步到服务端
  */
 export const useSettingsStore = defineStore('settings', () => {
   // ========== State ==========
@@ -141,74 +146,170 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
-   * 更新用户设置
+   * 乐观更新用户设置
+   * 先更新本地状态实现即时反馈，再异步同步到服务端
    * @param newSettings 新的设置值（部分更新）
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateSettings(newSettings: PartialUserSettings): Promise<boolean> {
-    saving.value = true
+  async function updateSettings(newSettings: PartialUserSettings): Promise<{ success: boolean; error?: string }> {
+    // 保存旧值以便失败时回滚
+    const oldSettings = { ...settings.value }
 
+    // 乐观更新：立即更新本地状态
+    settings.value = { ...settings.value, ...newSettings }
+
+    // 异步同步到服务端
     try {
       const res = await settingsApi.updateSettings(newSettings)
-      if (res.data) {
-        settings.value = { ...settings.value, ...res.data }
-        return true
+      // 检查服务端返回的 success 字段
+      if (res.success === false) {
+        // 服务端返回业务错误
+        let errorMsg: string | null = null
+        // 1. 尝试获取 message 字段
+        if (res.message) {
+          errorMsg = res.message
+        }
+        // 2. 如果 error 是字符串，直接使用
+        else if (typeof res.error === 'string') {
+          errorMsg = res.error
+        }
+        // 3. 如果 error 是对象，转为 JSON 字符串
+        else if (typeof res.error === 'object' && res.error !== null) {
+          errorMsg = JSON.stringify(res.error)
+        }
+        settings.value = oldSettings
+        return { success: false, error: errorMsg || '保存设置失败' }
       }
-    } catch (err) {
-      console.error('[SettingsStore] Failed to update settings:', err)
-    } finally {
-      saving.value = false
+      if (res.data) {
+        // 同步成功，使用服务端返回的数据（可能包含其他字段的更新）
+        settings.value = { ...settings.value, ...res.data }
+        return { success: true }
+      }
+      // 服务端返回成功但没有数据，保持乐观更新的状态
+      // PATCH 请求通常只返回 200/204 而不返回数据
+      return { success: true }
+    } catch (err: unknown) {
+      // 同步失败，回滚到旧值
+      const error = err as {
+        response?: { data?: { message?: string; error?: string | Record<string, unknown>; detail?: string }; status?: number; statusText?: string }
+        message?: string
+        code?: string
+      }
+
+      // 详细记录错误信息以便调试
+      console.error('[SettingsStore] Failed to sync settings:', {
+        error: err,
+        response: error?.response,
+        responseData: error?.response?.data,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        message: error?.message,
+        code: error?.code,
+      })
+
+      // 提取错误消息（按优先级）
+      let errorMsg: string | null = null
+
+      // 1. 尝试获取 message 字段
+      if (error?.response?.data?.message) {
+        errorMsg = error.response.data.message
+      }
+      // 2. 如果 error 是字符串，直接使用
+      else if (typeof error?.response?.data?.error === 'string') {
+        errorMsg = error.response.data.error
+      }
+      // 3. 如果 error 是对象，尝试获取其中的 message 或转为 JSON
+      else if (typeof error?.response?.data?.error === 'object' && error.response.data.error !== null) {
+        const errObj = error.response.data.error as Record<string, unknown>
+        errorMsg = (errObj.message as string) || JSON.stringify(errObj)
+      }
+      // 4. 其他字段
+      else if (error?.response?.data?.detail) {
+        errorMsg = error.response.data.detail
+      }
+      else if (error?.response?.statusText) {
+        errorMsg = error.response.statusText
+      }
+      else if (error?.response?.status) {
+        errorMsg = `HTTP ${error.response.status} 错误`
+      }
+      else if (error?.message) {
+        errorMsg = error.message
+      }
+
+      settings.value = oldSettings
+      return { success: false, error: errorMsg || '网络错误，请检查连接' }
     }
-
-    return false
   }
 
   /**
-   * 更新通知设置
+   * 更新通知设置（乐观更新）
+   * @param notification 新的通知设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateNotificationSettings(notification: NotificationSettings): Promise<boolean> {
-    return updateSettings({ notifications: notification })
+  async function updateNotificationSettings(notification: Partial<NotificationSettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.notifications, ...notification }
+    return updateSettings({ notifications: updated })
   }
 
   /**
-   * 更新隐私设置
+   * 更新隐私设置（乐观更新）
+   * @param privacy 新的隐私设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updatePrivacySettings(privacy: PrivacySettings): Promise<boolean> {
-    return updateSettings({ privacy })
+  async function updatePrivacySettings(privacy: Partial<PrivacySettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.privacy, ...privacy }
+    return updateSettings({ privacy: updated })
   }
 
   /**
-   * 更新消息设置
+   * 更新消息设置（乐观更新）
+   * @param message 新的消息设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateMessageSettings(message: MessageSettings): Promise<boolean> {
-    return updateSettings({ message })
+  async function updateMessageSettings(message: Partial<MessageSettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.message, ...message }
+    return updateSettings({ message: updated })
   }
 
   /**
-   * 更新安全设置
+   * 更新安全设置（乐观更新）
+   * @param security 新的安全设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateSecuritySettings(security: SecuritySettings): Promise<boolean> {
-    return updateSettings({ security })
+  async function updateSecuritySettings(security: Partial<SecuritySettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.security, ...security }
+    return updateSettings({ security: updated })
   }
 
   /**
-   * 更新语言地区设置
+   * 更新语言地区设置（乐观更新）
+   * @param locale 新的语言地区设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateLocaleSettings(locale: LocaleSettings): Promise<boolean> {
-    return updateSettings({ locale })
+  async function updateLocaleSettings(locale: Partial<LocaleSettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.locale, ...locale }
+    return updateSettings({ locale: updated })
   }
 
   /**
-   * 更新无障碍设置
+   * 更新无障碍设置（乐观更新）
+   * @param accessibility 新的无障碍设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateAccessibilitySettings(accessibility: AccessibilitySettings): Promise<boolean> {
-    return updateSettings({ accessibility })
+  async function updateAccessibilitySettings(accessibility: Partial<AccessibilitySettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.accessibility, ...accessibility }
+    return updateSettings({ accessibility: updated })
   }
 
   /**
-   * 更新媒体设置
+   * 更新媒体设置（乐观更新）
+   * @param media 新的媒体设置
+   * @returns 成功返回 { success: true }，失败返回 { success: false, error: string }
    */
-  async function updateMediaSettings(media: MediaSettings): Promise<boolean> {
-    return updateSettings({ media })
+  async function updateMediaSettings(media: Partial<MediaSettings>): Promise<{ success: boolean; error?: string }> {
+    const updated = { ...settings.value.media, ...media }
+    return updateSettings({ media: updated })
   }
 
   /**

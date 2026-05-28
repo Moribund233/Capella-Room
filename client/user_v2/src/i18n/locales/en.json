@@ -89,12 +89,15 @@
     "registerFailed": "Registration failed, please try again later"
   },
   "chat": {
-    "findRoom": "Find a room...",
+    "findRoom": "Find a channel…",
     "rooms": "Rooms",
     "publicRooms": "Public Rooms",
     "myRooms": "My Rooms",
+    "channels": "Channels",
+    "projects": "Projects",
     "online": "online",
-    "messagePlaceholder": "Message #{room}...",
+    "offline": "offline",
+    "messagePlaceholder": "Message #{room} …",
     "reply": "Reply",
     "react": "React",
     "share": "Share",
@@ -103,7 +106,33 @@
     "noRooms": "No rooms yet",
     "noMessages": "No messages yet",
     "noMembers": "No members yet",
-    "selectRoom": "Select a room to start chatting"
+    "selectRoom": "Select a room to start chatting",
+    "searchMessages": "Search messages",
+    "threads": "Threads",
+    "showMemberList": "Show member list",
+    "hideMemberList": "Hide member list",
+    "noDescription": "No description",
+    "send": "Send",
+    "uploadFile": "Upload file",
+    "emoji": "Emoji",
+    "gif": "GIF",
+    "replyingTo": "Replying to",
+    "editingMessage": "Editing message",
+    "edited": "edited",
+    "sending": "sending…",
+    "sendFailed": "send failed",
+    "messageDeleted": "This message has been deleted",
+    "loadMore": "Load more messages",
+    "newMessages": "new message(s)",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "confirmDelete": "Are you sure you want to delete this message?",
+    "owner": "owner",
+    "admin": "admin",
+    "welcome": {
+      "title": "Welcome to Wave",
+      "description": "Select a channel from the sidebar to start chatting"
+    }
   },
   "profile": {
     "title": "Profile",
@@ -141,7 +170,7 @@
         "light": "Light",
         "system": "System"
       },
-      "messageDensity": {
+      "density": {
         "title": "Message density",
         "description": "Control how much space between messages",
         "comfortable": "Comfortable",
@@ -154,16 +183,108 @@
     },
     "connectedAccounts": {
       "title": "Connected accounts",
+      "email": "Email",
       "connected": "Connected",
       "disconnect": "Disconnect"
     },
     "dangerZone": {
-      "title": "Danger zone",
+      "title": "Danger Zone",
       "description": "Permanently delete your account and all associated data. This action cannot be undone.",
-      "deleteAccount": "Delete account",
+      "deleteAccount": "Delete Account",
       "confirmDelete": "This action cannot be undone. All your data will be permanently deleted."
     },
-    "noBio": "No bio yet"
+    "noBio": "No bio yet",
+    "settings": {
+      "basicInfo": {
+        "title": "Basic Information",
+        "username": "Username",
+        "email": "Email",
+        "role": "Role"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "enable": "Enable Notifications",
+        "enableDesc": "Receive all types of notifications",
+        "directMessage": "Direct Message",
+        "directMessageDesc": "Notify me when receiving direct messages",
+        "mention": "＠Mentions",
+        "mentionDesc": "Notify when someone mentions me",
+        "roomInvitation": "Room Invitations",
+        "roomInvitationDesc": "Notify when receiving room invitations",
+        "system": "System Notifications",
+        "systemDesc": "Receive system announcements and updates",
+        "sound": "Sound Alerts",
+        "soundDesc": "Play notification sounds",
+        "desktop": "Desktop Notifications",
+        "desktopDesc": "Show desktop popup notifications"
+      },
+      "privacy": {
+        "title": "Privacy",
+        "onlineStatus": "Online Status Visibility",
+        "onlineStatusDesc": "Who can see my online status",
+        "profile": "Profile Visibility",
+        "profileDesc": "Who can view my profile",
+        "strangerMessage": "Allow Stranger Messages",
+        "strangerMessageDesc": "Non-friends can send me messages",
+        "roomInvite": "Allow Room Invitations",
+        "roomInviteDesc": "Others can invite me to join rooms"
+      },
+      "message": {
+        "title": "Messages",
+        "preview": "Message Preview",
+        "previewDesc": "Show message content in notifications",
+        "readReceipt": "Read Receipts",
+        "readReceiptDesc": "Let others know I've read messages",
+        "typing": "Typing Status",
+        "typingDesc": "Show typing indicator"
+      },
+      "locale": {
+        "title": "Language & Region",
+        "language": "Interface Language",
+        "languageDesc": "Choose app display language",
+        "timezone": "Timezone",
+        "timezoneDesc": "Set your local timezone",
+        "timeFormat": "Time Format",
+        "timeFormatDesc": "Choose time display format",
+        "dateFormat": "Date Format",
+        "dateFormatDesc": "Choose date display format"
+      },
+      "accessibility": {
+        "title": "Accessibility",
+        "fontSize": "Font Size",
+        "fontSizeDesc": "Adjust interface text size",
+        "highContrast": "High Contrast",
+        "highContrastDesc": "Enhance color contrast",
+        "reduceMotion": "Reduce Motion",
+        "reduceMotionDesc": "Reduce interface animations",
+        "compactMode": "Compact Mode",
+        "compactModeDesc": "Reduce interface element spacing"
+      },
+      "media": {
+        "title": "Media",
+        "autoDownload": "Auto Download Media",
+        "autoDownloadDesc": "Automatically download images and videos",
+        "saveGallery": "Save to Gallery",
+        "saveGalleryDesc": "Save downloaded media to device gallery",
+        "imageQuality": "Image Quality",
+        "imageQualityDesc": "Choose image loading quality",
+        "autoPlayVideo": "Auto-play Videos",
+        "autoPlayVideoDesc": "Automatically play video content"
+      },
+      "security": {
+        "title": "Security",
+        "abnormalLogin": "Abnormal Login Alert",
+        "abnormalLoginDesc": "Notify me when abnormal login is detected",
+        "singleDevice": "Single Device Login",
+        "singleDeviceDesc": "Only allow one device to login at a time"
+      },
+      "dangerZone": {
+        "title": "Danger Zone",
+        "description": "Permanently delete your account and all data. This action cannot be undone.",
+        "logout": "Logout",
+        "deleteAccount": "Delete Account"
+      }
+    }
   },
   "thread": {
     "title": "Thread",
@@ -178,6 +299,21 @@
       "lastReply": "Last reply"
     },
     "op": "op"
+  },
+  "discover": {
+    "title": "Discover",
+    "subtitle": "Explore communities and find your space",
+    "searchPlaceholder": "Search rooms...",
+    "all": "All",
+    "popular": "Popular",
+    "tech": "Tech",
+    "gaming": "Gaming",
+    "music": "Music",
+    "art": "Art",
+    "featured": "Featured",
+    "trending": "Trending",
+    "join": "Join",
+    "view": "View"
   },
   "quick": {
     "notifications": "Notifications",

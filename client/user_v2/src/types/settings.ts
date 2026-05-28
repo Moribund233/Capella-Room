@@ -18,10 +18,14 @@ export interface NotificationSettings {
   enableRoomInvitation: boolean
   /** 系统通知 */
   enableSystemNotification: boolean
+  /** 文件上传完成通知 */
+  enableFileUploadComplete: boolean
   /** 声音提醒 */
   enableSound: boolean
   /** 桌面通知 */
   enableDesktopNotification: boolean
+  /** 免打扰模式 */
+  enableDoNotDisturb: boolean
 }
 
 // ========== 隐私设置 ==========
@@ -103,7 +107,7 @@ export interface AccessibilitySettings {
   reduceMotion: boolean
   /** 高对比度 */
   highContrast: boolean
-  /** 紧凑模式 */
+  /** 紧凑模式 (dense_mode) */
   compactMode: boolean
 }
 
@@ -116,10 +120,14 @@ export type ImageQuality = 'original' | 'high' | 'medium' | 'low'
 export interface MediaSettings {
   /** 自动下载媒体文件 */
   autoDownloadMedia: boolean
+  /** 保存媒体到相册 */
+  saveMediaGallery: boolean
   /** 图片质量 */
   imageQuality: ImageQuality
   /** 自动播放视频 */
-  autoPlayVideo: 'always' | 'wifi' | 'never'
+  autoPlayVideo: boolean
+  /** 自动播放音频 */
+  autoPlayAudio: boolean
 }
 
 // ========== 设备类型 ==========

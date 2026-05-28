@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage, ElLoading } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { User, Lock, Message, ArrowLeft } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -55,12 +55,13 @@ async function handleLogin() {
     } else {
       ElMessage.error(result.message || t('auth.loginFailed'))
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 显示后端返回的具体错误消息
     console.error('[Login] Error:', error)
-    const errorMessage = error?.response?.data?.message
-      || error?.response?.data?.error
-      || error?.message
+    const err = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
+    const errorMessage = err?.response?.data?.message
+      || err?.response?.data?.error
+      || err?.message
       || t('auth.loginFailed')
     ElMessage.error({
       message: errorMessage,
@@ -109,12 +110,13 @@ async function handleRegister() {
     } else {
       ElMessage.error(result.message || t('auth.registerFailed'))
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 显示后端返回的具体错误消息
     console.error('[Register] Error:', error)
-    const errorMessage = error?.response?.data?.message
-      || error?.response?.data?.error
-      || error?.message
+    const err = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
+    const errorMessage = err?.response?.data?.message
+      || err?.response?.data?.error
+      || err?.message
       || t('auth.registerFailed')
     ElMessage.error({
       message: errorMessage,

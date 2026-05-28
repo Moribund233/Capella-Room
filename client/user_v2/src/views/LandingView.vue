@@ -2,8 +2,10 @@
 import { ArrowRight, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { ref } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
 
 const { t, locale } = useI18n()
+const settingsStore = useSettingsStore()
 
 // 语言选项
 const languages = [
@@ -26,6 +28,14 @@ function switchLanguage(code: string) {
   locale.value = code
   currentLang.value = code
   localStorage.setItem('locale', code)
+
+  // 同步更新 settings store 中的语言设置
+  const newLanguage = code === 'zh' ? 'zh-CN' : code === 'ja' ? 'ja-JP' : 'en-US'
+  settingsStore.updateLocaleSettings({
+    ...settingsStore.localeSettings,
+    language: newLanguage,
+  })
+
   langMenuVisible.value = false
 }
 </script>

@@ -46,13 +46,21 @@ export const useRoomStore = defineStore('room', () => {
     // 检查用户是否已登录
     const authStore = getAuthStore()
     if (!authStore.isAuthenticated) {
+      console.log('[RoomStore] fetchMyRooms: 用户未登录，跳过加载')
       return
     }
     loading.value = true
     error.value = null
     try {
       const data = await roomApi.getMyRooms()
-      rooms.value = data
+      console.log('[RoomStore] fetchMyRooms: 获取到房间数据', data)
+      // 确保数据是数组
+      if (Array.isArray(data)) {
+        rooms.value = data
+      } else {
+        console.error('[RoomStore] fetchMyRooms: 返回数据不是数组', data)
+        rooms.value = []
+      }
     } catch (err) {
       error.value = '获取我的聊天室失败'
       console.error('[RoomStore] fetchMyRooms error:', err)
