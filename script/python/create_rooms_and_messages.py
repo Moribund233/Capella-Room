@@ -366,7 +366,7 @@ def main():
     
     # 检查服务器连接
     try:
-        response = requests.get(f"{base_url}/api/health", timeout=5)
+        response = requests.get(f"{base_url}/health", timeout=5)
         print(f"✅ 服务器健康检查: 正常")
     except Exception as e:
         print(f"⚠️ 无法连接到服务器: {e}")

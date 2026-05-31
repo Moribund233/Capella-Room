@@ -131,12 +131,17 @@ fn user_routes() -> Router<Arc<AppState>> {
         // 用户设置
         .route("/me/settings", get(user_settings::get_user_settings))
         .route("/me/settings", patch(user_settings::update_user_settings))
+        .route("/me/settings", delete(user_settings::reset_user_settings))
         // 账号安全
         .route(
             "/me/security/overview",
             get(account_security::get_security_overview),
         )
         .route("/me/devices", get(account_security::list_devices))
+        .route(
+            "/me/devices",
+            delete(account_security::terminate_all_other_devices),
+        )
         .route(
             "/me/devices/:device_id",
             delete(account_security::terminate_device),

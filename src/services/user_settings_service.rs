@@ -243,6 +243,18 @@ impl UserSettingsService {
         Ok(settings.into())
     }
 
+    /// 删除用户全局设置（重置为默认）
+    /// 删除后，下次 GET 将返回所有分组的默认值
+    pub async fn delete_user_settings(&self, user_id: Uuid) -> Result<()> {
+        sqlx::query("DELETE FROM user_settings WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+        Ok(())
+    }
+
     /// 删除用户在某个房间的设置（重置为默认）
     pub async fn delete_room_settings(&self, user_id: Uuid, room_id: Uuid) -> Result<()> {
         let result = sqlx::query(

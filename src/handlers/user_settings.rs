@@ -115,6 +115,25 @@ pub async fn update_room_settings(
     Ok(Json(ApiResponse::success(settings)))
 }
 
+/// DELETE /api/v1/users/me/settings
+/// 删除当前用户的设置（重置为默认）
+pub async fn reset_user_settings(
+    state: axum::extract::State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户 ID".to_string()))?;
+
+    state
+        .user_settings_service()
+        .delete_user_settings(user_id)
+        .await?;
+
+    Ok(Json(ApiResponse::success_with_message("设置已重置为默认值")))
+}
+
 /// DELETE /api/v1/users/me/rooms/:room_id/settings
 /// 删除当前用户在指定房间的设置（恢复默认）
 pub async fn delete_room_settings(

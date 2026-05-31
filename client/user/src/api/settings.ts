@@ -58,7 +58,7 @@ export const securityApi = {
    * @returns 操作结果
    */
   logoutDevice(deviceId: string): Promise<ApiResponse<void>> {
-    return httpClient.post(`/users/me/devices/${deviceId}/logout`)
+    return httpClient.delete(`/users/me/devices/${deviceId}`)
   },
 
   /**
@@ -84,7 +84,7 @@ export const securityApi = {
    * @returns 操作结果
    */
   logoutAllOtherDevices(): Promise<ApiResponse<void>> {
-    return httpClient.post('/users/me/devices/logout-all-others')
+    return httpClient.delete('/users/me/devices')
   },
 
   /**
@@ -111,7 +111,7 @@ export const roomSettingsApi = {
    * @returns 房间设置列表
    */
   getRoomSettings(): Promise<ApiResponse<{ settings: RoomUserSettings[] }>> {
-    return httpClient.get('/users/me/room-settings')
+    return httpClient.get('/users/me/rooms/settings')
   },
 
   /**
@@ -120,7 +120,7 @@ export const roomSettingsApi = {
    * @returns 房间设置
    */
   getRoomSetting(roomId: string): Promise<ApiResponse<RoomUserSettings>> {
-    return httpClient.get(`/users/me/room-settings/${roomId}`)
+    return httpClient.get(`/users/me/rooms/${roomId}/settings`)
   },
 
   /**
@@ -133,7 +133,7 @@ export const roomSettingsApi = {
     roomId: string,
     settings: Partial<Omit<RoomUserSettings, 'roomId' | 'roomName'>>
   ): Promise<ApiResponse<RoomUserSettings>> {
-    return httpClient.patch(`/users/me/room-settings/${roomId}`, settings)
+    return httpClient.patch(`/users/me/rooms/${roomId}/settings`, settings)
   },
 
   /**
@@ -142,6 +142,6 @@ export const roomSettingsApi = {
    * @returns 重置后的设置
    */
   resetRoomSetting(roomId: string): Promise<ApiResponse<RoomUserSettings>> {
-    return httpClient.delete(`/users/me/room-settings/${roomId}`)
+    return httpClient.delete(`/users/me/rooms/${roomId}/settings`)
   },
 }
