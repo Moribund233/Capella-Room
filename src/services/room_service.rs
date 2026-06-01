@@ -1535,4 +1535,144 @@ impl RoomService {
 
         Ok(responses)
     }
+
+    // ==================== 管理员统计方法 ====================
+
+    /// 获取房间活跃度排行
+    pub async fn get_room_activity_ranking(&self, limit: i64) -> Result<Vec<RoomActivity>> {
+        #[derive(sqlx::FromRow)]
+        struct RoomActivityRow {
+            id: Uuid,
+            name: String,
+            member_count: i64,
+            message_count: i64,
+            last_message_at: Option<chrono::DateTime<chrono::Utc>>,
+        }
+
+        let rows: Vec<RoomActivityRow> = sqlx::query_as(
+            r#"
+            SELECT 
+                r.id,
+                r.name,
+                COUNT(DISTINCT rm.user_id) as member_count,
+                COUNT(m.id) as message_count,
+                MAX(m.created_at) as last_message_at
+            FROM rooms r
+            LEFT JOIN room_members rm ON r.id = rm.room_id
+            LEFT JOIN messages m ON r.id = m.room_id AND m.is_deleted = false
+            GROUP BY r.id, r.name
+            ORDER BY message_count DESC, last_message_at DESC NULLS LAST
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| RoomActivity {
+                id: row.id,
+                name: row.name,
+                member_count: row.member_count,
+                message_count: row.message_count,
+                last_message_at: row.last_message_at,
+            })
+            .collect())
+    }
+
+    /// 获取房间统计概览
+    pub async fn get_room_stats(&self) -> Result<RoomStats> {
+        // 总房间数
+        let total_rooms: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rooms")
+            .fetch_one(self.db.pool())
+            .await?;
+
+        // 公开房间数
+        let public_rooms: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM rooms WHERE is_private = false",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 私聊房间数
+        let direct_rooms: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM rooms WHERE room_type = 'direct'",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 人均房间数
+        let avg_rooms_per_user: f64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(AVG(room_count), 0.0)
+            FROM (
+                SELECT user_id, COUNT(*) as room_count
+                FROM room_members
+                GROUP BY user_id
+            ) subq
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 平均成员数
+        let avg_members_per_room: f64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(AVG(member_count), 0.0)
+            FROM (
+                SELECT room_id, COUNT(*) as member_count
+                FROM room_members
+                GROUP BY room_id
+            ) subq
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 空房间数（没有消息的房间）
+        let empty_rooms: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM rooms r
+            WHERE NOT EXISTS (
+                SELECT 1 FROM messages m
+                WHERE m.room_id = r.id AND m.is_deleted = false
+            )
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(RoomStats {
+            total_rooms,
+            public_rooms,
+            private_rooms: total_rooms - public_rooms,
+            direct_rooms,
+            avg_rooms_per_user,
+            avg_members_per_room,
+            empty_rooms,
+        })
+    }
+}
+
+/// 房间活跃度
+#[derive(Debug, serde::Serialize)]
+pub struct RoomActivity {
+    pub id: Uuid,
+    pub name: String,
+    pub member_count: i64,
+    pub message_count: i64,
+    pub last_message_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// 房间统计概览
+#[derive(Debug, serde::Serialize)]
+pub struct RoomStats {
+    pub total_rooms: i64,
+    pub public_rooms: i64,
+    pub private_rooms: i64,
+    pub direct_rooms: i64,
+    pub avg_rooms_per_user: f64,
+    pub avg_members_per_room: f64,
+    pub empty_rooms: i64,
 }

@@ -791,6 +791,85 @@ impl MessageService {
             monthly_messages: stats.monthly_messages.unwrap_or(0),
         })
     }
+
+    /// 获取消息类型分布统计
+    pub async fn get_message_type_stats(&self) -> Result<MessageTypeStats> {
+        let text_messages: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM messages
+            WHERE message_type = 'text' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let image_messages: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM messages
+            WHERE message_type = 'image' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let file_messages: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM messages
+            WHERE message_type = 'file' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let system_messages: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM messages
+            WHERE message_type = 'system' AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let reply_messages: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM messages
+            WHERE reply_to IS NOT NULL AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(MessageTypeStats {
+            text_messages,
+            image_messages,
+            file_messages,
+            system_messages,
+            reply_messages,
+        })
+    }
+
+    /// 获取消息时间分布（按小时）
+    pub async fn get_message_hourly_distribution(&self) -> Result<Vec<MessageHourlyDistribution>> {
+        let rows: Vec<(i32, i64)> = sqlx::query_as(
+            r#"
+            SELECT 
+                EXTRACT(HOUR FROM created_at)::int as hour,
+                COUNT(*) as count
+            FROM messages
+            WHERE created_at > NOW() - INTERVAL '7 days'
+            AND is_deleted = false
+            GROUP BY EXTRACT(HOUR FROM created_at)
+            ORDER BY hour
+            "#,
+        )
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(hour, count)| MessageHourlyDistribution { hour, count })
+            .collect())
+    }
 }
 
 /// 活跃度统计数据（数据库查询行映射）
@@ -813,4 +892,21 @@ pub struct ActivityStats {
     pub daily_messages: i64,
     pub weekly_messages: i64,
     pub monthly_messages: i64,
+}
+
+/// 消息类型统计
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MessageTypeStats {
+    pub text_messages: i64,
+    pub image_messages: i64,
+    pub file_messages: i64,
+    pub system_messages: i64,
+    pub reply_messages: i64,
+}
+
+/// 消息时间分布
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MessageHourlyDistribution {
+    pub hour: i32,
+    pub count: i64,
 }

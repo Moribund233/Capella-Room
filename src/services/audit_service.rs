@@ -15,7 +15,7 @@ use crate::error::{AppError, Result};
 use crate::models::audit::{
     AlertQuery, AlertRule, AlertStatus, AuditAlert, AuditAlertResponse, AuditEventType, AuditLog,
     AuditLogQuery, AuditMetadata, AuditSeverity, AuditStats, CreateAlertRequest,
-    CreateAuditLogRequest, DailyCount, EventTypeCount, SeverityCount, UpdateAlertRuleRequest,
+    CreateAuditLogRequest, DailyCount, EventTypeCount, SeverityCount as AuditSeverityCount, UpdateAlertRuleRequest,
 };
 use crate::models::user::{UserInfo, UserRole};
 use crate::redis::{AuditLogStreamMessage, StreamManager};
@@ -775,9 +775,9 @@ impl AuditService {
         .await
         .map_err(AppError::Database)?;
 
-        let logs_by_severity: Vec<SeverityCount> = severity_counts
+        let logs_by_severity: Vec<AuditSeverityCount> = severity_counts
             .into_iter()
-            .map(|(severity, count)| SeverityCount { severity, count })
+            .map(|(severity, count)| AuditSeverityCount { severity, count })
             .collect();
 
         let event_type_counts: Vec<(AuditEventType, i64)> = sqlx::query_as(
@@ -1409,6 +1409,90 @@ impl AuditService {
     pub fn alert_engine(&self) -> &Arc<AlertEngine> {
         &self.alert_engine
     }
+
+    /// 获取安全告警统计
+    pub async fn get_security_stats(&self) -> Result<SecurityStats> {
+        let pool = self.db.pool();
+
+        // 今日登录失败数
+        let failed_logins_today: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM audit_logs
+            WHERE event_type = 'system_login_failure'
+            AND created_at > NOW() - INTERVAL '1 day'
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        // 待处理告警数
+        let pending_alerts: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM audit_alerts WHERE status = 'new'",
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        // 今日告警数
+        let alerts_today: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM audit_alerts
+            WHERE created_at > NOW() - INTERVAL '1 day'
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        // 按严重级别统计告警
+        let severity_stats: Vec<(AuditSeverity, i64)> = sqlx::query_as(
+            r#"
+            SELECT severity, COUNT(*) as count
+            FROM audit_alerts
+            WHERE created_at > NOW() - INTERVAL '7 days'
+            GROUP BY severity
+            ORDER BY severity
+            "#,
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        let alerts_by_severity: Vec<AuditSeverityCount> = severity_stats
+            .into_iter()
+            .map(|(severity, count)| AuditSeverityCount { severity, count })
+            .collect();
+
+        // 本周审计日志数
+        let audit_logs_this_week: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM audit_logs
+            WHERE created_at > NOW() - INTERVAL '7 days'
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(AppError::Database)?;
+
+        Ok(SecurityStats {
+            failed_logins_today,
+            pending_alerts,
+            alerts_today,
+            alerts_by_severity,
+            audit_logs_this_week,
+        })
+    }
+}
+
+/// 安全统计
+#[derive(Debug, serde::Serialize)]
+pub struct SecurityStats {
+    pub failed_logins_today: i64,
+    pub pending_alerts: i64,
+    pub alerts_today: i64,
+    pub alerts_by_severity: Vec<AuditSeverityCount>,
+    pub audit_logs_this_week: i64,
 }
 
 /// 刷新日志缓冲区到数据库

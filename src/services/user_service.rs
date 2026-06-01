@@ -555,6 +555,41 @@ pub struct UserStats {
     pub online_hours: i64,
 }
 
+/// 用户增长统计数据
+#[derive(Debug, serde::Serialize)]
+pub struct UserGrowthStats {
+    pub new_users_today: i64,
+    pub new_users_this_week: i64,
+    pub new_users_this_month: i64,
+    pub total_users: i64,
+    pub growth_by_day: Vec<DailyUserCount>,
+}
+
+/// 每日用户数量
+#[derive(Debug, serde::Serialize)]
+pub struct DailyUserCount {
+    pub date: String,
+    pub count: i64,
+}
+
+/// 用户行为统计
+#[derive(Debug, serde::Serialize)]
+pub struct UserBehaviorStats {
+    pub avg_messages_per_user: f64,
+    pub avg_rooms_per_user: f64,
+    pub active_users_today: i64,
+    pub active_users_this_week: i64,
+}
+
+/// 好友关系统计
+#[derive(Debug, serde::Serialize)]
+pub struct FriendStats {
+    pub total_friendships: i64,
+    pub pending_requests: i64,
+    pub avg_friends_per_user: f64,
+    pub request_accept_rate: f64,
+}
+
 // ==================== 好友功能服务方法 ====================
 
 impl UserService {
@@ -869,5 +904,198 @@ impl UserService {
             row.get("username"),
             row.get("avatar_url"),
         ))
+    }
+
+    // ==================== 管理员统计方法 ====================
+
+    /// 获取用户增长统计
+    pub async fn get_user_growth_stats(&self, days: i64) -> Result<UserGrowthStats> {
+        // 获取今日、本周、本月新用户数
+        let new_users_today: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM users
+            WHERE created_at > NOW() - INTERVAL '1 day'
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let new_users_this_week: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM users
+            WHERE created_at > NOW() - INTERVAL '7 days'
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let new_users_this_month: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM users
+            WHERE created_at > NOW() - INTERVAL '30 days'
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let total_users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(self.db.pool())
+            .await?;
+
+        // 获取每日用户增长数据
+        let growth_by_day: Vec<DailyUserCount> = sqlx::query_as(
+            r#"
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as count
+            FROM users
+            WHERE created_at > NOW() - INTERVAL '1 day' * $1
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+            "#,
+        )
+        .bind(days)
+        .fetch_all(self.db.pool())
+        .await?
+        .into_iter()
+        .map(|(date, count): (chrono::NaiveDate, i64)| DailyUserCount {
+            date: date.format("%Y-%m-%d").to_string(),
+            count,
+        })
+        .collect();
+
+        Ok(UserGrowthStats {
+            new_users_today,
+            new_users_this_week,
+            new_users_this_month,
+            total_users,
+            growth_by_day,
+        })
+    }
+
+    /// 获取用户行为统计
+    pub async fn get_user_behavior_stats(&self) -> Result<UserBehaviorStats> {
+        // 人均消息数
+        let avg_messages_per_user: f64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(AVG(msg_count), 0.0)
+            FROM (
+                SELECT sender_id, COUNT(*) as msg_count
+                FROM messages
+                WHERE is_deleted = false
+                GROUP BY sender_id
+            ) subq
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 人均加入房间数
+        let avg_rooms_per_user: f64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(AVG(room_count), 0.0)
+            FROM (
+                SELECT user_id, COUNT(*) as room_count
+                FROM room_members
+                GROUP BY user_id
+            ) subq
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 今日活跃用户（发送过消息的用户）
+        let active_users_today: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(DISTINCT sender_id)
+            FROM messages
+            WHERE created_at > NOW() - INTERVAL '1 day'
+            AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 本周活跃用户
+        let active_users_this_week: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(DISTINCT sender_id)
+            FROM messages
+            WHERE created_at > NOW() - INTERVAL '7 days'
+            AND is_deleted = false
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(UserBehaviorStats {
+            avg_messages_per_user,
+            avg_rooms_per_user,
+            active_users_today,
+            active_users_this_week,
+        })
+    }
+
+    /// 获取好友关系统计
+    pub async fn get_friend_stats(&self) -> Result<FriendStats> {
+        // 总好友关系数
+        let total_friendships: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM friendships")
+                .fetch_one(self.db.pool())
+                .await?;
+
+        // 待处理申请数
+        let pending_requests: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM friend_requests WHERE status = 'pending'",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 人均好友数
+        let avg_friends_per_user: f64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(AVG(friend_count), 0.0)
+            FROM (
+                SELECT 
+                    user_id_a as user_id,
+                    COUNT(*) as friend_count
+                FROM friendships
+                GROUP BY user_id_a
+                UNION ALL
+                SELECT 
+                    user_id_b as user_id,
+                    COUNT(*) as friend_count
+                FROM friendships
+                GROUP BY user_id_b
+            ) subq
+            "#,
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        // 好友申请接受率
+        let total_requests: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM friend_requests")
+                .fetch_one(self.db.pool())
+                .await?;
+
+        let accepted_requests: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM friend_requests WHERE status = 'accepted'",
+        )
+        .fetch_one(self.db.pool())
+        .await?;
+
+        let request_accept_rate = if total_requests > 0 {
+            (accepted_requests as f64 / total_requests as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        Ok(FriendStats {
+            total_friendships,
+            pending_requests,
+            avg_friends_per_user,
+            request_accept_rate,
+        })
     }
 }

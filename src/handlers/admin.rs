@@ -817,6 +817,91 @@ pub async fn get_redis_status(
     Ok(Json(ApiResponse::success(response)))
 }
 
+// ==================== 增强统计接口 ====================
+
+use crate::services::user_service::{UserGrowthStats, UserBehaviorStats, FriendStats};
+use crate::services::room_service::{RoomActivity, RoomStats};
+use crate::services::message_service::{MessageTypeStats, MessageHourlyDistribution};
+use crate::services::audit_service::SecurityStats;
+
+/// 获取用户增长统计
+pub async fn get_user_growth_stats(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<DaysQuery>,
+) -> Result<Json<ApiResponse<UserGrowthStats>>> {
+    let days = query.days.unwrap_or(30);
+    let stats = state.user_service().get_user_growth_stats(days).await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取用户行为统计
+pub async fn get_user_behavior_stats(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<UserBehaviorStats>>> {
+    let stats = state.user_service().get_user_behavior_stats().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取好友关系统计
+pub async fn get_friend_stats(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<FriendStats>>> {
+    let stats = state.user_service().get_friend_stats().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取房间活跃度排行
+pub async fn get_room_activity_ranking(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<LimitQuery>,
+) -> Result<Json<ApiResponse<Vec<RoomActivity>>>> {
+    let limit = query.limit.unwrap_or(10);
+    let stats = state.room_service().get_room_activity_ranking(limit).await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取房间统计概览
+pub async fn get_room_stats(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<RoomStats>>> {
+    let stats = state.room_service().get_room_stats().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取消息类型分布
+pub async fn get_message_type_stats(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<MessageTypeStats>>> {
+    let stats = state.message_service().get_message_type_stats().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取消息时间分布
+pub async fn get_message_hourly_distribution(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<Vec<MessageHourlyDistribution>>>> {
+    let stats = state.message_service().get_message_hourly_distribution().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取安全告警统计
+pub async fn get_security_stats(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<SecurityStats>>> {
+    let stats = state.audit_service().get_security_stats().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DaysQuery {
+    pub days: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LimitQuery {
+    pub limit: Option<i64>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct RedisStatsResponse {
     pub pubsub_channels: i64,

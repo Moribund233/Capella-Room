@@ -154,3 +154,174 @@ export function getPerformanceStats(): Promise<ApiResponse<PerformanceStats>> {
 export function getMonitorData(): Promise<ApiResponse<MonitorData>> {
   return http.get<MonitorData>('/admin/monitor')
 }
+
+// ==================== 增强统计类型 ====================
+
+/**
+ * 用户增长统计
+ */
+export interface UserGrowthStats {
+  new_users_today: number
+  new_users_this_week: number
+  new_users_this_month: number
+  total_users: number
+  growth_by_day: DailyUserCount[]
+}
+
+/**
+ * 每日用户数量
+ */
+export interface DailyUserCount {
+  date: string
+  count: number
+}
+
+/**
+ * 用户行为统计
+ */
+export interface UserBehaviorStats {
+  avg_messages_per_user: number
+  avg_rooms_per_user: number
+  active_users_today: number
+  active_users_this_week: number
+}
+
+/**
+ * 好友关系统计
+ */
+export interface FriendStats {
+  total_friendships: number
+  pending_requests: number
+  avg_friends_per_user: number
+  request_accept_rate: number
+}
+
+/**
+ * 房间活跃度
+ */
+export interface RoomActivity {
+  id: string
+  name: string
+  member_count: number
+  message_count: number
+  last_message_at: string | null
+}
+
+/**
+ * 房间统计概览
+ */
+export interface RoomStats {
+  total_rooms: number
+  public_rooms: number
+  private_rooms: number
+  direct_rooms: number
+  avg_rooms_per_user: number
+  avg_members_per_room: number
+  empty_rooms: number
+}
+
+/**
+ * 消息类型统计
+ */
+export interface MessageTypeStats {
+  text_messages: number
+  image_messages: number
+  file_messages: number
+  system_messages: number
+  reply_messages: number
+}
+
+/**
+ * 消息时间分布
+ */
+export interface MessageHourlyDistribution {
+  hour: number
+  count: number
+}
+
+/**
+ * 严重级别统计
+ */
+export interface SeverityCount {
+  severity: string
+  count: number
+}
+
+/**
+ * 安全统计
+ */
+export interface SecurityStats {
+  failed_logins_today: number
+  pending_alerts: number
+  alerts_today: number
+  alerts_by_severity: SeverityCount[]
+  audit_logs_this_week: number
+}
+
+// ==================== 增强统计 API ====================
+
+/**
+ * 获取用户增长统计
+ * @param days 天数范围
+ * @returns 用户增长统计数据
+ */
+export function getUserGrowthStats(days?: number): Promise<ApiResponse<UserGrowthStats>> {
+  return http.get<UserGrowthStats>('/admin/stats/users/growth', { params: { days } })
+}
+
+/**
+ * 获取用户行为统计
+ * @returns 用户行为统计数据
+ */
+export function getUserBehaviorStats(): Promise<ApiResponse<UserBehaviorStats>> {
+  return http.get<UserBehaviorStats>('/admin/stats/users/behavior')
+}
+
+/**
+ * 获取好友关系统计
+ * @returns 好友关系统计数据
+ */
+export function getFriendStats(): Promise<ApiResponse<FriendStats>> {
+  return http.get<FriendStats>('/admin/stats/users/friends')
+}
+
+/**
+ * 获取房间活跃度排行
+ * @param limit 返回数量
+ * @returns 房间活跃度排行
+ */
+export function getRoomActivityRanking(limit?: number): Promise<ApiResponse<RoomActivity[]>> {
+  return http.get<RoomActivity[]>('/admin/stats/rooms/activity', { params: { limit } })
+}
+
+/**
+ * 获取房间统计概览
+ * @returns 房间统计概览
+ */
+export function getRoomStats(): Promise<ApiResponse<RoomStats>> {
+  return http.get<RoomStats>('/admin/stats/rooms/overview')
+}
+
+/**
+ * 获取消息类型分布统计
+ * @returns 消息类型统计数据
+ */
+export function getMessageTypeStats(): Promise<ApiResponse<MessageTypeStats>> {
+  return http.get<MessageTypeStats>('/admin/stats/messages/types')
+}
+
+/**
+ * 获取消息时间分布统计
+ * @returns 消息时间分布数据
+ */
+export function getMessageHourlyDistribution(): Promise<ApiResponse<MessageHourlyDistribution[]>> {
+  return http.get<MessageHourlyDistribution[]>('/admin/stats/messages/hourly')
+}
+
+/**
+ * 获取安全告警统计
+ * @returns 安全告警统计数据
+ */
+export function getSecurityStats(): Promise<ApiResponse<SecurityStats>> {
+  return http.get<SecurityStats>('/admin/stats/security')
+}

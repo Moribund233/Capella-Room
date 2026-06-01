@@ -12,20 +12,39 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api
 interface RequestOptions extends RequestInit {
   /** 是否需要认证 */
   requireAuth?: boolean
+  /** 查询参数 */
+  params?: Record<string, unknown>
 }
 
 /**
  * 构建完整的请求 URL
  * @param url 请求路径
+ * @param params 查询参数
  * @returns 完整 URL
  */
-function buildUrl(url: string): string {
+function buildUrl(url: string, params?: Record<string, unknown>): string {
   if (url.startsWith('http')) {
     return url
   }
   const baseUrl = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL
   const path = url.startsWith('/') ? url : `/${url}`
-  return `${baseUrl}${path}`
+  let fullUrl = `${baseUrl}${path}`
+
+  // 添加查询参数
+  if (params && Object.keys(params).length > 0) {
+    const searchParams = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value))
+      }
+    }
+    const queryString = searchParams.toString()
+    if (queryString) {
+      fullUrl += `?${queryString}`
+    }
+  }
+
+  return fullUrl
 }
 
 /**
@@ -84,9 +103,10 @@ async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
  * @returns 响应数据
  */
 export async function request<T>(url: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
-  const response = await fetch(buildUrl(url), {
-    ...options,
-    headers: getHeaders(options),
+  const { params, ...fetchOptions } = options
+  const response = await fetch(buildUrl(url, params), {
+    ...fetchOptions,
+    headers: getHeaders(fetchOptions),
   })
 
   return handleResponse<T>(response)
