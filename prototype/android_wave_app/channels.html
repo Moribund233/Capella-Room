@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b14">
+  <title>频道 - Wave</title>
+  <style>
+    :root {
+      --bg: #0b0b14;
+      --surface: #141420;
+      --surface-elevated: #1a1a2e;
+      --fg: #ececf1;
+      --muted: #8b8b9e;
+      --border: #262636;
+      --accent: #7c5cfc;
+      --accent-soft: rgba(124, 92, 252, 0.18);
+      --accent-pink: #e85d9a;
+      --accent-green: #3ba55d;
+      --accent-orange: #f09042;
+      --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Roboto', system-ui, sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Roboto', system-ui, sans-serif;
+      --radius: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --nav-h: 64px;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      height: 100%;
+      font-family: var(--font-body);
+      font-size: 15px;
+      background: var(--bg);
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .phone-frame {
+      width: 100%;
+      height: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      background: var(--bg);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 60px rgba(0,0,0,0.5);
+    }
+    
+    @media (min-width: 431px) {
+      html { background: #1a1a2e; }
+      body { 
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .phone-frame {
+        height: 90vh;
+        border-radius: 40px;
+        border: 8px solid #2a2a3e;
+        overflow: hidden;
+      }
+    }
+    
+    /* 头部 */
+    .header {
+      padding: calc(12px + var(--safe-top)) 16px 12px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    
+    .header h1 {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+    }
+    
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--fg);
+      cursor: pointer;
+    }
+    
+    .icon-btn:active { background: var(--surface-elevated); }
+    .icon-btn svg { width: 20px; height: 20px; }
+    
+    /* 搜索栏 */
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      padding: 10px 16px;
+    }
+    
+    .search-bar svg {
+      width: 18px;
+      height: 18px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    
+    .search-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--fg);
+      font-size: 15px;
+      font-family: inherit;
+    }
+    
+    .search-bar input:focus { outline: none; }
+    .search-bar input::placeholder { color: var(--muted); }
+    
+    /* 内容区 */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .content::-webkit-scrollbar { display: none; }
+    
+    /* 标签页 */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    
+    .tabs::-webkit-scrollbar { display: none; }
+    
+    .tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    
+    /* 分类标题 */
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 16px 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    
+    .section-title button {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    
+    /* 频道列表 */
+    .channel-list {
+      padding: 0 16px;
+    }
+    
+    .channel-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: var(--fg);
+      transition: all 0.2s ease;
+    }
+    
+    .channel-item:active {
+      background: var(--surface-elevated);
+      transform: scale(0.99);
+    }
+    
+    .channel-item.unread {
+      border-left: 3px solid var(--accent);
+    }
+    
+    .channel-icon {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+    }
+    
+    .channel-icon.hash {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 18px;
+    }
+    
+    .channel-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .channel-info h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .channel-info p {
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .channel-meta {
+      text-align: right;
+    }
+    
+    .channel-meta .time {
+      font-size: 12px;
+      color: var(--muted);
+      display: block;
+    }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: var(--radius-full);
+      margin-top: 4px;
+    }
+    
+    /* DM 列表 */
+    .dm-list {
+      padding: 0 16px;
+    }
+    
+    .dm-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: var(--fg);
+      transition: all 0.2s ease;
+    }
+    
+    .dm-item:active { background: var(--surface); }
+    
+    .dm-avatar {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      position: relative;
+    }
+    
+    .dm-avatar .status {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+    }
+    
+    .dm-avatar .status.online { background: var(--accent-green); }
+    .dm-avatar .status.away { background: var(--accent-orange); }
+    .dm-avatar .status.dnd { background: var(--accent-pink); }
+    .dm-avatar .status.offline { background: var(--muted); }
+    
+    .dm-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .dm-info h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .dm-info p {
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .dm-item.unread .dm-info p {
+      color: var(--fg);
+      font-weight: 500;
+    }
+    
+    /* 在线用户 */
+    .online-users {
+      display: flex;
+      gap: 16px;
+      padding: 12px 16px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .online-users::-webkit-scrollbar { display: none; }
+    
+    .online-user {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    
+    .online-user-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      position: relative;
+      border: 2px solid transparent;
+      transition: all 0.2s ease;
+    }
+    
+    .online-user:active .online-user-avatar {
+      transform: scale(0.95);
+    }
+    
+    .online-user-avatar .status {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+      background: var(--accent-green);
+    }
+    
+    .online-user span {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    
+    /* 添加按钮 */
+    .fab {
+      position: absolute;
+      bottom: calc(var(--nav-h) + var(--safe-bottom) + 20px);
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      background: var(--accent);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(124, 92, 252, 0.4);
+      transition: all 0.2s ease;
+    }
+    
+    .fab:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 10px rgba(124, 92, 252, 0.3);
+    }
+    
+    .fab svg { width: 24px; height: 24px; }
+    
+    /* 底部导航 */
+    .bottom-nav {
+      height: calc(var(--nav-h) + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+    
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 16px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 11px;
+      transition: color 0.2s ease;
+      position: relative;
+    }
+    
+    .nav-item.active { color: var(--accent); }
+    .nav-item svg { width: 24px; height: 24px; }
+    
+    .nav-item .nav-badge {
+      position: absolute;
+      top: 4px;
+      right: 12px;
+      width: 8px;
+      height: 8px;
+      background: var(--accent-pink);
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- 头部 -->
+    <div class="header">
+      <div class="header-top">
+        <h1>Wave</h1>
+        <div class="header-actions">
+          <button class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+          </button>
+          <button class="icon-btn" onclick="location.href='profile.html'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="搜索频道、消息或用户">
+      </div>
+    </div>
+    
+    <!-- 内容区 -->
+    <div class="content">
+      <!-- 在线用户 -->
+      <div class="online-users">
+        <div class="online-user">
+          <div class="online-user-avatar" style="background: linear-gradient(135deg, #7c5cfc, #e85d9a);">
+            A
+            <span class="status"></span>
+          </div>
+          <span>alex</span>
+        </div>
+        <div class="online-user">
+          <div class="online-user-avatar" style="background: linear-gradient(135deg, #3ba55d, #4a9eff);">
+            S
+            <span class="status"></span>
+          </div>
+          <span>sarah</span>
+        </div>
+        <div class="online-user">
+          <div class="online-user-avatar" style="background: linear-gradient(135deg, #f09042, #e85d9a);">
+            M
+            <span class="status"></span>
+          </div>
+          <span>mike</span>
+        </div>
+        <div class="online-user">
+          <div class="online-user-avatar" style="background: linear-gradient(135deg, #4a9eff, #7c5cfc);">
+            J
+            <span class="status"></span>
+          </div>
+          <span>jordan</span>
+        </div>
+        <div class="online-user">
+          <div class="online-user-avatar" style="background: linear-gradient(135deg, #e85d9a, #f09042);">
+            E
+            <span class="status"></span>
+          </div>
+          <span>emma</span>
+        </div>
+      </div>
+      
+      <!-- 标签页 -->
+      <div class="tabs">
+        <button class="tab active">全部</button>
+        <button class="tab">频道</button>
+        <button class="tab">私信</button>
+        <button class="tab">未读</button>
+      </div>
+      
+      <!-- 频道列表 -->
+      <div class="section-title">
+        频道
+        <button>+ 新建</button>
+      </div>
+      <div class="channel-list">
+        <a href="chat.html" class="channel-item unread">
+          <div class="channel-icon hash">#</div>
+          <div class="channel-info">
+            <h3>general</h3>
+            <p>alex: 大家好！今天有什么新动态？</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">10:23</span>
+            <span class="badge">3</span>
+          </div>
+        </a>
+        
+        <a href="chat.html" class="channel-item">
+          <div class="channel-icon hash">#</div>
+          <div class="channel-info">
+            <h3>random</h3>
+            <p>mike 分享了一个链接</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">昨天</span>
+          </div>
+        </a>
+        
+        <a href="chat.html" class="channel-item unread">
+          <div class="channel-icon" style="background: linear-gradient(135deg, #7c5cfc, #4a9eff);">设</div>
+          <div class="channel-info">
+            <h3>设计 <span style="color: var(--muted); font-weight: 400;">#design</span></h3>
+            <p>sarah: 新的设计稿已经上传了</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">9:45</span>
+            <span class="badge">12</span>
+          </div>
+        </a>
+        
+        <a href="chat.html" class="channel-item">
+          <div class="channel-icon" style="background: linear-gradient(135deg, #3ba55d, #4a9eff);">开</div>
+          <div class="channel-info">
+            <h3>开发 <span style="color: var(--muted); font-weight: 400;">#dev</span></h3>
+            <p>jordan: PR 已经合并了</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">昨天</span>
+          </div>
+        </a>
+      </div>
+      
+      <!-- 私信列表 -->
+      <div class="section-title">
+        私信
+        <button>+ 新建</button>
+      </div>
+      <div class="dm-list">
+        <a href="chat.html" class="dm-item unread">
+          <div class="dm-avatar" style="background: linear-gradient(135deg, #e85d9a, #f09042);">
+            E
+            <span class="status online"></span>
+          </div>
+          <div class="dm-info">
+            <h3>emma <span style="color: var(--accent-green); font-size: 12px;">●</span></h3>
+            <p>有人要一起午餐吗？今天想试试...</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">10:32</span>
+            <span class="badge">2</span>
+          </div>
+        </a>
+        
+        <a href="chat.html" class="dm-item">
+          <div class="dm-avatar" style="background: linear-gradient(135deg, #3ba55d, #4a9eff);">
+            S
+            <span class="status online"></span>
+          </div>
+          <div class="dm-info">
+            <h3>sarah</h3>
+            <p>好的，没问题！</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">昨天</span>
+          </div>
+        </a>
+        
+        <a href="chat.html" class="dm-item">
+          <div class="dm-avatar" style="background: linear-gradient(135deg, #f09042, #e85d9a);">
+            M
+            <span class="status away"></span>
+          </div>
+          <div class="dm-info">
+            <h3>mike</h3>
+            <p>会议推迟到下午3点了</p>
+          </div>
+          <div class="channel-meta">
+            <span class="time">周一</span>
+          </div>
+        </a>
+      </div>
+      
+      <div style="height: 100px;"></div>
+    </div>
+    
+    <!-- 添加按钮 -->
+    <button class="fab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    
+    <!-- 底部导航 -->
+    <div class="bottom-nav">
+      <a href="channels.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        首页
+      </a>
+      <a href="chat.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        消息
+        <span class="nav-badge"></span>
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        发现
+      </a>
+      <a href="profile.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        我的
+      </a>
+    </div>
+  </div>
+  
+  <script>
+    // 标签切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
