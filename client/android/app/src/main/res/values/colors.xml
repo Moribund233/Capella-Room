@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capella Design System - Dark Theme Colors -->
+    <color name="bg">#0B0B14</color>
+    <color name="surface">#141420</color>
+    <color name="surface_elevated">#1A1A2E</color>
+    <color name="foreground">#ECECF1</color>
+    <color name="muted">#8B8B9E</color>
+    <color name="border">#262636</color>
+    
+    <!-- Accent Colors -->
+    <color name="accent">#7C5CFC</color>
+    <color name="accent_soft">#2E1F66</color>
+    <color name="accent_pink">#E85D9A</color>
+    <color name="accent_green">#3BA55D</color>
+    <color name="accent_orange">#F09042</color>
+    <color name="accent_blue">#4A9EFF</color>
+    
+    <!-- System Colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+</resources>

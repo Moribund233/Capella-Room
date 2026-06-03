@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Capella Room</string>
+    
+    <!-- Splash / Landing -->
+    <string name="app_tagline">社交聊天，重新想象</string>
+    <string name="hero_description">一个自然流动的社交聊天空间\n频道、话题和你关心的人</string>
+    <string name="cta_get_started">开始使用</string>
+    <string name="cta_login">已有账号？登录</string>
+    <string name="channel_general">#general</string>
+    <string name="channel_member_count">%d 位成员</string>
+    <string name="tag_hot">热门</string>
+    <string name="feature_channels">频道聊天</string>
+    <string name="feature_channels_desc">主题讨论空间</string>
+    <string name="feature_threads">话题线程</string>
+    <string name="feature_threads_desc">有序的对话</string>
+    <string name="feature_community">社区连接</string>
+    <string name="feature_community_desc">找到志同道合</string>
+    <string name="feature_privacy">隐私安全</string>
+    <string name="feature_privacy_desc">端到端加密</string>
+
+    <!-- Auth -->
+    <string name="login_title">登录</string>
+    <string name="login_subtitle">欢迎回来，请登录您的账号</string>
+    <string name="username">用户名</string>
+    <string name="password">密码</string>
+    <string name="login">登录</string>
+    <string name="register">注册</string>
+    <string name="forgot_password">忘记密码？</string>
+    <string name="no_account">还没有账号？</string>
+    <string name="has_account">已有账号？</string>
+    
+    <!-- Navigation -->
+    <string name="nav_channels">频道</string>
+    <string name="nav_messages">消息</string>
+    <string name="nav_profile">我的</string>
+    
+    <!-- Chat -->
+    <string name="message_hint">输入消息…</string>
+    <string name="send">发送</string>
+    <string name="attach">附件</string>
+    <string name="emoji">表情</string>
+    
+    <!-- Common -->
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="loading">加载中…</string>
+    <string name="error">出错了</string>
+    <string name="retry">重试</string>
+    <string name="empty">暂无内容</string>
+    
+    <!-- Profile -->
+    <string name="profile_title">个人资料</string>
+    <string name="settings">设置</string>
+    <string name="logout">退出登录</string>
+    <string name="appearance">外观</string>
+    <string name="notifications">通知</string>
+    <string name="privacy">隐私</string>
+</resources>
