@@ -1,15 +1,22 @@
 package com.capella.room.ui.screen.splash
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.capella.room.data.local.TokenManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class SplashViewModel @Inject constructor() : ViewModel() {
+class SplashViewModel @Inject constructor(
+    private val tokenManager: TokenManager
+) : ViewModel() {
 
-    companion object {
-        private const val SPLASH_DURATION_MS = 2000L
+    fun checkLoginState(onResult: (isLoggedIn: Boolean) -> Unit) {
+        viewModelScope.launch {
+            val loggedIn = tokenManager.isLoggedIn.first()
+            onResult(loggedIn)
+        }
     }
-
-    val splashDurationMs: Long get() = SPLASH_DURATION_MS
 }

@@ -357,7 +357,7 @@ pub async fn set_member_role(
 pub async fn get_my_rooms(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-) -> Result<Json<Vec<RoomResponse>>> {
+) -> Result<Json<ApiResponse<Vec<RoomResponse>>>> {
     let user_id = state
         .auth_service
         .extract_user_id(&claims)
@@ -365,7 +365,7 @@ pub async fn get_my_rooms(
 
     let rooms = state.room_service().get_user_rooms(user_id).await?;
 
-    Ok(Json(rooms))
+    Ok(Json(ApiResponse::success(rooms)))
 }
 
 /// 创建房间邀请

@@ -9,7 +9,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val localUserRepository: LocalUserRepository
 ) {
 
     suspend fun login(email: String, password: String): Result<LoginData> {
@@ -19,8 +20,17 @@ class AuthRepository @Inject constructor(
                 val body = response.body()
                 if (body?.success == true && body.data != null) {
                     val data = body.data
+                    // 保存 Token
                     tokenManager.saveTokens(data.accessToken, data.refreshToken)
                     tokenManager.saveUserInfo(data.user.id, data.user.username)
+                    // 保存到本地数据库
+                    localUserRepository.saveCurrentUser(
+                        userId = data.user.id,
+                        username = data.user.username,
+                        accessToken = data.accessToken,
+                        refreshToken = data.refreshToken,
+                        avatarUrl = data.user.avatarUrl
+                    )
                     Result.success(data)
                 } else {
                     Result.failure(AuthException(body?.message ?: "登录失败"))

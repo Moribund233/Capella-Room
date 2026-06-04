@@ -7,10 +7,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.capella.room.ui.screen.auth.LoginScreen
+import com.capella.room.ui.screen.chat.ChatScreen
+import com.capella.room.ui.screen.main.MainScreen
 import com.capella.room.ui.screen.splash.SplashScreen
 
 @Composable
@@ -22,7 +25,14 @@ fun CapellaNavGraph(navController: NavHostController) {
         composable(Screen.Splash.route) {
             SplashScreen(
                 onNavigateToLogin = {
-                    navController.navigate(Screen.Login.route)
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                },
+                onNavigateToMain = {
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -30,7 +40,7 @@ fun CapellaNavGraph(navController: NavHostController) {
         composable(Screen.Login.route) {
             LoginScreen(
                 onNavigateToChannels = {
-                    navController.navigate(Screen.Channels.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -40,31 +50,25 @@ fun CapellaNavGraph(navController: NavHostController) {
             )
         }
 
-        // Phase 3 placeholder
-        composable(Screen.Channels.route) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "频道列表\n（Phase 3 实现）",
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
+        composable(Screen.Main.route) {
+            MainScreen(
+                onNavigateToChat = { channelId ->
+                    navController.navigate(Screen.Chat.createRoute(channelId))
+                },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Main.route) { inclusive = true }
+                    }
+                }
+            )
         }
 
-        composable(Screen.Profile.route) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "个人资料\n（Phase 6 实现）",
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
+        composable(Screen.Chat.route) {
+            ChatScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }

@@ -85,6 +85,11 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
+
     // WebSocket
     implementation(libs.java.websocket)
 

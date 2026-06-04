@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -74,9 +75,12 @@ private const val SPLASH_DURATION_MS = 2200L
 
 @Composable
 fun SplashScreen(
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onNavigateToMain: () -> Unit,
+    viewModel: SplashViewModel = hiltViewModel()
 ) {
     var showSplash by remember { mutableStateOf(true) }
+    var splashDone by remember { mutableStateOf(false) }
 
     val splashAlpha by animateFloatAsState(
         targetValue = if (showSplash) 1f else 0f,
@@ -85,8 +89,17 @@ fun SplashScreen(
     )
 
     LaunchedEffect(Unit) {
-        delay(SPLASH_DURATION_MS)
-        showSplash = false
+        delay(SPLASH_DURATION_MS + 400L) // wait for splash + fade out
+        splashDone = true
+    }
+
+    // Check login state after splash finishes
+    LaunchedEffect(splashDone) {
+        if (splashDone) {
+            viewModel.checkLoginState { isLoggedIn ->
+                if (isLoggedIn) onNavigateToMain() else onNavigateToLogin()
+            }
+        }
     }
 
     Box(
@@ -94,8 +107,6 @@ fun SplashScreen(
             .fillMaxSize()
             .background(Background)
     ) {
-        LandingContent(onNavigateToLogin = onNavigateToLogin)
-
         AnimatedVisibility(
             visible = showSplash,
             exit = fadeOut(animationSpec = tween(400))
