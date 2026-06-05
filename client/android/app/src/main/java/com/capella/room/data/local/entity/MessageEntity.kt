@@ -65,7 +65,17 @@ data class MessageEntity(
     val localCreatedAt: Long = System.currentTimeMillis(),
 
     @ColumnInfo(name = "pending_content")
-    val pendingContent: String? = null // 待同步的编辑内容
+    val pendingContent: String? = null, // 待同步的编辑内容
+
+    // 已读回执字段
+    @ColumnInfo(name = "is_read")
+    val isRead: Boolean = false,
+
+    @ColumnInfo(name = "read_count")
+    val readCount: Int = 0, // 群聊中已读人数
+
+    @ColumnInfo(name = "read_by")
+    val readBy: String? = null // JSON 数组，存储已读用户ID列表
 )
 
 /**

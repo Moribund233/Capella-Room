@@ -73,6 +73,7 @@ class LocalMessageRepository @Inject constructor(
         senderId: String,
         senderName: String,
         content: String,
+        messageType: String = "text",
         replyTo: String? = null
     ): MessageEntity {
         val tempId = "temp_${System.currentTimeMillis()}_${(0..9999).random()}"
@@ -82,6 +83,7 @@ class LocalMessageRepository @Inject constructor(
             senderId = senderId,
             senderName = senderName,
             content = content,
+            messageType = messageType,
             replyTo = replyTo,
             createdAt = java.time.Instant.now().toString(),
             syncStatus = SyncStatus.PENDING
@@ -122,14 +124,15 @@ class LocalMessageRepository @Inject constructor(
      * 更新消息内容（编辑）
      */
     suspend fun updateMessageContent(messageId: String, newContent: String) {
-        messageDao.updateMessageContent(messageId, newContent, SyncStatus.EDIT_PENDING)
+        val editedAt = java.time.Instant.now().toString()
+        messageDao.updateMessageContent(messageId, newContent, editedAt, SyncStatus.EDIT_PENDING)
     }
 
     /**
      * 确认消息编辑已同步
      */
-    suspend fun confirmMessageEdited(messageId: String) {
-        messageDao.updateSyncStatus(messageId, SyncStatus.SYNCED)
+    suspend fun confirmMessageEdited(messageId: String, editedAt: String) {
+        messageDao.confirmMessageEdited(messageId, editedAt)
     }
 
     /**
@@ -182,6 +185,21 @@ class LocalMessageRepository @Inject constructor(
     }
 
     // ==================== 转换方法 ====================
+
+    /**
+     * 标记消息为已读
+     */
+    suspend fun markAsRead(messageId: String) {
+        messageDao.markAsRead(messageId)
+    }
+
+    /**
+     * 更新消息已读回执
+     */
+    suspend fun updateReadReceipt(messageId: String, readCount: Int, readBy: List<String>) {
+        val readByJson = readBy.joinToString(",", prefix = "[", postfix = "]") { "\"$it\"" }
+        messageDao.updateReadReceipt(messageId, readCount, readByJson)
+    }
 
     /**
      * 将 DTO 转换为实体

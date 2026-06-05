@@ -10,13 +10,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 object DatabaseMigrations {
 
     /**
-     * 从版本 1 迁移到版本 2 的示例
-     * 添加新字段示例
+     * 从版本 1 迁移到版本 2
+     * 添加消息已读回执字段
      */
     val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // 示例：添加新列
-            // db.execSQL("ALTER TABLE messages ADD COLUMN reactions TEXT DEFAULT NULL")
+            // 添加已读回执相关字段
+            db.execSQL("ALTER TABLE messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE messages ADD COLUMN read_count INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE messages ADD COLUMN read_by TEXT DEFAULT NULL")
+            // 添加消息编辑相关字段
+            db.execSQL("ALTER TABLE messages ADD COLUMN edited_at TEXT DEFAULT NULL")
         }
     }
 
@@ -44,8 +48,7 @@ object DatabaseMigrations {
      */
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
-            // MIGRATION_1_2,
-            // MIGRATION_2_3
+            MIGRATION_1_2
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.capella.room.ui.screen.chat
 
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,7 @@ import com.capella.room.data.remote.api.RoomApi
 import com.capella.room.data.remote.dto.MessageDto
 import com.capella.room.data.remote.dto.RoomDto
 import com.capella.room.data.remote.websocket.WebSocketConnectionState
+import com.capella.room.data.repository.FileRepository
 import com.capella.room.data.repository.LocalMessageRepository
 import com.capella.room.data.repository.LocalRoomRepository
 import com.capella.room.data.repository.LocalUserRepository
@@ -58,7 +60,8 @@ class ChatViewModel @Inject constructor(
     private val webSocketRepository: WebSocketRepository,
     private val localMessageRepository: LocalMessageRepository,
     private val localRoomRepository: LocalRoomRepository,
-    private val localUserRepository: LocalUserRepository
+    private val localUserRepository: LocalUserRepository,
+    private val fileRepository: FileRepository
 ) : ViewModel() {
 
     companion object {
@@ -69,6 +72,9 @@ class ChatViewModel @Inject constructor(
     }
 
     private val channelId: String = savedStateHandle["channelId"] ?: ""
+
+    /** 当前房间ID */
+    val currentRoomId: String get() = channelId
 
     var uiState by mutableStateOf(ChatUiState())
         private set
@@ -213,6 +219,13 @@ class ChatViewModel @Inject constructor(
                     if (onlineUsers.roomId == channelId) {
                         uiState = uiState.copy(onlineUserCount = onlineUsers.users.size)
                     }
+                }
+            }
+
+            // 监听消息已读回执
+            launch {
+                webSocketRepository.messageReadReceipt.collect { receipt ->
+                    handleMessageReadReceipt(receipt.messageId, receipt.userId)
                 }
             }
 
@@ -417,9 +430,9 @@ class ChatViewModel @Inject constructor(
      * 发送消息
      * 支持离线模式，消息会先保存到本地，网络恢复后自动同步
      */
-    fun sendMessage(replyTo: String? = null) {
-        val text = uiState.inputText.trim()
-        Log.d(TAG, "sendMessage called, text='$text', isOfflineMode=${uiState.isOfflineMode}, connectionState=${uiState.connectionState}")
+    fun sendMessage(content: String? = null, messageType: String = "text", replyTo: String? = null) {
+        val text = content ?: uiState.inputText.trim()
+        Log.d(TAG, "sendMessage called, text='$text', type='$messageType', isOfflineMode=${uiState.isOfflineMode}, connectionState=${uiState.connectionState}")
         if (text.isBlank()) {
             Log.d(TAG, "sendMessage: text is blank, returning")
             return
@@ -439,15 +452,18 @@ class ChatViewModel @Inject constructor(
                 senderId = currentUser.userId,
                 senderName = currentUser.username,
                 content = text,
+                messageType = messageType,
                 replyTo = replyTo
             )
             Log.d(TAG, "sendMessage: created pending message ${pendingMessage.id}")
 
-            // 清空输入框
-            uiState = uiState.copy(inputText = "")
+            // 清空输入框（仅当是文本输入时）
+            if (content == null) {
+                uiState = uiState.copy(inputText = "")
+            }
 
             // 发送停止输入状态
-            if (!uiState.isOfflineMode) {
+            if (!uiState.isOfflineMode && content == null) {
                 webSocketRepository.sendStopTyping(channelId)
             }
             hasSentTyping = false
@@ -512,11 +528,11 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * 处理消息编辑
+     * 处理消息编辑（来自 WebSocket 的实时通知）
      */
     private fun handleMessageEdited(messageId: String, newContent: String, editedAt: String) {
         viewModelScope.launch {
-            localMessageRepository.updateMessageContent(messageId, newContent)
+            localMessageRepository.confirmMessageEdited(messageId, editedAt)
         }
     }
 
@@ -526,6 +542,17 @@ class ChatViewModel @Inject constructor(
     private fun handleMessageDeleted(messageId: String) {
         viewModelScope.launch {
             localMessageRepository.deleteMessage(messageId)
+        }
+    }
+
+    /**
+     * 处理消息已读回执
+     */
+    private fun handleMessageReadReceipt(messageId: String, userId: String) {
+        viewModelScope.launch {
+            // 更新本地消息的已读状态
+            localMessageRepository.markAsRead(messageId)
+            // TODO: 更新已读人数统计
         }
     }
 
@@ -557,7 +584,8 @@ class ChatViewModel @Inject constructor(
             if (!uiState.isOfflineMode) {
                 val success = webSocketRepository.editMessage(messageId, newContent)
                 if (success) {
-                    localMessageRepository.confirmMessageEdited(messageId)
+                    val editedAt = java.time.Instant.now().toString()
+                    localMessageRepository.confirmMessageEdited(messageId, editedAt)
                 }
             }
         }
@@ -611,6 +639,100 @@ class ChatViewModel @Inject constructor(
      */
     fun clearError() {
         uiState = uiState.copy(errorMessage = null)
+    }
+
+    // ==================== 消息搜索 ====================
+
+    /**
+     * 搜索本地缓存的消息
+     */
+    suspend fun searchLocalMessages(roomId: String, query: String): List<MessageDto> {
+        return try {
+            val entities = localMessageRepository.searchMessages(roomId, query)
+            localMessageRepository.toDtoList(entities)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to search local messages", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * 搜索远程消息
+     */
+    suspend fun searchRemoteMessages(roomId: String, query: String): List<MessageDto> {
+        return try {
+            val response = roomApi.searchMessages(
+                query = query,
+                roomId = roomId,
+                limit = 50
+            )
+            if (response.isSuccessful && response.body()?.success == true) {
+                response.body()?.data ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to search remote messages", e)
+            emptyList()
+        }
+    }
+
+    // ==================== 文件上传 ====================
+
+    /**
+     * 上传图片
+     */
+    fun uploadImage(uri: Uri) {
+        if (uiState.isOfflineMode) {
+            uiState = uiState.copy(errorMessage = "当前处于离线状态，无法上传文件")
+            return
+        }
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true)
+            val result = fileRepository.uploadImage(uri)
+            result.fold(
+                onSuccess = { fileDto ->
+                    // 发送图片消息
+                    sendMessage("[图片] ${fileDto.url}", messageType = "image")
+                    uiState = uiState.copy(isLoading = false)
+                },
+                onFailure = { error ->
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        errorMessage = "上传失败: ${error.message}"
+                    )
+                }
+            )
+        }
+    }
+
+    /**
+     * 上传文件
+     */
+    fun uploadFile(uri: Uri) {
+        if (uiState.isOfflineMode) {
+            uiState = uiState.copy(errorMessage = "当前处于离线状态，无法上传文件")
+            return
+        }
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true)
+            val result = fileRepository.uploadFile(uri)
+            result.fold(
+                onSuccess = { fileDto ->
+                    // 发送文件消息
+                    sendMessage("[文件] ${fileDto.originalName}\n${fileDto.url}", messageType = "file")
+                    uiState = uiState.copy(isLoading = false)
+                },
+                onFailure = { error ->
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        errorMessage = "上传失败: ${error.message}"
+                    )
+                }
+            )
+        }
     }
 
     // ==================== 格式化工具方法 ====================

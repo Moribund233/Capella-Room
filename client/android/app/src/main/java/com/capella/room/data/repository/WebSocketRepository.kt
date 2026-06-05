@@ -6,6 +6,7 @@ import com.capella.room.data.remote.dto.UserInfo
 import com.capella.room.data.remote.websocket.EditMessagePayload
 import com.capella.room.data.remote.websocket.MessageDeletedPayload
 import com.capella.room.data.remote.websocket.MessageEditedPayload
+import com.capella.room.data.remote.websocket.MessageReadReceiptPayload
 import com.capella.room.data.remote.websocket.NewMessagePayload
 import com.capella.room.data.remote.websocket.OnlineUserInfo
 import com.capella.room.data.remote.websocket.OnlineUsersPayload
@@ -96,6 +97,10 @@ class WebSocketRepository @Inject constructor(
     // 房间消息摘要流（用于房间列表更新）
     private val _roomMessageSummary = MutableSharedFlow<RoomMessageSummaryPayload>(extraBufferCapacity = 64)
     val roomMessageSummary: Flow<RoomMessageSummaryPayload> = _roomMessageSummary.asSharedFlow()
+
+    // 消息已读回执流
+    private val _messageReadReceipt = MutableSharedFlow<MessageReadReceiptPayload>(extraBufferCapacity = 64)
+    val messageReadReceipt: Flow<MessageReadReceiptPayload> = _messageReadReceipt.asSharedFlow()
 
     // 当前房间 ID
     private val _currentRoomId = MutableStateFlow<String?>(null)
@@ -285,6 +290,10 @@ class WebSocketRepository @Inject constructor(
                 WebSocketMessageType.MessageDeleted -> {
                     val payload = parsePayload(message.payload, MessageDeletedPayload::class.java)
                     payload?.let { _messageDeleted.tryEmit(it) }
+                }
+                WebSocketMessageType.MessageReadReceipt -> {
+                    val payload = parsePayload(message.payload, MessageReadReceiptPayload::class.java)
+                    payload?.let { _messageReadReceipt.tryEmit(it) }
                 }
                 WebSocketMessageType.UserTyping -> {
                     val payload = parsePayload(message.payload, UserTypingPayload::class.java)

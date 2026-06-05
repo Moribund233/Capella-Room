@@ -2,6 +2,7 @@ package com.capella.room.di
 
 import com.capella.room.data.local.TokenManager
 import com.capella.room.data.remote.api.AuthApi
+import com.capella.room.data.remote.api.FileApi
 import com.capella.room.data.remote.api.RoomApi
 import com.capella.room.data.remote.api.UserApi
 import com.squareup.moshi.Moshi
@@ -83,4 +84,9 @@ object NetworkModule {
     @Singleton
     fun provideRoomApi(retrofit: Retrofit): RoomApi =
         retrofit.create(RoomApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideFileApi(retrofit: Retrofit): FileApi =
+        retrofit.create(FileApi::class.java)
 }

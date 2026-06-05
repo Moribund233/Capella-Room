@@ -23,7 +23,7 @@ import com.capella.room.data.local.entity.UserEntity
         UserEntity::class,
         CurrentUserEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class CapellaDatabase : RoomDatabase() {

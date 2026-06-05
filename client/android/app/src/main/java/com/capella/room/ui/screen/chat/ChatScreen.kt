@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,22 +32,32 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import android.widget.Toast
 import androidx.compose.ui.Modifier
@@ -62,6 +74,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import com.capella.room.data.remote.dto.MessageDto
 import com.capella.room.data.remote.websocket.WebSocketConnectionState
 import com.capella.room.ui.theme.AccentBlue
@@ -96,6 +111,40 @@ fun ChatScreen(
     val state = viewModel.uiState
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // 编辑状态
+    var editingMessageId by remember { mutableStateOf<String?>(null) }
+    var editingContent by remember { mutableStateOf("") }
+
+    // 删除确认对话框
+    var deleteMessageId by remember { mutableStateOf<String?>(null) }
+
+    // 回复状态
+    var replyingToMessage by remember { mutableStateOf<MessageDto?>(null) }
+
+    // 搜索弹窗状态
+    var showSearch by remember { mutableStateOf(false) }
+
+    // 附件菜单状态
+    var showAttachmentMenu by remember { mutableStateOf(false) }
+
+    // 文件选择器
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.uploadImage(it)
+        }
+    }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.uploadFile(it)
+        }
+    }
 
     // 检测是否不在底部（显示回到底部按钮）
     val showScrollToBottom by remember {
@@ -126,13 +175,64 @@ fun ChatScreen(
         }
     }
 
+    // 处理编辑消息
+    fun startEditing(message: MessageDto) {
+        editingMessageId = message.id
+        editingContent = message.content
+        viewModel.updateInputText(message.content)
+        // 取消回复状态
+        replyingToMessage = null
+    }
+
+    fun cancelEditing() {
+        editingMessageId = null
+        editingContent = ""
+        viewModel.updateInputText("")
+    }
+
+    fun confirmEdit() {
+        val messageId = editingMessageId
+        val newContent = state.inputText.trim()
+        if (messageId != null && newContent.isNotBlank() && newContent != editingContent) {
+            viewModel.editMessage(messageId, newContent)
+            Toast.makeText(context, "消息已编辑", Toast.LENGTH_SHORT).show()
+        }
+        cancelEditing()
+    }
+
+    // 处理删除消息
+    fun confirmDelete() {
+        deleteMessageId?.let { messageId ->
+            viewModel.deleteMessage(messageId)
+            Toast.makeText(context, "消息已删除", Toast.LENGTH_SHORT).show()
+        }
+        deleteMessageId = null
+    }
+
+    // 处理回复消息
+    fun startReplying(message: MessageDto) {
+        replyingToMessage = message
+    }
+
+    fun cancelReplying() {
+        replyingToMessage = null
+    }
+
+    fun confirmReply() {
+        replyingToMessage?.let { message ->
+            viewModel.sendMessage(replyTo = message.id)
+        }
+        cancelReplying()
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(Background)) {
         // Header
         ChatHeader(
             roomName = state.roomInfo?.name ?: "频道",
             memberCount = state.roomInfo?.memberCount ?: 0,
             onBack = onNavigateBack,
-            connectionState = state.connectionState
+            connectionState = state.connectionState,
+            onSearchClick = { showSearch = true }
         )
 
         // Message list
@@ -178,7 +278,10 @@ fun ChatScreen(
                             message = message,
                             userColor = getUserColor(message.sender.username),
                             formattedTime = viewModel.formatMessageTime(message.createdAt),
-                            isCurrentUser = message.sender.id == state.currentUserId
+                            isCurrentUser = message.sender.id == state.currentUserId,
+                            onEdit = { startEditing(message) },
+                            onDelete = { deleteMessageId = message.id },
+                            onReply = { /* TODO: Phase 6.7 */ }
                         )
                     }
 
@@ -237,18 +340,90 @@ fun ChatScreen(
             )
         }
 
+        // 编辑模式指示器
+        if (editingMessageId != null) {
+            EditingIndicator(
+                onCancel = { cancelEditing() }
+            )
+        }
+
         // Input area
-        val context = LocalContext.current
         ChatInputArea(
             text = state.inputText,
             onTextChange = viewModel::updateInputText,
             onSend = {
-                Toast.makeText(context, "发送按钮点击: text='${state.inputText}', isConnected=${state.connectionState == WebSocketConnectionState.Authenticated}", Toast.LENGTH_SHORT).show()
-                viewModel.sendMessage()
+                if (editingMessageId != null) {
+                    confirmEdit()
+                } else if (replyingToMessage != null) {
+                    confirmReply()
+                } else {
+                    Toast.makeText(context, "发送按钮点击: text='${state.inputText}', isConnected=${state.connectionState == WebSocketConnectionState.Authenticated}", Toast.LENGTH_SHORT).show()
+                    viewModel.sendMessage()
+                }
             },
             onEmojiToggle = viewModel::toggleEmojiPanel,
-            placeholder = if (state.roomInfo != null) "发消息到 #${state.roomInfo.name}" else "发消息",
-            isConnected = state.connectionState == WebSocketConnectionState.Authenticated
+            placeholder = when {
+                editingMessageId != null -> "编辑消息..."
+                replyingToMessage != null -> "回复消息..."
+                state.roomInfo != null -> "发消息到 #${state.roomInfo.name}"
+                else -> "发消息"
+            },
+            isConnected = state.connectionState == WebSocketConnectionState.Authenticated,
+            isEditing = editingMessageId != null,
+            replyingTo = replyingToMessage,
+            onCancelReply = { cancelReplying() }
+        )
+    }
+
+    // 删除确认对话框
+    if (deleteMessageId != null) {
+        AlertDialog(
+            onDismissRequest = { deleteMessageId = null },
+            title = { Text("删除消息") },
+            text = { Text("确定要删除这条消息吗？此操作无法撤销。") },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmDelete() }
+                ) {
+                    Text("删除", color = AccentPink)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { deleteMessageId = null }
+                ) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    // 消息搜索弹窗
+    if (showSearch) {
+        MessageSearchBottomSheet(
+            roomId = viewModel.currentRoomId,
+            roomName = state.roomInfo?.name ?: "",
+            onDismiss = { showSearch = false },
+            onMessageClick = { message ->
+                // TODO: 跳转到消息位置
+                Toast.makeText(context, "跳转到消息: ${message.content.take(20)}...", Toast.LENGTH_SHORT).show()
+            },
+            viewModel = viewModel
+        )
+    }
+
+    // 附件菜单弹窗
+    if (showAttachmentMenu) {
+        AttachmentMenuDialog(
+            onDismiss = { showAttachmentMenu = false },
+            onImageClick = {
+                showAttachmentMenu = false
+                imagePicker.launch("image/*")
+            },
+            onFileClick = {
+                showAttachmentMenu = false
+                filePicker.launch("*/*")
+            }
         )
     }
 }
@@ -258,7 +433,8 @@ private fun ChatHeader(
     roomName: String,
     memberCount: Int,
     onBack: () -> Unit,
-    connectionState: WebSocketConnectionState
+    connectionState: WebSocketConnectionState,
+    onSearchClick: () -> Unit
 ) {
     val context = LocalContext.current
     Row(
@@ -328,7 +504,7 @@ private fun ChatHeader(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { Toast.makeText(context, "搜索", Toast.LENGTH_SHORT).show() },
+                    .clickable { onSearchClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -394,17 +570,33 @@ private fun DateDivider(label: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageItem(
     message: MessageDto,
     userColor: Color,
     formattedTime: String,
-    isCurrentUser: Boolean
+    isCurrentUser: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onReply: () -> Unit
 ) {
     // 气泡颜色定义
     val myBubbleColor = Color(0xFF5865F2) // 当前用户气泡 - 紫色
     val otherBubbleColor = Color(0xFF404249) // 其他用户气泡 - 深灰色
     val bubbleColor = if (isCurrentUser) myBubbleColor else otherBubbleColor
+
+    // 长按菜单状态
+    var showMenu by remember { mutableStateOf(false) }
+
+    // 已删除消息的特殊展示
+    if (message.isDeleted) {
+        DeletedMessageItem(
+            formattedTime = formattedTime,
+            isCurrentUser = isCurrentUser
+        )
+        return
+    }
 
     Row(
         modifier = Modifier
@@ -457,36 +649,110 @@ private fun MessageItem(
                 Spacer(modifier = Modifier.height(2.dp))
             }
 
-            // 气泡容器
-            Box(
-                modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = if (isCurrentUser) 16.dp else 4.dp,
-                            topEnd = if (isCurrentUser) 4.dp else 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 16.dp
+            // 气泡容器（带长按菜单）
+            Box {
+                Box(
+                    modifier = Modifier
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = if (isCurrentUser) 16.dp else 4.dp,
+                                topEnd = if (isCurrentUser) 4.dp else 16.dp,
+                                bottomStart = 16.dp,
+                                bottomEnd = 16.dp
+                            )
                         )
+                        .background(bubbleColor)
+                        .combinedClickable(
+                            onClick = { },
+                            onLongClick = { showMenu = true }
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Column {
+                        // 回复引用（如果有）
+                        if (message.replyTo != null) {
+                            // TODO: 显示回复的消息内容
+                            ReplyQuotePlaceholder(
+                                replyToId = message.replyTo,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+
+                        // 消息内容
+                        Text(
+                            text = buildMessageText(message.content),
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            color = Color.White
+                        )
+                        // 已编辑标记
+                        if (message.editCount > 0) {
+                            Text(
+                                text = "已编辑",
+                                fontSize = 10.sp,
+                                color = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // 长按菜单
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(SurfaceElevated)
+                ) {
+                    // 回复选项（所有人可用）
+                    DropdownMenuItem(
+                        text = { Text("回复") },
+                        onClick = {
+                            showMenu = false
+                            onReply()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Reply, contentDescription = null, tint = Foreground)
+                        }
                     )
-                    .background(bubbleColor)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = buildMessageText(message.content),
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
-                    color = Color.White
-                )
+
+                    // 编辑和删除选项（仅自己可用）
+                    if (isCurrentUser) {
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            onClick = {
+                                showMenu = false
+                                onEdit()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Edit, contentDescription = null, tint = Foreground)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除", color = AccentPink) },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = AccentPink)
+                            }
+                        )
+                    }
+                }
             }
 
             if (isCurrentUser) {
-                // 当前用户：显示时间
-                Text(
-                    text = formattedTime,
-                    fontSize = 11.sp,
-                    color = Muted,
+                // 当前用户：显示时间和已编辑标记
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(top = 2.dp, end = 4.dp)
-                )
+                ) {
+                    Text(
+                        text = formattedTime,
+                        fontSize = 11.sp,
+                        color = Muted
+                    )
+                }
             }
         }
 
@@ -507,6 +773,50 @@ private fun MessageItem(
                     fontSize = 14.sp
                 )
             }
+        }
+    }
+}
+
+/**
+ * 已删除消息项
+ */
+@Composable
+private fun DeletedMessageItem(
+    formattedTime: String,
+    isCurrentUser: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start
+    ) {
+        if (!isCurrentUser) {
+            Spacer(modifier = Modifier.width(44.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF2A2B2F))
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "此消息已删除",
+                fontSize = 14.sp,
+                color = Muted,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+            )
+        }
+
+        if (isCurrentUser) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = formattedTime,
+                fontSize = 11.sp,
+                color = Muted,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }
@@ -606,6 +916,48 @@ private fun EmojiPanel(onEmojiClick: (String) -> Unit) {
     }
 }
 
+/**
+ * 编辑模式指示器
+ */
+@Composable
+private fun EditingIndicator(
+    onCancel: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Surface)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Edit,
+            contentDescription = null,
+            tint = AccentPurple,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "编辑消息",
+            fontSize = 14.sp,
+            color = AccentPurple,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(
+            onClick = onCancel,
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "取消编辑",
+                tint = Muted,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun ChatInputArea(
     text: String,
@@ -613,40 +965,57 @@ private fun ChatInputArea(
     onSend: () -> Unit,
     onEmojiToggle: () -> Unit,
     placeholder: String,
-    isConnected: Boolean
+    isConnected: Boolean,
+    isEditing: Boolean = false,
+    replyingTo: MessageDto? = null,
+    onCancelReply: () -> Unit = {}
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Background)
-            .padding(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 24.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Emoji button
-        IconButton(
-            onClick = onEmojiToggle,
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.EmojiEmotions,
-                contentDescription = "表情",
-                tint = Muted,
-                modifier = Modifier.size(22.dp)
+        // 回复指示器
+        if (replyingTo != null) {
+            ReplyIndicator(
+                message = replyingTo,
+                onCancel = onCancelReply
             )
         }
 
-        // Attachment button
-        IconButton(
-            onClick = { /* TODO: attach file */ },
-            modifier = Modifier.size(40.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.AttachFile,
-                contentDescription = "附件",
-                tint = Muted,
-                modifier = Modifier.size(22.dp)
-            )
-        }
+            // Emoji button
+            IconButton(
+                onClick = onEmojiToggle,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EmojiEmotions,
+                    contentDescription = "表情",
+                    tint = Muted,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            // Attachment button (编辑/回复模式下隐藏)
+            if (!isEditing && replyingTo == null) {
+                IconButton(
+                    onClick = { /* TODO: show attachment menu */ },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = "附件",
+                        tint = Muted,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
 
         // Text input with rounded background
         BasicTextField(
@@ -657,7 +1026,7 @@ private fun ChatInputArea(
                 .padding(horizontal = 4.dp)
                 .heightIn(min = 44.dp, max = 120.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .background(Surface)
+                .background(if (isEditing) SurfaceElevated else Surface)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             singleLine = false,
             maxLines = 5,
@@ -681,24 +1050,39 @@ private fun ChatInputArea(
             }
         )
 
-        // Send button
-        IconButton(
-            onClick = onSend,
-            enabled = text.isNotBlank() && isConnected,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    if (text.isNotBlank() && isConnected) AccentPurple
-                    else SurfaceElevated
+            // Send button
+            val sendEnabled = text.isNotBlank() && (isConnected || isEditing)
+            IconButton(
+                onClick = onSend,
+                enabled = sendEnabled,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (sendEnabled) {
+                            when {
+                                isEditing -> AccentBlue
+                                replyingTo != null -> AccentGreen
+                                else -> AccentPurple
+                            }
+                        } else SurfaceElevated
+                    )
+            ) {
+                Icon(
+                    imageVector = when {
+                        isEditing -> Icons.Default.Edit
+                        replyingTo != null -> Icons.Default.Reply
+                        else -> Icons.Default.Send
+                    },
+                    contentDescription = when {
+                        isEditing -> "保存"
+                        replyingTo != null -> "回复"
+                        else -> "发送"
+                    },
+                    tint = if (sendEnabled) Color.White else Muted,
+                    modifier = Modifier.size(20.dp)
                 )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "发送",
-                tint = if (text.isNotBlank() && isConnected) Color.White else Muted,
-                modifier = Modifier.size(20.dp)
-            )
+            }
         }
     }
 }

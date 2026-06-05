@@ -97,8 +97,28 @@ interface MessageDao {
     /**
      * 更新消息内容（编辑）
      */
-    @Query("UPDATE messages SET content = :content, edit_count = edit_count + 1, sync_status = :syncStatus WHERE id = :messageId")
-    suspend fun updateMessageContent(messageId: String, content: String, syncStatus: SyncStatus = SyncStatus.EDIT_PENDING)
+    @Query("UPDATE messages SET content = :content, edit_count = edit_count + 1, edited_at = :editedAt, sync_status = :syncStatus WHERE id = :messageId")
+    suspend fun updateMessageContent(messageId: String, content: String, editedAt: String, syncStatus: SyncStatus = SyncStatus.EDIT_PENDING)
+
+    /**
+     * 确认消息编辑已同步（更新编辑时间和同步状态）
+     */
+    @Query("UPDATE messages SET edited_at = :editedAt, sync_status = 'SYNCED' WHERE id = :messageId")
+    suspend fun confirmMessageEdited(messageId: String, editedAt: String)
+
+    // ==================== 已读回执 ====================
+
+    /**
+     * 标记消息为已读
+     */
+    @Query("UPDATE messages SET is_read = 1 WHERE id = :messageId")
+    suspend fun markAsRead(messageId: String)
+
+    /**
+     * 更新消息已读人数和已读用户列表
+     */
+    @Query("UPDATE messages SET read_count = :readCount, read_by = :readBy WHERE id = :messageId")
+    suspend fun updateReadReceipt(messageId: String, readCount: Int, readBy: String)
 
     /**
      * 搜索消息
