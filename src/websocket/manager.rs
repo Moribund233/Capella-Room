@@ -9,7 +9,7 @@ use crate::redis::pubsub::RedisPubSub;
 use crate::utils::logging::PerformanceTimer;
 
 /// WebSocket 消息通道默认缓冲区大小
-pub const DEFAULT_WS_MESSAGE_BUFFER_SIZE: usize = 100;
+pub const DEFAULT_WS_MESSAGE_BUFFER_SIZE: usize = 500;
 
 /// 用户连接信息
 #[derive(Debug, Clone)]
@@ -278,15 +278,21 @@ impl WebSocketManager {
 
     /// 广播房间消息摘要给所有订阅该房间的用户
     /// 用于房间列表实时更新
+    /// 使用并发发送，避免单用户慢消费阻塞整个广播
     pub async fn broadcast_room_summary(&self, room_id: Uuid, message: String) {
         let mut timer = PerformanceTimer::new("ws_broadcast_room_summary");
 
+        let mut senders: Vec<(Uuid, mpsc::Sender<String>)> = Vec::new();
         if let Some(subscribers) = self.room_summary_subscribers.get(&room_id) {
             for user_id in subscribers.iter() {
-                if let Err(e) = self.send_to_user(*user_id, message.clone()).await {
-                    warn!("Failed to send room summary to user {}: {}", user_id, e);
+                if let Some(conn) = self.connections.get(user_id) {
+                    senders.push((*user_id, conn.sender.clone()));
                 }
             }
+        }
+
+        if !senders.is_empty() {
+            concurrent_send(senders, message).await;
         }
 
         timer.finish();
@@ -307,13 +313,16 @@ impl WebSocketManager {
         self.broadcast_local(room_id, message.clone(), exclude_user)
             .await;
 
-        // 2. 如果启用了 Redis，发布到 Redis
-        if let Some(ref mut redis_pubsub) = *self.redis_pubsub.write().await {
-            if let Err(e) = redis_pubsub
-                .publish_room_message(room_id, message, exclude_user)
-                .await
-            {
-                warn!("Failed to publish room message to Redis: {}", e);
+        // 2. 如果启用了 Redis，尝试发布到 Redis（非阻塞）
+        //    使用 try_write 避免多任务竞争写锁导致串行化
+        if let Ok(mut guard) = self.redis_pubsub.try_write() {
+            if let Some(ref mut redis_pubsub) = &mut *guard {
+                if let Err(e) = redis_pubsub
+                    .publish_room_message(room_id, message, exclude_user)
+                    .await
+                {
+                    warn!("Failed to publish room message to Redis: {}", e);
+                }
             }
         }
         timer.finish();
@@ -329,12 +338,15 @@ impl WebSocketManager {
     /// # 说明
     /// 该方法仅向当前节点的客户端发送消息，不通过 Redis 发布
     /// 用于处理从 Redis 接收到的消息
+    ///
+    /// 使用并发发送：所有目标用户同时发送，单用户慢消费（channel 满）不影响其他用户
     pub async fn broadcast_local(
         &self,
         room_id: Uuid,
         message: String,
         exclude_user: Option<Uuid>,
     ) {
+        let mut senders: Vec<(Uuid, mpsc::Sender<String>)> = Vec::new();
         if let Some(subscribers) = self.room_subscribers.get(&room_id) {
             for user_id in subscribers.iter() {
                 // 跳过被排除的用户
@@ -344,10 +356,14 @@ impl WebSocketManager {
                     }
                 }
 
-                if let Err(e) = self.send_to_user(*user_id, message.clone()).await {
-                    warn!("Failed to send message to user {}: {}", user_id, e);
+                if let Some(connection) = self.connections.get(user_id) {
+                    senders.push((*user_id, connection.sender.clone()));
                 }
             }
+        }
+
+        if !senders.is_empty() {
+            concurrent_send(senders, message).await;
         }
     }
 
@@ -463,6 +479,26 @@ impl WebSocketManager {
             .get(&room_id)
             .map(|subscribers| subscribers.contains(&user_id))
             .unwrap_or(false)
+    }
+}
+
+/// 并发发送消息给多个用户
+/// 使用 try_send 非阻塞发送，channel 满时跳过该用户
+/// 避免单个慢消费用户阻塞整个广播链路 (backpressure 级联)
+async fn concurrent_send(senders: Vec<(Uuid, mpsc::Sender<String>)>, message: String) {
+    for (uid, sender) in senders {
+        match sender.try_send(message.clone()) {
+            Ok(()) => {}
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                warn!(
+                    "Backpressure: channel full for user {}, skipping message",
+                    uid
+                );
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                debug!("User {} connection closed (channel closed)", uid);
+            }
+        }
     }
 }
 

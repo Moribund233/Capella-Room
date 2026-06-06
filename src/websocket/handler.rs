@@ -217,9 +217,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
         }
     }
 
-    // 如果是重连，先断开旧连接
-    if is_reconnect && state.ws_manager().is_user_connected(user_id) {
-        info!("Disconnecting old connection for user: {}", user_id);
+    // 先断开旧连接（如有），避免旧连接的 cleanup 覆盖新连接数据
+    if state.ws_manager().is_user_connected(user_id) {
         state.ws_manager().disconnect(user_id);
     }
 
@@ -318,9 +317,19 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
         loop {
             tokio::select! {
                 // 从通道接收消息并发送给客户端
+                // 使用 try_send 类似策略：写超时则丢弃当前消息不阻塞
                 Some(message) = rx.recv() => {
-                    if sender.send(Message::Text(message)).await.is_err() {
-                        break;
+                    match tokio::time::timeout(
+                        Duration::from_secs(5),
+                        sender.send(Message::Text(message)),
+                    ).await {
+                        Ok(Ok(())) => {}
+                        Ok(Err(_)) => break,  // WebSocket 关闭
+                        Err(_) => {
+                            // 客户端消费慢，丢弃当前消息继续
+                            // 避免单客户端慢消费阻塞全系统广播管道
+                            debug!("Dropped message for user {} (slow client)", user_id);
+                        }
                     }
                 }
                 // 定时验证 Token 是否过期
@@ -644,7 +653,7 @@ async fn handle_message(
     msg: WebSocketMessage,
     user_id: Uuid,
     username: &str,
-    state: &AppState,
+    state: &Arc<AppState>,
     tx: &mpsc::Sender<String>,
     last_pong: &Arc<std::sync::Mutex<Instant>>,
 ) -> anyhow::Result<()> {
@@ -1112,7 +1121,7 @@ async fn handle_chat_message(
     username: &str,
     content: String,
     reply_to: Option<Uuid>,
-    state: &AppState,
+    state: &Arc<AppState>,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
     let mut _timer = PerformanceTimer::new("handle_chat_message");
@@ -1177,7 +1186,7 @@ async fn handle_chat_message(
                 None
             };
 
-            // 广播消息给房间所有成员
+            // 构造广播数据
             let new_message = WebSocketMessage::NewMessage {
                 message_id: message.id,
                 room_id,
@@ -1189,14 +1198,8 @@ async fn handle_chat_message(
                 created_at: message.created_at,
             };
 
-            if let Ok(json) = new_message.to_json() {
-                state
-                    .ws_manager()
-                    .broadcast_to_room_all(room_id, json)
-                    .await;
-            }
+            let broadcast_json = new_message.to_json().ok();
 
-            // 4. 向订阅该房间的用户推送消息摘要（用于房间列表实时更新）
             let message_preview = crate::models::room::MessagePreview {
                 id: message.id,
                 content: message.content.clone(),
@@ -1206,26 +1209,48 @@ async fn handle_chat_message(
             let summary = WebSocketMessage::RoomMessageSummary {
                 room_id,
                 last_message: message_preview,
-                unread_count: 0, // TODO: 计算实际未读数
+                unread_count: 0,
             };
-            if let Ok(json) = summary.to_json() {
-                state
-                    .ws_manager()
-                    .broadcast_room_summary(room_id, json)
-                    .await;
-            }
+            let summary_json = summary.to_json().ok();
 
-            // 5. 检测并处理@提及通知
-            handle_mentions(
-                &content,
-                message.id,
-                room_id,
-                user_id,
-                username,
-                &message.created_at,
-                state,
-            )
-            .await;
+            let content_for_mentions = content.clone();
+            let msg_id_for_mentions = message.id;
+            let created_at_for_mentions = message.created_at;
+            let username_for_mentions = username.to_string();
+            let user_id_for_mentions = user_id;
+
+            // 后台异步执行：广播 + 摘要 + 提及通知
+            // 不阻塞 recv_task，确保消息处理流水线畅通
+            let state_for_async = Arc::clone(state);
+            tokio::spawn(async move {
+                // 广播消息给房间所有成员
+                if let Some(json) = broadcast_json {
+                    state_for_async
+                        .ws_manager()
+                        .broadcast_to_room_all(room_id, json)
+                        .await;
+                }
+
+                // 推送消息摘要
+                if let Some(json) = summary_json {
+                    state_for_async
+                        .ws_manager()
+                        .broadcast_room_summary(room_id, json)
+                        .await;
+                }
+
+                // 检测并处理@提及通知
+                handle_mentions(
+                    &content_for_mentions,
+                    msg_id_for_mentions,
+                    room_id,
+                    user_id_for_mentions,
+                    &username_for_mentions,
+                    &created_at_for_mentions,
+                    &*state_for_async,
+                )
+                .await;
+            });
 
             StructuredLogger::message_sent(
                 message.id,

@@ -9,8 +9,7 @@ services:
       dockerfile: Dockerfile
     image: capella-room:latest
     container_name: capella-room-prod
-    ports:
-      - "3000:3000"
+    network_mode: host
     env_file:
       - .env.production
     environment:
@@ -25,9 +24,3 @@ services:
       timeout: 10s
       start_period: 5s
       retries: 3
-    networks:
-      - 1panel-network  # 使用 1Panel 的网络
-
-networks:
-  1panel-network:
-    external: true  # 使用外部已存在的网络

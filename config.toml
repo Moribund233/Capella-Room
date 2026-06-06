@@ -57,11 +57,11 @@ base_url = "/uploads"
 # WebSocket 心跳间隔（秒）
 heartbeat_interval_secs = 30
 # WebSocket 心跳超时（秒，超过此时间未收到 Pong 则断开连接）
-heartbeat_timeout_secs = 90
+heartbeat_timeout_secs = 120
 # WebSocket 认证超时（秒，连接后必须在此时间内完成认证）
 auth_timeout_secs = 30
 # WebSocket 消息缓冲区大小
-message_buffer_size = 100
+message_buffer_size = 5000
 
 # -----------------------------------------------------------------------------
 # 重连策略配置
