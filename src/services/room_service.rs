@@ -105,14 +105,13 @@ impl RoomService {
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                     WHERE (r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     ))
@@ -150,14 +149,13 @@ impl RoomService {
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                     WHERE r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     )
@@ -196,14 +194,13 @@ impl RoomService {
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                     WHERE r.is_private = false
                     AND r.name ILIKE $1
                     GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
@@ -238,14 +235,13 @@ impl RoomService {
                     FROM rooms r
                     LEFT JOIN room_members rm ON r.id = rm.room_id
                     LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                     WHERE r.is_private = false
                     GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
@@ -294,14 +290,13 @@ impl RoomService {
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                 WHERE r.is_private = false OR EXISTS (
                     SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                 )
@@ -338,14 +333,13 @@ impl RoomService {
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                 WHERE r.is_private = false
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.updated_at DESC
@@ -398,14 +392,13 @@ impl RoomService {
             FROM rooms r
             LEFT JOIN room_members rm ON r.id = rm.room_id
             LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
             WHERE r.id = $1
             GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
             "#,
@@ -865,14 +858,13 @@ impl RoomService {
             JOIN room_members rm ON r.id = rm.room_id
             LEFT JOIN room_members rm2 ON r.id = rm2.room_id
             LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
             WHERE rm.user_id = $1
             GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
             ORDER BY r.created_at DESC
@@ -929,14 +921,13 @@ impl RoomService {
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                 WHERE r.name ILIKE $1
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.created_at DESC
@@ -970,14 +961,13 @@ impl RoomService {
                 FROM rooms r
                 LEFT JOIN room_members rm ON r.id = rm.room_id
                 LEFT JOIN users u ON r.owner_id = u.id
-            LEFT JOIN LATERAL (
-                SELECT m.id, m.content, u2.username as sender_name, m.created_at
+            LEFT JOIN (
+                SELECT DISTINCT ON (m.room_id) m.id, m.room_id, m.content, u2.username as sender_name, m.created_at
                 FROM messages m
                 LEFT JOIN users u2 ON m.sender_id = u2.id
-                WHERE m.room_id = r.id AND m.is_deleted = false
-                ORDER BY m.created_at DESC
-                LIMIT 1
-            ) lm ON true
+                WHERE m.is_deleted = false
+                ORDER BY m.room_id, m.created_at DESC
+            ) lm ON lm.room_id = r.id
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.created_at DESC
                 LIMIT $1 OFFSET $2

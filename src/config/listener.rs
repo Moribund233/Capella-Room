@@ -2,6 +2,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 use crate::config::{ConfigChangeEvent, ConfigManager};
+use crate::services::batch_message_service::BatchMessageService;
 use crate::websocket::manager::WebSocketManager;
 
 /// WebSocket 配置监听器
@@ -136,10 +137,80 @@ impl LoggingConfigListener {
     }
 }
 
+/// 批量消息写入配置监听器
+/// 监听 batch_message.* 配置变更并动态更新 BatchMessageService
+pub struct BatchMessageConfigListener {
+    config_manager: Arc<ConfigManager>,
+    batch_service: Arc<BatchMessageService>,
+}
+
+impl BatchMessageConfigListener {
+    pub fn new(
+        config_manager: Arc<ConfigManager>,
+        batch_service: Arc<BatchMessageService>,
+    ) -> Self {
+        Self {
+            config_manager,
+            batch_service,
+        }
+    }
+
+    /// 启动配置监听任务
+    pub async fn run(self) {
+        let mut rx = self.config_manager.subscribe_config_changes();
+
+        info!("Batch message config listener started");
+
+        while let Ok(event) = rx.recv().await {
+            match event {
+                ConfigChangeEvent::ConfigUpdated { key, .. } => {
+                    self.handle_config_change(&key).await;
+                }
+                ConfigChangeEvent::ConfigReloaded => {
+                    self.reload_all_configs().await;
+                }
+                _ => {}
+            }
+        }
+
+        info!("Batch message config listener stopped");
+    }
+
+    async fn handle_config_change(&self, key: &str) {
+        match key {
+            "batch_message.batch_size"
+            | "batch_message.flush_interval_ms"
+            | "batch_message.max_queue_size" => {
+                let config = self.config_manager.get_config().await;
+                self.batch_service
+                    .update_config(config.batch_message.clone())
+                    .await;
+                info!(
+                    "Batch message configuration '{}' updated, new config: batch_size={}, flush_interval={}ms, max_queue_size={}",
+                    key,
+                    config.batch_message.batch_size,
+                    config.batch_message.flush_interval_ms,
+                    config.batch_message.max_queue_size,
+                );
+            }
+            _ => {}
+        }
+    }
+
+    async fn reload_all_configs(&self) {
+        let config = self.config_manager.get_config().await;
+        self.batch_service
+            .update_config(config.batch_message.clone())
+            .await;
+        info!("All batch message configurations reloaded");
+    }
+}
+
 /// 启动所有配置监听器
 pub fn start_config_listeners(
     config_manager: Arc<ConfigManager>,
     ws_manager: Arc<WebSocketManager>,
+    batch_service: Arc<BatchMessageService>,
 ) {
     // 启动 WebSocket 配置监听器
     let ws_listener = WebSocketConfigListener::new(Arc::clone(&config_manager), ws_manager);
@@ -148,9 +219,16 @@ pub fn start_config_listeners(
     });
 
     // 启动日志配置监听器
-    let logging_listener = LoggingConfigListener::new(config_manager);
+    let logging_listener = LoggingConfigListener::new(Arc::clone(&config_manager));
     tokio::spawn(async move {
         logging_listener.run().await;
+    });
+
+    // 启动批量消息配置监听器
+    let batch_listener =
+        BatchMessageConfigListener::new(Arc::clone(&config_manager), batch_service);
+    tokio::spawn(async move {
+        batch_listener.run().await;
     });
 
     info!("All config listeners started");

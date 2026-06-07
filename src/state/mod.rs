@@ -12,7 +12,7 @@ use crate::services::account_security_service::AccountSecurityService;
 use crate::services::audit_log_consumer::AuditLogConsumerHandler;
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
-use crate::services::batch_message_service::{BatchMessageConfig, BatchMessageService};
+use crate::services::batch_message_service::BatchMessageService;
 use crate::services::file_service::FileService;
 use crate::services::ip_security_service::IpSecurityService;
 use crate::services::message_service::MessageService;
@@ -83,6 +83,8 @@ impl AppState {
         init_global_log_broadcaster((*log_broadcaster).clone());
         let logger = Arc::new(StructuredLogger);
 
+        // 在 config 被移入 shared_config 前提取批量消息配置
+        let batch_message_config = config.batch_message.clone();
         let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
         let auth_service = AuthService::with_shared_config(shared_config.clone());
@@ -117,9 +119,9 @@ impl AppState {
             .await,
         );
 
-        // 创建并启动批量消息写入服务
-        let batch_config = BatchMessageConfig::default();
-        let (batch_message_service, notify_rx) = BatchMessageService::new(db.clone(), batch_config);
+        // 创建并启动批量消息写入服务（使用配置系统的默认值，支持后续热重载）
+        let (batch_message_service, notify_rx) =
+            BatchMessageService::new(db.clone(), batch_message_config).await;
         let batch_message_service = Arc::new(batch_message_service);
         batch_message_service.start(notify_rx);
 
@@ -154,6 +156,7 @@ impl AppState {
             });
         }
 
+        let batch_service_for_listener = batch_message_service.clone();
         let state = Arc::new(Self {
             db,
             ws_manager: ws_manager.clone(),
@@ -176,8 +179,8 @@ impl AppState {
             redis_manager,
         });
 
-        // 启动配置监听器
-        start_config_listeners(config_manager, ws_manager);
+        // 启动配置监听器（WebSocket + 日志 + 批量消息）
+        start_config_listeners(config_manager, ws_manager, batch_service_for_listener);
 
         Ok(state)
     }

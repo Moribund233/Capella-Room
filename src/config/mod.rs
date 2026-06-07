@@ -7,6 +7,7 @@ pub mod loader;
 pub mod manager;
 
 pub use listener::{start_config_listeners, LoggingConfigListener, WebSocketConfigListener};
+pub use listener::BatchMessageConfigListener;
 pub use loader::ConfigLoader;
 pub use manager::{ConfigChangeEvent, ConfigManager};
 
@@ -34,6 +35,8 @@ pub struct AppConfig {
     pub audit: AuditConfig,
     #[serde(default)]
     pub redis: RedisConfig,
+    #[serde(default)]
+    pub batch_message: BatchMessageConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -189,6 +192,20 @@ pub struct InitialAdminConfig {
     pub email: String,
     #[serde(default)]
     pub password: String,
+}
+
+/// 批量消息写入配置
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct BatchMessageConfig {
+    /// 批量大小，达到此数量立即写入
+    #[serde(default)]
+    pub batch_size: usize,
+    /// 刷新间隔（毫秒），达到此时间立即写入
+    #[serde(default)]
+    pub flush_interval_ms: u64,
+    /// 队列最大长度，超过此长度将丢弃最旧的消息
+    #[serde(default)]
+    pub max_queue_size: usize,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]

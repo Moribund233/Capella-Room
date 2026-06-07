@@ -1,0 +1,24 @@
+-- ============================================
+-- Phase 9.6: 移除误导性索引
+-- ============================================
+-- 问题背景:
+--   migration 004 添加了 idx_messages_created_at_only (created_at) WHERE is_deleted = false
+--   本意是优化"日/周/月消息量统计"查询。但该索引仅有 created_at 一列，
+--   导致 PostgreSQL 查询规划器在 LEFT JOIN LATERAL (...) ORDER BY created_at DESC LIMIT 1
+--   场景下优先选择此索引而非 (room_id, created_at DESC) 复合索引。
+--
+--   实际效果: 规划器扫描整个 created_at 索引 + Filter(room_id = ?)，
+--   数据量 86 万时单次查询耗时 42 秒。而 idx_messages_room_not_deleted
+--   (room_id, created_at DESC) WHERE is_deleted = false 能直接定位到目标房间，
+--   仅需 0.097ms。
+--
+-- 替代方案:
+--   统计类查询（COUNT WHERE created_at > ?）可继续使用 migration 001 中
+--   的 idx_messages_created_at (无过滤条件的 created_at 索引)，
+--   或使用 migration 004 中的 idx_messages_created_at_sender
+--   (created_at, sender_id) WHERE is_deleted = false 做更精确的用户活跃统计。
+--   这两者的选择率不会被 LATERAL + ORDER BY LIMIT 子查询误用。
+-- ============================================
+
+-- 移除误导性索引，防止规划器在 room 范围查询时选错
+DROP INDEX IF EXISTS idx_messages_created_at_only;

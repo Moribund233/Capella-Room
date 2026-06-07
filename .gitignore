@@ -42,6 +42,9 @@ doc/
 # SQLx offline mode
 .sqlx/
 
+# Codegraph index
+.codegraph/
+
 # template
 temp/
 

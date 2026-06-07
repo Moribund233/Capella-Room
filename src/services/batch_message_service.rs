@@ -2,6 +2,10 @@
 //!
 //! 将消息写入操作从实时路径解耦，使用内存队列批量聚合后写入数据库。
 //! 这样可以在保证消息实时广播的同时，提高数据库写入吞吐量。
+//!
+//! # 配置
+//! 通过 `config::BatchMessageConfig` 接入配置系统，支持热重载。
+//! 运行时可通过 `update_config()` 动态调整参数。
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -11,6 +15,7 @@ use tokio::time::interval;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::config::BatchMessageConfig;
 use crate::db::Database;
 use crate::models::message::MessageType;
 
@@ -35,31 +40,11 @@ pub struct PendingMessage {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// 批量消息写入器配置
-#[derive(Debug, Clone)]
-pub struct BatchMessageConfig {
-    /// 批量大小，达到此数量立即写入
-    pub batch_size: usize,
-    /// 刷新间隔（毫秒），达到此时间立即写入
-    pub flush_interval_ms: u64,
-    /// 队列最大长度，超过此长度将丢弃最旧的消息
-    pub max_queue_size: usize,
-}
-
-impl Default for BatchMessageConfig {
-    fn default() -> Self {
-        Self {
-            batch_size: 500,        // 增大批量大小，提高写入效率
-            flush_interval_ms: 50,  // 缩短刷新间隔，更快写入
-            max_queue_size: 100000, // 增大队列，避免高并发时丢消息
-        }
-    }
-}
-
 /// 批量消息写入服务
 pub struct BatchMessageService {
     db: Database,
-    config: BatchMessageConfig,
+    /// 运行时配置（支持热重载）
+    config: Arc<RwLock<BatchMessageConfig>>,
     /// 消息队列
     queue: Arc<Mutex<VecDeque<PendingMessage>>>,
     /// 用于通知刷新任务新消息到达
@@ -70,9 +55,11 @@ pub struct BatchMessageService {
 
 impl BatchMessageService {
     /// 创建新的批量消息服务
-    pub fn new(db: Database, config: BatchMessageConfig) -> (Self, mpsc::Receiver<()>) {
+    pub async fn new(db: Database, config: BatchMessageConfig) -> (Self, mpsc::Receiver<()>) {
         let (notify_tx, notify_rx) = mpsc::channel(1);
-        let queue = Arc::new(Mutex::new(VecDeque::with_capacity(config.max_queue_size)));
+        let config = Arc::new(RwLock::new(config));
+        let max_queue_size = config.read().await.max_queue_size;
+        let queue = Arc::new(Mutex::new(VecDeque::with_capacity(max_queue_size)));
         let running = Arc::new(RwLock::new(true));
 
         let service = Self {
@@ -86,7 +73,20 @@ impl BatchMessageService {
         (service, notify_rx)
     }
 
+    /// 更新运行时配置（由配置监听器调用）
+    pub async fn update_config(&self, new_config: BatchMessageConfig) {
+        let mut config = self.config.write().await;
+        *config = new_config;
+        info!("Batch message writer configuration updated");
+    }
+
+    /// 获取当前配置快照
+    pub async fn get_config(&self) -> BatchMessageConfig {
+        self.config.read().await.clone()
+    }
+
     /// 启动批量写入任务
+    /// 每次循环从 RwLock 读取最新配置，支持热重载
     pub fn start(&self, mut notify_rx: mpsc::Receiver<()>) {
         let queue = self.queue.clone();
         let db = self.db.clone();
@@ -94,15 +94,26 @@ impl BatchMessageService {
         let running = self.running.clone();
 
         tokio::spawn(async move {
-            info!(
-                "Batch message writer started (batch_size={}, flush_interval={}ms)",
-                config.batch_size, config.flush_interval_ms
-            );
-
-            let mut flush_timer = interval(Duration::from_millis(config.flush_interval_ms));
-            flush_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            // 读取初始配置打印启动日志
+            {
+                let cfg = config.read().await;
+                info!(
+                    "Batch message writer started (batch_size={}, flush_interval={}ms, max_queue_size={})",
+                    cfg.batch_size, cfg.flush_interval_ms, cfg.max_queue_size
+                );
+            }
 
             loop {
+                // 每次迭代读取最新配置，确保热重载生效
+                let (batch_size, flush_interval_ms) = {
+                    let cfg = config.read().await;
+                    (cfg.batch_size, cfg.flush_interval_ms)
+                };
+
+                let mut flush_timer =
+                    interval(Duration::from_millis(flush_interval_ms));
+                flush_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
                 tokio::select! {
                     // 定时刷新
                     _ = flush_timer.tick() => {
@@ -111,17 +122,17 @@ impl BatchMessageService {
                             !q.is_empty()
                         };
                         if should_flush {
-                            Self::flush_batch(&queue, &db, config.batch_size).await;
+                            Self::flush_batch(&queue, &db, batch_size).await;
                         }
                     }
                     // 收到新消息通知
                     _ = notify_rx.recv() => {
                         let should_flush = {
                             let q = queue.lock().await;
-                            q.len() >= config.batch_size
+                            q.len() >= batch_size
                         };
                         if should_flush {
-                            Self::flush_batch(&queue, &db, config.batch_size).await;
+                            Self::flush_batch(&queue, &db, batch_size).await;
                         }
                     }
                 }
@@ -144,12 +155,14 @@ impl BatchMessageService {
     /// # 错误
     /// - `BatchError::QueueFull`: 队列已满，已丢弃最旧消息以腾出空间，新消息仍成功入队
     pub async fn enqueue(&self, message: PendingMessage) -> std::result::Result<(), BatchError> {
+        // 先读配置再锁队列，避免锁顺序死锁
+        let max_queue_size = self.config.read().await.max_queue_size;
         let mut queue = self.queue.lock().await;
 
-        if queue.len() >= self.config.max_queue_size {
+        if queue.len() >= max_queue_size {
             warn!(
                 "Message queue full ({}), dropping oldest message",
-                self.config.max_queue_size
+                max_queue_size
             );
             queue.pop_front();
             queue.push_back(message);
@@ -290,6 +303,7 @@ impl BatchMessageService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::BatchMessageConfig;
 
     #[test]
     fn test_batch_config_default() {

@@ -262,6 +262,24 @@ impl ConfigManager {
                 config.logging.level = item.value.clone();
                 debug!("Hot reloaded logging.level = {}", item.value);
             }
+            "batch_message.batch_size" => {
+                if let Ok(size) = item.value.parse() {
+                    config.batch_message.batch_size = size;
+                    debug!("Hot reloaded batch_message.batch_size = {}", size);
+                }
+            }
+            "batch_message.flush_interval_ms" => {
+                if let Ok(ms) = item.value.parse() {
+                    config.batch_message.flush_interval_ms = ms;
+                    debug!("Hot reloaded batch_message.flush_interval_ms = {}ms", ms);
+                }
+            }
+            "batch_message.max_queue_size" => {
+                if let Ok(size) = item.value.parse() {
+                    config.batch_message.max_queue_size = size;
+                    debug!("Hot reloaded batch_message.max_queue_size = {}", size);
+                }
+            }
             "system.maintenance_mode" => {
                 if let Ok(mode) = item.value.parse() {
                     config.system.maintenance_mode = mode;
@@ -608,6 +626,34 @@ impl ConfigManager {
                 "int",
                 "审计日志自动归档时间（小时，0-23）",
                 "audit",
+                true,
+                true,
+            ),
+            // 批量消息写入配置
+            (
+                "batch_message.batch_size",
+                "500",
+                "int",
+                "批量消息写入大小（达到此数量立即写入数据库）",
+                "batch_message",
+                true,
+                true,
+            ),
+            (
+                "batch_message.flush_interval_ms",
+                "50",
+                "int",
+                "批量写入刷新间隔（毫秒）",
+                "batch_message",
+                true,
+                true,
+            ),
+            (
+                "batch_message.max_queue_size",
+                "100000",
+                "int",
+                "批量写入队列上限（超过后丢弃最旧消息）",
+                "batch_message",
                 true,
                 true,
             ),
