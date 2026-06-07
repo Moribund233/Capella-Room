@@ -24,7 +24,7 @@
 # 数据库连接 URL（必须通过环境变量 DATABASE_URL 设置）
 # url = "postgres://username:password@localhost:5432/capella_room"
 # 数据库连接池大小
-max_connections = 10
+max_connections = 25
 # 连接超时时间（秒）
 acquire_timeout_secs = 30
 # 空闲超时时间（秒）
@@ -61,7 +61,7 @@ heartbeat_timeout_secs = 120
 # WebSocket 认证超时（秒，连接后必须在此时间内完成认证）
 auth_timeout_secs = 30
 # WebSocket 消息缓冲区大小
-message_buffer_size = 5000
+message_buffer_size = 50000
 
 # -----------------------------------------------------------------------------
 # 重连策略配置

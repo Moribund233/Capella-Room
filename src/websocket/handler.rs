@@ -403,17 +403,39 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                             continue;
                         }
 
-                        if let Err(e) = handle_message(
+                        // ChatMessage/EditMessage/DeleteMessage 包含 DB 写入操作，
+                        // 耗时较长。spawn 到后台避免阻塞 recv_task 读取下一条消息
+                        if matches!(
                             ws_msg,
-                            user_id,
-                            &username_for_recv,
-                            &state_clone,
-                            &tx_clone,
-                            &last_pong_clone,
-                        )
-                        .await
-                        {
-                            warn!("Error handling message: {}", e);
+                            WebSocketMessage::ChatMessage { .. }
+                                | WebSocketMessage::EditMessage { .. }
+                                | WebSocketMessage::DeleteMessage { .. }
+                        ) {
+                            let state = state_clone.clone();
+                            let tx = tx_clone.clone();
+                            let uid = user_id;
+                            let uname = username_for_recv.clone();
+                            let lp = last_pong_clone.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) =
+                                    handle_message(ws_msg, uid, &uname, &state, &tx, &lp).await
+                                {
+                                    warn!("Error handling message: {}", e);
+                                }
+                            });
+                        } else {
+                            if let Err(e) = handle_message(
+                                ws_msg,
+                                user_id,
+                                &username_for_recv,
+                                &state_clone,
+                                &tx_clone,
+                                &last_pong_clone,
+                            )
+                            .await
+                            {
+                                warn!("Error handling message: {}", e);
+                            }
                         }
                     }
                     Err(e) => {
@@ -1199,6 +1221,8 @@ async fn handle_chat_message(
             };
 
             let broadcast_json = new_message.to_json().ok();
+            // 克隆一份给发送者直投使用（广播用的 json 会被 move 进闭包）
+            let broadcast_json_for_sender = broadcast_json.clone();
 
             let message_preview = crate::models::room::MessagePreview {
                 id: message.id,
@@ -1219,16 +1243,28 @@ async fn handle_chat_message(
             let username_for_mentions = username.to_string();
             let user_id_for_mentions = user_id;
 
-            // 后台异步执行：广播 + 摘要 + 提及通知
+            // 后台异步执行：广播（排除发送者）+ 发送者直投 + 摘要 + 提及通知
             // 不阻塞 recv_task，确保消息处理流水线畅通
             let state_for_async = Arc::clone(state);
+            let tx_for_async = tx.clone();
             tokio::spawn(async move {
-                // 广播消息给房间所有成员
+                // 广播消息给房间其他成员（排除发送者），避免发送者自身的 channel
+                // 被回显消息填满导致背压丢消息
                 if let Some(json) = broadcast_json {
                     state_for_async
                         .ws_manager()
-                        .broadcast_to_room_all(room_id, json)
+                        .broadcast_to_room(room_id, json, Some(user_id))
                         .await;
+                }
+
+                // 发送者直投：通过 tx channel 可靠送达，不使用 try_send
+                // 确保发送者一定能收到自己的消息回显
+                if let Some(json) = broadcast_json_for_sender {
+                    let _ = tokio::time::timeout(
+                        std::time::Duration::from_secs(5),
+                        tx_for_async.send(json),
+                    )
+                    .await;
                 }
 
                 // 推送消息摘要

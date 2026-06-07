@@ -252,6 +252,12 @@ impl ConfigManager {
                     debug!("Hot reloaded websocket.auth_timeout_secs = {}", secs);
                 }
             }
+            "websocket.message_buffer_size" => {
+                if let Ok(size) = item.value.parse() {
+                    config.websocket.message_buffer_size = size;
+                    debug!("Hot reloaded websocket.message_buffer_size = {}", size);
+                }
+            }
             "logging.level" => {
                 config.logging.level = item.value.clone();
                 debug!("Hot reloaded logging.level = {}", item.value);
