@@ -12,6 +12,7 @@ use crate::services::account_security_service::AccountSecurityService;
 use crate::services::audit_log_consumer::AuditLogConsumerHandler;
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
+use crate::services::batch_message_service::{BatchMessageConfig, BatchMessageService};
 use crate::services::file_service::FileService;
 use crate::services::ip_security_service::IpSecurityService;
 use crate::services::message_service::MessageService;
@@ -35,6 +36,7 @@ pub struct AppState {
     pub user_service: UserService,
     pub room_service: RoomService,
     pub message_service: MessageService,
+    pub batch_message_service: Arc<BatchMessageService>,
     pub file_service: Arc<FileService>,
     pub notification_service: Arc<NotificationService>,
     pub audit_service: Arc<AuditService>,
@@ -115,6 +117,12 @@ impl AppState {
             .await,
         );
 
+        // 创建并启动批量消息写入服务
+        let batch_config = BatchMessageConfig::default();
+        let (batch_message_service, notify_rx) = BatchMessageService::new(db.clone(), batch_config);
+        let batch_message_service = Arc::new(batch_message_service);
+        batch_message_service.start(notify_rx);
+
         let ip_security_service =
             Arc::new(IpSecurityService::new(db.clone(), audit_service.clone()).await);
 
@@ -156,6 +164,7 @@ impl AppState {
             user_service,
             room_service,
             message_service,
+            batch_message_service,
             file_service,
             notification_service,
             audit_service,
@@ -207,6 +216,10 @@ impl AppState {
 
     pub fn message_service(&self) -> &MessageService {
         &self.message_service
+    }
+
+    pub fn batch_message_service(&self) -> &BatchMessageService {
+        &self.batch_message_service
     }
 
     pub fn file_service(&self) -> &FileService {
@@ -262,6 +275,7 @@ impl Clone for AppState {
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),
             message_service: MessageService::new(self.db.clone()),
+            batch_message_service: Arc::clone(&self.batch_message_service),
             file_service: Arc::clone(&self.file_service),
             notification_service: Arc::clone(&self.notification_service),
             audit_service: Arc::clone(&self.audit_service),

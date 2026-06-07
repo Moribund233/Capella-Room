@@ -199,13 +199,13 @@ impl MessageService {
     ) -> Result<Vec<MessageResponse>> {
         let mut timer = PerformanceTimer::new("db_get_room_messages");
         let messages = if let Some(before_id) = before {
-            // 使用 created_at 进行游标分页，而不是 UUID 比较
+            // 使用 (created_at, id) 进行游标分页，id 作为时间戳重复时的断链器
             sqlx::query_as::<_, Message>(
                 r#"
                 SELECT * FROM messages
                 WHERE room_id = $1 AND is_deleted = false
-                AND created_at < (SELECT created_at FROM messages WHERE id = $2)
-                ORDER BY created_at DESC
+                AND (created_at, id) < (SELECT created_at, id FROM messages WHERE id = $2)
+                ORDER BY created_at DESC, id DESC
                 LIMIT $3
                 "#,
             )
@@ -419,13 +419,13 @@ impl MessageService {
         limit: i64,
     ) -> Result<Vec<MessageResponse>> {
         let messages = if let Some(last_id) = last_message_id {
-            // 获取指定消息之后的新消息（使用 created_at 比较）
+            // 获取指定消息之后的新消息（使用 (created_at, id) 游标，id 作为断链器）
             sqlx::query_as::<_, Message>(
                 r#"
-                SELECT * FROM messages 
+                SELECT * FROM messages
                 WHERE room_id = $1 AND is_deleted = false
-                AND created_at > (SELECT created_at FROM messages WHERE id = $2)
-                ORDER BY created_at ASC
+                AND (created_at, id) > (SELECT created_at, id FROM messages WHERE id = $2)
+                ORDER BY created_at ASC, id ASC
                 LIMIT $3
                 "#,
             )

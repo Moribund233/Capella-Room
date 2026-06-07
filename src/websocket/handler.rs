@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     models::security::IpCheckResult,
+    services::batch_message_service::PendingMessage,
     state::AppState,
     utils::logging::{PerformanceTimer, StructuredLogger},
     websocket::protocol::{MissedMessage, ReplyToInfo, UserInfo, UserStatus, WebSocketMessage},
@@ -1137,6 +1138,7 @@ async fn handle_leave_room(
 }
 
 /// 处理聊天消息
+/// 使用批量写入解耦消息收发和持久化，确保实时广播不被数据库写入阻塞
 async fn handle_chat_message(
     room_id: Uuid,
     user_id: Uuid,
@@ -1182,129 +1184,131 @@ async fn handle_chat_message(
         }
     }
 
-    // 4. 保存消息到数据库
-    match state
-        .message_service()
-        .create_text_message(room_id, user_id, &content, reply_to)
-        .await
-    {
-        Ok(message) => {
-            // 获取被引用消息的信息（如果有）
-            let reply_to_message = if let Some(reply_to_id) = message.reply_to {
-                state
-                    .message_service()
-                    .get_reply_to_info(reply_to_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(|info| ReplyToInfo {
-                        id: info.id,
-                        sender_id: info.sender.id,
-                        sender_name: info.sender.username.clone(),
-                        content: info.content,
-                        created_at: info.created_at,
-                    })
-            } else {
-                None
-            };
+    // 4. 生成消息ID（与广播给客户端的ID一致，后续写入DB时也会使用此ID）
+    let temp_message_id = Uuid::new_v4();
+    let created_at = chrono::Utc::now();
 
-            // 构造广播数据
-            let new_message = WebSocketMessage::NewMessage {
-                message_id: message.id,
-                room_id,
-                sender_id: user_id,
-                sender_name: username.to_string(),
-                content: message.content.clone(),
-                reply_to: message.reply_to,
-                reply_to_message,
-                created_at: message.created_at,
-            };
-
-            let broadcast_json = new_message.to_json().ok();
-            // 克隆一份给发送者直投使用（广播用的 json 会被 move 进闭包）
-            let broadcast_json_for_sender = broadcast_json.clone();
-
-            let message_preview = crate::models::room::MessagePreview {
-                id: message.id,
-                content: message.content.clone(),
-                sender_name: username.to_string(),
-                created_at: message.created_at,
-            };
-            let summary = WebSocketMessage::RoomMessageSummary {
-                room_id,
-                last_message: message_preview,
-                unread_count: 0,
-            };
-            let summary_json = summary.to_json().ok();
-
-            let content_for_mentions = content.clone();
-            let msg_id_for_mentions = message.id;
-            let created_at_for_mentions = message.created_at;
-            let username_for_mentions = username.to_string();
-            let user_id_for_mentions = user_id;
-
-            // 后台异步执行：广播（排除发送者）+ 发送者直投 + 摘要 + 提及通知
-            // 不阻塞 recv_task，确保消息处理流水线畅通
-            let state_for_async = Arc::clone(state);
-            let tx_for_async = tx.clone();
-            tokio::spawn(async move {
-                // 广播消息给房间其他成员（排除发送者），避免发送者自身的 channel
-                // 被回显消息填满导致背压丢消息
-                if let Some(json) = broadcast_json {
-                    state_for_async
-                        .ws_manager()
-                        .broadcast_to_room(room_id, json, Some(user_id))
-                        .await;
-                }
-
-                // 发送者直投：通过 tx channel 可靠送达，不使用 try_send
-                // 确保发送者一定能收到自己的消息回显
-                if let Some(json) = broadcast_json_for_sender {
-                    let _ = tokio::time::timeout(
-                        std::time::Duration::from_secs(5),
-                        tx_for_async.send(json),
-                    )
-                    .await;
-                }
-
-                // 推送消息摘要
-                if let Some(json) = summary_json {
-                    state_for_async
-                        .ws_manager()
-                        .broadcast_room_summary(room_id, json)
-                        .await;
-                }
-
-                // 检测并处理@提及通知
-                handle_mentions(
-                    &content_for_mentions,
-                    msg_id_for_mentions,
-                    room_id,
-                    user_id_for_mentions,
-                    &username_for_mentions,
-                    &created_at_for_mentions,
-                    &*state_for_async,
-                )
-                .await;
-            });
-
-            StructuredLogger::message_sent(
-                message.id,
-                room_id,
-                user_id,
-                username,
-                content.len(),
-                _timer.finish().as_millis(),
-            );
-        }
-        Err(e) => {
-            error!("Failed to save message: {}", e);
-            let error_msg = WebSocketMessage::error("SAVE_FAILED", "Failed to save message");
-            if let Ok(json) = error_msg.to_json() {
-                let _ = tx.send(json).await;
-            }
+    // 5. 将消息加入批量写入队列（异步，不阻塞）
+    let pending_message = PendingMessage {
+        id: temp_message_id,
+        room_id,
+        sender_id: user_id,
+        content: content.clone(),
+        message_type: crate::models::message::MessageType::Text,
+        reply_to,
+        created_at,
+    };
+    if let Err(e) = state.batch_message_service().enqueue(pending_message).await {
+        warn!("Batch queue pressure for user {}: {}", user_id, e);
+        // 队列堆积时通知客户端，但消息仍会尝试写入
+        let warn_msg = WebSocketMessage::error("QUEUE_BACKPRESSURE", "消息队列繁忙，已尽力处理");
+        if let Ok(json) = warn_msg.to_json() {
+            let _ = tx.send(json).await;
         }
     }
+
+    // 6. 获取被引用消息的信息（如果有）- 从数据库查询
+    let reply_to_message = if let Some(reply_to_id) = reply_to {
+        state
+            .message_service()
+            .get_reply_to_info(reply_to_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|info| ReplyToInfo {
+                id: info.id,
+                sender_id: info.sender.id,
+                sender_name: info.sender.username.clone(),
+                content: info.content,
+                created_at: info.created_at,
+            })
+    } else {
+        None
+    };
+
+    // 7. 构造广播数据（使用临时ID，客户端应能处理）
+    let new_message = WebSocketMessage::NewMessage {
+        message_id: temp_message_id,
+        room_id,
+        sender_id: user_id,
+        sender_name: username.to_string(),
+        content: content.clone(),
+        reply_to,
+        reply_to_message,
+        created_at,
+    };
+
+    let broadcast_json = new_message.to_json().ok();
+    let broadcast_json_for_sender = broadcast_json.clone();
+
+    let message_preview = crate::models::room::MessagePreview {
+        id: temp_message_id,
+        content: content.clone(),
+        sender_name: username.to_string(),
+        created_at,
+    };
+    let summary = WebSocketMessage::RoomMessageSummary {
+        room_id,
+        last_message: message_preview,
+        unread_count: 0,
+    };
+    let summary_json = summary.to_json().ok();
+
+    let content_for_mentions = content.clone();
+    let msg_id_for_mentions = temp_message_id;
+    let created_at_for_mentions = created_at;
+    let username_for_mentions = username.to_string();
+    let user_id_for_mentions = user_id;
+
+    // 8. 后台异步执行：广播（排除发送者）+ 发送者直投 + 摘要 + 提及通知
+    // 不阻塞 recv_task，确保消息处理流水线畅通
+    let state_for_async = Arc::clone(state);
+    let tx_for_async = tx.clone();
+    tokio::spawn(async move {
+        // 广播消息给房间其他成员（排除发送者）
+        if let Some(json) = broadcast_json {
+            state_for_async
+                .ws_manager()
+                .broadcast_to_room(room_id, json, Some(user_id))
+                .await;
+        }
+
+        // 发送者直投：通过 tx channel 可靠送达
+        if let Some(json) = broadcast_json_for_sender {
+            let _ =
+                tokio::time::timeout(std::time::Duration::from_secs(5), tx_for_async.send(json))
+                    .await;
+        }
+
+        // 推送消息摘要
+        if let Some(json) = summary_json {
+            state_for_async
+                .ws_manager()
+                .broadcast_room_summary(room_id, json)
+                .await;
+        }
+
+        // 检测并处理@提及通知
+        handle_mentions(
+            &content_for_mentions,
+            msg_id_for_mentions,
+            room_id,
+            user_id_for_mentions,
+            &username_for_mentions,
+            &created_at_for_mentions,
+            &state_for_async,
+        )
+        .await;
+    });
+
+    StructuredLogger::message_sent(
+        temp_message_id,
+        room_id,
+        user_id,
+        username,
+        content.len(),
+        _timer.finish().as_millis(),
+    );
 
     Ok(())
 }

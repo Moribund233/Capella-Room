@@ -4,6 +4,7 @@ pub mod alert_handler;
 pub mod audit_log_consumer;
 pub mod audit_service;
 pub mod auth_service;
+pub mod batch_message_service;
 pub mod file_service;
 pub mod ip_security_service;
 pub mod message_service;
