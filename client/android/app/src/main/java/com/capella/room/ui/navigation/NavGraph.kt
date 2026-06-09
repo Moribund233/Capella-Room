@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import com.capella.room.ui.screen.auth.LoginScreen
 import com.capella.room.ui.screen.chat.ChatScreen
 import com.capella.room.ui.screen.main.MainScreen
+import com.capella.room.ui.screen.profile.SecurityScreen
 import com.capella.room.ui.screen.splash.SplashScreen
 
 @Composable
@@ -55,6 +56,9 @@ fun CapellaNavGraph(navController: NavHostController) {
                 onNavigateToChat = { channelId ->
                     navController.navigate(Screen.Chat.createRoute(channelId))
                 },
+                onNavigateToSecurity = {
+                    navController.navigate(Screen.Security.route)
+                },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Main.route) { inclusive = true }
@@ -68,6 +72,12 @@ fun CapellaNavGraph(navController: NavHostController) {
                 onNavigateBack = {
                     navController.popBackStack()
                 }
+            )
+        }
+
+        composable(Screen.Security.route) {
+            SecurityScreen(
+                onBack = { navController.popBackStack() }
             )
         }
     }

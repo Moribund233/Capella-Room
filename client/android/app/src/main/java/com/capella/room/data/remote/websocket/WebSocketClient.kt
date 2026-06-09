@@ -34,7 +34,10 @@ class WebSocketClient @Inject constructor(
 ) {
     companion object {
         private const val TAG = "WebSocketClient"
-        private const val WS_URL = "ws://10.0.2.2:3000/ws"
+        // 生产环境 WebSocket (Cloudflare Tunnel - 使用 wss)
+        private const val WS_URL = "wss://chat.moribund.top/ws"
+        // 本地开发环境
+        // private const val WS_URL = "ws://10.0.2.2:3000/ws"
         private const val AUTH_TIMEOUT_MS = 30000L
         private const val HEARTBEAT_INTERVAL_MS = 30000L
         private const val HEARTBEAT_TIMEOUT_MS = 90000L

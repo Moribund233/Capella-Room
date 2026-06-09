@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- 生产环境: Cloudflare Tunnel (HTTPS，不需要明文传输) -->
+    <domain-config>
+        <domain includeSubdomains="true">moribund.top</domain>
+        <domain includeSubdomains="true">chat.moribund.top</domain>
+    </domain-config>
+
+    <!-- 本地开发环境 (允许明文 HTTP) -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- Android emulator host -->
         <domain includeSubdomains="false">10.0.2.2</domain>
-        <!-- Local development -->
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- 局域网开发服务器 -->
+        <domain includeSubdomains="false">192.168.1.184</domain>
     </domain-config>
 </network-security-config>

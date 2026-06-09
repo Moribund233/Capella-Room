@@ -14,6 +14,9 @@ interface UserApi {
     @PUT("api/v1/users/me")
     suspend fun updateProfile(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<ApiResponse<UserDto>>
 
+    @GET("api/v1/users/me/stats")
+    suspend fun getMyStats(): Response<ApiResponse<UserStatsDto>>
+
     @PUT("api/v1/users/me/password")
     suspend fun changePassword(@Body body: Map<String, String>): Response<ApiResponse<Unit>>
 

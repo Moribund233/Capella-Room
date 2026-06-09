@@ -208,9 +208,14 @@ fun RoomInvitationBottomSheet(
         CreateInvitationDialog(
             onDismiss = { showCreateDialog = false },
             onCreate = { expiresInHours ->
-                viewModel.createInvitation(roomId, expiresInHours) { newInvitation ->
-                    invitations = invitations + newInvitation
-                }
+                viewModel.createInvitation(
+                    roomId = roomId,
+                    expiresInHours = expiresInHours,
+                    onSuccess = { newInvitation ->
+                        invitations = invitations + newInvitation
+                    },
+                    onError = { /* TODO: show error */ }
+                )
                 showCreateDialog = false
             }
         )
