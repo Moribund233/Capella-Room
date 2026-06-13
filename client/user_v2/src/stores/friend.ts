@@ -39,8 +39,8 @@ export const useFriendStore = defineStore('friend', () => {
     error.value = null
     try {
       const res = await friendApi.getFriends()
-      if (res.success && res.data) {
-        friends.value = res.data.friends
+      if (res.success && Array.isArray(res.data)) {
+        friends.value = res.data
       }
     } catch (err) {
       error.value = '获取好友列表失败'
@@ -59,8 +59,8 @@ export const useFriendStore = defineStore('friend', () => {
     error.value = null
     try {
       const res = await friendApi.getReceivedRequests()
-      if (res.success && res.data) {
-        receivedRequests.value = res.data.requests
+      if (res.success && Array.isArray(res.data)) {
+        receivedRequests.value = res.data
       }
     } catch (err) {
       error.value = '获取好友请求失败'
@@ -79,8 +79,8 @@ export const useFriendStore = defineStore('friend', () => {
     error.value = null
     try {
       const res = await friendApi.getSentRequests()
-      if (res.success && res.data) {
-        sentRequests.value = res.data.requests
+      if (res.success && Array.isArray(res.data)) {
+        sentRequests.value = res.data
       }
     } catch (err) {
       error.value = '获取已发送请求失败'
@@ -98,8 +98,9 @@ export const useFriendStore = defineStore('friend', () => {
     error.value = null
     try {
       const res = await friendApi.sendFriendRequest(data)
-      if (res.success && res.data) {
-        sentRequests.value.unshift(res.data)
+      if (res.success) {
+        // 重新获取已发送请求列表以获取完整数据
+        await fetchSentRequests()
         return true
       }
       error.value = res.message || '发送好友请求失败'
@@ -117,10 +118,10 @@ export const useFriendStore = defineStore('friend', () => {
     try {
       const res = await friendApi.handleFriendRequest(requestId, accept)
       if (res.success) {
-        // 更新列表中该请求的状态
+        // 更新列表中该请求的状态（后端只返回成功消息，需要本地更新）
         const idx = receivedRequests.value.findIndex((r) => r.id === requestId)
-        if (idx !== -1 && res.data) {
-          receivedRequests.value[idx] = res.data
+        if (idx !== -1) {
+          receivedRequests.value[idx]!.status = accept ? 'accepted' : 'rejected'
         }
         // 如果接受，刷新好友列表
         if (accept) {

@@ -4,7 +4,7 @@ import { messageApi } from '@/api/message'
 import { useWebSocketStore } from './websocket'
 import { useAuthStore } from './auth'
 import type { Message, ReplyToMessage } from '@/types/message'
-import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload } from '@/types/websocket'
+import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload, MissedMessagesPayload, MessageReadReceiptPayload } from '@/types/websocket'
 
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Message[]>([])
@@ -181,6 +181,72 @@ export const useMessageStore = defineStore('message', () => {
     if (messages.value.some((m) => m.id === payload.message_id)) return
 
     messages.value.push(toMessage(payload))
+
+    // 自动发送已读回执（非自己发送的消息）
+    if (payload.sender_id !== authStore.user?.id) {
+      sendReadReceipt(payload.message_id)
+    }
+  }
+
+  /** 标记消息为已读（收到对方 MessageReadReceipt 时） */
+  function markMessageAsRead(messageId: string) {
+    const msg = messages.value.find((m) => m.id === messageId)
+    if (msg) {
+      msg.read = true
+    }
+  }
+
+  /** 自动发送已读回执（当前房间可见的最新消息） */
+  function sendReadReceiptForRoom() {
+    const wsStore = useWebSocketStore()
+    const authStore = useAuthStore()
+    if (!wsStore.isConnected || !currentRoomId.value) return
+
+    // 找到最后一条别人发送的消息，发送已读确认
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      const m = messages.value[i]
+      if (m && !m.sending && !m.is_deleted && m.sender.id !== authStore.user?.id) {
+        wsStore.send('MessageRead', { message_id: m.id })
+        break
+      }
+    }
+  }
+
+  /** 发送单条消息的已读回执 */
+  function sendReadReceipt(messageId: string) {
+    const wsStore = useWebSocketStore()
+    if (wsStore.isConnected) {
+      wsStore.send('MessageRead', { message_id: messageId })
+    }
+  }
+
+  /** 处理离线消息推送（来自 WS MissedMessages） */
+  function addMissedMessages(payload: MissedMessagesPayload) {
+    if (payload.room_id !== currentRoomId.value) return
+    if (!payload.messages?.length) return
+
+    const existingIds = new Set(messages.value.map((m) => m.id))
+    const newMsgs = payload.messages
+      .filter((m) => !existingIds.has(m.message_id))
+      .map((m) => ({
+        id: m.message_id,
+        room_id: m.room_id,
+        sender: { id: m.sender_id, username: m.sender_name, avatar_url: null },
+        read: false,
+        content: m.content,
+        message_type: 'text' as const,
+        reply_to: m.reply_to,
+        reply_to_message: m.reply_to_message,
+        is_deleted: false,
+        created_at: m.created_at,
+        edit_count: 0,
+        edited_at: null,
+      }))
+
+    if (newMsgs.length === 0) return
+    messages.value = [...newMsgs, ...messages.value]
+    // 自动发送已读回执
+    sendReadReceiptForRoom()
   }
 
   /** 处理消息编辑（来自 WS） */
@@ -259,10 +325,13 @@ export const useMessageStore = defineStore('message', () => {
     currentRoomId,
     fetchMessages,
     fetchMore,
+    markMessageAsRead,
+    sendReadReceiptForRoom,
     sendMessage,
     confirmMessage,
     failMessage,
     addIncomingMessage,
+    addMissedMessages,
     handleMessageEdited,
     handleMessageDeleted,
     editMessage,

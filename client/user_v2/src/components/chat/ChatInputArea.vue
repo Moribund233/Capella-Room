@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useWebSocketStore } from '@/stores/websocket'
+import { uploadApi } from '@/api/upload'
+import { ElMessage } from 'element-plus'
 import type { ReplyToMessage } from '@/types/message'
+import { Close, UploadFilled, Promotion } from '@element-plus/icons-vue'
 const { t } = useI18n()
 
 const props = defineProps<{
+  roomId: string
   roomName: string
   replyingTo: ReplyToMessage | null
   editingMessage: { id: string; content: string } | null
@@ -16,9 +21,15 @@ const emit = defineEmits<{
   cancelEdit: []
 }>()
 
+const wsStore = useWebSocketStore()
+
 const inputText = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isFocused = ref(false)
+const uploading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+let typingTimer: ReturnType<typeof setTimeout> | null = null
+let isTyping = false
 
 // 编辑模式：填充内容
 watch(
@@ -32,6 +43,26 @@ watch(
   { immediate: true },
 )
 
+function sendTyping() {
+  if (!wsStore.isConnected) return
+  if (!isTyping) {
+    isTyping = true
+    wsStore.send('Typing', { room_id: props.roomId })
+  }
+  if (typingTimer) clearTimeout(typingTimer)
+  typingTimer = setTimeout(() => {
+    sendStopTyping()
+  }, 2000)
+}
+
+function sendStopTyping() {
+  if (!wsStore.isConnected) return
+  isTyping = false
+  if (typingTimer) clearTimeout(typingTimer)
+  typingTimer = null
+  wsStore.send('StopTyping', { room_id: props.roomId })
+}
+
 function autoResize() {
   const ta = textareaRef.value
   if (!ta) return
@@ -41,6 +72,7 @@ function autoResize() {
 
 function handleInput() {
   autoResize()
+  sendTyping()
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -54,6 +86,7 @@ function handleSend() {
   const text = inputText.value.trim()
   if (!text) return
 
+  sendStopTyping()
   emit('send', text)
   inputText.value = ''
   nextTick(() => autoResize())
@@ -70,6 +103,43 @@ function handleCancelEdit() {
 function focusInput() {
   textareaRef.value?.focus()
 }
+
+function handleBlur() {
+  isFocused.value = false
+  sendStopTyping()
+}
+
+function triggerFilePicker() {
+  fileInputRef.value?.click()
+}
+
+async function handleFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+
+  uploading.value = true
+  try {
+    const isImage = file.type.startsWith('image/')
+    const res = isImage
+      ? await uploadApi.uploadImage(file, 'message')
+      : await uploadApi.uploadFile(file, 'message')
+    if (res.success && res.data) {
+      emit('send', res.data.url)
+    } else {
+      ElMessage.error(res.message || t('common.error'))
+    }
+  } catch {
+    ElMessage.error(t('common.error'))
+  } finally {
+    uploading.value = false
+  }
+}
+
+onUnmounted(() => {
+  sendStopTyping()
+})
 </script>
 
 <template>
@@ -83,7 +153,7 @@ function focusInput() {
         <span class="reply-preview__text">{{ replyingTo.content }}</span>
       </div>
       <button class="reply-preview__close" @click.stop="handleCancelReply">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <el-icon :size="16"><Close /></el-icon>
       </button>
     </div>
 
@@ -94,7 +164,7 @@ function focusInput() {
         <span class="reply-preview__label">{{ t('chat.editingMessage') }}</span>
       </div>
       <button class="reply-preview__close" @click.stop="handleCancelEdit">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <el-icon :size="16"><Close /></el-icon>
       </button>
     </div>
 
@@ -104,14 +174,21 @@ function focusInput() {
       :class="{ 'input-wrapper--focused': isFocused }"
     >
       <div class="input-tools">
-        <button :title="t('chat.uploadFile')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+          style="display:none"
+          @change="handleFileSelected"
+        />
+        <button
+          :title="t('chat.uploadFile')"
+          :disabled="uploading"
+          @click="triggerFilePicker"
+        >
+          <el-icon :size="20"><UploadFilled /></el-icon>
         </button>
-        <button :title="t('chat.emoji')">
+        <button :title="t('chat.emoji')" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="10"/>
             <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
@@ -119,6 +196,7 @@ function focusInput() {
             <line x1="15" y1="9" x2="15.01" y2="9"/>
           </svg>
         </button>
+        <span v-if="uploading" class="uploading-spinner" />
       </div>
 
       <textarea
@@ -129,7 +207,7 @@ function focusInput() {
         @input="handleInput"
         @keydown="handleKeydown"
         @focus="isFocused = true"
-        @blur="isFocused = false"
+        @blur="handleBlur"
       />
 
       <div class="input-tools">
@@ -146,9 +224,7 @@ function focusInput() {
           :disabled="!inputText.trim()"
           @click="handleSend"
         >
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-          </svg>
+          <el-icon :size="20"><Promotion /></el-icon>
         </button>
       </div>
     </div>
@@ -320,6 +396,19 @@ function focusInput() {
     opacity: 0.4;
     cursor: not-allowed;
   }
+}
+
+.uploading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 640px) {

@@ -183,9 +183,9 @@ export const useUIStore = defineStore('ui', () => {
   function saveToLocalStorage(): void {
     try {
       if (localConfig.value) {
-        localStorage.setItem('ui_config_override', JSON.stringify(localConfig.value))
+        localStorage.setItem('debug_ui_config_override', JSON.stringify(localConfig.value))
       } else {
-        localStorage.removeItem('ui_config_override')
+        localStorage.removeItem('debug_ui_config_override')
       }
     } catch (error) {
       console.error('Failed to save UI config to localStorage:', error)
@@ -197,7 +197,7 @@ export const useUIStore = defineStore('ui', () => {
    */
   function loadFromLocalStorage(): void {
     try {
-      const stored = localStorage.getItem('ui_config_override')
+      const stored = localStorage.getItem('debug_ui_config_override')
       if (stored) {
         localConfig.value = JSON.parse(stored) as Partial<UIConfig>
       }

@@ -232,6 +232,9 @@ ws://localhost:8080/ws
 | PUT | `/api/v1/messages/:message_id` | 是 | 编辑消息 |
 | DELETE | `/api/v1/messages/:message_id` | 是 | 删除消息 |
 | GET | `/api/v1/messages/:message_id/history` | 是 | 获取消息编辑历史 |
+| POST | `/api/v1/messages/:message_id/reactions` | 是 | 添加表情反应 |
+| DELETE | `/api/v1/messages/:message_id/reactions` | 是 | 移除表情反应 |
+| GET | `/api/v1/messages/:message_id/reactions` | 是 | 获取消息反应列表 |
 
 > **注意**: 发送消息通过 WebSocket 实时通信
 
@@ -651,6 +654,8 @@ ws://localhost:3000/ws
 | | `NewMessage` | S→C | 新消息通知 |
 | | `EditMessage` / `MessageEdited` | 双向 | 编辑消息 |
 | | `DeleteMessage` / `MessageDeleted` | 双向 | 删除消息 |
+| | `AddReaction` / `ReactionAdded` | 双向 | 添加表情反应 |
+| | `RemoveReaction` / `ReactionRemoved` | 双向 | 移除表情反应 |
 | | `Typing` / `StopTyping` | C→S | 输入状态 |
 | **通知系统** | `PrivateMessage` | S→C | 私信通知 |
 | | `Mentioned` | S→C | @提及通知 |

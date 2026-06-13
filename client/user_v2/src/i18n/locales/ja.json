@@ -108,10 +108,12 @@
     "noMembers": "メンバーがいません",
     "selectRoom": "チャットを開始するルームを選択してください",
     "searchMessages": "メッセージを検索",
-    "threads": "スレッド",
     "showMemberList": "メンバー一覧を表示",
     "hideMemberList": "メンバー一覧を非表示",
+    "joinSuccess": "ルームに参加しました",
+    "joinFailed": "ルームへの参加に失敗しました",
     "noDescription": "説明なし",
+    "jumpToMessage": "メッセージにジャンプ",
     "send": "送信",
     "uploadFile": "ファイルをアップロード",
     "emoji": "絵文字",
@@ -124,6 +126,10 @@
     "messageDeleted": "このメッセージは削除されました",
     "loadMore": "さらにメッセージを読み込む",
     "newMessages": "件の新着メッセージ",
+    "isTyping": "が入力中…",
+    "areTyping": "が入力中…",
+    "read": "既読",
+    "sent": "送信済み",
     "today": "今日",
     "yesterday": "昨日",
     "confirmDelete": "このメッセージを削除してもよろしいですか？",
@@ -286,19 +292,30 @@
       }
     }
   },
-  "thread": {
-    "title": "スレッド",
-    "backToChannel": "#{channel}に戻る",
-    "inChannel": "#{channel}で",
-    "replyPlaceholder": "このスレッドに返信...",
-    "details": {
-      "title": "スレッド詳細",
-      "startedBy": "開始者",
-      "participants": "参加者",
-      "replies": "返信",
-      "lastReply": "最後の返信"
-    },
-    "op": "投稿者"
+  "friends": {
+    "title": "友達",
+    "friends": "友達",
+    "received": "受信したリクエスト",
+    "sent": "送信済み",
+    "addFriend": "友達を追加",
+    "sendRequest": "リクエストを送信",
+    "sendMessage": "メッセージを送る",
+    "viewProfile": "プロフィール",
+    "deleteFriend": "友達を削除",
+    "deleteConfirm": "この友達を削除してもよろしいですか？",
+    "cancelRequest": "リクエストをキャンセル",
+    "accept": "承認",
+    "reject": "拒否",
+    "pending": "承認待ち",
+    "waiting": "あなたの返答待ち",
+    "accepted": "承認済み",
+    "rejected": "拒否済み",
+    "noFriends": "友達がいません",
+    "noReceived": "リクエストはありません",
+    "noSent": "送信済みリクエストはありません",
+    "searchPlaceholder": "ユーザー名で検索...",
+    "searchNoResult": "ユーザーが見つかりません",
+    "requestSent": "友達リクエストを送信しました！"
   },
   "discover": {
     "title": "発見",
@@ -320,5 +337,10 @@
     "themeDark": "ダークテーマ",
     "themeLight": "ライトテーマ",
     "personalization": "パーソナライゼーション"
+  },
+  "connection": {
+    "disconnected": "接続が切れました",
+    "connecting": "接続中…",
+    "reconnecting": "再接続中…"
   }
 }

@@ -1,14 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import {
-  Search,
-  ChatDotSquare,
+  Search, Setting, UserFilled,
 } from '@element-plus/icons-vue'
 import type { Room, RoomMember } from '@/types/room'
 
 const { t } = useI18n()
-const router = useRouter()
 
 const props = defineProps<{
   room: Room
@@ -19,6 +17,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleSidebar: []
   toggleMemberPanel: []
+  toggleSearch: []
+  toggleSettings: []
 }>()
 
 function getInitial(name: string) {
@@ -30,9 +30,10 @@ function getColor(index: number) {
   return colors[index % colors.length]
 }
 
-function goToThread() {
-  router.push('/thread')
-}
+const onlineCount = computed(() =>
+  props.members.filter((m) => m.user_status === 'online' || m.user_status === 'away').length,
+)
+
 </script>
 
 <template>
@@ -65,26 +66,27 @@ function goToThread() {
           {{ getInitial(member.username) }}
         </div>
       </div>
-      <span class="member-count">{{ members.length }} {{ t('chat.online') }}</span>
+      <span class="member-count">
+        <span class="status-dot status-dot--online" />
+        {{ onlineCount }}/{{ members.length }}
+      </span>
 
       <el-tooltip :content="t('chat.searchMessages')" placement="bottom">
-        <button class="header-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <button class="header-btn" @click="emit('toggleSearch')">
+          <el-icon :size="20"><Search /></el-icon>
         </button>
       </el-tooltip>
 
-      <el-tooltip :content="t('chat.threads')" placement="bottom">
-        <button class="header-btn" @click="goToThread">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M17 12a5 5 0 01-5 5M7 12a5 5 0 015-5"/>
-            <path d="M12 17a5 5 0 005-5M12 7a5 5 0 00-5 5"/>
-          </svg>
-        </button>
-      </el-tooltip>
 
       <el-tooltip :content="t('chat.members')" placement="bottom">
         <button class="header-btn" @click="emit('toggleMemberPanel')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          <el-icon :size="20"><UserFilled /></el-icon>
+        </button>
+      </el-tooltip>
+
+      <el-tooltip content="Room settings" placement="bottom">
+        <button class="header-btn" @click="emit('toggleSettings')">
+          <el-icon :size="20"><Setting /></el-icon>
         </button>
       </el-tooltip>
     </div>
@@ -180,9 +182,23 @@ function goToThread() {
 }
 
 .member-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &--online {
+    background: var(--accent-green);
+  }
 }
 
 .header-btn {
@@ -200,9 +216,8 @@ function goToThread() {
     background: var(--message-hover);
   }
 
-  svg {
-    width: 20px;
-    height: 20px;
+  svg, .el-icon {
+    font-size: 20px;
   }
 }
 

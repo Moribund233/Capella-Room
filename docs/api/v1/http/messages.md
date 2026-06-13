@@ -13,6 +13,9 @@
 | PUT | `/api/v1/messages/:message_id` | 编辑消息 |
 | DELETE | `/api/v1/messages/:message_id` | 删除消息 |
 | GET | `/api/v1/messages/:message_id/history` | 获取消息编辑历史 |
+| POST | `/api/v1/messages/:message_id/reactions` | 添加表情反应 |
+| DELETE | `/api/v1/messages/:message_id/reactions?emoji=xxx` | 移除表情反应 |
+| GET | `/api/v1/messages/:message_id/reactions` | 获取消息的反应列表 |
 
 ---
 
@@ -64,7 +67,8 @@ Authorization: Bearer {access_token}
         "is_deleted": false,
         "created_at": "2024-01-15T08:30:00Z",
         "edit_count": 0,
-        "edited_at": null
+        "edited_at": null,
+        "reactions": null
       },
       {
         "id": "660e8400-e29b-41d4-a716-446655440003",
@@ -90,7 +94,14 @@ Authorization: Bearer {access_token}
         "is_deleted": false,
         "created_at": "2024-01-15T08:31:00Z",
         "edit_count": 1,
-        "edited_at": "2024-01-15T08:35:00Z"
+        "edited_at": "2024-01-15T08:35:00Z",
+        "reactions": [
+          {
+            "emoji": "👍",
+            "count": 2,
+            "users": ["550e8400-...", "660e8400-..."]
+          }
+        ]
       }
     ],
     "total": 2,
@@ -127,6 +138,7 @@ Authorization: Bearer {access_token}
 | `created_at` | string (ISO 8601) | 发送时间 |
 | `edit_count` | number | 编辑次数 |
 | `edited_at` | string \| null | 最后编辑时间 |
+| `reactions` | array \| null | 表情反应汇总（`{emoji, count, users}`） |
 
 #### 被回复消息对象 (reply_to_message)
 
@@ -199,7 +211,8 @@ Authorization: Bearer {access_token}
     "is_deleted": false,
     "created_at": "2024-01-15T08:30:00Z",
     "edit_count": 0,
-    "edited_at": null
+    "edited_at": null,
+    "reactions": null
   }
 ]
 ```
@@ -692,6 +705,9 @@ class MessageLoader {
 | **编辑消息** | ✅ `PUT /messages/{id}` | ✅ `EditMessage` |
 | **删除消息** | ✅ `DELETE /messages/{id}` | ✅ `DeleteMessage` |
 | **获取编辑历史** | ✅ `GET /messages/{id}/history` | ❌ 不支持 |
+| **添加反应** | ✅ `POST /messages/{id}/reactions` | ✅ `AddReaction` |
+| **移除反应** | ✅ `DELETE /messages/{id}/reactions` | ✅ `RemoveReaction` |
+| **获取反应** | ✅ `GET /messages/{id}/reactions` | ❌ 不支持 |
 
 ### 推荐用法
 
@@ -700,8 +716,9 @@ class MessageLoader {
 3. **加载更多**: 使用 HTTP API 分页加载历史消息
 4. **搜索**: 使用 HTTP API 搜索消息
 5. **管理操作**: 编辑、删除可通过 HTTP 或 WebSocket
+6. **表情反应**: 可通过 HTTP 或 WebSocket 添加/移除
 
 ---
 
-*文档版本: 1.0.0*  
-*最后更新: 2026-04-26*
+*文档版本: 1.1.0*  
+*最后更新: 2026-06-13*

@@ -15,11 +15,17 @@ const authStore = useAuthStore()
 
 const { messages, loading, loadingMore, hasMore, error } = storeToRefs(messageStore)
 
+const props = withDefaults(defineProps<{
+  typingUsers?: Array<{ id: string; username: string }>
+}>(), {
+  typingUsers: () => [],
+})
+
 const emit = defineEmits<{
   reply: [message: Message]
   edit: [message: Message]
   delete: [id: string]
-  jumpToThread: [messageId: string]
+  jumpToThread: [messageId: string | undefined]
 }>()
 
 const listRef = ref<HTMLElement | null>(null)
@@ -104,7 +110,7 @@ const messageGroups = computed(() => {
         showDate: true,
       })
     } else {
-      groups[groups.length - 1].messages.push(msg)
+      groups[groups.length - 1]!.messages.push(msg)
     }
   }
 
@@ -126,6 +132,24 @@ function formatDateSeparator(dateStr: string): string {
   if (diffDays === 1) return t('chat.yesterday')
   return date.toLocaleDateString()
 }
+
+const currentHighlight = ref<string | null>(null)
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+function scrollToMessage(msgId: string) {
+  if (!listRef.value) return
+  const el = listRef.value.querySelector(`[data-message-id="${msgId}"]`) as HTMLElement | null
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+
+  if (highlightTimer) clearTimeout(highlightTimer)
+  currentHighlight.value = msgId
+  highlightTimer = setTimeout(() => {
+    currentHighlight.value = null
+  }, 2000)
+}
+
+defineExpose({ scrollToMessage })
 </script>
 
 <template>
@@ -196,12 +220,24 @@ function formatDateSeparator(dateStr: string): string {
         :key="msg.id"
         :message="msg"
         :is-own="isOwnMessage(msg)"
+        :highlight="currentHighlight === msg.id"
         @reply="emit('reply', $event)"
         @edit="emit('edit', $event)"
         @delete="emit('delete', $event)"
         @jump-to-thread="emit('jumpToThread', $event)"
       />
     </template>
+
+    <!-- 正在输入指示器 -->
+    <div v-if="typingUsers.length > 0" class="typing-indicator">
+      <span class="typing-dots">
+        <span class="dot" /><span class="dot" /><span class="dot" />
+      </span>
+      <span class="typing-text">
+        {{ typingUsers.map(u => u.username).join(', ') }}
+        {{ typingUsers.length === 1 ? t('chat.isTyping') : t('chat.areTyping') }}
+      </span>
+    </div>
 
     <!-- 新消息提示 -->
     <div
@@ -304,6 +340,52 @@ function formatDateSeparator(dateStr: string): string {
     position: relative;
     top: -16px;
   }
+}
+
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-text {
+  font-style: italic;
 }
 
 .new-message-bar {

@@ -108,10 +108,12 @@
     "noMembers": "暂无成员",
     "selectRoom": "选择一个房间开始聊天",
     "searchMessages": "搜索消息",
-    "threads": "线程",
     "showMemberList": "显示成员列表",
     "hideMemberList": "隐藏成员列表",
+    "joinSuccess": "已加入房间",
+    "joinFailed": "加入房间失败",
     "noDescription": "暂无描述",
+    "jumpToMessage": "跳转到消息",
     "send": "发送",
     "uploadFile": "上传文件",
     "emoji": "表情",
@@ -124,6 +126,10 @@
     "messageDeleted": "此消息已被删除",
     "loadMore": "加载更多消息",
     "newMessages": "条新消息",
+    "isTyping": "正在输入…",
+    "areTyping": "正在输入…",
+    "read": "已读",
+    "sent": "已发送",
     "today": "今天",
     "yesterday": "昨天",
     "confirmDelete": "确定要删除此消息吗？",
@@ -285,19 +291,30 @@
       }
     }
   },
-  "thread": {
-    "title": "线程",
-    "backToChannel": "返回 #{channel}",
-    "inChannel": "在 #{channel}",
-    "replyPlaceholder": "回复此线程...",
-    "details": {
-      "title": "线程详情",
-      "startedBy": "发起者",
-      "participants": "参与者",
-      "replies": "回复",
-      "lastReply": "最后回复"
-    },
-    "op": "楼主"
+  "friends": {
+    "title": "好友",
+    "friends": "好友",
+    "received": "收到的请求",
+    "sent": "已发送",
+    "addFriend": "添加好友",
+    "sendRequest": "发送请求",
+    "sendMessage": "发送私信",
+    "viewProfile": "查看资料",
+    "deleteFriend": "删除好友",
+    "deleteConfirm": "确定要删除该好友吗？",
+    "cancelRequest": "取消请求",
+    "accept": "接受",
+    "reject": "拒绝",
+    "pending": "等待对方接受",
+    "waiting": "等待你处理",
+    "accepted": "已接受",
+    "rejected": "已拒绝",
+    "noFriends": "暂无好友",
+    "noReceived": "暂无好友请求",
+    "noSent": "暂无已发送的请求",
+    "searchPlaceholder": "搜索用户名...",
+    "searchNoResult": "未找到用户",
+    "requestSent": "好友请求已发送！"
   },
   "discover": {
     "title": "发现",
@@ -319,6 +336,11 @@
     "themeDark": "深色主题",
     "themeLight": "浅色主题",
     "personalization": "个性化"
+  },
+  "connection": {
+    "disconnected": "连接已断开",
+    "connecting": "正在连接…",
+    "reconnecting": "正在重连…"
   },
   "notFound": {
     "title": "页面未找到",

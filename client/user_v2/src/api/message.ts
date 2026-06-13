@@ -29,7 +29,7 @@ export const messageApi = {
   },
 
   /** 搜索消息 */
-  searchMessages(params: SearchMessagesParams): Promise<Message[]> {
+  searchMessages(params: SearchMessagesParams): Promise<ApiResponse<Message[]>> {
     return httpClient.get('/messages/search', { params })
   },
 

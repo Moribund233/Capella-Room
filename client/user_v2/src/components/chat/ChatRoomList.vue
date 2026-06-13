@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useRoomStore } from '@/stores/room'
+import { useDirectRoomStore } from '@/stores/directRoom'
 import { useAuthStore } from '@/stores/auth'
 import { useMessageStore } from '@/stores/message'
+import { useWebSocketStore } from '@/stores/websocket'
 import type { Room } from '@/types/room'
+import type { DirectRoom } from '@/types/room'
 import {
   Search,
   ArrowDown,
@@ -15,10 +18,13 @@ import {
 const { t } = useI18n()
 const router = useRouter()
 const roomStore = useRoomStore()
+const directRoomStore = useDirectRoomStore()
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
+const wsStore = useWebSocketStore()
 
 const { rooms, currentRoom } = storeToRefs(roomStore)
+const { directRooms } = storeToRefs(directRoomStore)
 const user = computed(() => authStore.user)
 const searchQuery = ref('')
 
@@ -28,15 +34,61 @@ const filteredRooms = computed(() => {
   return rooms.value.filter((r) => r.name.toLowerCase().includes(q))
 })
 
+const filteredDirectRooms = computed(() => {
+  if (!searchQuery.value.trim()) return directRooms.value
+  const q = searchQuery.value.toLowerCase()
+  return directRooms.value.filter((r) =>
+    r.target_user.username.toLowerCase().includes(q),
+  )
+})
+
 function selectRoom(room: Room) {
   if (currentRoom.value?.id === room.id) return
   roomStore.currentRoom = room
+  directRoomStore.setCurrentDirectRoom(null)
   messageStore.switchRoom(room.id)
-  messageStore.fetchMessages(room.id)
+  messageStore.fetchMessages(room.id).then(() => {
+    messageStore.sendReadReceiptForRoom()
+  })
   roomStore.fetchMembers(room.id)
   roomStore.clearUnreadCount(room.id)
+  if (wsStore.isConnected) {
+    wsStore.send('JoinRoom', { room_id: room.id })
+  }
   closeMobile()
 }
+
+function selectDirectRoom(room: DirectRoom) {
+  if (currentRoom.value?.id === room.id) return
+  const roomObj: Room = {
+    id: room.id,
+    name: room.target_user.username,
+    description: null,
+    owner: { id: '', username: '', avatar_url: null },
+    is_private: true,
+    max_members: 2,
+    member_count: 2,
+    created_at: room.created_at,
+    updated_at: room.created_at,
+    unread_count: room.unread_count,
+    last_message: room.last_message,
+  }
+  roomStore.currentRoom = roomObj
+  directRoomStore.setCurrentDirectRoom(room)
+  messageStore.switchRoom(room.id)
+  messageStore.fetchMessages(room.id).then(() => {
+    messageStore.sendReadReceiptForRoom()
+  })
+  roomStore.clearUnreadCount(room.id)
+  if (wsStore.isConnected) {
+    wsStore.send('JoinRoom', { room_id: room.id })
+  }
+  closeMobile()
+}
+
+onMounted(() => {
+  directRoomStore.fetchDirectRooms()
+})
 
 function goToProfile() {
   router.push('/profile')
@@ -96,6 +148,28 @@ function closeMobile() {
       >
         <span class="channel-hash">#</span>
         <span class="channel-name">{{ room.name }}</span>
+        <span
+          v-if="room.unread_count && room.unread_count > 0 && currentRoom?.id !== room.id"
+          class="channel-badge"
+        >
+          {{ room.unread_count > 99 ? '99+' : room.unread_count }}
+        </span>
+      </div>
+
+      <!-- 私聊分组 -->
+      <div v-if="filteredDirectRooms.length > 0" class="channel-category">
+        <span>{{ t('chat.directMessages') || 'Direct Messages' }}</span>
+      </div>
+
+      <div
+        v-for="room in filteredDirectRooms"
+        :key="room.id"
+        class="channel"
+        :class="{ active: currentRoom?.id === room.id }"
+        @click="selectDirectRoom(room)"
+      >
+        <span class="channel-dm">@</span>
+        <span class="channel-name">{{ room.target_user.username }}</span>
         <span
           v-if="room.unread_count && room.unread_count > 0 && currentRoom?.id !== room.id"
           class="channel-badge"
@@ -254,6 +328,15 @@ function closeMobile() {
   color: var(--muted);
   opacity: 0.6;
   font-weight: 300;
+}
+
+.channel-dm {
+  color: var(--accent-pink, var(--accent));
+  opacity: 0.7;
+  font-weight: 400;
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
 }
 
 .channel-name {

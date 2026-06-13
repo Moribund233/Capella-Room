@@ -4,6 +4,8 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::models::message_reaction::ReactionSummary;
+
 /// 消息数据库模型
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Message {
@@ -101,6 +103,8 @@ pub struct MessageResponse {
     pub created_at: DateTime<Utc>,
     pub edit_count: i32,
     pub edited_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reactions: Option<Vec<ReactionSummary>>,
 }
 
 /// 发送者信息
@@ -126,6 +130,7 @@ impl Message {
             created_at: self.created_at,
             edit_count: self.edit_count,
             edited_at: self.edited_at,
+            reactions: None,
         }
     }
 
@@ -147,6 +152,29 @@ impl Message {
             created_at: self.created_at,
             edit_count: self.edit_count,
             edited_at: self.edited_at,
+            reactions: None,
+        }
+    }
+
+    /// 转换为响应DTO，包含反应信息
+    pub fn to_response_with_reactions(
+        &self,
+        sender: SenderInfo,
+        reactions: Option<Vec<ReactionSummary>>,
+    ) -> MessageResponse {
+        MessageResponse {
+            id: self.id,
+            room_id: self.room_id,
+            sender,
+            content: self.content.clone(),
+            message_type: self.message_type.clone(),
+            reply_to: self.reply_to,
+            reply_to_message: None,
+            is_deleted: self.is_deleted,
+            created_at: self.created_at,
+            edit_count: self.edit_count,
+            edited_at: self.edited_at,
+            reactions,
         }
     }
 

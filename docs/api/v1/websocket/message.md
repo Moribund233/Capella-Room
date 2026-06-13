@@ -27,6 +27,8 @@
 | `MessageRead` | 消息已读确认 | ✅ | - |
 | `EditMessage` | 编辑消息 | ✅ | - |
 | `DeleteMessage` | 删除消息 | ✅ | - |
+| `AddReaction` | 添加表情反应 | ✅ | ✅ |
+| `RemoveReaction` | 移除表情反应 | ✅ | - |
 | `GetMissedMessages` | 获取离线消息 | ✅ | ✅ |
 
 ### 服务端发送的消息
@@ -39,6 +41,8 @@
 | `MessageReadReceipt` | 消息已读回执 |
 | `MessageEdited` | 消息已编辑通知 |
 | `MessageDeleted` | 消息已删除通知 |
+| `ReactionAdded` | 表情反应已添加（广播） |
+| `ReactionRemoved` | 表情反应已移除（广播） |
 | `MissedMessages` | 离线消息列表 |
 | `Mentioned` | @提及通知 |
 | `Error` | 错误响应 |
@@ -375,6 +379,99 @@
 
 ---
 
+## 表情反应
+
+消息表情反应支持通过 WebSocket 实时添加/移除，并广播给房间内所有成员。
+
+### 添加反应
+
+#### 请求
+
+```json
+{
+  "type": "AddReaction",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "emoji": "👍"
+  }
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 是 | 固定为 "AddReaction" |
+| payload.message_id | string (UUID) | 是 | 消息 ID |
+| payload.emoji | string | 是 | 表情符号（如 👍 ❤️ 😂） |
+
+#### 广播通知
+
+成功添加后，服务端向房间内所有成员广播：
+
+```json
+{
+  "type": "ReactionAdded",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "44777268-d040-4ef5-81de-9aad6ea3ead3",
+    "emoji": "👍"
+  }
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| message_id | string (UUID) | 消息 ID |
+| room_id | string (UUID) | 房间 ID |
+| user_id | string (UUID) | 添加该反应的用户 ID |
+| emoji | string | 表情符号 |
+
+---
+
+### 移除反应
+
+#### 请求
+
+```json
+{
+  "type": "RemoveReaction",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "emoji": "👍"
+  }
+}
+```
+
+#### 广播通知
+
+成功移除后，服务端向房间内所有成员广播：
+
+```json
+{
+  "type": "ReactionRemoved",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "44777268-d040-4ef5-81de-9aad6ea3ead3",
+    "emoji": "👍"
+  }
+}
+```
+
+### 注意事项
+
+1. 同一用户对同一消息的同一表情只允许一个反应
+2. 添加反应需要用户在房间中
+3. 反应会实时广播给房间内所有成员，客户端无需重新加载消息即可看到更新
+4. 消息列表接口（`get_room_messages` / `search_messages`）会自动包含 `reactions` 字段
+5. 反应完整列表可通过 `GET /api/v1/messages/:id/reactions` 查询
+
+---
+
 ## 完整示例
 
 ### JavaScript 示例
@@ -442,6 +539,28 @@ class MessageManager {
     }));
   }
 
+  // 添加表情反应
+  addReaction(messageId, emoji) {
+    this.ws.send(JSON.stringify({
+      type: 'AddReaction',
+      payload: {
+        message_id: messageId,
+        emoji: emoji
+      }
+    }));
+  }
+
+  // 移除表情反应
+  removeReaction(messageId, emoji) {
+    this.ws.send(JSON.stringify({
+      type: 'RemoveReaction',
+      payload: {
+        message_id: messageId,
+        emoji: emoji
+      }
+    }));
+  }
+
   // 获取离线消息
   getMissedMessages(roomId, lastMessageId = null) {
     this.ws.send(JSON.stringify({
@@ -470,6 +589,12 @@ class MessageManager {
         break;
       case 'MessageDeleted':
         this.handleMessageDeleted(msg.payload);
+        break;
+      case 'ReactionAdded':
+        this.handleReactionAdded(msg.payload);
+        break;
+      case 'ReactionRemoved':
+        this.handleReactionRemoved(msg.payload);
         break;
       case 'Mentioned':
         this.handleMentioned(msg.payload);
@@ -505,6 +630,29 @@ class MessageManager {
     if (users.length > 0) {
       console.log(`${users.join(', ')} 正在输入...`);
     }
+  }
+
+  handleReactionAdded(payload) {
+    const msg = this.messages.get(payload.message_id);
+    if (msg) {
+      console.log(`${payload.user_id} 添加了 ${payload.emoji}`);
+      // 更新本地消息的反应状态
+      this.updateMessageReactions(payload.message_id);
+    }
+  }
+
+  handleReactionRemoved(payload) {
+    const msg = this.messages.get(payload.message_id);
+    if (msg) {
+      console.log(`${payload.user_id} 移除了 ${payload.emoji}`);
+      this.updateMessageReactions(payload.message_id);
+    }
+  }
+
+  updateMessageReactions(messageId) {
+    // 客户端可以选择重新拉取消息反应，或本地乐观更新
+    // 建议：通过 WebSocket 广播的事件知道需要更新哪些消息，
+    // 然后调用 GET /api/v1/messages/{id}/reactions 刷新
   }
 
   handleMentioned(payload) {

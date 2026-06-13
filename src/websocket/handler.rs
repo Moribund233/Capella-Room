@@ -404,13 +404,15 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                             continue;
                         }
 
-                        // ChatMessage/EditMessage/DeleteMessage 包含 DB 写入操作，
+                        // ChatMessage/EditMessage/DeleteMessage/AddReaction/RemoveReaction 包含 DB 写入操作，
                         // 耗时较长。spawn 到后台避免阻塞 recv_task 读取下一条消息
                         if matches!(
                             ws_msg,
                             WebSocketMessage::ChatMessage { .. }
                                 | WebSocketMessage::EditMessage { .. }
                                 | WebSocketMessage::DeleteMessage { .. }
+                                | WebSocketMessage::AddReaction { .. }
+                                | WebSocketMessage::RemoveReaction { .. }
                         ) {
                             let state = state_clone.clone();
                             let tx = tx_clone.clone();
@@ -743,6 +745,21 @@ async fn handle_message(
         // 删除消息
         WebSocketMessage::DeleteMessage { message_id } => {
             handle_delete_message(message_id, user_id, state, tx).await?;
+        }
+
+        // ========== 消息反应 ==========
+        WebSocketMessage::AddReaction {
+            message_id,
+            emoji,
+        } => {
+            handle_add_reaction(message_id, user_id, username, &emoji, state, tx).await?;
+        }
+
+        WebSocketMessage::RemoveReaction {
+            message_id,
+            emoji,
+        } => {
+            handle_remove_reaction(message_id, user_id, &emoji, state, tx).await?;
         }
 
         // 获取离线消息
@@ -1845,6 +1862,147 @@ async fn handle_get_offline_notifications(
             warn!("Failed to get offline notifications: {}", e);
             let error_msg =
                 WebSocketMessage::error("FETCH_FAILED", "Failed to fetch notifications");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ========== 消息反应处理 ==========
+
+/// 处理添加表情反应
+async fn handle_add_reaction(
+    message_id: Uuid,
+    user_id: Uuid,
+    _username: &str,
+    emoji: &str,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("User {} adding reaction {} to message {}", user_id, emoji, message_id);
+
+    let orig_msg = match state.message_service().get_message_by_id(message_id).await {
+        Ok(Some(msg)) => msg,
+        Ok(None) => {
+            let error_msg = WebSocketMessage::error("NOT_FOUND", "Message not found");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("Failed to get message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to get message");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+    };
+    let room_id = orig_msg.room_id;
+
+    if !state.ws_manager().is_user_in_room(room_id, user_id) {
+        let error_msg = WebSocketMessage::error("NOT_IN_ROOM", "You are not in this room");
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
+
+    match state
+        .reaction_service()
+        .add_reaction(message_id, user_id, emoji)
+        .await
+    {
+        Ok(_) => {
+            let added_msg = WebSocketMessage::ReactionAdded {
+                message_id,
+                room_id,
+                user_id,
+                emoji: emoji.to_string(),
+            };
+            if let Ok(json) = added_msg.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_to_room_all(room_id, json)
+                    .await;
+            }
+            info!(
+                "Reaction {} added by user {} to message {} in room {}",
+                emoji, user_id, message_id, room_id
+            );
+        }
+        Err(e) => {
+            warn!("Failed to add reaction: {}", e);
+            let error_msg = WebSocketMessage::error("REACTION_FAILED", &e.to_string());
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理移除表情反应
+async fn handle_remove_reaction(
+    message_id: Uuid,
+    user_id: Uuid,
+    emoji: &str,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("User {} removing reaction {} from message {}", user_id, emoji, message_id);
+
+    let orig_msg = match state.message_service().get_message_by_id(message_id).await {
+        Ok(Some(msg)) => msg,
+        Ok(None) => {
+            let error_msg = WebSocketMessage::error("NOT_FOUND", "Message not found");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("Failed to get message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to get message");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+    };
+    let room_id = orig_msg.room_id;
+
+    match state
+        .reaction_service()
+        .remove_reaction(message_id, user_id, emoji)
+        .await
+    {
+        Ok(_) => {
+            let removed_msg = WebSocketMessage::ReactionRemoved {
+                message_id,
+                room_id,
+                user_id,
+                emoji: emoji.to_string(),
+            };
+            if let Ok(json) = removed_msg.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_to_room_all(room_id, json)
+                    .await;
+            }
+            info!(
+                "Reaction {} removed by user {} from message {} in room {}",
+                emoji, user_id, message_id, room_id
+            );
+        }
+        Err(e) => {
+            warn!("Failed to remove reaction: {}", e);
+            let error_msg = WebSocketMessage::error("REACTION_FAILED", &e.to_string());
             if let Ok(json) = error_msg.to_json() {
                 let _ = tx.send(json).await;
             }

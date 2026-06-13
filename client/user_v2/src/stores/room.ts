@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { roomApi } from '@/api/room'
 import { useAuthStore } from '@/stores/auth'
-import type { Room, RoomMember, CreateRoomData } from '@/types/room'
+import type { Room, RoomMember, CreateRoomData, UpdateRoomData } from '@/types/room'
 
 export const useRoomStore = defineStore('room', () => {
   // 状态
@@ -52,13 +52,12 @@ export const useRoomStore = defineStore('room', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await roomApi.getMyRooms()
-      console.log('[RoomStore] fetchMyRooms: 获取到房间数据', data)
-      // 确保数据是数组
-      if (Array.isArray(data)) {
-        rooms.value = data
+      const res = await roomApi.getMyRooms()
+      console.log('[RoomStore] fetchMyRooms: 获取到房间数据', res)
+      if (res.success && Array.isArray(res.data)) {
+        rooms.value = res.data
       } else {
-        console.error('[RoomStore] fetchMyRooms: 返回数据不是数组', data)
+        console.error('[RoomStore] fetchMyRooms: 返回数据格式异常', res)
         rooms.value = []
       }
     } catch (err) {
@@ -122,6 +121,85 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
+  // 更新房间信息
+  async function updateRoom(roomId: string, data: UpdateRoomData): Promise<boolean> {
+    error.value = null
+    try {
+      const res = await roomApi.updateRoom(roomId, data)
+      if (res.success) {
+        const room = rooms.value.find((r) => r.id === roomId)
+        if (room && res.data) {
+          Object.assign(room, res.data)
+        }
+        if (currentRoom.value?.id === roomId && res.data) {
+          Object.assign(currentRoom.value, res.data)
+        }
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = '更新房间失败'
+      console.error('[RoomStore] updateRoom error:', err)
+      return false
+    }
+  }
+
+  // 删除房间
+  async function deleteRoom(roomId: string): Promise<boolean> {
+    error.value = null
+    try {
+      const res = await roomApi.deleteRoom(roomId)
+      if (res.success) {
+        rooms.value = rooms.value.filter((r) => r.id !== roomId)
+        if (currentRoom.value?.id === roomId) {
+          currentRoom.value = null
+          members.value = []
+        }
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = '删除房间失败'
+      console.error('[RoomStore] deleteRoom error:', err)
+      return false
+    }
+  }
+
+  // 踢出成员
+  async function kickMember(roomId: string, userId: string): Promise<boolean> {
+    error.value = null
+    try {
+      const res = await roomApi.kickMember(roomId, userId)
+      if (res.success) {
+        members.value = members.value.filter((m) => m.user_id !== userId)
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = '踢出成员失败'
+      console.error('[RoomStore] kickMember error:', err)
+      return false
+    }
+  }
+
+  // 设置成员角色
+  async function setMemberRole(roomId: string, userId: string, role: 'admin' | 'member'): Promise<boolean> {
+    error.value = null
+    try {
+      const res = await roomApi.setMemberRole(roomId, userId, role)
+      if (res.success) {
+        const member = members.value.find((m) => m.user_id === userId)
+        if (member) member.role = role
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = '设置成员角色失败'
+      console.error('[RoomStore] setMemberRole error:', err)
+      return false
+    }
+  }
+
   // 离开房间
   async function leaveRoom(roomId: string): Promise<boolean> {
     try {
@@ -136,6 +214,14 @@ export const useRoomStore = defineStore('room', () => {
       error.value = '离开聊天室失败'
       console.error('[RoomStore] leaveRoom error:', err)
       return false
+    }
+  }
+
+  // 更新成员在线状态（由 WebSocket UserStatusChanged 事件触发）
+  function updateMemberStatus(userId: string, status: RoomMember['user_status']) {
+    const member = members.value.find((m) => m.user_id === userId)
+    if (member) {
+      member.user_status = status
     }
   }
 
@@ -213,6 +299,11 @@ export const useRoomStore = defineStore('room', () => {
     fetchMembers,
     createRoom,
     joinRoom,
+    updateMemberStatus,
+    updateRoom,
+    deleteRoom,
+    kickMember,
+    setMemberRole,
     leaveRoom,
     clearCurrentRoom,
     updateRoomLastMessage,

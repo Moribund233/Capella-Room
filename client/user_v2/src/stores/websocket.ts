@@ -4,6 +4,7 @@ import { wsService } from '@/services/websocket'
 import { useAuthStore } from './auth'
 import { useConfigStore } from './config'
 import { useConnectivityStore } from './connectivity'
+import { useRoomStore } from './room'
 import type { ConnectionState, MessageHandler } from '@/types/websocket'
 
 export const useWebSocketStore = defineStore('websocket', () => {
@@ -13,6 +14,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
   let isStateHandlerRegistered = false
   // 标记是否正在连接中，避免重复连接
   let isConnectingInProgress = false
+  // 标记是否为重连成功（用于决定是否需要拉取离线消息）
+  let wasReconnecting = false
 
   const isConnected = computed(() => connectionState.value === 'connected')
   const isConnecting = computed(() =>
@@ -21,14 +24,34 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   // 同步 wsService 的状态变化
   function onStateChange(state: ConnectionState) {
+    const prev = connectionState.value
     connectionState.value = state
+
     if (state === 'reconnecting') {
       reconnectAttempts.value++
+      wasReconnecting = true
     } else if (state === 'connected') {
       reconnectAttempts.value = 0
       isConnectingInProgress = false
+
+      // 重连成功后拉取离线消息
+      if (wasReconnecting) {
+        wasReconnecting = false
+        fetchMissedMessages()
+      }
     } else if (state === 'disconnected') {
       isConnectingInProgress = false
+    }
+  }
+
+  // 重连后为所有房间拉取离线消息
+  function fetchMissedMessages() {
+    const roomStore = useRoomStore()
+    for (const room of roomStore.rooms) {
+      wsService.send('GetMissedMessages', {
+        room_id: room.id,
+        last_message_id: room.last_message?.id || null,
+      })
     }
   }
 

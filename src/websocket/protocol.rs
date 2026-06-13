@@ -108,6 +108,35 @@ pub enum WebSocketMessage {
     /// 消息已读回执
     MessageReadReceipt { message_id: Uuid, user_id: Uuid },
 
+    // ========== 消息反应 ==========
+    /// 添加表情反应
+    AddReaction {
+        message_id: Uuid,
+        emoji: String,
+    },
+
+    /// 移除表情反应
+    RemoveReaction {
+        message_id: Uuid,
+        emoji: String,
+    },
+
+    /// 反应已添加（广播）
+    ReactionAdded {
+        message_id: Uuid,
+        room_id: Uuid,
+        user_id: Uuid,
+        emoji: String,
+    },
+
+    /// 反应已移除（广播）
+    ReactionRemoved {
+        message_id: Uuid,
+        room_id: Uuid,
+        user_id: Uuid,
+        emoji: String,
+    },
+
     /// 编辑消息
     EditMessage {
         message_id: Uuid,

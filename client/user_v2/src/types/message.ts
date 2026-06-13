@@ -28,4 +28,5 @@ export interface Message {
 
   sending?: boolean
   error?: boolean
+  read?: boolean
 }

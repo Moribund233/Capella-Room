@@ -9,7 +9,7 @@ export const roomApi = {
   },
 
   /** 获取我加入的聊天室 */
-  getMyRooms(): Promise<Room[]> {
+  getMyRooms(): Promise<ApiResponse<Room[]>> {
     return httpClient.get('/users/me/rooms')
   },
 

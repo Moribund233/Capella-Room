@@ -48,10 +48,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/DiscoverView.vue'),
       },
       {
-        path: 'thread',
-        name: 'thread',
-        component: () => import('@/views/ThreadView.vue'),
+        path: 'friends',
+        name: 'friends',
+        component: () => import('@/views/FriendsView.vue'),
       },
+
     ],
   },
   {

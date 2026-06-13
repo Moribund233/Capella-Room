@@ -8,9 +8,12 @@ use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
 
+use std::collections::HashMap;
+
 use crate::{
     error::{AppError, Result},
     models::message::{EditMessageRequest, MessageEditResponse, MessageResponse},
+    models::message_reaction::ReactionSummary,
     models::response::ApiResponse,
     services::auth_service::Claims,
     state::AppState,
@@ -46,10 +49,18 @@ pub async fn get_room_messages(
 ) -> Result<Json<ApiResponse<MessageListResponse>>> {
     let limit = query.limit.min(100);
 
-    let messages = state
+    let mut messages = state
         .message_service
         .get_room_messages(room_id, limit, query.before)
         .await?;
+
+    // 批量加载消息反应
+    let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+    let reactions = state
+        .reaction_service
+        .get_messages_reactions(&message_ids)
+        .await?;
+    attach_reactions(&mut messages, &reactions);
 
     let total = messages.len() as i64;
     let has_more = total >= limit;
@@ -85,12 +96,32 @@ pub async fn search_messages(
 
     let limit = query.limit.min(100);
 
-    let messages = state
+    let mut messages = state
         .message_service
         .search_messages(query.room_id, &query.q, limit)
         .await?;
 
+    // 批量加载消息反应
+    let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+    let reactions = state
+        .reaction_service
+        .get_messages_reactions(&message_ids)
+        .await?;
+    attach_reactions(&mut messages, &reactions);
+
     Ok(Json(messages))
+}
+
+/// 将反应摘要附加到消息响应中
+fn attach_reactions(
+    messages: &mut [MessageResponse],
+    reactions: &HashMap<Uuid, Vec<ReactionSummary>>,
+) {
+    for msg in messages.iter_mut() {
+        if let Some(reaction_list) = reactions.get(&msg.id) {
+            msg.reactions = Some(reaction_list.clone());
+        }
+    }
 }
 
 /// 删除消息

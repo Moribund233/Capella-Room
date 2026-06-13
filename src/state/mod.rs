@@ -17,6 +17,7 @@ use crate::services::file_service::FileService;
 use crate::services::ip_security_service::IpSecurityService;
 use crate::services::message_service::MessageService;
 use crate::services::monitor_service::MonitorService;
+use crate::services::reaction_service::ReactionService;
 use crate::services::notification_service::NotificationService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
@@ -36,6 +37,7 @@ pub struct AppState {
     pub user_service: UserService,
     pub room_service: RoomService,
     pub message_service: MessageService,
+    pub reaction_service: ReactionService,
     pub batch_message_service: Arc<BatchMessageService>,
     pub file_service: Arc<FileService>,
     pub notification_service: Arc<NotificationService>,
@@ -60,6 +62,7 @@ impl fmt::Debug for AppState {
             .field("user_service", &"<UserService>")
             .field("room_service", &"<RoomService>")
             .field("message_service", &"<MessageService>")
+            .field("reaction_service", &"<ReactionService>")
             .field("file_service", &"<FileService>")
             .field("notification_service", &"<NotificationService>")
             .field("audit_service", &"<AuditService>")
@@ -91,6 +94,7 @@ impl AppState {
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
+        let reaction_service = ReactionService::new(db.clone());
 
         // 先创建用户设置服务（通知服务依赖它）
         let user_settings_service = UserSettingsService::new(db.clone().pool().clone());
@@ -167,6 +171,7 @@ impl AppState {
             user_service,
             room_service,
             message_service,
+            reaction_service,
             batch_message_service,
             file_service,
             notification_service,
@@ -219,6 +224,10 @@ impl AppState {
 
     pub fn message_service(&self) -> &MessageService {
         &self.message_service
+    }
+
+    pub fn reaction_service(&self) -> &ReactionService {
+        &self.reaction_service
     }
 
     pub fn batch_message_service(&self) -> &BatchMessageService {
@@ -278,6 +287,7 @@ impl Clone for AppState {
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),
             message_service: MessageService::new(self.db.clone()),
+            reaction_service: ReactionService::new(self.db.clone()),
             batch_message_service: Arc::clone(&self.batch_message_service),
             file_service: Arc::clone(&self.file_service),
             notification_service: Arc::clone(&self.notification_service),

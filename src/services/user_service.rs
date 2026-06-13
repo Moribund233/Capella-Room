@@ -978,7 +978,7 @@ impl UserService {
         // 人均消息数
         let avg_messages_per_user: f64 = sqlx::query_scalar(
             r#"
-            SELECT COALESCE(AVG(msg_count), 0.0)
+            SELECT COALESCE(AVG(msg_count)::float8, 0.0)
             FROM (
                 SELECT sender_id, COUNT(*) as msg_count
                 FROM messages
@@ -993,7 +993,7 @@ impl UserService {
         // 人均加入房间数
         let avg_rooms_per_user: f64 = sqlx::query_scalar(
             r#"
-            SELECT COALESCE(AVG(room_count), 0.0)
+            SELECT COALESCE(AVG(room_count)::float8, 0.0)
             FROM (
                 SELECT user_id, COUNT(*) as room_count
                 FROM room_members
@@ -1054,7 +1054,7 @@ impl UserService {
         // 人均好友数
         let avg_friends_per_user: f64 = sqlx::query_scalar(
             r#"
-            SELECT COALESCE(AVG(friend_count), 0.0)
+            SELECT COALESCE(AVG(friend_count)::float8, 0.0)
             FROM (
                 SELECT 
                     user_id_a as user_id,

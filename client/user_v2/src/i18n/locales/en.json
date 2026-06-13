@@ -108,10 +108,12 @@
     "noMembers": "No members yet",
     "selectRoom": "Select a room to start chatting",
     "searchMessages": "Search messages",
-    "threads": "Threads",
     "showMemberList": "Show member list",
     "hideMemberList": "Hide member list",
+    "joinSuccess": "Joined room",
+    "joinFailed": "Failed to join room",
     "noDescription": "No description",
+    "jumpToMessage": "Jump to message",
     "send": "Send",
     "uploadFile": "Upload file",
     "emoji": "Emoji",
@@ -124,6 +126,10 @@
     "messageDeleted": "This message has been deleted",
     "loadMore": "Load more messages",
     "newMessages": "new message(s)",
+    "isTyping": "is typing…",
+    "areTyping": "are typing…",
+    "read": "Read",
+    "sent": "Sent",
     "today": "Today",
     "yesterday": "Yesterday",
     "confirmDelete": "Are you sure you want to delete this message?",
@@ -286,19 +292,30 @@
       }
     }
   },
-  "thread": {
-    "title": "Thread",
-    "backToChannel": "Back to #{channel}",
-    "inChannel": "in #{channel}",
-    "replyPlaceholder": "Reply to this thread...",
-    "details": {
-      "title": "Thread details",
-      "startedBy": "Started by",
-      "participants": "Participants",
-      "replies": "Replies",
-      "lastReply": "Last reply"
-    },
-    "op": "op"
+  "friends": {
+    "title": "Friends",
+    "friends": "Friends",
+    "received": "Received",
+    "sent": "Sent",
+    "addFriend": "Add Friend",
+    "sendRequest": "Send Request",
+    "sendMessage": "Send Message",
+    "viewProfile": "View Profile",
+    "deleteFriend": "Remove Friend",
+    "deleteConfirm": "Are you sure to remove this friend?",
+    "cancelRequest": "Cancel Request",
+    "accept": "Accept",
+    "reject": "Reject",
+    "pending": "Pending",
+    "waiting": "Awaiting your response",
+    "accepted": "Accepted",
+    "rejected": "Rejected",
+    "noFriends": "No friends yet",
+    "noReceived": "No pending requests",
+    "noSent": "No sent requests",
+    "searchPlaceholder": "Search username...",
+    "searchNoResult": "No users found",
+    "requestSent": "Friend request sent!"
   },
   "discover": {
     "title": "Discover",
@@ -320,5 +337,10 @@
     "themeDark": "Dark Theme",
     "themeLight": "Light Theme",
     "personalization": "Personalization"
+  },
+  "connection": {
+    "disconnected": "Connection lost",
+    "connecting": "Connecting…",
+    "reconnecting": "Reconnecting…"
   }
 }

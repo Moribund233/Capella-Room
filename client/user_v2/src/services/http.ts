@@ -96,6 +96,12 @@ httpClient.interceptors.response.use(
 
     // 处理 401 错误
     if (error.response?.status === 401) {
+      // 登录/注册接口的 401 是业务错误（密码错误/用户不存在），直接透传
+      if (originalRequest.url?.includes('/auth/login') ||
+          originalRequest.url?.includes('/auth/register')) {
+        return Promise.reject(error)
+      }
+
       // 如果是刷新 token 的请求失败，直接处理未授权
       if (originalRequest.url?.includes('/auth/refresh')) {
         await handleUnauthorized()

@@ -5,6 +5,7 @@ pub mod auth;
 pub mod config;
 pub mod file;
 pub mod message;
+pub mod message_reaction;
 pub mod notification;
 pub mod room;
 pub mod security;

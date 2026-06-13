@@ -9,6 +9,7 @@ pub mod file_service;
 pub mod ip_security_service;
 pub mod message_service;
 pub mod monitor_service;
+pub mod reaction_service;
 pub mod notification_service;
 pub mod room_service;
 pub mod ui_config_service;

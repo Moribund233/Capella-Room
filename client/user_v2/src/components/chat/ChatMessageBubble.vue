@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { formatTime } from '@/utils/date'
 import type { Message } from '@/types/message'
 import { ElMessageBox } from 'element-plus'
+import { ChatRound, Edit, CircleClose, Document } from '@element-plus/icons-vue'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -12,13 +13,14 @@ const authStore = useAuthStore()
 const props = defineProps<{
   message: Message
   isOwn: boolean
+  highlight?: boolean
 }>()
 
 const emit = defineEmits<{
   reply: [message: Message]
   edit: [message: Message]
   delete: [id: string]
-  jumpToThread: [messageId: string]
+  jumpToThread: [messageId: string | undefined]
 }>()
 
 const displayName = computed(() => props.message.sender.username)
@@ -27,6 +29,8 @@ const isDeleted = computed(() => props.message.is_deleted)
 const isSending = computed(() => props.message.sending)
 const isError = computed(() => props.message.error)
 const isEdited = computed(() => (props.message.edit_count || 0) > 0)
+const isImageUrl = computed(() => /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(props.message.content))
+const isFileUrl = computed(() => /\/files\//.test(props.message.content) && !isImageUrl.value)
 
 function getAvatarColor(name: string): string {
   const colors = ['var(--accent)', 'var(--accent-pink)', 'var(--accent-green)', 'var(--accent-orange)', 'var(--accent-blue)']
@@ -34,7 +38,7 @@ function getAvatarColor(name: string): string {
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return colors[Math.abs(hash) % colors.length]
+  return colors[Math.abs(hash) % colors.length]!
 }
 
 function getInitial(name: string): string {
@@ -61,12 +65,14 @@ function handleEdit() {
 <template>
   <div
     class="bubble-row"
+    :data-message-id="message.id"
     :class="{
       'bubble-row--own': isOwn,
       'bubble-row--deleted': isDeleted,
       'bubble-row--sending': isSending,
       'bubble-row--error': isError,
       'bubble-row--system': displayName === 'Wave Bot' || displayName === 'System',
+      'bubble-row--highlight': highlight,
     }"
   >
     <!-- 系统消息（居中简约） -->
@@ -98,14 +104,14 @@ function handleEdit() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
           </button>
           <button :title="t('chat.reply')" @click="emit('reply', message)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <el-icon :size="16"><ChatRound /></el-icon>
           </button>
           <button
             v-if="isOwn && !isDeleted"
             :title="t('common.edit')"
             @click="handleEdit"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <el-icon :size="16"><Edit /></el-icon>
           </button>
           <button v-if="isOwn && !isDeleted" title="More" class="more-btn">
             <el-dropdown trigger="click" placement="bottom-end" @command="(cmd: string) => {
@@ -125,7 +131,7 @@ function handleEdit() {
         <div class="bubble" :class="{ 'bubble--own': isOwn }">
           <!-- 发送失败标记 -->
           <div v-if="isError" class="bubble-error-icon" :title="t('chat.sendFailed')">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <el-icon :size="18"><CircleClose /></el-icon>
           </div>
 
           <!-- 头部：名字 + 时间 -->
@@ -135,8 +141,13 @@ function handleEdit() {
             <span v-if="isEdited" class="bubble-edited">({{ t('chat.edited') }})</span>
           </div>
 
-          <!-- 回复引用 -->
-          <div v-if="message.reply_to_message" class="bubble-reply">
+          <!-- 回复引用（点击跳转到原消息） -->
+          <div
+            v-if="message.reply_to_message"
+            class="bubble-reply"
+            :title="t('chat.jumpToMessage')"
+            @click.stop="message.reply_to && emit('jumpToThread', message.reply_to)"
+          >
             <span class="bubble-reply__line" />
             <div class="bubble-reply__body">
               <span class="bubble-reply__author">{{ message.reply_to_message.sender.username }}</span>
@@ -147,6 +158,15 @@ function handleEdit() {
           <!-- 消息正文 -->
           <div v-if="isDeleted" class="bubble-text bubble-text--deleted">
             {{ t('chat.messageDeleted') }}
+          </div>
+          <div v-else-if="isImageUrl" class="bubble-image">
+            <img :src="message.content" alt="" loading="lazy" @click.stop />
+          </div>
+          <div v-else-if="isFileUrl" class="bubble-file">
+            <el-icon :size="28" class="bubble-file__icon"><Document /></el-icon>
+            <a :href="message.content" target="_blank" class="bubble-file__name" rel="noopener">
+              {{ message.content.split('/').pop() || message.content }}
+            </a>
           </div>
           <div v-else class="bubble-text">
             <p>{{ message.content }}</p>
@@ -163,6 +183,12 @@ function handleEdit() {
           <span class="sending-dot" />
           <span class="sending-dot" />
           <span class="sending-dot" />
+        </div>
+
+        <!-- 已读回执（自己的消息） -->
+        <div v-if="isOwn && !isSending && !isDeleted" class="bubble-read-receipt">
+          <span v-if="message.read" class="bubble-read-receipt__read">{{ t('chat.read') }}</span>
+          <span v-else class="bubble-read-receipt__sent">{{ t('chat.sent') }}</span>
         </div>
       </div>
     </template>
@@ -202,6 +228,19 @@ function handleEdit() {
     .bubble {
       border-color: var(--accent-pink);
     }
+  }
+
+  &--highlight {
+    animation: highlight-pulse 2s ease-out;
+  }
+}
+
+@keyframes highlight-pulse {
+  0% {
+    background: color-mix(in oklch, var(--accent) 20%, transparent);
+  }
+  100% {
+    background: transparent;
   }
 }
 
@@ -387,6 +426,12 @@ function handleEdit() {
   padding: 6px 8px;
   background: color-mix(in oklch, var(--fg) 4%, transparent);
   border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: color-mix(in oklch, var(--fg) 8%, transparent);
+  }
 
   &__line {
     width: 3px;
@@ -427,6 +472,52 @@ function handleEdit() {
   }
 }
 
+// ─── 图片消息 ───────────────────────────────
+.bubble-image {
+  margin: -8px -14px;
+  border-radius: 6px 16px 16px 16px;
+  overflow: hidden;
+  line-height: 0;
+
+  img {
+    max-width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    cursor: pointer;
+    display: block;
+  }
+}
+
+// ─── 文件消息 ───────────────────────────────
+.bubble-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  background: color-mix(in oklch, var(--fg) 4%, transparent);
+  border-radius: 8px;
+
+  &__icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+
+  &__name {
+    font-size: 14px;
+    color: var(--accent);
+    text-decoration: none;
+    word-break: break-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 // ─── 正文 ─────────────────────────────────────
 .bubble-text {
   font-size: 15px;
@@ -461,6 +552,21 @@ function handleEdit() {
     &:hover {
       color: var(--accent-pink);
     }
+  }
+}
+
+// ─── 已读回执 ─────────────────────────────
+.bubble-read-receipt {
+  font-size: 11px;
+  line-height: 1;
+  margin-top: 2px;
+
+  &__sent {
+    color: var(--muted);
+  }
+
+  &__read {
+    color: var(--accent);
   }
 }
 

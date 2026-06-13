@@ -1,132 +1,135 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from '@/composables/useTheme'
+import { ElMessage } from 'element-plus'
+import { useRoomStore } from '@/stores/room'
+import { searchApi } from '@/api/search'
+import type { Room } from '@/types/room'
+import type { UserSearchItem } from '@/types/search'
 import {
   Search,
   TrendCharts,
   CollectionTag,
   Lock,
   OfficeBuilding,
+  User,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const { t } = useI18n()
-const { isDark } = useTheme()
+const roomStore = useRoomStore()
 
-// 搜索关键词
 const searchQuery = ref('')
+const searchActive = ref(false)
+const searching = ref(false)
+const searchResultsRooms = ref<Room[]>([])
+const searchResultsUsers = ref<UserSearchItem[]>([])
 
-// 分类标签
-const categories = [
-  { key: 'all', label: t('discover.all') },
-  { key: 'popular', label: t('discover.popular') },
-  { key: 'tech', label: t('discover.tech') },
-  { key: 'gaming', label: t('discover.gaming') },
-  { key: 'music', label: t('discover.music') },
-  { key: 'art', label: t('discover.art') },
-]
+const featuredRooms = ref<Room[]>([])
+const recentRooms = ref<Room[]>([])
+const loadingFeatured = ref(false)
+const loadingRecent = ref(false)
 
-const activeCategory = ref('all')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-// 推荐房间
-const featuredRooms = [
-  {
-    id: 'vue-community',
-    name: 'Vue.js Community',
-    description: 'Official Vue.js community for developers and enthusiasts',
-    members: 12580,
-    tags: ['tech', 'javascript', 'vue'],
-    type: 'public',
-    icon: 'V',
-    iconColor: 'var(--accent-green)',
-  },
-  {
-    id: 'rust-lang',
-    name: 'Rust Programming',
-    description: 'A place for Rustaceans to learn, share, and discuss',
-    members: 8932,
-    tags: ['tech', 'rust', 'systems'],
-    type: 'public',
-    icon: 'R',
-    iconColor: 'var(--accent-orange)',
-  },
-  {
-    id: 'design-systems',
-    name: 'Design Systems',
-    description: 'Discussing design systems, component libraries, and UI patterns',
-    members: 5640,
-    tags: ['design', 'ui', 'ux'],
-    type: 'public',
-    icon: 'D',
-    iconColor: 'var(--accent-pink)',
-  },
-]
-
-// 热门房间
-const trendingRooms = [
-  {
-    id: 'gamedev',
-    name: 'Game Development',
-    description: 'Indie and professional game developers',
-    members: 4210,
-    growth: '+12%',
-    type: 'public',
-  },
-  {
-    id: 'ai-ml',
-    name: 'AI & Machine Learning',
-    description: 'Discussing the latest in AI and ML',
-    members: 3890,
-    growth: '+28%',
-    type: 'public',
-  },
-  {
-    id: 'web3',
-    name: 'Web3 & Blockchain',
-    description: 'Decentralized web and blockchain tech',
-    members: 2150,
-    growth: '+8%',
-    type: 'public',
-  },
-  {
-    id: 'creative-coding',
-    name: 'Creative Coding',
-    description: 'Generative art and creative programming',
-    members: 1840,
-    growth: '+15%',
-    type: 'public',
-  },
-]
-
-/**
- * 加入房间
- */
-function joinRoom() {
-  // TODO: 实现加入房间逻辑
-  router.push(`/app`)
+async function loadRooms() {
+  loadingFeatured.value = true
+  loadingRecent.value = true
+  try {
+    const [featuredRes, recentRes] = await Promise.all([
+      searchApi.getPublicRooms({ limit: 6 }),
+      searchApi.getRecentPublicRooms({ limit: 10 }),
+    ])
+    if (featuredRes.success && featuredRes.data) {
+      featuredRooms.value = featuredRes.data
+    }
+    if (recentRes.success && recentRes.data) {
+      recentRooms.value = recentRes.data
+    }
+  } catch {
+    console.error('[Discover] Failed to load rooms')
+  } finally {
+    loadingFeatured.value = false
+    loadingRecent.value = false
+  }
 }
 
-/**
- * 查看房间详情
- */
-function viewRoom() {
-  // TODO: 实现查看房间详情逻辑
+async function doSearch() {
+  const q = searchQuery.value.trim()
+  if (!q) {
+    searchActive.value = false
+    return
+  }
+  searchActive.value = true
+  searching.value = true
+  try {
+    const [roomRes, userRes] = await Promise.all([
+      searchApi.searchRooms({ keyword: q, limit: 10 }),
+      searchApi.searchUsers({ keyword: q, limit: 10 }),
+    ])
+    if (roomRes.success && roomRes.data) {
+      searchResultsRooms.value = roomRes.data.rooms
+    } else {
+      searchResultsRooms.value = []
+    }
+    if (userRes.success && userRes.data) {
+      searchResultsUsers.value = userRes.data.users
+    } else {
+      searchResultsUsers.value = []
+    }
+  } catch {
+    searchResultsRooms.value = []
+    searchResultsUsers.value = []
+  } finally {
+    searching.value = false
+  }
 }
+
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(doSearch, 400)
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchActive.value = false
+  searchResultsRooms.value = []
+  searchResultsUsers.value = []
+}
+
+async function handleJoinRoom(roomId: string) {
+  const ok = await roomStore.joinRoom(roomId)
+  if (ok) {
+    ElMessage.success(t('chat.joinSuccess'))
+    router.push('/app')
+  } else {
+    ElMessage.error(roomStore.error || t('chat.joinFailed'))
+  }
+}
+
+function handleViewRoom(roomId: string) {
+  roomStore.fetchRoomDetail(roomId)
+  router.push('/app')
+}
+
+function getInitial(name: string) {
+  return name.charAt(0).toUpperCase()
+}
+
+onMounted(() => {
+  loadRooms()
+})
 </script>
 
 <template>
   <div class="discover-layout">
-    <!-- 主内容区 -->
     <main class="discover-main">
-      <!-- 头部 -->
       <header class="discover-header">
         <div class="header-content">
           <h1 class="discover-title">{{ t('discover.title') }}</h1>
           <p class="discover-subtitle">{{ t('discover.subtitle') }}</p>
 
-          <!-- 搜索框 -->
           <div class="search-box">
             <el-input
               v-model="searchQuery"
@@ -134,33 +137,82 @@ function viewRoom() {
               :prefix-icon="Search"
               size="large"
               class="search-input"
+              clearable
+              @input="onSearchInput"
+              @clear="clearSearch"
             />
-          </div>
-
-          <!-- 分类标签 -->
-          <div class="category-tabs">
-            <button
-              v-for="category in categories"
-              :key="category.key"
-              class="category-tab"
-              :class="{ active: activeCategory === category.key }"
-              @click="activeCategory = category.key"
-            >
-              {{ category.label }}
-            </button>
           </div>
         </div>
       </header>
 
-      <!-- 内容区 -->
       <div class="discover-content">
+        <!-- 搜索结果 -->
+        <section v-if="searchActive" class="content-section">
+          <h2 class="section-title">
+            <el-icon><Search /></el-icon>
+            {{ t('common.search') }}
+          </h2>
+
+          <div v-if="searching" class="list-placeholder">{{ t('common.loading') }}</div>
+
+          <template v-else>
+            <!-- 房间结果 -->
+            <div v-if="searchResultsRooms.length > 0" class="search-group">
+              <h3 class="search-group-title">{{ t('chat.rooms') }}</h3>
+              <div class="search-results-list">
+                <div v-for="room in searchResultsRooms" :key="room.id" class="search-item">
+                  <div class="search-item__icon">
+                    <el-icon :size="18"><OfficeBuilding /></el-icon>
+                  </div>
+                  <div class="search-item__body">
+                    <span class="search-item__name">{{ room.name }}</span>
+                    <span class="search-item__meta">{{ room.member_count }} {{ t('chat.members') }}</span>
+                  </div>
+                  <div class="search-item__actions">
+                    <el-button size="small" type="primary" @click="handleJoinRoom(room.id)">
+                      {{ t('discover.join') }}
+                    </el-button>
+                    <el-button size="small" @click="handleViewRoom(room.id)">
+                      {{ t('discover.view') }}
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 用户结果 -->
+            <div v-if="searchResultsUsers.length > 0" class="search-group">
+              <h3 class="search-group-title">{{ t('friends.title') }}</h3>
+              <div class="search-results-list">
+                <div v-for="user in searchResultsUsers" :key="user.id" class="search-item">
+                  <div class="search-item__avatar">
+                    <img v-if="user.avatar_url" :src="user.avatar_url" :alt="user.username" class="avatar-img" />
+                    <div v-else class="avatar-placeholder">{{ getInitial(user.username) }}</div>
+                  </div>
+                  <div class="search-item__body">
+                    <span class="search-item__name">{{ user.username }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!searching && searchResultsRooms.length === 0 && searchResultsUsers.length === 0" class="list-placeholder">
+              {{ t('friends.searchNoResult') }}
+            </div>
+          </template>
+        </section>
+
         <!-- 推荐房间 -->
-        <section class="content-section">
+        <section v-if="!searchActive" class="content-section">
           <h2 class="section-title">
             <el-icon><TrendCharts /></el-icon>
             {{ t('discover.featured') }}
           </h2>
-          <div class="featured-grid">
+          <div v-if="loadingFeatured" class="list-placeholder">{{ t('common.loading') }}</div>
+          <div v-else-if="featuredRooms.length === 0" class="list-placeholder">
+            {{ t('chat.noRooms') }}
+          </div>
+          <div v-else class="featured-grid">
             <el-card
               v-for="room in featuredRooms"
               :key="room.id"
@@ -168,30 +220,25 @@ function viewRoom() {
               shadow="never"
             >
               <div class="room-card-header">
-                <div class="room-icon" :style="{ background: room.iconColor }">
-                  {{ room.icon }}
+                <div class="room-icon" :class="{ 'room-icon--private': room.is_private }">
+                  <el-icon :size="22"><OfficeBuilding /></el-icon>
                 </div>
                 <div class="room-info">
                   <h3 class="room-name">{{ room.name }}</h3>
                   <div class="room-meta">
                     <el-icon><User /></el-icon>
-                    <span>{{ room.members.toLocaleString() }} {{ t('chat.members') }}</span>
-                    <el-icon v-if="room.type === 'public'"><OfficeBuilding /></el-icon>
+                    <span>{{ room.member_count }} {{ t('chat.members') }}</span>
+                    <el-icon v-if="!room.is_private"><OfficeBuilding /></el-icon>
                     <el-icon v-else><Lock /></el-icon>
                   </div>
                 </div>
               </div>
-              <p class="room-description">{{ room.description }}</p>
-              <div class="room-tags">
-                <el-tag v-for="tag in room.tags" :key="tag" size="small" effect="plain">
-                  #{{ tag }}
-                </el-tag>
-              </div>
+              <p v-if="room.description" class="room-description">{{ room.description }}</p>
               <div class="room-actions">
-                <el-button type="primary" @click="joinRoom()">
+                <el-button type="primary" @click="handleJoinRoom(room.id)">
                   {{ t('discover.join') }}
                 </el-button>
-                <el-button text @click="viewRoom()">
+                <el-button text @click="handleViewRoom(room.id)">
                   {{ t('discover.view') }}
                 </el-button>
               </div>
@@ -199,15 +246,19 @@ function viewRoom() {
           </div>
         </section>
 
-        <!-- 热门房间 -->
-        <section class="content-section">
+        <!-- 最新活跃房间 -->
+        <section v-if="!searchActive" class="content-section">
           <h2 class="section-title">
             <el-icon><CollectionTag /></el-icon>
             {{ t('discover.trending') }}
           </h2>
-          <div class="trending-list">
+          <div v-if="loadingRecent" class="list-placeholder">{{ t('common.loading') }}</div>
+          <div v-else-if="recentRooms.length === 0" class="list-placeholder">
+            {{ t('chat.noRooms') }}
+          </div>
+          <div v-else class="trending-list">
             <el-card
-              v-for="room in trendingRooms"
+              v-for="room in recentRooms"
               :key="room.id"
               class="room-card trending"
               shadow="never"
@@ -215,14 +266,13 @@ function viewRoom() {
               <div class="trending-content">
                 <div class="trending-info">
                   <h3 class="room-name">{{ room.name }}</h3>
-                  <p class="room-description">{{ room.description }}</p>
+                  <p v-if="room.description" class="room-description">{{ room.description }}</p>
                   <div class="room-meta">
                     <el-icon><User /></el-icon>
-                    <span>{{ room.members.toLocaleString() }} {{ t('chat.members') }}</span>
-                    <span class="growth">{{ room.growth }}</span>
+                    <span>{{ room.member_count }} {{ t('chat.members') }}</span>
                   </div>
                 </div>
-                <el-button type="primary" @click="joinRoom()">
+                <el-button type="primary" @click="handleJoinRoom(room.id)">
                   {{ t('discover.join') }}
                 </el-button>
               </div>
@@ -303,34 +353,6 @@ function viewRoom() {
   }
 }
 
-.category-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.category-tab {
-  padding: 8px 16px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-
-  &:hover {
-    border-color: var(--fg);
-    color: var(--fg);
-  }
-
-  &.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-}
-
 .discover-content {
   padding: 32px 48px 48px;
   max-width: 960px;
@@ -353,6 +375,13 @@ function viewRoom() {
   font-weight: 600;
   margin: 0 0 20px;
   color: var(--fg);
+}
+
+.list-placeholder {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .featured-grid {
@@ -388,6 +417,7 @@ function viewRoom() {
       font-weight: 700;
       color: #fff;
       flex-shrink: 0;
+      background: var(--accent);
     }
 
     .room-info {
@@ -418,19 +448,6 @@ function viewRoom() {
       color: var(--muted);
       margin: 0 0 12px;
       line-height: 1.5;
-    }
-
-    .room-tags {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
-
-      .el-tag {
-        background: var(--bg);
-        border-color: var(--border);
-        color: var(--muted);
-      }
     }
 
     .room-actions {
@@ -485,11 +502,98 @@ function viewRoom() {
     .el-icon {
       font-size: 14px;
     }
+  }
+}
 
-    .growth {
-      color: var(--accent-green);
-      font-weight: 500;
+.search-group {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.search-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.search-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  gap: 10px;
+
+  &__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  &__avatar {
+    flex-shrink: 0;
+
+    .avatar-img, .avatar-placeholder {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .avatar-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
     }
   }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__name {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  &__actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 6px;
+  }
+}
+
+.room-icon--private {
+  background: var(--accent-pink);
 }
 </style>

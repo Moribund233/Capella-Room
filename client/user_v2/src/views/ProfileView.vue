@@ -6,6 +6,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
 import { useSettingsStore } from '@/stores/settings'
+import { uploadApi } from '@/api/upload'
+import { userApi } from '@/api/user'
 import type { LocaleSettings } from '@/types/settings'
 import {
   Clock,
@@ -28,6 +30,36 @@ const loading = ref(false)
 
 // 当前用户
 const currentUser = computed(() => authStore.user)
+
+// 头像上传
+const uploadingAvatar = ref(false)
+const avatarInputRef = ref<HTMLInputElement | null>(null)
+
+function triggerAvatarUpload() {
+  avatarInputRef.value?.click()
+}
+
+async function handleAvatarSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+
+  uploadingAvatar.value = true
+  try {
+    const res = await uploadApi.uploadAvatar(file)
+    if (res.success && res.data) {
+      await authStore.fetchUser()
+      ElMessage.success('Avatar updated')
+    } else {
+      ElMessage.error(res.message || t('common.error'))
+    }
+  } catch {
+    ElMessage.error(t('common.error'))
+  } finally {
+    uploadingAvatar.value = false
+  }
+}
 
 // 用户统计
 const userStats = computed(() => ({
@@ -262,9 +294,29 @@ const imageQualityOptions = [
       <div v-else class="container">
         <!-- 个人资料头部 -->
         <div class="profile-header">
-          <div class="profile-avatar">
-            <span>{{ getInitials(currentUser?.username || '') }}</span>
+          <div
+            class="profile-avatar"
+            :class="{ 'profile-avatar--uploading': uploadingAvatar }"
+            @click="triggerAvatarUpload"
+          >
+            <template v-if="currentUser?.avatar_url">
+              <img :src="currentUser.avatar_url" :alt="currentUser.username" class="profile-avatar__img" />
+            </template>
+            <template v-else>
+              <span>{{ getInitials(currentUser?.username || '') }}</span>
+            </template>
+            <div class="profile-avatar__overlay">
+              <span v-if="uploadingAvatar">…</span>
+              <span v-else>Change</span>
+            </div>
             <span class="status-big"></span>
+            <input
+              ref="avatarInputRef"
+              type="file"
+              accept="image/*"
+              style="display:none"
+              @change="handleAvatarSelected"
+            />
           </div>
           <div class="profile-info">
             <h1>{{ currentUser?.username || 'User' }}</h1>
@@ -757,6 +809,38 @@ const imageQualityOptions = [
   font-weight: 700;
   color: #fff;
   position: relative;
+  cursor: pointer;
+  overflow: hidden;
+
+  &--uploading {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s;
+    border-radius: 50%;
+  }
+
+  &:hover &__overlay {
+    opacity: 1;
+  }
 }
 
 .status-big {

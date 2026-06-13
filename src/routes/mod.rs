@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use crate::{
     handlers::{
-        account_security, admin, audit, auth, config, file, message, notification, room, security,
-        ui_config, user, user_settings,
+        account_security, admin, audit, auth, config, file, message, message_reaction,
+        notification, room, security, ui_config, user, user_settings,
     },
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
@@ -253,6 +253,13 @@ fn message_routes() -> Router<Arc<AppState>> {
         .route(
             "/:message_id/history",
             get(message::get_message_edit_history),
+        )
+        // 消息反应
+        .route(
+            "/:message_id/reactions",
+            get(message_reaction::get_message_reactions)
+                .post(message_reaction::add_reaction)
+                .delete(message_reaction::remove_reaction),
         )
 }
 

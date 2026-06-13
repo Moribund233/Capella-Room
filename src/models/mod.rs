@@ -2,6 +2,7 @@ pub mod account_security;
 pub mod audit;
 pub mod file;
 pub mod message;
+pub mod message_reaction;
 pub mod response;
 pub mod room;
 pub mod security;
