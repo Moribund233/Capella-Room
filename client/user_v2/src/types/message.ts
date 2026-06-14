@@ -28,6 +28,16 @@ export interface MessageEditResponse {
   created_at: string
 }
 
+export interface PinnedMessage {
+  id: string
+  message_id: string
+  room_id: string
+  pinned_by: string
+  content: string
+  sender_name: string
+  created_at: string
+}
+
 export interface Message {
   id: string
   room_id: string
@@ -45,4 +55,5 @@ export interface Message {
   sending?: boolean
   error?: boolean
   read?: boolean
+  is_system?: boolean
 }

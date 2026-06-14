@@ -3,8 +3,8 @@ import { ref } from 'vue'
 import { messageApi } from '@/api/message'
 import { useWebSocketStore } from './websocket'
 import { useAuthStore } from './auth'
-import type { Message, ReplyToMessage } from '@/types/message'
-import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload, MissedMessagesPayload, ReactionAddedPayload, ReactionRemovedPayload } from '@/types/websocket'
+import type { Message, ReplyToMessage, PinnedMessage } from '@/types/message'
+import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload, MissedMessagesPayload, ReactionAddedPayload, ReactionRemovedPayload, MessagePinnedPayload, MessageUnpinnedPayload } from '@/types/websocket'
 
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Message[]>([])
@@ -14,6 +14,7 @@ export const useMessageStore = defineStore('message', () => {
   const loadingMore = ref(false)
   const error = ref<string | null>(null)
   const currentRoomId = ref<string | null>(null)
+  const pinnedMessages = ref<PinnedMessage[]>([])
 
   /** 从 WS NewMessagePayload 转换为 Message */
   function toMessage(payload: NewMessagePayload): Message {
@@ -293,6 +294,26 @@ export const useMessageStore = defineStore('message', () => {
     })
   }
 
+  /** 添加系统消息（来自 WS SystemMessage 广播） */
+  function addSystemMessage(content: string) {
+    if (!currentRoomId.value) return
+    const sys: Message = {
+      id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      room_id: currentRoomId.value,
+      sender: { id: '', username: '', avatar_url: null },
+      content,
+      message_type: 'text',
+      reply_to: null,
+      reply_to_message: null,
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      edit_count: 0,
+      edited_at: null,
+      is_system: true,
+    }
+    messages.value.push(sys)
+  }
+
   /** 发送添加反应 WS 消息 */
   function addReaction(messageId: string, emoji: string) {
     const wsStore = useWebSocketStore()
@@ -346,6 +367,53 @@ export const useMessageStore = defineStore('message', () => {
     }
   }
 
+  /** 获取房间置顶消息 */
+  async function fetchPinnedMessages(roomId: string) {
+    try {
+      const res = await messageApi.getRoomPinnedMessages(roomId)
+      if (res.success && res.data) {
+        pinnedMessages.value = res.data
+      }
+    } catch (err) {
+      console.error('[MessageStore] fetchPinnedMessages error:', err)
+    }
+  }
+
+  /** 发送置顶消息 WS */
+  function pinMessage(messageId: string, roomId: string) {
+    const wsStore = useWebSocketStore()
+    wsStore.send('PinMessage', { message_id: messageId, room_id: roomId })
+  }
+
+  /** 发送取消置顶 WS */
+  function unpinMessage(messageId: string, roomId: string) {
+    const wsStore = useWebSocketStore()
+    wsStore.send('UnpinMessage', { message_id: messageId, room_id: roomId })
+  }
+
+  /** 处理 MessagePinned（广播） */
+  function handleMessagePinned(payload: MessagePinnedPayload) {
+    if (payload.room_id !== currentRoomId.value) return
+    if (pinnedMessages.value.some((m) => m.message_id === payload.message_id)) return
+    pinnedMessages.value.unshift({
+      id: '',
+      message_id: payload.message_id,
+      room_id: payload.room_id,
+      pinned_by: payload.pinned_by,
+      content: payload.content_preview,
+      sender_name: payload.pinned_by_name,
+      created_at: payload.pinned_at,
+    })
+  }
+
+  /** 处理 MessageUnpinned（广播） */
+  function handleMessageUnpinned(payload: MessageUnpinnedPayload) {
+    if (payload.room_id !== currentRoomId.value) return
+    pinnedMessages.value = pinnedMessages.value.filter(
+      (m) => m.message_id !== payload.message_id,
+    )
+  }
+
   /** 切换到另一个房间 */
   function switchRoom(roomId: string) {
     if (currentRoomId.value === roomId) return
@@ -356,6 +424,7 @@ export const useMessageStore = defineStore('message', () => {
     loading.value = false
     loadingMore.value = false
     error.value = null
+    pinnedMessages.value = []
   }
 
   function $reset() {
@@ -366,6 +435,7 @@ export const useMessageStore = defineStore('message', () => {
     loadingMore.value = false
     error.value = null
     currentRoomId.value = null
+    pinnedMessages.value = []
   }
 
   return {
@@ -383,6 +453,7 @@ export const useMessageStore = defineStore('message', () => {
     sendMessage,
     confirmMessage,
     failMessage,
+    addSystemMessage,
     addIncomingMessage,
     addMissedMessages,
     handleMessageEdited,
@@ -393,6 +464,12 @@ export const useMessageStore = defineStore('message', () => {
     removeReaction,
     handleReactionAdded,
     handleReactionRemoved,
+    pinnedMessages,
+    fetchPinnedMessages,
+    pinMessage,
+    unpinMessage,
+    handleMessagePinned,
+    handleMessageUnpinned,
     switchRoom,
     $reset,
   }

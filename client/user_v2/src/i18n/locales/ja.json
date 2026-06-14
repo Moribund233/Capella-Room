@@ -139,16 +139,19 @@
     "noEditHistory": "編集履歴はありません",
     "before": "変更前",
     "after": "変更後",
+    "pinMessage": "メッセージをピン留め",
+    "unpinMessage": "ピン留めを解除",
+    "pinnedMessage": "ピン留め済み",
     "owner": "所有者",
     "admin": "管理者",
     "welcome": {
-      "title": "Wave へようこそ",
+      "title": "CapellaRoom へようこそ",
       "description": "サイドバーからチャンネルを選択して会話を始めましょう"
     }
   },
   "profile": {
     "title": "プロフィール",
-    "backToWave": "Waveに戻る",
+    "backToWave": "CapellaRoomに戻る",
     "message": "メッセージを送信",
     "shareProfile": "プロフィールを共有",
     "joined": "参加日",

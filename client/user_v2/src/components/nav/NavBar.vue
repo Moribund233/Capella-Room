@@ -17,7 +17,7 @@ import {
   Moon,
   Sunny,
   Bell,
-  UserFilled,
+  Connection,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -34,7 +34,7 @@ const { isMobile } = useResponsive()
 const navItems = [
   { name: 'chat', path: '/app', icon: ChatRound, labelKey: 'chat.rooms' },
   { name: 'discover', path: '/discover', icon: Compass, labelKey: 'discover.title' },
-  { name: 'friends', path: '/friends', icon: UserFilled, labelKey: 'friends.title' },
+  { name: 'friends', path: '/friends', icon: Connection, labelKey: 'friends.title' },
   { name: 'profile', path: '/profile', icon: User, labelKey: 'profile.title' },
 ]
 
@@ -303,6 +303,7 @@ const quickItems = computed<QuickItem[]>(() => [
   transition: all 0.2s ease;
   font-size: 20px;
   line-height: 1;
+  color: var(--el-text-color-regular);
 
   &:hover {
     background: var(--el-color-primary-light-9);

@@ -29,13 +29,16 @@ import type {
   ReactionAddedPayload,
   ReactionRemovedPayload,
   UserStatusChangedPayload,
+  MessagePinnedPayload,
+  MessageUnpinnedPayload,
+  SystemMessagePayload,
 } from '@/types/websocket'
 
 const roomStore = useRoomStore()
 const messageStore = useMessageStore()
 const wsStore = useWebSocketStore()
 const { t } = useI18n()
-const { isMobile } = useResponsive()
+const { isMobile, showMemberPanel: canShowMemberPanel } = useResponsive()
 
 const connectionBanner = computed(() => {
   const state = wsStore.connectionState
@@ -121,6 +124,19 @@ onMounted(() => {
   ws.onMessage('ReactionRemoved', (payload: unknown) => {
     messageStore.handleReactionRemoved(payload as ReactionRemovedPayload)
   })
+
+  ws.onMessage('MessagePinned', (payload: unknown) => {
+    messageStore.handleMessagePinned(payload as MessagePinnedPayload)
+  })
+
+  ws.onMessage('MessageUnpinned', (payload: unknown) => {
+    messageStore.handleMessageUnpinned(payload as MessageUnpinnedPayload)
+  })
+
+  ws.onMessage('SystemMessage', (payload: unknown) => {
+    const p = payload as SystemMessagePayload
+    messageStore.addSystemMessage(p.content)
+  })
 })
 
 onUnmounted(() => {
@@ -137,6 +153,9 @@ watch(currentRoom, (room) => {
       showSidebar.value = false
     }
     showMemberPanel.value = false
+
+    // 加载置顶消息
+    messageStore.fetchPinnedMessages(room.id)
   }
 })
 
@@ -275,7 +294,7 @@ function handleJumpToSearch(msgId: string) {
     <!-- 成员面板 -->
     <transition name="slide-right">
       <div
-        v-if="hasRoom && showMemberPanel && !isMobile"
+        v-if="hasRoom && showMemberPanel && canShowMemberPanel"
         class="app-view__member-panel"
       >
         <ChatMemberPanel

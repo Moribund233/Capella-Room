@@ -139,16 +139,19 @@
     "noEditHistory": "无编辑历史",
     "before": "修改前",
     "after": "修改后",
+    "pinMessage": "置顶消息",
+    "unpinMessage": "取消置顶",
+    "pinnedMessage": "已置顶",
     "owner": "创建者",
     "admin": "管理员",
     "welcome": {
-      "title": "欢迎来到 Wave",
+      "title": "欢迎来到 CapellaRoom",
       "description": "从侧边栏选择一个频道开始聊天"
     }
   },
   "profile": {
     "title": "个人资料",
-    "backToWave": "返回 Wave",
+    "backToWave": "返回 CapellaRoom",
     "message": "发送消息",
     "shareProfile": "分享资料",
     "joined": "加入于",

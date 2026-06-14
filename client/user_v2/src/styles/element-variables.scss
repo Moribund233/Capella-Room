@@ -197,6 +197,14 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+// 主题切换过渡动画
+html.transitioning,
+html.transitioning *,
+html.transitioning *::before,
+html.transitioning *::after {
+  transition: all 0.3s ease !important;
+}
+
 // 滚动条样式
 ::-webkit-scrollbar {
   width: 6px;

@@ -7,6 +7,11 @@ const breakpoints = {
   l: 1024,
   xl: 1280,
   xxl: 1536,
+  // 原型设计断点
+  memberPanel: 900,
+  rightPanel: 860,
+  gridCollapse: 840,
+  mobileSidebar: 640,
 }
 
 // 使用全局状态确保所有组件共享同一个响应式数据
@@ -77,6 +82,10 @@ export function useResponsive() {
     sidebarCollapsed.value = !sidebarCollapsed.value
   }
 
+  const showMemberPanel = computed(() => windowWidth.value > 900)
+  const showRightPanel = computed(() => windowWidth.value > 860)
+  const isGridCollapsed = computed(() => windowWidth.value < 840)
+
   return {
     windowWidth,
     breakpoint,
@@ -86,5 +95,8 @@ export function useResponsive() {
     layoutMode,
     sidebarCollapsed,
     toggleSidebar,
+    showMemberPanel,
+    showRightPanel,
+    isGridCollapsed,
   }
 }

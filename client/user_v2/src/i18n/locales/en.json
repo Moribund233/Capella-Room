@@ -139,16 +139,19 @@
     "noEditHistory": "No edit history",
     "before": "Before",
     "after": "After",
+    "pinMessage": "Pin message",
+    "unpinMessage": "Unpin message",
+    "pinnedMessage": "Pinned message",
     "owner": "owner",
     "admin": "admin",
     "welcome": {
-      "title": "Welcome to Wave",
+      "title": "Welcome to CapellaRoom",
       "description": "Select a channel from the sidebar to start chatting"
     }
   },
   "profile": {
     "title": "Profile",
-    "backToWave": "Back to Wave",
+    "backToWave": "Back to CapellaRoom",
     "message": "Message",
     "shareProfile": "Share profile",
     "joined": "Joined",

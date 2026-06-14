@@ -177,6 +177,7 @@ function getRoleColor(role: string): string {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
 
   &--online {
     animation: member-status-pulse 2s ease-in-out infinite;

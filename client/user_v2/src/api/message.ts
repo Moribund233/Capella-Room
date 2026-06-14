@@ -1,6 +1,6 @@
 import httpClient from '@/services/http'
 import type { ApiResponse } from '@/types/api'
-import type { Message, MessageEditResponse } from '@/types/message'
+import type { Message, MessageEditResponse, PinnedMessage } from '@/types/message'
 
 export interface MessageListResponse {
   messages: Message[]
@@ -36,5 +36,20 @@ export const messageApi = {
   /** 获取消息编辑历史 */
   getEditHistory(messageId: string): Promise<MessageEditResponse[]> {
     return httpClient.get(`/messages/${messageId}/history`)
+  },
+
+  /** 获取房间置顶消息 */
+  getRoomPinnedMessages(roomId: string): Promise<ApiResponse<PinnedMessage[]>> {
+    return httpClient.get(`/rooms/${roomId}/pinned-messages`)
+  },
+
+  /** 置顶消息 */
+  pinMessage(messageId: string): Promise<ApiResponse<void>> {
+    return httpClient.post(`/messages/${messageId}/pin`)
+  },
+
+  /** 取消置顶消息 */
+  unpinMessage(messageId: string): Promise<ApiResponse<void>> {
+    return httpClient.delete(`/messages/${messageId}/pin`)
   },
 }

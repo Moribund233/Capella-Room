@@ -60,10 +60,12 @@
 | A4 | **Markdown 渲染** — 消息内容支持 Markdown 显示 | ✅ |
 | A5 | **语言切换 (NavBar)** — NavBar 添加语言切换按钮（循环切换） | ✅ |
 | A6 | **GIF 选择器** — Giphy API + GifPicker 组件 | ✅ |
-| A7 | **系统日志订阅** — WS Logs 实时查看界面 | ❌ |
+| A7 | **系统日志订阅** — WS Logs 实时查看界面 (user_v2 用户无权限) | ❌ 已取消 |
 | A8 | **删除账号** — ProfileView 危险区域 + 后端自服务 API | ✅ |
 
 ### Phase B — 动画与用户体验优化 ✓ 高优先级
+
+> 设计规范参考: `prototype/new_user_client/` — 暗色主题 `#7c5cfc` 紫色品牌色, 过渡 100-200ms ease, 响应式断点 900/860/840/640px
 
 | # | 任务 | 涉及文件 | 预估 |
 |---|------|---------|:----:|
@@ -80,10 +82,10 @@
 
 ### Phase C — 后端功能补齐
 
-| # | 任务 | 涉及文件 | 预估 |
-|---|------|---------|:----:|
-| C1 | **删除账号自服务 API** — `DELETE /api/v1/users/me` | `src/handlers/user.rs` | 2h |
-| C2 | **置顶消息** — DB 迁移 + Model + API + WS | `migrations/`, `src/models/`, `src/handlers/`, `src/websocket/` | 6h |
+| # | 任务 | 涉及文件 | 预估 | 状态 |
+|---|------|---------|:----:|:----:|
+| C1 | **删除账号自服务 API** — `DELETE /api/v1/users/me` | `src/handlers/user.rs` | 2h | ✅ (随 A8 完成) |
+| C2 | **置顶消息** — DB迁移/Model/Service/API/WS/Test (后端) + API/Store/Types/Components/WS (前端) | 后端已完善 `/src/`; 前端待接入 `client/user_v2/src/` | 前端~4h | 🟡 后端✅ 前端❌ |
 | C3 | **消息线程** — parent_id 字段 + API + WS + UI | ❌ 已取消 |
 | C4 | **Admin 管理面板** — `client/admin/` 已有完整实现 | ❌ 已取消 |
 

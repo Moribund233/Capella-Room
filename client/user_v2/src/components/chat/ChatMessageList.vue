@@ -6,6 +6,7 @@ import { useMessageStore } from '@/stores/message'
 import { useAuthStore } from '@/stores/auth'
 import { Loading, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import ChatMessageBubble from './ChatMessageBubble.vue'
+import PinnedMessagesPanel from './PinnedMessagesPanel.vue'
 import type { Message } from '@/types/message'
 
 const { t } = useI18n()
@@ -148,104 +149,126 @@ defineExpose({ scrollToMessage })
 </script>
 
 <template>
-  <div
-    ref="listRef"
-    class="messages"
-    @scroll="onScroll; onScrollTop()"
-  >
-    <!-- 加载更多 -->
-    <div v-if="hasMore" class="load-more">
-      <el-button
-        v-if="!loadingMore"
-        text
-        size="small"
-        type="primary"
-        @click="loadMore"
-      >
-        {{ t('chat.loadMore') }}
-      </el-button>
-      <el-icon v-else class="is-loading">
-        <Loading />
-      </el-icon>
-    </div>
+  <div class="messages-container">
+    <PinnedMessagesPanel @jump-to-message="scrollToMessage" />
 
-    <!-- 首次加载中 -->
-    <div v-if="loading && messages.length === 0" class="messages-loading">
-      <div v-for="i in 5" :key="i" class="message-skeleton">
-        <div class="skeleton-avatar" />
-        <div class="skeleton-body">
-          <div class="skeleton-header" :style="{ width: 80 + i * 20 + 'px' }" />
-          <div class="skeleton-line" :style="{ width: 150 + i * 30 + 'px' }" />
+    <div
+      ref="listRef"
+      class="messages"
+      @scroll="onScroll; onScrollTop()"
+    >
+      <!-- 加载更多 -->
+      <div v-if="hasMore" class="load-more">
+        <el-button
+          v-if="!loadingMore"
+          text
+          size="small"
+          type="primary"
+          @click="loadMore"
+        >
+          {{ t('chat.loadMore') }}
+        </el-button>
+        <el-icon v-else class="is-loading">
+          <Loading />
+        </el-icon>
+      </div>
+
+      <!-- 首次加载中 -->
+      <div v-if="loading && messages.length === 0" class="messages-loading">
+        <div v-for="i in 5" :key="i" class="message-skeleton">
+          <div class="skeleton-avatar" />
+          <div class="skeleton-body">
+            <div class="skeleton-header" :style="{ width: 80 + i * 20 + 'px' }" />
+            <div class="skeleton-line" :style="{ width: 150 + i * 30 + 'px' }" />
+          </div>
         </div>
+      </div>
+
+      <!-- 错误状态 -->
+      <div v-if="error && messages.length === 0" class="messages-error">
+        <el-result
+          :title="t('common.error')"
+          :sub-title="error"
+        >
+          <template #icon>
+            <el-icon :size="48" color="var(--accent-pink)"><WarningFilled /></el-icon>
+          </template>
+          <template #extra>
+            <el-button type="primary" @click="messageStore.fetchMessages(messageStore.currentRoomId!)">
+              {{ t('common.retry') }}
+            </el-button>
+          </template>
+        </el-result>
+      </div>
+
+      <!-- 空状态 -->
+      <div v-if="!loading && !error && messages.length === 0" class="messages-empty">
+        <span>{{ t('chat.noMessages') }}</span>
+      </div>
+
+      <!-- 消息列表 -->
+      <TransitionGroup name="msg" tag="div" class="message-list">
+        <template v-for="item in flatItems" :key="item.key">
+          <div v-if="item.type === 'divider'" class="message-divider">
+            <span>{{ formatDateSeparator(item.date!) }}</span>
+          </div>
+
+          <ChatMessageBubble
+            v-else
+            :message="item.message!"
+            :is-own="isOwnMessage(item.message!)"
+            :highlight="currentHighlight === item.key"
+            @reply="emit('reply', $event)"
+            @edit="emit('edit', $event)"
+            @delete="emit('delete', $event)"
+            @jump-to-thread="emit('jumpToThread', $event)"
+          />
+        </template>
+      </TransitionGroup>
+
+      <!-- 正在输入指示器 -->
+      <div v-if="typingUsers.length > 0" class="typing-indicator">
+        <span class="typing-dots">
+          <span class="dot" /><span class="dot" /><span class="dot" />
+        </span>
+        <span class="typing-text">
+          {{ typingUsers.map(u => u.username).join(', ') }}
+          {{ typingUsers.length === 1 ? t('chat.isTyping') : t('chat.areTyping') }}
+        </span>
+      </div>
+
+      <!-- 新消息提示 -->
+      <div
+        v-if="newMessageCount > 0 && !autoScroll"
+        class="new-message-bar"
+        @click="scrollToNewMessages"
+      >
+        <el-icon><ArrowDown /></el-icon>
+        {{ newMessageCount }} {{ t('chat.newMessages') }}
       </div>
     </div>
 
-    <!-- 错误状态 -->
-    <div v-if="error && messages.length === 0" class="messages-error">
-      <el-result
-        :title="t('common.error')"
-        :sub-title="error"
+    <transition name="fade">
+      <div
+        v-if="!autoScroll && messages.length > 0"
+        class="scroll-bottom-btn"
+        @click="scrollToNewMessages"
       >
-        <template #icon>
-          <el-icon :size="48" color="var(--accent-pink)"><WarningFilled /></el-icon>
-        </template>
-        <template #extra>
-          <el-button type="primary" @click="messageStore.fetchMessages(messageStore.currentRoomId!)">
-            {{ t('common.retry') }}
-          </el-button>
-        </template>
-      </el-result>
-    </div>
-
-    <!-- 空状态 -->
-    <div v-if="!loading && !error && messages.length === 0" class="messages-empty">
-      <span>{{ t('chat.noMessages') }}</span>
-    </div>
-
-    <!-- 消息列表 -->
-    <TransitionGroup name="msg" tag="div" class="message-list">
-      <template v-for="item in flatItems" :key="item.key">
-        <div v-if="item.type === 'divider'" class="message-divider">
-          <span>{{ formatDateSeparator(item.date!) }}</span>
-        </div>
-
-        <ChatMessageBubble
-          v-else
-          :message="item.message!"
-          :is-own="isOwnMessage(item.message!)"
-          :highlight="currentHighlight === item.key"
-          @reply="emit('reply', $event)"
-          @edit="emit('edit', $event)"
-          @delete="emit('delete', $event)"
-          @jump-to-thread="emit('jumpToThread', $event)"
-        />
-      </template>
-    </TransitionGroup>
-
-    <!-- 正在输入指示器 -->
-    <div v-if="typingUsers.length > 0" class="typing-indicator">
-      <span class="typing-dots">
-        <span class="dot" /><span class="dot" /><span class="dot" />
-      </span>
-      <span class="typing-text">
-        {{ typingUsers.map(u => u.username).join(', ') }}
-        {{ typingUsers.length === 1 ? t('chat.isTyping') : t('chat.areTyping') }}
-      </span>
-    </div>
-
-    <!-- 新消息提示 -->
-    <div
-      v-if="newMessageCount > 0 && !autoScroll"
-      class="new-message-bar"
-      @click="scrollToNewMessages"
-    >
-      <el-icon><ArrowDown /></el-icon>
-      {{ newMessageCount }} {{ t('chat.newMessages') }}
-    </div>
+        <el-icon><ArrowDown /></el-icon>
+      </div>
+    </transition>
   </div>
 </template>
 
 <style scoped lang="scss">
+.messages-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -265,7 +288,10 @@ defineExpose({ scrollToMessage })
 }
 
 .msg-leave-active {
-  transition: all 0.2s ease-in;
+  transition: all 0.25s ease-in;
+  max-height: 200px;
+  margin-bottom: 0;
+  overflow: hidden;
   position: absolute;
 }
 
@@ -281,6 +307,10 @@ defineExpose({ scrollToMessage })
 .msg-leave-to {
   opacity: 0;
   transform: translateX(-20px);
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .load-more {
@@ -424,6 +454,43 @@ defineExpose({ scrollToMessage })
   &:hover {
     opacity: 1;
   }
+}
+
+.scroll-bottom-btn {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  transition: transform 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    transform: scale(1.1);
+    background: color-mix(in oklch, var(--accent) 80%, white);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 640px) {

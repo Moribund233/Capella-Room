@@ -89,6 +89,36 @@ export interface DeleteMessagePayload {
   message_id: string
 }
 
+/** 置顶消息 */
+export interface PinMessagePayload {
+  message_id: string
+  room_id: string
+}
+
+/** 取消置顶 */
+export interface UnpinMessagePayload {
+  message_id: string
+  room_id: string
+}
+
+/** 消息已置顶（广播） */
+export interface MessagePinnedPayload {
+  message_id: string
+  room_id: string
+  pinned_by: string
+  pinned_by_name: string
+  content_preview: string
+  pinned_at: string
+}
+
+/** 消息已取消置顶（广播） */
+export interface MessageUnpinnedPayload {
+  message_id: string
+  room_id: string
+  unpinned_by: string
+  unpinned_at: string
+}
+
 /** 获取离线消息 */
 export interface GetMissedMessagesPayload {
   room_id: string
@@ -241,6 +271,11 @@ export interface GlobalOnlineUsersPayload {
   total: number
 }
 
+/** 系统消息（广播） */
+export interface SystemMessagePayload {
+  content: string
+}
+
 /** 消息预览（用于房间列表中的最后消息） */
 export interface MessagePreview {
   id: string
@@ -274,6 +309,8 @@ export enum WSMessageType {
   GET_ONLINE_USERS = 'GetOnlineUsers',
   ADD_REACTION = 'AddReaction',
   REMOVE_REACTION = 'RemoveReaction',
+  PIN_MESSAGE = 'PinMessage',
+  UNPIN_MESSAGE = 'UnpinMessage',
   RECONNECT = 'Reconnect',
   PING = 'Ping',
   PONG = 'Pong',
@@ -298,6 +335,8 @@ export enum WSMessageType {
   REACTION_ADDED = 'ReactionAdded',
   REACTION_REMOVED = 'ReactionRemoved',
   GLOBAL_ONLINE_USERS = 'GlobalOnlineUsers',
+  MESSAGE_PINNED = 'MessagePinned',
+  MESSAGE_UNPINNED = 'MessageUnpinned',
   ERROR = 'Error',
   SYSTEM_MESSAGE = 'SystemMessage',
   MENTIONED = 'Mentioned',

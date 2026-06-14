@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMessageStore } from '@/stores/message'
@@ -28,8 +28,14 @@ const emit = defineEmits<{
   jumpToThread: [messageId: string | undefined]
 }>()
 
+const isPinned = computed(() =>
+  messageStore.pinnedMessages.some((m) => m.message_id === props.message.id),
+)
+
 const showEmojiPicker = ref(false)
 const showEditHistory = ref(false)
+const imageLoaded = ref(false)
+const imageError = ref(false)
 
 const displayName = computed(() => props.message.sender.username)
 const displayTime = computed(() => formatTime(props.message.created_at))
@@ -40,6 +46,11 @@ const isEdited = computed(() => (props.message.edit_count || 0) > 0)
 const isImageUrl = computed(() => /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(props.message.content))
 const isFileUrl = computed(() => /\/files\//.test(props.message.content) && !isImageUrl.value)
 const currentUserId = computed(() => authStore.user?.id ?? '')
+
+watch(() => props.message.id, () => {
+  imageLoaded.value = false
+  imageError.value = false
+})
 
 function hasReacted(emoji: string): boolean {
   const r = props.message.reactions?.find((r) => r.emoji === emoji)
@@ -97,12 +108,11 @@ function handleEdit() {
       'bubble-row--deleted': isDeleted,
       'bubble-row--sending': isSending,
       'bubble-row--error': isError,
-      'bubble-row--system': displayName === 'Wave Bot' || displayName === 'System',
       'bubble-row--highlight': highlight,
     }"
   >
     <!-- 系统消息（居中简约） -->
-    <template v-if="displayName === 'Wave Bot' || displayName === 'System'">
+    <template v-if="message.is_system">
       <div class="bubble-system">
         <span class="bubble-system__dot" />
         <span class="bubble-system__text">{{ message.content }}</span>
@@ -110,7 +120,7 @@ function handleEdit() {
       </div>
     </template>
 
-    <!-- 普通消息气泡 -->
+    <!-- 普通消息 -->
     <template v-else>
       <!-- 他人消息：左侧头像 -->
       <div v-if="!isOwn" class="bubble-avatar">
@@ -128,6 +138,16 @@ function handleEdit() {
         <div class="bubble-actions">
           <button :title="t('chat.react')" @click="showEmojiPicker = !showEmojiPicker">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          </button>
+          <button
+            :title="isPinned ? t('chat.unpinMessage') : t('chat.pinMessage')"
+            :class="{ 'pin-btn--active': isPinned }"
+            @click="isPinned
+              ? messageStore.unpinMessage(message.id, message.room_id)
+              : messageStore.pinMessage(message.id, message.room_id)
+            "
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
           </button>
           <button :title="t('chat.reply')" @click="emit('reply', message)">
             <el-icon :size="16"><ChatRound /></el-icon>
@@ -165,6 +185,9 @@ function handleEdit() {
             <span class="bubble-author">{{ isOwn ? t('chat.you') : displayName }}</span>
             <span class="bubble-time">{{ displayTime }}</span>
             <span v-if="isEdited" class="bubble-edited" @click.stop="showEditHistory = !showEditHistory">({{ t('chat.edited') }})</span>
+            <span v-if="isPinned" class="bubble-pinned" :title="t('chat.pinnedMessage')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            </span>
           </div>
 
           <!-- 回复引用（点击跳转到原消息） -->
@@ -186,13 +209,22 @@ function handleEdit() {
             {{ t('chat.messageDeleted') }}
           </div>
           <div v-else-if="isImageUrl" class="bubble-image">
+            <div v-if="!imageLoaded && !imageError" class="bubble-image__placeholder">
+              <el-skeleton animated style="width: 100%; height: 200px" />
+            </div>
             <img
+              v-show="imageLoaded && !imageError"
               :src="message.content"
               alt=""
               loading="lazy"
               @click.stop
-              @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
+              @load="imageLoaded = true"
+              @error="imageError = true"
             />
+            <div v-if="imageError" class="bubble-image__error" @click="imageError = false; imageLoaded = false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="24" height="24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>加载失败，点击重试</span>
+            </div>
           </div>
           <div v-else-if="isFileUrl" class="bubble-file">
             <el-icon :size="28" class="bubble-file__icon"><Document /></el-icon>
@@ -380,6 +412,10 @@ function handleEdit() {
     }
   }
 
+  .pin-btn--active {
+    color: var(--accent);
+  }
+
   .more-trigger {
     letter-spacing: 1px;
     font-weight: 700;
@@ -488,6 +524,16 @@ function handleEdit() {
   color: var(--muted);
 }
 
+.bubble-pinned {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+
+  svg {
+    display: block;
+  }
+}
+
 // ─── 回复引用 ────────────────────────────────
 .bubble-reply {
   display: flex;
@@ -557,6 +603,30 @@ function handleEdit() {
     object-fit: contain;
     cursor: pointer;
     display: block;
+  }
+
+  &__placeholder {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 100px;
+
+    &:hover {
+      color: var(--accent);
+    }
   }
 }
 

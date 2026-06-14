@@ -180,9 +180,8 @@ function closeMobile() {
 
       <!-- 加载状态 -->
       <div v-if="roomStore.loading" class="channel-loading">
-        <div v-for="i in 4" :key="i" class="channel-skeleton">
-          <span class="skeleton-hash">#</span>
-          <span class="skeleton-name" :style="{ width: 60 + i * 20 + 'px' }" />
+        <div v-for="i in 5" :key="i" class="channel-skeleton">
+          <el-skeleton :rows="1" animated />
         </div>
       </div>
     </div>
@@ -365,29 +364,6 @@ function closeMobile() {
   padding: 4px 8px;
 }
 
-.channel-skeleton {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-
-  .skeleton-hash {
-    color: var(--muted);
-    opacity: 0.3;
-  }
-
-  .skeleton-name {
-    height: 12px;
-    border-radius: 4px;
-    background: var(--message-hover);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-}
 
 .user-section {
   border-top: 1px solid var(--border);
@@ -425,6 +401,7 @@ function closeMobile() {
     border-radius: 50%;
     background: var(--accent-green);
     border: 2px solid var(--sidebar-bg);
+    transition: background 0.25s ease;
   }
 }
 

@@ -5,7 +5,7 @@ import { useWebSocketStore } from '@/stores/websocket'
 import { uploadApi } from '@/api/upload'
 import { ElMessage } from 'element-plus'
 import type { ReplyToMessage } from '@/types/message'
-import { Close, UploadFilled, Promotion } from '@element-plus/icons-vue'
+import { Close, UploadFilled, Promotion, Loading } from '@element-plus/icons-vue'
 import EmojiPicker from './EmojiPicker.vue'
 import GifPicker from './GifPicker.vue'
 const { t } = useI18n()
@@ -118,14 +118,17 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-function handleSend() {
-  const text = inputText.value.trim()
-  if (!text) return
+const sendState = ref<'idle' | 'sending' | 'error'>('idle')
 
-  sendStopTyping()
-  emit('send', text)
+function handleSend() {
+  if (!inputText.value.trim() || sendState.value === 'sending') return
+  sendState.value = 'sending'
+  emit('send', inputText.value.trim())
   inputText.value = ''
-  nextTick(() => autoResize())
+  autoResize()
+  setTimeout(() => {
+    sendState.value = 'idle'
+  }, 300)
 }
 
 function handleCancelReply() {
@@ -270,11 +273,15 @@ onUnmounted(() => {
         <button
           :title="t('chat.send')"
           class="send-btn"
-          :class="{ 'send-btn--active': inputText.trim() }"
-          :disabled="!inputText.trim()"
+          :class="{
+            'send-btn--active': inputText.trim(),
+            'send-btn--sending': sendState === 'sending',
+          }"
+          :disabled="!inputText.trim() || sendState === 'sending'"
           @click="handleSend"
         >
-          <el-icon :size="20"><Promotion /></el-icon>
+          <el-icon v-if="sendState === 'sending'" class="is-loading" :size="20"><Loading /></el-icon>
+          <el-icon v-else :size="20"><Promotion /></el-icon>
         </button>
       </div>
     </div>
@@ -455,6 +462,11 @@ onUnmounted(() => {
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  &--sending {
+    opacity: 0.7;
+    pointer-events: none;
   }
 }
 
