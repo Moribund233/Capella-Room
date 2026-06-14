@@ -158,6 +158,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         system: Default::default(),
         admin: Default::default(),
         redis: Default::default(),
+        batch_message: Default::default(),
     };
 
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);

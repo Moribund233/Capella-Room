@@ -22,10 +22,6 @@ const otherMembers = computed(() =>
   props.members.filter((m) => m.user_status !== 'online' && m.user_status !== 'away' && m.user_status !== 'offline'),
 )
 
-function getInitial(name: string): string {
-  return name.charAt(0).toUpperCase()
-}
-
 function getDotColor(status: string): string {
   switch (status) {
     case 'online': return 'var(--accent-green)'
@@ -64,6 +60,7 @@ function getRoleColor(role: string): string {
         >
           <span
             class="member-dot"
+            :class="{ 'member-dot--online': member.user_status === 'online' }"
             :style="{ background: getDotColor(member.user_status) }"
           />
           <span class="name">{{ member.username }}</span>
@@ -180,6 +177,15 @@ function getRoleColor(role: string): string {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+
+  &--online {
+    animation: member-status-pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes member-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent-green) 40%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--accent-green) 0%, transparent); }
 }
 
 .name {

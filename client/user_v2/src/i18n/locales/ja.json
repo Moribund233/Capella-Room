@@ -118,6 +118,8 @@
     "uploadFile": "ファイルをアップロード",
     "emoji": "絵文字",
     "gif": "GIF",
+    "searchGif": "GIFを検索",
+    "noGifResults": "GIFが見つかりません",
     "replyingTo": "返信先",
     "editingMessage": "メッセージを編集中",
     "edited": "編集済",
@@ -133,6 +135,10 @@
     "today": "今日",
     "yesterday": "昨日",
     "confirmDelete": "このメッセージを削除してもよろしいですか？",
+    "editHistory": "編集履歴",
+    "noEditHistory": "編集履歴はありません",
+    "before": "変更前",
+    "after": "変更後",
     "owner": "所有者",
     "admin": "管理者",
     "welcome": {
@@ -197,7 +203,8 @@
       "title": "危険区域",
       "description": "アカウントとすべての関連データを永久に削除します。この操作は元に戻せません。",
       "deleteAccount": "アカウントを削除",
-      "confirmDelete": "この操作は元に戻せません。すべてのデータが永久に削除されます。"
+      "confirmDelete": "この操作は元に戻せません。すべてのデータが永久に削除されます。",
+      "accountDeleted": "アカウントを削除しました"
     },
     "noBio": "自己紹介はありません",
     "settings": {

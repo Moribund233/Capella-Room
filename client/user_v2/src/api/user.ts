@@ -77,5 +77,12 @@ export const userApi = {
    */
   getUser(userId: string): Promise<ApiResponse<User>> {
     return httpClient.get(`/users/${userId}`)
+  },
+
+  /**
+   * 删除当前账号（自服务软删除）
+   */
+  deleteAccount(): Promise<ApiResponse<void>> {
+    return httpClient.delete('/users/me')
   }
 }

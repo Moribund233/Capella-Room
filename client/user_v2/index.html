@@ -26,6 +26,16 @@
           --wave-logo-filter: invert(1) brightness(0.9) contrast(1.2);
         }
       }
+
+      /* 主题切换平滑过渡 */
+      html.transitioning *,
+      html.transitioning *::before,
+      html.transitioning *::after {
+        transition: background-color 0.25s ease,
+                    color 0.25s ease,
+                    border-color 0.25s ease,
+                    box-shadow 0.25s ease !important;
+      }
     </style>
   </head>
   <body>

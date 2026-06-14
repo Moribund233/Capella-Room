@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useMessageStore } from '@/stores/message'
 import { useAuthStore } from '@/stores/auth'
-import { shouldShowTimeSeparator, formatTime } from '@/utils/date'
 import { Loading, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import ChatMessageBubble from './ChatMessageBubble.vue'
 import type { Message } from '@/types/message'
@@ -15,7 +14,7 @@ const authStore = useAuthStore()
 
 const { messages, loading, loadingMore, hasMore, error } = storeToRefs(messageStore)
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   typingUsers?: Array<{ id: string; username: string }>
 }>(), {
   typingUsers: () => [],
@@ -89,32 +88,28 @@ function onScrollTop() {
   }
 }
 
-// 消息分组 - 按天分隔
-interface MessageGroup {
-  date: string
-  messages: Message[]
-  showDate: boolean
+// 消息分组 - 拍平成带分隔符的列表（用于 TransitionGroup）
+interface FlatItem {
+  type: 'divider' | 'message'
+  key: string
+  date?: string
+  message?: Message
 }
 
-const messageGroups = computed(() => {
-  const groups: MessageGroup[] = []
+const flatItems = computed(() => {
+  const items: FlatItem[] = []
   let currentDate = ''
 
   for (const msg of messages.value) {
     const msgDate = new Date(msg.created_at).toLocaleDateString()
     if (msgDate !== currentDate) {
       currentDate = msgDate
-      groups.push({
-        date: msgDate,
-        messages: [msg],
-        showDate: true,
-      })
-    } else {
-      groups[groups.length - 1]!.messages.push(msg)
+      items.push({ type: 'divider', key: `d-${msgDate}`, date: msgDate })
     }
+    items.push({ type: 'message', key: msg.id, message: msg })
   }
 
-  return groups
+  return items
 })
 
 function isOwnMessage(message: Message): boolean {
@@ -208,25 +203,24 @@ defineExpose({ scrollToMessage })
     </div>
 
     <!-- 消息列表 -->
-    <template v-for="group in messageGroups" :key="group.date">
-      <!-- 时间分隔符 -->
-      <div class="message-divider">
-        <span>{{ formatDateSeparator(group.date) }}</span>
-      </div>
+    <TransitionGroup name="msg" tag="div" class="message-list">
+      <template v-for="item in flatItems" :key="item.key">
+        <div v-if="item.type === 'divider'" class="message-divider">
+          <span>{{ formatDateSeparator(item.date!) }}</span>
+        </div>
 
-      <!-- 消息 -->
-      <ChatMessageBubble
-        v-for="msg in group.messages"
-        :key="msg.id"
-        :message="msg"
-        :is-own="isOwnMessage(msg)"
-        :highlight="currentHighlight === msg.id"
-        @reply="emit('reply', $event)"
-        @edit="emit('edit', $event)"
-        @delete="emit('delete', $event)"
-        @jump-to-thread="emit('jumpToThread', $event)"
-      />
-    </template>
+        <ChatMessageBubble
+          v-else
+          :message="item.message!"
+          :is-own="isOwnMessage(item.message!)"
+          :highlight="currentHighlight === item.key"
+          @reply="emit('reply', $event)"
+          @edit="emit('edit', $event)"
+          @delete="emit('delete', $event)"
+          @jump-to-thread="emit('jumpToThread', $event)"
+        />
+      </template>
+    </TransitionGroup>
 
     <!-- 正在输入指示器 -->
     <div v-if="typingUsers.length > 0" class="typing-indicator">
@@ -258,6 +252,35 @@ defineExpose({ scrollToMessage })
   padding: 20px 24px 8px;
   display: flex;
   flex-direction: column;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+}
+
+// ─── 消息进出动画 ─────────────────────────────
+.msg-enter-active {
+  transition: all 0.25s ease-out;
+}
+
+.msg-leave-active {
+  transition: all 0.2s ease-in;
+  position: absolute;
+}
+
+.msg-move {
+  transition: transform 0.25s ease;
+}
+
+.msg-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.msg-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
 }
 
 .load-more {

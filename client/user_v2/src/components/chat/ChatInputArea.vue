@@ -6,6 +6,8 @@ import { uploadApi } from '@/api/upload'
 import { ElMessage } from 'element-plus'
 import type { ReplyToMessage } from '@/types/message'
 import { Close, UploadFilled, Promotion } from '@element-plus/icons-vue'
+import EmojiPicker from './EmojiPicker.vue'
+import GifPicker from './GifPicker.vue'
 const { t } = useI18n()
 
 const props = defineProps<{
@@ -28,6 +30,40 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isFocused = ref(false)
 const uploading = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const showEmojiPicker = ref(false)
+const showGifPicker = ref(false)
+
+function selectGif(url: string) {
+  emit('send', url)
+  showGifPicker.value = false
+}
+
+function toggleGifPicker() {
+  showGifPicker.value = !showGifPicker.value
+  if (showGifPicker.value) showEmojiPicker.value = false
+}
+
+function toggleEmojiPicker() {
+  showEmojiPicker.value = !showEmojiPicker.value
+  if (showEmojiPicker.value) showGifPicker.value = false
+}
+
+function insertEmoji(emoji: string) {
+  const ta = textareaRef.value
+  if (!ta) {
+    inputText.value += emoji
+  } else {
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const text = inputText.value
+    inputText.value = text.slice(0, start) + emoji + text.slice(end)
+    nextTick(() => {
+      ta.selectionStart = ta.selectionEnd = start + emoji.length
+      ta.focus()
+      autoResize()
+    })
+  }
+}
 let typingTimer: ReturnType<typeof setTimeout> | null = null
 let isTyping = false
 
@@ -188,14 +224,21 @@ onUnmounted(() => {
         >
           <el-icon :size="20"><UploadFilled /></el-icon>
         </button>
-        <button :title="t('chat.emoji')" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
-        </button>
+        <div class="emoji-btn-wrapper">
+          <button :title="t('chat.emoji')" @click="toggleEmojiPicker">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+          </button>
+          <EmojiPicker
+            :visible="showEmojiPicker"
+            @select="insertEmoji"
+            @close="showEmojiPicker = false"
+          />
+        </div>
         <span v-if="uploading" class="uploading-spinner" />
       </div>
 
@@ -211,12 +254,19 @@ onUnmounted(() => {
       />
 
       <div class="input-tools">
-        <button :title="t('chat.gif')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <path d="M9 12h6"/>
-          </svg>
-        </button>
+        <div class="gif-btn-wrapper">
+          <button :title="t('chat.gif')" @click="toggleGifPicker">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 12h6"/>
+            </svg>
+          </button>
+          <GifPicker
+            :visible="showGifPicker"
+            @select="selectGif"
+            @close="showGifPicker = false"
+          />
+        </div>
         <button
           :title="t('chat.send')"
           class="send-btn"
@@ -385,11 +435,21 @@ onUnmounted(() => {
   }
 }
 
+.emoji-btn-wrapper,
+.gif-btn-wrapper {
+  position: relative;
+}
+
 .send-btn {
   color: var(--muted) !important;
+  transition: transform 0.12s ease;
 
   &--active {
     color: var(--accent) !important;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.85);
   }
 
   &:disabled {

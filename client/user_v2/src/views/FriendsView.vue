@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFriendStore } from '@/stores/friend'
 import { useDirectRoomStore } from '@/stores/directRoom'
-import { useRoomStore } from '@/stores/room'
 import { searchApi } from '@/api/search'
 import type { Friend } from '@/types/friend'
 import type { UserSearchItem } from '@/types/search'
@@ -25,7 +24,6 @@ const router = useRouter()
 const { t } = useI18n()
 const friendStore = useFriendStore()
 const directRoomStore = useDirectRoomStore()
-const roomStore = useRoomStore()
 
 const activeTab = ref<TabType>('friends')
 

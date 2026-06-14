@@ -19,6 +19,23 @@ use crate::{
     state::AppState,
 };
 
+/// 删除当前用户（自服务软删除）
+pub async fn delete_current_user(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<Json<ApiResponse<serde_json::Value>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)?;
+
+    state
+        .user_service()
+        .soft_delete_user(user_id)
+        .await?;
+
+    Ok(Json(ApiResponse::success_with_message("账号已删除")))
+}
+
 /// 获取用户列表查询参数
 #[derive(Debug, Deserialize)]
 pub struct ListUsersQuery {

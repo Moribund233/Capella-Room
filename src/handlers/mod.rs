@@ -7,6 +7,7 @@ pub mod file;
 pub mod message;
 pub mod message_reaction;
 pub mod notification;
+pub mod pin_message;
 pub mod room;
 pub mod security;
 pub mod ui_config;

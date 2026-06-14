@@ -24,7 +24,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   // 同步 wsService 的状态变化
   function onStateChange(state: ConnectionState) {
-    const prev = connectionState.value
     connectionState.value = state
 
     if (state === 'reconnecting') {

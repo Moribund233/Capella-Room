@@ -35,17 +35,28 @@ function getSystemTheme(): 'light' | 'dark' {
  * @param theme 主题类型
  */
 function applyThemeToDocument(theme: ThemeType): void {
+  const el = document.documentElement
   const effectiveTheme = theme === 'system' ? getSystemTheme() : theme
-  document.documentElement.setAttribute('data-theme', effectiveTheme)
+
+  // 启用过渡动画
+  el.classList.add('transitioning')
+  el.setAttribute('data-theme', effectiveTheme)
 
   // 同步 Element Plus 和自定义 CSS 的 dark/light 类
   if (effectiveTheme === 'dark') {
-    document.documentElement.classList.add('dark')
-    document.documentElement.classList.remove('light')
+    el.classList.add('dark')
+    el.classList.remove('light')
   } else {
-    document.documentElement.classList.add('light')
-    document.documentElement.classList.remove('dark')
+    el.classList.add('light')
+    el.classList.remove('dark')
   }
+
+  // 动画结束后移除 transition 类
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.classList.remove('transitioning')
+    })
+  })
 }
 
 /**

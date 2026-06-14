@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useRoomStore } from '@/stores/room'
 import { useInvitationStore } from '@/stores/invitation'
 import { useAuthStore } from '@/stores/auth'
@@ -8,7 +7,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close, CopyDocument } from '@element-plus/icons-vue'
 import type { Room } from '@/types/room'
 
-const { t } = useI18n()
 const roomStore = useRoomStore()
 const invitationStore = useInvitationStore()
 const authStore = useAuthStore()

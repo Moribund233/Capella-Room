@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useMessageStore } from '@/stores/message'
 import { formatTime } from '@/utils/date'
+import { renderMarkdown } from '@/utils/markdown'
 import type { Message } from '@/types/message'
 import { ElMessageBox } from 'element-plus'
 import { ChatRound, Edit, CircleClose, Document } from '@element-plus/icons-vue'
+import EmojiPicker from './EmojiPicker.vue'
+import EditHistoryPanel from './EditHistoryPanel.vue'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const messageStore = useMessageStore()
 
 const props = defineProps<{
   message: Message
@@ -23,6 +28,9 @@ const emit = defineEmits<{
   jumpToThread: [messageId: string | undefined]
 }>()
 
+const showEmojiPicker = ref(false)
+const showEditHistory = ref(false)
+
 const displayName = computed(() => props.message.sender.username)
 const displayTime = computed(() => formatTime(props.message.created_at))
 const isDeleted = computed(() => props.message.is_deleted)
@@ -31,6 +39,24 @@ const isError = computed(() => props.message.error)
 const isEdited = computed(() => (props.message.edit_count || 0) > 0)
 const isImageUrl = computed(() => /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(props.message.content))
 const isFileUrl = computed(() => /\/files\//.test(props.message.content) && !isImageUrl.value)
+const currentUserId = computed(() => authStore.user?.id ?? '')
+
+function hasReacted(emoji: string): boolean {
+  const r = props.message.reactions?.find((r) => r.emoji === emoji)
+  return r ? r.users.includes(currentUserId.value) : false
+}
+
+function handleReactionClick(emoji: string) {
+  if (hasReacted(emoji)) {
+    messageStore.removeReaction(props.message.id, emoji)
+  } else {
+    messageStore.addReaction(props.message.id, emoji)
+  }
+}
+
+function handleEmojiSelect(emoji: string) {
+  handleReactionClick(emoji)
+}
 
 function getAvatarColor(name: string): string {
   const colors = ['var(--accent)', 'var(--accent-pink)', 'var(--accent-green)', 'var(--accent-orange)', 'var(--accent-blue)']
@@ -100,7 +126,7 @@ function handleEdit() {
       <div class="bubble-content" :class="{ 'bubble-content--own': isOwn }">
         <!-- 操作栏（悬停显示） -->
         <div class="bubble-actions">
-          <button :title="t('chat.react')" @click="emit('reply', message)">
+          <button :title="t('chat.react')" @click="showEmojiPicker = !showEmojiPicker">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
           </button>
           <button :title="t('chat.reply')" @click="emit('reply', message)">
@@ -138,7 +164,7 @@ function handleEdit() {
           <div class="bubble-header">
             <span class="bubble-author">{{ isOwn ? t('chat.you') : displayName }}</span>
             <span class="bubble-time">{{ displayTime }}</span>
-            <span v-if="isEdited" class="bubble-edited">({{ t('chat.edited') }})</span>
+            <span v-if="isEdited" class="bubble-edited" @click.stop="showEditHistory = !showEditHistory">({{ t('chat.edited') }})</span>
           </div>
 
           <!-- 回复引用（点击跳转到原消息） -->
@@ -160,7 +186,13 @@ function handleEdit() {
             {{ t('chat.messageDeleted') }}
           </div>
           <div v-else-if="isImageUrl" class="bubble-image">
-            <img :src="message.content" alt="" loading="lazy" @click.stop />
+            <img
+              :src="message.content"
+              alt=""
+              loading="lazy"
+              @click.stop
+              @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
+            />
           </div>
           <div v-else-if="isFileUrl" class="bubble-file">
             <el-icon :size="28" class="bubble-file__icon"><Document /></el-icon>
@@ -168,14 +200,26 @@ function handleEdit() {
               {{ message.content.split('/').pop() || message.content }}
             </a>
           </div>
-          <div v-else class="bubble-text">
-            <p>{{ message.content }}</p>
-          </div>
+          <div v-else class="bubble-text bubble-text--md" v-html="renderMarkdown(message.content)" />
 
           <!-- 已删除&自己消息下的操作 -->
           <div v-if="isDeleted && isOwn" class="bubble-deleted-actions">
             <button @click="handleDelete">{{ t('common.delete') }}</button>
           </div>
+        </div>
+
+        <!-- 反应区域 -->
+        <div v-if="!isDeleted && message.reactions && message.reactions.length > 0" class="bubble-reactions">
+          <button
+            v-for="r in message.reactions"
+            :key="r.emoji"
+            class="bubble-reactions__pill"
+            :class="{ 'bubble-reactions__pill--active': hasReacted(r.emoji) }"
+            @click="handleReactionClick(r.emoji)"
+          >
+            <span class="bubble-reactions__emoji">{{ r.emoji }}</span>
+            <span class="bubble-reactions__count">{{ r.count }}</span>
+          </button>
         </div>
 
         <!-- 发送中状态指示 -->
@@ -189,6 +233,23 @@ function handleEdit() {
         <div v-if="isOwn && !isSending && !isDeleted" class="bubble-read-receipt">
           <span v-if="message.read" class="bubble-read-receipt__read">{{ t('chat.read') }}</span>
           <span v-else class="bubble-read-receipt__sent">{{ t('chat.sent') }}</span>
+        </div>
+
+        <!-- Emoji 选择器 -->
+        <div style="position: relative">
+          <EmojiPicker
+            :visible="showEmojiPicker"
+            @select="handleEmojiSelect"
+            @close="showEmojiPicker = false"
+          />
+        </div>
+
+        <!-- 编辑历史面板 -->
+        <div v-if="showEditHistory" class="edit-history-wrapper" @click.stop>
+          <EditHistoryPanel
+            :message-id="message.id"
+            @close="showEditHistory = false"
+          />
         </div>
       </div>
     </template>
@@ -272,6 +333,15 @@ function handleEdit() {
     margin-left: auto;
     align-items: flex-end;
   }
+}
+
+// ─── 编辑历史面板 ─────────────────────────────
+.edit-history-wrapper {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 8px;
+  z-index: 60;
 }
 
 // ─── 悬停操作栏 ─────────────────────────────────
@@ -478,6 +548,8 @@ function handleEdit() {
   border-radius: 6px 16px 16px 16px;
   overflow: hidden;
   line-height: 0;
+  min-height: 60px;
+  background: color-mix(in oklch, var(--fg) 4%, transparent);
 
   img {
     max-width: 100%;
@@ -535,6 +607,40 @@ function handleEdit() {
     color: var(--muted);
     font-size: 13px;
   }
+
+  &--md {
+    p { margin: 0 0 4px; &:last-child { margin: 0; } }
+    a { color: var(--accent); text-decoration: underline; }
+    code {
+      background: color-mix(in oklch, var(--fg) 8%, transparent);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    pre {
+      background: color-mix(in oklch, var(--fg) 6%, transparent);
+      padding: 8px 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 6px 0;
+      code { background: none; padding: 0; }
+    }
+    blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+      margin: 6px 0;
+      color: var(--muted);
+    }
+    ul, ol { margin: 4px 0; padding-left: 20px; }
+    li { margin: 2px 0; }
+    h1, h2, h3, h4, h5, h6 { margin: 8px 0 4px; font-weight: 600; }
+    h1 { font-size: 17px; }
+    h2 { font-size: 16px; }
+    h3 { font-size: 15px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+    del { opacity: 0.6; }
+  }
 }
 
 // ─── 删除消息操作 ─────────────────────────────
@@ -552,6 +658,48 @@ function handleEdit() {
     &:hover {
       color: var(--accent-pink);
     }
+  }
+}
+
+// ─── 反应区域 ─────────────────────────────
+.bubble-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+
+  &__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border, #e0e0e0);
+    background: var(--surface, #fff);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.4;
+    transition: background 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: color-mix(in oklch, var(--accent) 8%, var(--surface));
+      border-color: var(--accent);
+    }
+
+    &--active {
+      background: color-mix(in oklch, var(--accent) 14%, var(--surface));
+      border-color: var(--accent);
+    }
+  }
+
+  &__emoji {
+    font-size: 15px;
+  }
+
+  &__count {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
   }
 }
 

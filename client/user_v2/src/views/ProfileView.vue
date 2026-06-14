@@ -228,8 +228,9 @@ function deleteAccount() {
     }
   ).then(async () => {
     try {
+      await userApi.deleteAccount()
       await authStore.logout()
-      ElMessage.success(t('common.success'))
+      ElMessage.success(t('profile.dangerZone.accountDeleted'))
       router.push('/')
     } catch {
       ElMessage.error(t('common.error'))

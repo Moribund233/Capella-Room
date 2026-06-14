@@ -1,6 +1,6 @@
 import httpClient from '@/services/http'
 import type { ApiResponse } from '@/types/api'
-import type { Message } from '@/types/message'
+import type { Message, MessageEditResponse } from '@/types/message'
 
 export interface MessageListResponse {
   messages: Message[]
@@ -34,7 +34,7 @@ export const messageApi = {
   },
 
   /** 获取消息编辑历史 */
-  getEditHistory(messageId: string): Promise<ApiResponse<Message[]>> {
+  getEditHistory(messageId: string): Promise<MessageEditResponse[]> {
     return httpClient.get(`/messages/${messageId}/history`)
   },
 }

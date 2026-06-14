@@ -29,6 +29,7 @@
 | **个人头像上传** | ProfileView 点击上传 + 预览 | ✅ |
 | **浏览器推送通知** | Notification API + NewMessage 事件 → 系统通知 | ✅ |
 | **消息反应** | 后端: DB迁移/Model/Service/API/WS + MessageResponse.reactions | ✅ |
+| **已读回执** | 消息气泡显示已读/未读状态 + Store 自动发送 + 设置开关 | ✅ |
 
 ### 本次会话修复/补全
 
@@ -49,38 +50,42 @@
 
 ## 待完成（按优先级排列）
 
-### P1 — 功能补全
+### Phase A — user_v2 功能补齐 ✅
 
-| # | 任务 | 涉及文件 | 后端就绪 | 预估 |
-|---|------|---------|:-------:|:----:|
-| 10 | **已读回执** — 消息气泡显示已读/未读状态 | `ChatMessageBubble.vue`, `message.ts` store | ⚠️ 部分 | 2h |
+| # | 任务 | 状态 |
+|---|------|:----:|
+| A1 | **消息反应 UI** — 气泡加表情按钮 → Emoji 选择器 → 显示反应列表 | ✅ |
+| A2 | **编辑历史查看** — "已编辑" 可点击 → 弹出 EditHistoryPanel | ✅ |
+| A3 | **Emoji 选择器** — ChatInputArea 加 Emoji 按钮 → 弹出面板 | ✅ |
+| A4 | **Markdown 渲染** — 消息内容支持 Markdown 显示 | ✅ |
+| A5 | **语言切换 (NavBar)** — NavBar 添加语言切换按钮（循环切换） | ✅ |
+| A6 | **GIF 选择器** — Giphy API + GifPicker 组件 | ✅ |
+| A7 | **系统日志订阅** — WS Logs 实时查看界面 | ❌ |
+| A8 | **删除账号** — ProfileView 危险区域 + 后端自服务 API | ✅ |
 
-### P2 — 体验增强
+### Phase B — 动画与用户体验优化 ✓ 高优先级
 
-| # | 任务 | 涉及文件 | 后端就绪 | 预估 |
-|---|------|---------|:-------:|:----:|
-| 12 | **Emoji 选择器** — ChatInputArea 加 Emoji 按钮 → 弹出 Emoji 面板 | `ChatInputArea.vue`, `EmojiPicker.vue` | N/A | 3h |
-| 13 | **Markdown 渲染** — 消息内容支持 Markdown 格式显示 | `ChatMessageBubble.vue` | N/A | 2h |
-| 14 | **编辑历史查看** — 已编辑消息显示 "已编辑"，可查看历史版本 | `ChatMessageBubble.vue`, `message.ts` API | ✅ | 2h |
-| 15 | **语言切换 (已登录)** — NavBar 加语言切换 | `NavBar.vue`, `locale.ts` | N/A | 1h |
-| 16 | **消息反应 (Reactions)** — 消息气泡加表情反应功能 | `ChatMessageBubble.vue`, types | ✅ 已完成 | 4h |
-| 17 | **删除账号** — ProfileView 危险区域功能实现 | `ProfileView.vue`, `user.ts` API | ❌ 需确认 | 2h |
+| # | 任务 | 涉及文件 | 预估 |
+|---|------|---------|:----:|
+| B1 | **消息进出动画** — 新消息滑入，删除/编辑平滑过渡 | `ChatMessageList.vue`, `ChatMessageBubble.vue` | 3h |
+| B2 | **页面转场动画** — 路由切换 Transition 效果 | `AppView.vue`, `router` | 2h |
+| B3 | **发送按钮微交互** — loading/success/error 状态反馈 | `ChatInputArea.vue` | 1.5h |
+| B4 | **滚动体验** — 新消息自动滚动、滚动到顶部加载历史时保持位置、跳转未读 | `ChatMessageList.vue` | 3h |
+| B5 | **骨架屏/加载态** — 房间列表/消息列表/发现页 Skeleton 占位 | `ChatRoomList.vue`, `ChatMessageList.vue`, `DiscoverView.vue` | 3h |
+| B6 | **Toast/通知动效** — 通知出现/消失动画 | `useNotification.ts`, `AppView.vue` | 1h |
+| B7 | **响应式适配** — 移动端布局、侧边栏抽屉、触摸优化 | `AppView.vue`, `NavBar.vue`, `ChatRoomList.vue` | 4h |
+| B8 | **在线状态指示器** — 头像绿点脉冲动画 + 状态切换过渡 | `ChatHeader.vue`, `ChatMemberPanel.vue` | 1.5h |
+| B9 | **图片/文件懒加载** — 渐进加载、占位图、加载失败重试 | `ChatMessageBubble.vue`, `FileUpload.vue` | 2h |
+| B10 | **主题切换平滑过渡** — 亮/暗切换时颜色过渡动画 | `useTheme.ts`, `AppView.vue` | 1h |
 
-### P3 — 低优先级 / 锦上添花
+### Phase C — 后端功能补齐
 
-| # | 任务 | 涉及文件 | 后端就绪 | 预估 |
-|---|------|---------|:-------:|:----:|
-| 18 | **GIF 选择器** | `ChatInputArea.vue` | N/A | 3h |
-| 19 | **聊天背景自定义** | `ChatMessageList.vue`, personalization store | N/A | 2h |
-| 20 | **置顶消息 (Pinned Message)** | new store + UI | ❌ 后端无 | 4h |
-| 21 | **消息线程 (Threads)** | new store + UI | ❌ 后端无 | 8h |
-| 22 | **系统日志订阅 (WS Logs)** | websocket types + UI | ✅ | 3h |
-
-### Admin — 独立后台
-
-| # | 任务 | 涉及文件 | 后端就绪 | 预估 |
-|---|------|---------|:-------:|:----:|
-| A1 | Admin 管理面板（独立前端或子模块） | `client/admin/` | ✅ | 长期 |
+| # | 任务 | 涉及文件 | 预估 |
+|---|------|---------|:----:|
+| C1 | **删除账号自服务 API** — `DELETE /api/v1/users/me` | `src/handlers/user.rs` | 2h |
+| C2 | **置顶消息** — DB 迁移 + Model + API + WS | `migrations/`, `src/models/`, `src/handlers/`, `src/websocket/` | 6h |
+| C3 | **消息线程** — parent_id 字段 + API + WS + UI | ❌ 已取消 |
+| C4 | **Admin 管理面板** — `client/admin/` 已有完整实现 | ❌ 已取消 |
 
 ---
 

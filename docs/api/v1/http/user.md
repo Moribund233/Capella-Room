@@ -22,6 +22,7 @@
 | **POST** | **`/api/v1/users/friends/requests/handle`** | **处理好友请求** |
 | **DELETE** | **`/api/v1/users/friends/requests/:id`** | **取消好友请求** |
 | **DELETE** | **`/api/v1/users/friends/:id`** | **删除好友** |
+| **DELETE** | **`/api/v1/users/me`** | **注销账号（软删除）** |
 
 ---
 
@@ -1724,5 +1725,36 @@ Authorization: Bearer {access_token}
 
 ---
 
-*文档版本: 1.2.0*  
-*最后更新: 2026-05-07*
+## 注销账号
+
+> **注意**: 注销账号为**软删除**操作，用户的个人信息会被匿名化，但其发送的消息内容仍会保留。
+
+### 请求
+
+```http
+DELETE /api/v1/users/me
+Authorization: Bearer {access_token}
+```
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "账号已注销"
+}
+```
+
+### 功能特性
+
+- 用户名、邮箱等个人信息会被匿名化
+- 用户发送的消息内容仍会保留在服务器上
+- 注销后无法登录
+- 已注销用户的设备 Token 会失效
+
+---
+
+*文档版本: 1.3.0*  
+*最后更新: 2026-06-14*

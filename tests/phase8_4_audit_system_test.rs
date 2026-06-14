@@ -111,6 +111,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             archive_hour: 3,
         },
         redis: Default::default(),
+        batch_message: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
@@ -698,4 +699,69 @@ async fn test_audit_log_query_by_severity() {
     let (logs, total) = state.audit_service().query_logs(query).await.unwrap();
     assert!(total >= 1, "应该有至少1条错误日志, 实际有 {} 条", total);
     assert!(logs.iter().all(|log| log.severity == AuditSeverity::Error));
+}
+
+/// 测试删除用户后审计日志 FK 约束不会阻断其他日志写入
+///
+/// 复现场景：
+/// 1. 创建用户后硬删除（模拟 admin 删除用户）
+/// 2. 用已删除用户的 UUID 创建审计日志（FK 约束会失败）
+/// 3. 混合正常日志一起刷入
+/// 4. 验证：正常日志不会被事务中毒影响（旧行为会被整个事务 abort 掉）
+#[tokio::test]
+async fn test_audit_log_fk_violation_does_not_poison_batch() {
+    let (_app, state) = create_test_app().await;
+
+    let (user_id, _token) =
+        create_test_user(&state, "fk_test_user", "fk_test_user@test.com").await;
+
+    // 硬删除用户（模拟 admin 删除）
+    let deleted = sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(user_id)
+        .execute(state.db().pool())
+        .await
+        .unwrap();
+    assert_eq!(deleted.rows_affected(), 1, "用户应该被删除");
+
+    // 第 1 条：actor_id 引用已删除用户 → 会触发 FK 约束失败
+    let bad_log = CreateAuditLogRequest::new(
+        AuditEventType::UserLogin,
+        "login",
+        "这条日志的 actor 已被删除",
+    )
+    .with_actor(user_id, capella_room::models::user::UserRole::User);
+
+    state.audit_service().log_event(bad_log).await.unwrap();
+
+    // 第 2 条：没有 actor_id（合法的日志）
+    let good_log = CreateAuditLogRequest::new(
+        AuditEventType::SystemLoginFailure,
+        "login_failure",
+        "这条日志没有 actor_id，应该正常写入",
+    );
+
+    state.audit_service().log_event(good_log).await.unwrap();
+
+    // 刷入数据库
+    let flush_result = state.audit_service().flush_buffer().await;
+    assert!(
+        flush_result.is_ok(),
+        "flush_buffer 不应因单条 FK 失败而整体失败"
+    );
+
+    // 查询——good_log 应该被成功写入
+    let (_logs, total) = state
+        .audit_service()
+        .query_logs(capella_room::models::audit::AuditLogQuery {
+            event_type: Some(AuditEventType::SystemLoginFailure),
+            ..Default::default()
+        })
+        .await
+        .unwrap_or_else(|_| (vec![], 0));
+
+    assert!(
+        total >= 1,
+        "正常日志（没有 actor_id）应该被成功写入，但实际查询到 {} 条",
+        total
+    );
 }

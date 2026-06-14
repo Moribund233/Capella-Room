@@ -440,6 +440,38 @@ impl UserService {
         Ok(())
     }
 
+    /// 软删除用户（自服务）：标记为不活动、匿名化个人数据、清除密码
+    pub async fn soft_delete_user(&self, user_id: Uuid) -> Result<()> {
+        let suffix = &user_id.to_string()[..8];
+        let anon_username = format!("deleted_user_{}", suffix);
+        let anon_email = format!("deleted_{}@deleted", suffix);
+
+        let result = sqlx::query(
+            r#"
+            UPDATE users
+            SET
+                is_active = false,
+                username = $1,
+                email = $2,
+                avatar_url = NULL,
+                password_hash = 'deleted',
+                updated_at = NOW()
+            WHERE id = $3 AND is_active = true
+            "#,
+        )
+        .bind(&anon_username)
+        .bind(&anon_email)
+        .bind(user_id)
+        .execute(self.db.pool())
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
     /// 禁用/启用用户
     pub async fn set_user_disabled(&self, user_id: Uuid, disabled: bool) -> Result<User> {
         let user = sqlx::query_as::<_, User>(

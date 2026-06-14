@@ -50,6 +50,34 @@ export interface MessageReadPayload {
   message_id: string
 }
 
+/** 添加反应 */
+export interface AddReactionPayload {
+  message_id: string
+  emoji: string
+}
+
+/** 移除反应 */
+export interface RemoveReactionPayload {
+  message_id: string
+  emoji: string
+}
+
+/** 反应已添加（广播） */
+export interface ReactionAddedPayload {
+  message_id: string
+  room_id: string
+  user_id: string
+  emoji: string
+}
+
+/** 反应已移除（广播） */
+export interface ReactionRemovedPayload {
+  message_id: string
+  room_id: string
+  user_id: string
+  emoji: string
+}
+
 /** 编辑消息 */
 export interface EditMessagePayload {
   message_id: string
@@ -244,6 +272,8 @@ export enum WSMessageType {
   DELETE_MESSAGE = 'DeleteMessage',
   GET_MISSED_MESSAGES = 'GetMissedMessages',
   GET_ONLINE_USERS = 'GetOnlineUsers',
+  ADD_REACTION = 'AddReaction',
+  REMOVE_REACTION = 'RemoveReaction',
   RECONNECT = 'Reconnect',
   PING = 'Ping',
   PONG = 'Pong',
@@ -265,6 +295,8 @@ export enum WSMessageType {
   MISSED_MESSAGES = 'MissedMessages',
   RECONNECT_RESULT = 'ReconnectResult',
   SESSION_RESTORED = 'SessionRestored',
+  REACTION_ADDED = 'ReactionAdded',
+  REACTION_REMOVED = 'ReactionRemoved',
   GLOBAL_ONLINE_USERS = 'GlobalOnlineUsers',
   ERROR = 'Error',
   SYSTEM_MESSAGE = 'SystemMessage',

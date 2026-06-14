@@ -1512,13 +1512,23 @@ async fn flush_logs(db: &Database, buffer: &Arc<RwLock<Vec<CreateAuditLogRequest
     let pool = db.pool();
     let mut tx = pool.begin().await.map_err(AppError::Database)?;
 
-    for log in logs_to_flush {
+    for (i, log) in logs_to_flush.iter().enumerate() {
+        // 使用 savepoint 隔离每条 insert，避免单条 FK 失败污染整批
+        let sp_name = format!("audit_sp_{}", i);
+        if let Err(e) = sqlx::query(&format!("SAVEPOINT {}", sp_name))
+            .execute(&mut *tx)
+            .await
+        {
+            warn!("Failed to create savepoint {}: {}", sp_name, e);
+            continue;
+        }
+
         let metadata_json = log
             .metadata
             .as_ref()
             .and_then(|m| serde_json::to_value(m).ok());
 
-        if let Err(e) = sqlx::query(
+        let insert_result = sqlx::query(
             "INSERT INTO audit_logs 
              (event_type, severity, actor_id, actor_role, target_type, target_id, 
               action, description, metadata, status, error_message)
@@ -1527,18 +1537,36 @@ async fn flush_logs(db: &Database, buffer: &Arc<RwLock<Vec<CreateAuditLogRequest
         .bind(&log.event_type)
         .bind(log.severity())
         .bind(log.actor_id)
-        .bind(log.actor_role)
+        .bind(log.actor_role.clone())
         .bind(&log.target_type)
         .bind(log.target_id)
         .bind(&log.action)
         .bind(&log.description)
         .bind(metadata_json)
-        .bind(log.status.unwrap_or_else(|| "success".to_string()))
+        .bind(log.status.clone().unwrap_or_else(|| "success".to_string()))
         .bind(&log.error_message)
         .execute(&mut *tx)
-        .await
-        {
-            error!("Failed to insert audit log: {}", e);
+        .await;
+
+        match insert_result {
+            Ok(_) => {
+                if let Err(e) = sqlx::query(&format!("RELEASE SAVEPOINT {}", sp_name))
+                    .execute(&mut *tx)
+                    .await
+                {
+                    warn!("Failed to release savepoint {}: {}", sp_name, e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to insert audit log (will rollback savepoint): {}", e);
+                if let Err(rollback_err) =
+                    sqlx::query(&format!("ROLLBACK TO SAVEPOINT {}", sp_name))
+                        .execute(&mut *tx)
+                        .await
+                {
+                    warn!("Failed to rollback savepoint {}: {}", sp_name, rollback_err);
+                }
+            }
         }
     }
 

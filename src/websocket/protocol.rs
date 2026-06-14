@@ -156,6 +156,36 @@ pub enum WebSocketMessage {
     /// 消息已删除通知
     MessageDeleted { message_id: Uuid },
 
+    /// 置顶消息
+    PinMessage {
+        message_id: Uuid,
+        room_id: Uuid,
+    },
+
+    /// 取消置顶消息
+    UnpinMessage {
+        message_id: Uuid,
+        room_id: Uuid,
+    },
+
+    /// 消息已置顶（广播）
+    MessagePinned {
+        message_id: Uuid,
+        room_id: Uuid,
+        pinned_by: Uuid,
+        pinned_by_name: String,
+        content_preview: String,
+        pinned_at: DateTime<Utc>,
+    },
+
+    /// 消息已取消置顶（广播）
+    MessageUnpinned {
+        message_id: Uuid,
+        room_id: Uuid,
+        unpinned_by: Uuid,
+        unpinned_at: DateTime<Utc>,
+    },
+
     // ========== 系统消息 ==========
     /// 系统广播
     SystemMessage { content: String },

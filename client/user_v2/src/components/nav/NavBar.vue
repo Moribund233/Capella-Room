@@ -8,6 +8,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useNotificationStore } from '@/stores/notification'
 import { QuickBar } from '@/components/quick'
 import type { QuickItem } from '@/components/quick'
+import { supportedLocales, setLocale, getCurrentLocale } from '@/i18n'
 import {
   ChatRound,
   User,
@@ -72,6 +73,18 @@ async function handleLogout(): Promise<void> {
   router.push('/login')
 }
 
+const currentLocale = computed(() => {
+  const code = getCurrentLocale()
+  return supportedLocales.find(l => l.code === code) ?? supportedLocales[1]!
+})
+
+function cycleLocale() {
+  const codes = supportedLocales.map(l => l.code)
+  const idx = codes.indexOf(currentLocale.value.code)
+  const next = codes[(idx + 1) % codes.length] as 'en' | 'zh' | 'ja'
+  setLocale(next)
+}
+
 /**
  * QuickBar 配置 - 全局快捷操作
  */
@@ -128,6 +141,17 @@ const quickItems = computed<QuickItem[]>(() => [
       <!-- QuickBar 快捷栏 -->
       <div class="nav-bar__quick">
         <QuickBar :items="quickItems" />
+      </div>
+
+      <!-- 语言切换 -->
+      <div class="nav-bar__locale">
+        <button
+          class="nav-bar__locale-btn"
+          @click="cycleLocale"
+          :title="currentLocale.name"
+        >
+          <span class="nav-bar__locale-text">{{ currentLocale.flag }}</span>
+        </button>
       </div>
 
       <!-- 退出按钮 -->
@@ -256,6 +280,33 @@ const quickItems = computed<QuickItem[]>(() => [
   align-items: center;
   gap: 4px;
   border-bottom: 1px solid var(--el-border-color-light);
+}
+
+/* 语言切换 */
+.nav-bar__locale {
+  width: 100%;
+  padding: 6px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.nav-bar__locale-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 20px;
+  line-height: 1;
+
+  &:hover {
+    background: var(--el-color-primary-light-9);
+  }
 }
 
 /* 登出按钮 */

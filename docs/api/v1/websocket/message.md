@@ -29,6 +29,8 @@
 | `DeleteMessage` | 删除消息 | ✅ | - |
 | `AddReaction` | 添加表情反应 | ✅ | ✅ |
 | `RemoveReaction` | 移除表情反应 | ✅ | - |
+| `PinMessage` | 置顶消息 | ✅ | ✅ |
+| `UnpinMessage` | 取消置顶消息 | ✅ | ✅ |
 | `GetMissedMessages` | 获取离线消息 | ✅ | ✅ |
 
 ### 服务端发送的消息
@@ -43,6 +45,8 @@
 | `MessageDeleted` | 消息已删除通知 |
 | `ReactionAdded` | 表情反应已添加（广播） |
 | `ReactionRemoved` | 表情反应已移除（广播） |
+| `MessagePinned` | 消息已置顶（广播） |
+| `MessageUnpinned` | 消息已取消置顶（广播） |
 | `MissedMessages` | 离线消息列表 |
 | `Mentioned` | @提及通知 |
 | `Error` | 错误响应 |
@@ -469,6 +473,101 @@
 3. 反应会实时广播给房间内所有成员，客户端无需重新加载消息即可看到更新
 4. 消息列表接口（`get_room_messages` / `search_messages`）会自动包含 `reactions` 字段
 5. 反应完整列表可通过 `GET /api/v1/messages/:id/reactions` 查询
+
+---
+
+## 消息置顶
+
+消息置顶支持通过 WebSocket 实时置顶/取消置顶消息，并广播给房间内所有成员。
+
+### 置顶消息
+
+#### 请求
+
+```json
+{
+  "type": "PinMessage",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 是 | 固定为 "PinMessage" |
+| payload.message_id | string (UUID) | 是 | 要置顶的消息 ID |
+| payload.room_id | string (UUID) | 是 | 房间 ID |
+
+#### 广播通知
+
+成功置顶后，服务端向房间内所有成员广播：
+
+```json
+{
+  "type": "MessagePinned",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "pinned_by": "44777268-d040-4ef5-81de-9aad6ea3ead3",
+    "pinned_by_name": "user123",
+    "content_preview": "这是重要通知…",
+    "pinned_at": "2026-06-14T10:00:00.000Z"
+  }
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| message_id | string (UUID) | 被置顶的消息 ID |
+| room_id | string (UUID) | 房间 ID |
+| pinned_by | string (UUID) | 置顶操作者 ID |
+| pinned_by_name | string | 置顶操作者名称 |
+| content_preview | string | 消息内容预览（最多 100 字符） |
+| pinned_at | string (ISO 8601) | 置顶时间 |
+
+### 取消置顶
+
+#### 请求
+
+```json
+{
+  "type": "UnpinMessage",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+#### 广播通知
+
+成功取消置顶后，服务端向房间内所有成员广播：
+
+```json
+{
+  "type": "MessageUnpinned",
+  "payload": {
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "unpinned_by": "44777268-d040-4ef5-81de-9aad6ea3ead3",
+    "unpinned_at": "2026-06-14T10:05:00.000Z"
+  }
+}
+```
+
+### 注意事项
+
+1. 置顶/取消置顶需要用户在房间中
+2. 已置顶的消息再次置顶会返回错误
+3. 操作会实时广播给房间内所有成员
+4. 内容预览截取消息前 100 字符，超过部分以 `…` 结尾
+5. 置顶消息列表可通过 `GET /api/v1/rooms/:room_id/pinned-messages` 查询
 
 ---
 

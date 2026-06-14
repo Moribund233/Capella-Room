@@ -91,6 +91,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             archive_hour: 3,
         },
         redis: Default::default(),
+        batch_message: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 

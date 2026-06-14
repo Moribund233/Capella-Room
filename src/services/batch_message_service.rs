@@ -302,7 +302,7 @@ impl BatchMessageService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use crate::config::BatchMessageConfig;
 
     #[test]

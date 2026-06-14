@@ -38,6 +38,7 @@
 | **POST** | **`/api/v1/rooms/:room_id/invitations`** | **创建房间邀请** |
 | **DELETE** | **`/api/v1/rooms/:room_id/invitations/:invitation_id`** | **撤销房间邀请** |
 | GET | `/api/v1/rooms/:room_id/messages` | 获取房间消息历史 |
+| GET | `/api/v1/rooms/:room_id/pinned-messages` | 获取房间置顶消息列表 |
 
 ---
 

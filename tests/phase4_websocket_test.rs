@@ -162,6 +162,7 @@ async fn setup_test_server() -> (TestServer, Database) {
             archive_hour: 3,
         },
         redis: Default::default(),
+        batch_message: Default::default(),
     };
 
     let metrics_collector = Arc::new(MetricsCollector::new());

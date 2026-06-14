@@ -1,17 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { NavBar } from '@/components/nav'
 import { useResponsive } from '@/composables/useResponsive'
 
-const route = useRoute()
 const { isMobile } = useResponsive()
-
-// 判断是否在聊天页面（显示侧边栏的页面）
-const isChatPage = computed(() => {
-  const chatRoutes = ['app']
-  return chatRoutes.includes(route.name as string)
-})
 </script>
 
 <template>
@@ -23,7 +14,11 @@ const isChatPage = computed(() => {
     <main class="main-layout__content" :class="{ 'main-layout--mobile': isMobile }">
       <!-- 页面内容 -->
       <div class="main-layout__page">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <transition name="page" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </div>
     </main>
 
@@ -77,5 +72,21 @@ const isChatPage = computed(() => {
   left: 0;
   right: 0;
   z-index: 100;
+}
+
+// ─── 页面转场动画 ─────────────────────────────
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

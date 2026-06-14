@@ -118,6 +118,8 @@
     "uploadFile": "上传文件",
     "emoji": "表情",
     "gif": "GIF",
+    "searchGif": "搜索GIF",
+    "noGifResults": "没有找到GIF",
     "replyingTo": "回复",
     "editingMessage": "编辑消息",
     "edited": "已编辑",
@@ -133,6 +135,10 @@
     "today": "今天",
     "yesterday": "昨天",
     "confirmDelete": "确定要删除此消息吗？",
+    "editHistory": "编辑历史",
+    "noEditHistory": "无编辑历史",
+    "before": "修改前",
+    "after": "修改后",
     "owner": "创建者",
     "admin": "管理员",
     "welcome": {
@@ -196,7 +202,8 @@
       "title": "危险区域",
       "description": "永久删除你的账户和所有相关数据。此操作无法撤销。",
       "deleteAccount": "删除账户",
-      "confirmDelete": "此操作无法撤销。你的所有数据将被永久删除。"
+      "confirmDelete": "此操作无法撤销。你的所有数据将被永久删除。",
+      "accountDeleted": "账号已删除"
     },
     "noBio": "暂无个人简介",
     "settings": {

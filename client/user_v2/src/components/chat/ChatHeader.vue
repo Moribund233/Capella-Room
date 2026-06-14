@@ -198,7 +198,13 @@ const onlineCount = computed(() =>
 
   &--online {
     background: var(--accent-green);
+    animation: status-pulse 2s ease-in-out infinite;
   }
+}
+
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent-green) 40%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--accent-green) 0%, transparent); }
 }
 
 .header-btn {

@@ -603,20 +603,7 @@ async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uu
                 anyhow::anyhow!("Invalid user ID: {}", e)
             })?;
 
-            // 优化：优先从JWT claims中获取用户名，避免数据库查询
-            if let Some(username) = claims.username {
-                debug!(
-                    "User authenticated from JWT claims: {} ({})",
-                    username, user_id
-                );
-                return Ok((user_id, username));
-            }
-
-            // 兼容旧token：如果claims中没有用户名，则查询数据库
-            warn!(
-                "JWT claims missing username, falling back to database query for user: {}",
-                user_id
-            );
+            // 查询数据库验证用户仍然存在（比 JWT claims 更可靠）
             match state.user_service().get_user_by_id(user_id).await {
                 Ok(Some(user)) => {
                     debug!(
@@ -788,6 +775,15 @@ async fn handle_message(
         } => {
             handle_get_offline_notifications(user_id, last_notification_id, limit, state, tx)
                 .await?;
+        }
+
+        // ========== 消息置顶 ==========
+        WebSocketMessage::PinMessage { message_id, room_id } => {
+            handle_pin_message(message_id, room_id, user_id, username, state, tx).await?;
+        }
+
+        WebSocketMessage::UnpinMessage { message_id, room_id } => {
+            handle_unpin_message(message_id, room_id, user_id, username, state, tx).await?;
         }
 
         // ========== 待办通知系统 ==========
@@ -2003,6 +1999,138 @@ async fn handle_remove_reaction(
         Err(e) => {
             warn!("Failed to remove reaction: {}", e);
             let error_msg = WebSocketMessage::error("REACTION_FAILED", &e.to_string());
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理置顶消息
+async fn handle_pin_message(
+    message_id: Uuid,
+    room_id: Uuid,
+    user_id: Uuid,
+    username: &str,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("User {} pinning message {} in room {}", user_id, message_id, room_id);
+
+    if !state.ws_manager().is_user_in_room(room_id, user_id) {
+        let error_msg = WebSocketMessage::error("NOT_IN_ROOM", "You are not in this room");
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
+
+    let content_preview = match state.message_service().get_message_by_id(message_id).await {
+        Ok(Some(msg)) => {
+            let preview = msg.content.chars().take(100).collect::<String>();
+            if msg.content.len() > 100 { format!("{}…", preview) } else { preview }
+        }
+        Ok(None) => {
+            let error_msg = WebSocketMessage::error("NOT_FOUND", "Message not found");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("Failed to get message {}: {}", message_id, e);
+            let error_msg = WebSocketMessage::error("FETCH_FAILED", "Failed to get message");
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+            return Ok(());
+        }
+    };
+
+    match state
+        .pin_message_service()
+        .pin_message(message_id, room_id, user_id)
+        .await
+    {
+        Ok(pinned) => {
+            let pinned_msg = WebSocketMessage::MessagePinned {
+                message_id,
+                room_id,
+                pinned_by: user_id,
+                pinned_by_name: username.to_string(),
+                content_preview,
+                pinned_at: pinned.created_at,
+            };
+            if let Ok(json) = pinned_msg.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_to_room_all(room_id, json)
+                    .await;
+            }
+            info!(
+                "Message {} pinned by user {} in room {}",
+                message_id, user_id, room_id
+            );
+        }
+        Err(e) => {
+            warn!("Failed to pin message: {}", e);
+            let error_msg = WebSocketMessage::error("PIN_FAILED", &e.to_string());
+            if let Ok(json) = error_msg.to_json() {
+                let _ = tx.send(json).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理取消置顶消息
+async fn handle_unpin_message(
+    message_id: Uuid,
+    room_id: Uuid,
+    user_id: Uuid,
+    _username: &str,
+    state: &AppState,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    debug!("User {} unpinning message {} in room {}", user_id, message_id, room_id);
+
+    if !state.ws_manager().is_user_in_room(room_id, user_id) {
+        let error_msg = WebSocketMessage::error("NOT_IN_ROOM", "You are not in this room");
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
+
+    match state
+        .pin_message_service()
+        .unpin_message(message_id)
+        .await
+    {
+        Ok(_) => {
+            let unpinned_msg = WebSocketMessage::MessageUnpinned {
+                message_id,
+                room_id,
+                unpinned_by: user_id,
+                unpinned_at: chrono::Utc::now(),
+            };
+            if let Ok(json) = unpinned_msg.to_json() {
+                state
+                    .ws_manager()
+                    .broadcast_to_room_all(room_id, json)
+                    .await;
+            }
+            info!(
+                "Message {} unpinned by user {} in room {}",
+                message_id, user_id, room_id
+            );
+        }
+        Err(e) => {
+            warn!("Failed to unpin message: {}", e);
+            let error_msg = WebSocketMessage::error("UNPIN_FAILED", &e.to_string());
             if let Ok(json) = error_msg.to_json() {
                 let _ = tx.send(json).await;
             }

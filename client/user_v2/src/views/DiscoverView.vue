@@ -208,7 +208,16 @@ onMounted(() => {
             <el-icon><TrendCharts /></el-icon>
             {{ t('discover.featured') }}
           </h2>
-          <div v-if="loadingFeatured" class="list-placeholder">{{ t('common.loading') }}</div>
+          <div v-if="loadingFeatured" class="featured-skeleton">
+            <div v-for="i in 3" :key="i" class="room-card-skeleton">
+              <div class="skeleton-icon" />
+              <div class="skeleton-body">
+                <div class="skeleton-title" />
+                <div class="skeleton-meta" />
+                <div class="skeleton-desc" />
+              </div>
+            </div>
+          </div>
           <div v-else-if="featuredRooms.length === 0" class="list-placeholder">
             {{ t('chat.noRooms') }}
           </div>
@@ -252,7 +261,15 @@ onMounted(() => {
             <el-icon><CollectionTag /></el-icon>
             {{ t('discover.trending') }}
           </h2>
-          <div v-if="loadingRecent" class="list-placeholder">{{ t('common.loading') }}</div>
+          <div v-if="loadingRecent" class="trending-skeleton">
+            <div v-for="i in 4" :key="i" class="room-row-skeleton">
+              <div class="skeleton-icon" />
+              <div class="skeleton-body">
+                <div class="skeleton-title" />
+                <div class="skeleton-meta" />
+              </div>
+            </div>
+          </div>
           <div v-else-if="recentRooms.length === 0" class="list-placeholder">
             {{ t('chat.noRooms') }}
           </div>
@@ -595,5 +612,72 @@ onMounted(() => {
 
 .room-icon--private {
   background: var(--accent-pink);
+}
+
+// ─── 骨架屏 ─────────────────────────────
+.featured-skeleton,
+.trending-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.room-card-skeleton,
+.room-row-skeleton {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #eee);
+  background: var(--surface, #fff);
+}
+
+.room-row-skeleton {
+  align-items: center;
+}
+
+.skeleton-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--message-hover, #f0f0f0);
+  flex-shrink: 0;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-title {
+  height: 16px;
+  width: 60%;
+  border-radius: 4px;
+  background: var(--message-hover, #f0f0f0);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-meta {
+  height: 12px;
+  width: 40%;
+  border-radius: 4px;
+  background: var(--message-hover, #f0f0f0);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-desc {
+  height: 12px;
+  width: 80%;
+  border-radius: 4px;
+  background: var(--message-hover, #f0f0f0);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
 </style>

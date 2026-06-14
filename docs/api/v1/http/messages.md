@@ -16,6 +16,9 @@
 | POST | `/api/v1/messages/:message_id/reactions` | 添加表情反应 |
 | DELETE | `/api/v1/messages/:message_id/reactions?emoji=xxx` | 移除表情反应 |
 | GET | `/api/v1/messages/:message_id/reactions` | 获取消息的反应列表 |
+| POST | `/api/v1/messages/:message_id/pin` | 置顶消息 |
+| DELETE | `/api/v1/messages/:message_id/pin` | 取消置顶消息 |
+| GET | `/api/v1/rooms/:room_id/pinned-messages` | 获取房间置顶消息列表 |
 
 ---
 
@@ -720,5 +723,126 @@ class MessageLoader {
 
 ---
 
-*文档版本: 1.1.0*  
-*最后更新: 2026-06-13*
+## 消息置顶
+
+消息置顶功能允许将重要消息置顶到房间顶部，方便成员快速查看。
+
+### 接口
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/messages/:message_id/pin` | 置顶消息 | 需要 |
+| DELETE | `/api/v1/messages/:message_id/pin` | 取消置顶 | 需要 |
+| GET | `/api/v1/rooms/:room_id/pinned-messages` | 获取置顶消息列表 | 需要 |
+
+### 置顶消息
+
+#### 请求
+
+```http
+POST /api/v1/messages/{message_id}/pin
+Authorization: Bearer {access_token}
+```
+
+#### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "770e8400-e29b-41d4-a716-446655440003",
+    "message_id": "660e8400-e29b-41d4-a716-446655440001",
+    "room_id": "550e8400-e29b-41d4-a716-446655440000",
+    "pinned_by": "44777268-d040-4ef5-81de-9aad6ea3ead3",
+    "created_at": "2026-06-14T10:00:00.000Z"
+  }
+}
+```
+
+**失败 - 消息已被置顶 (409 Conflict)**
+
+```json
+{
+  "success": false,
+  "code": "CONFLICT",
+  "error": "资源冲突",
+  "message": "消息已被置顶"
+}
+```
+
+### 取消置顶
+
+#### 请求
+
+```http
+DELETE /api/v1/messages/{message_id}/pin
+Authorization: Bearer {access_token}
+```
+
+#### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": "置顶已取消"
+}
+```
+
+### 获取置顶消息列表
+
+#### 请求
+
+```http
+GET /api/v1/rooms/{room_id}/pinned-messages
+Authorization: Bearer {access_token}
+```
+
+#### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "770e8400-e29b-41d4-a716-446655440003",
+      "message_id": "660e8400-e29b-41d4-a716-446655440001",
+      "room_id": "550e8400-e29b-41d4-a716-446655440000",
+      "pinned_by": "44777268-d040-4ef5-81de-9aad6ea3ead3",
+      "content": "这是重要通知",
+      "sender_name": "user123",
+      "created_at": "2026-06-14T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | string (UUID) | 置顶记录 ID |
+| message_id | string (UUID) | 被置顶的消息 ID |
+| room_id | string (UUID) | 房间 ID |
+| pinned_by | string (UUID) | 置顶操作者 ID |
+| content | string | 消息内容 |
+| sender_name | string | 消息发送者名称 |
+| created_at | string (ISO 8601) | 置顶时间 |
+
+### 功能特性
+
+- 已置顶的消息再次置顶会返回冲突（409）
+- 取消置顶不存在的记录会返回 404
+- 置顶消息列表按置顶时间倒序排列
+- 已删除的消息不会出现在置顶列表中
+- 置顶/取消置顶操作会通过 WebSocket 实时广播给房间所有成员（`MessagePinned` / `MessageUnpinned`）
+
+---
+
+*文档版本: 1.2.0*  
+*最后更新: 2026-06-14*

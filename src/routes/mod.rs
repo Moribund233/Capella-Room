@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::{
     handlers::{
         account_security, admin, audit, auth, config, file, message, message_reaction,
-        notification, room, security, ui_config, user, user_settings,
+        notification, pin_message, room, security, ui_config, user, user_settings,
     },
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
@@ -125,6 +125,7 @@ fn user_routes() -> Router<Arc<AppState>> {
         // 当前用户相关
         .route("/me", get(user::get_current_user))
         .route("/me", put(user::update_user))
+        .route("/me", delete(user::delete_current_user))
         .route("/me/password", put(user::change_password))
         .route("/me/stats", get(user::get_user_stats))
         .route("/me/rooms", get(room::get_my_rooms))
@@ -240,6 +241,11 @@ fn room_routes() -> Router<Arc<AppState>> {
         )
         // 消息
         .route("/:room_id/messages", get(message::get_room_messages))
+        // 置顶消息
+        .route(
+            "/:room_id/pinned-messages",
+            get(pin_message::get_room_pinned_messages),
+        )
 }
 
 /// 消息路由
@@ -261,6 +267,9 @@ fn message_routes() -> Router<Arc<AppState>> {
                 .post(message_reaction::add_reaction)
                 .delete(message_reaction::remove_reaction),
         )
+        // 消息置顶
+        .route("/:message_id/pin", post(pin_message::pin_message))
+        .route("/:message_id/pin", delete(pin_message::unpin_message))
 }
 
 /// 通知路由

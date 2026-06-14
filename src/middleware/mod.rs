@@ -7,6 +7,7 @@ use axum::{
 };
 use serde_json::json;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::{error::AppError, services::auth_service::Claims, state::AppState};
 
@@ -64,6 +65,53 @@ pub async fn auth_middleware(
                 .into_response();
         }
     };
+
+    // 验证用户仍然存在于数据库中（JWT 可能已签发但用户已被删除）
+    match Uuid::parse_str(&claims.sub) {
+        Ok(user_id) => {
+            match state.user_service().get_user_by_id(user_id).await {
+                Ok(Some(_)) => {} // 用户存在，继续
+                Ok(None) => {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(json!({
+                            "success": false,
+                            "code": "USER_NOT_FOUND",
+                            "error": "认证失败",
+                            "message": "用户不存在或已被删除"
+                        })),
+                    )
+                        .into_response();
+                }
+                Err(e) => {
+                    tracing::error!("验证用户是否存在时出错: {}", e);
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({
+                            "success": false,
+                            "code": "INTERNAL_ERROR",
+                            "error": "服务器错误",
+                            "message": "验证用户信息时出错"
+                        })),
+                    )
+                        .into_response();
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("从claims提取用户ID失败: {}", e);
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({
+                    "success": false,
+                    "code": "AUTH_ERROR",
+                    "error": "认证失败",
+                    "message": "令牌中包含无效的用户ID"
+                })),
+            )
+                .into_response();
+        }
+    }
 
     // 将用户信息添加到请求扩展
     request.extensions_mut().insert(claims);

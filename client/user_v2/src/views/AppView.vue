@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
 import { useMessageStore } from '@/stores/message'
 import { useWebSocketStore } from '@/stores/websocket'
@@ -21,8 +20,17 @@ import {
   RoomSettingsModal,
 } from '@/components/chat'
 import ChatMessageListComponent from '@/components/chat/ChatMessageList.vue'
+import type { Message } from '@/types/message'
+import type {
+  NewMessagePayload,
+  MessageEditedPayload,
+  MessageDeletedPayload,
+  MissedMessagesPayload,
+  ReactionAddedPayload,
+  ReactionRemovedPayload,
+  UserStatusChangedPayload,
+} from '@/types/websocket'
 
-const authStore = useAuthStore()
 const roomStore = useRoomStore()
 const messageStore = useMessageStore()
 const wsStore = useWebSocketStore()
@@ -59,10 +67,9 @@ onMounted(() => {
 
   // WebSocket 消息处理
   ws.onMessage('NewMessage', (payload: unknown) => {
-    const p = payload as { message_id: string; room_id: string; sender_name: string; content: string }
-    messageStore.addIncomingMessage(payload as any)
+    const p = payload as NewMessagePayload
+    messageStore.addIncomingMessage(p)
 
-    // 浏览器推送通知：仅当不在当前房间或标签页隐藏时弹出
     if (document.hidden || p.room_id !== currentRoom.value?.id) {
       browserNotify(p.sender_name, {
         body: p.content,
@@ -72,11 +79,11 @@ onMounted(() => {
   })
 
   ws.onMessage('MessageEdited', (payload: unknown) => {
-    messageStore.handleMessageEdited(payload as any)
+    messageStore.handleMessageEdited(payload as MessageEditedPayload)
   })
 
   ws.onMessage('MessageDeleted', (payload: unknown) => {
-    messageStore.handleMessageDeleted(payload as any)
+    messageStore.handleMessageDeleted(payload as MessageDeletedPayload)
   })
 
   ws.onMessage('UserTyping', (payload: unknown) => {
@@ -94,8 +101,8 @@ onMounted(() => {
   })
 
   ws.onMessage('UserStatusChanged', (payload: unknown) => {
-    const p = payload as { user_id: string; username: string; status: string }
-    roomStore.updateMemberStatus(p.user_id, p.status as any)
+    const p = payload as UserStatusChangedPayload
+    roomStore.updateMemberStatus(p.user_id, p.status)
   })
 
   ws.onMessage('MessageReadReceipt', (payload: unknown) => {
@@ -104,7 +111,15 @@ onMounted(() => {
   })
 
   ws.onMessage('MissedMessages', (payload: unknown) => {
-    messageStore.addMissedMessages(payload as any)
+    messageStore.addMissedMessages(payload as MissedMessagesPayload)
+  })
+
+  ws.onMessage('ReactionAdded', (payload: unknown) => {
+    messageStore.handleReactionAdded(payload as ReactionAddedPayload)
+  })
+
+  ws.onMessage('ReactionRemoved', (payload: unknown) => {
+    messageStore.handleReactionRemoved(payload as ReactionRemovedPayload)
   })
 })
 
@@ -132,12 +147,11 @@ function handleSend(content: string) {
 }
 
 // 开始回复
-function handleReply(message: any) {
+function handleReply(message: Message) {
   messageActions.startReply(message)
 }
 
-// 开始编辑
-function handleEdit(message: any) {
+function handleEdit(message: Message) {
   messageActions.startEdit(message)
 }
 

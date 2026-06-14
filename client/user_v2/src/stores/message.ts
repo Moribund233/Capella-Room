@@ -4,7 +4,7 @@ import { messageApi } from '@/api/message'
 import { useWebSocketStore } from './websocket'
 import { useAuthStore } from './auth'
 import type { Message, ReplyToMessage } from '@/types/message'
-import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload, MissedMessagesPayload, MessageReadReceiptPayload } from '@/types/websocket'
+import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload, MissedMessagesPayload, ReactionAddedPayload, ReactionRemovedPayload } from '@/types/websocket'
 
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Message[]>([])
@@ -293,6 +293,59 @@ export const useMessageStore = defineStore('message', () => {
     })
   }
 
+  /** 发送添加反应 WS 消息 */
+  function addReaction(messageId: string, emoji: string) {
+    const wsStore = useWebSocketStore()
+    wsStore.send('AddReaction', { message_id: messageId, emoji })
+  }
+
+  /** 发送移除反应 WS 消息 */
+  function removeReaction(messageId: string, emoji: string) {
+    const wsStore = useWebSocketStore()
+    wsStore.send('RemoveReaction', { message_id: messageId, emoji })
+  }
+
+  /** 处理 ReactionAdded（广播） */
+  function handleReactionAdded(payload: ReactionAddedPayload) {
+    if (payload.room_id !== currentRoomId.value) return
+    const msg = messages.value.find((m) => m.id === payload.message_id)
+    if (!msg) return
+
+    if (!msg.reactions) msg.reactions = []
+    const existing = msg.reactions.find((r) => r.emoji === payload.emoji)
+    if (existing) {
+      if (!existing.users.includes(payload.user_id)) {
+        existing.count++
+        existing.users.push(payload.user_id)
+      }
+    } else {
+      msg.reactions.push({
+        emoji: payload.emoji,
+        count: 1,
+        users: [payload.user_id],
+      })
+    }
+  }
+
+  /** 处理 ReactionRemoved（广播） */
+  function handleReactionRemoved(payload: ReactionRemovedPayload) {
+    if (payload.room_id !== currentRoomId.value) return
+    const msg = messages.value.find((m) => m.id === payload.message_id)
+    if (!msg || !msg.reactions) return
+
+    const existing = msg.reactions.find((r) => r.emoji === payload.emoji)
+    if (!existing) return
+
+    const idx = existing.users.indexOf(payload.user_id)
+    if (idx !== -1) {
+      existing.users.splice(idx, 1)
+      existing.count--
+    }
+    if (existing.count <= 0) {
+      msg.reactions = msg.reactions.filter((r) => r.emoji !== payload.emoji)
+    }
+  }
+
   /** 切换到另一个房间 */
   function switchRoom(roomId: string) {
     if (currentRoomId.value === roomId) return
@@ -336,6 +389,10 @@ export const useMessageStore = defineStore('message', () => {
     handleMessageDeleted,
     editMessage,
     deleteMessage,
+    addReaction,
+    removeReaction,
+    handleReactionAdded,
+    handleReactionRemoved,
     switchRoom,
     $reset,
   }
