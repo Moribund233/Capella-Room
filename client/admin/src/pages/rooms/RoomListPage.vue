@@ -188,7 +188,7 @@ const mobileActions: MobileAction<RoomInfo>[] = [
       <!-- 桌面端：表格视图 -->
       <div class="desktop-view">
         <RoomTable
-          v-model:selected-keys="selectedKeys as (string | number)[]"
+          v-model:selected-keys="selectedKeys"
           :data="rooms"
           :loading="loading"
           @select="handleSelectRoom"
