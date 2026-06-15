@@ -1,3 +1,5 @@
+pub mod mail_service;
+pub mod verification_code_service;
 pub mod account_security_service;
 pub mod alert_engine;
 pub mod alert_handler;

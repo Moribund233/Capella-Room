@@ -260,6 +260,23 @@ impl ConfigLoader {
             );
         }
 
+        // 验证批量消息配置
+        if config.batch_message.batch_size == 0 {
+            return Err(anyhow::anyhow!(
+                "batch_message.batch_size cannot be 0. Please set a valid value in config.toml"
+            ));
+        }
+        if config.batch_message.flush_interval_ms == 0 {
+            return Err(anyhow::anyhow!(
+                "batch_message.flush_interval_ms cannot be 0. Please set a valid value in config.toml"
+            ));
+        }
+        if config.batch_message.max_queue_size == 0 {
+            return Err(anyhow::anyhow!(
+                "batch_message.max_queue_size cannot be 0. Please set a valid value in config.toml"
+            ));
+        }
+
         // 验证 Redis 配置（如果启用）
         if config.redis.enabled && config.redis.url.is_empty() {
             return Err(anyhow::anyhow!(

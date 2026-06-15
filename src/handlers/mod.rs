@@ -2,6 +2,7 @@ pub mod account_security;
 pub mod admin;
 pub mod audit;
 pub mod auth;
+pub mod auth_v2;
 pub mod config;
 pub mod file;
 pub mod message;

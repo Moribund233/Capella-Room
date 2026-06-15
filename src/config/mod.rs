@@ -35,8 +35,9 @@ pub struct AppConfig {
     pub audit: AuditConfig,
     #[serde(default)]
     pub redis: RedisConfig,
-    #[serde(default)]
     pub batch_message: BatchMessageConfig,
+    #[serde(default)]
+    pub mail: MailConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -195,17 +196,76 @@ pub struct InitialAdminConfig {
 }
 
 /// 批量消息写入配置
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BatchMessageConfig {
     /// 批量大小，达到此数量立即写入
-    #[serde(default)]
     pub batch_size: usize,
     /// 刷新间隔（毫秒），达到此时间立即写入
-    #[serde(default)]
     pub flush_interval_ms: u64,
     /// 队列最大长度，超过此长度将丢弃最旧的消息
-    #[serde(default)]
     pub max_queue_size: usize,
+}
+
+/// 邮件后端类型
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MailBackend {
+    Console,
+    Smtp,
+}
+
+impl Default for MailBackend {
+    fn default() -> Self {
+        Self::Console
+    }
+}
+
+/// 邮件服务配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct MailConfig {
+    /// 邮件后端类型
+    #[serde(default)]
+    pub backend: MailBackend,
+    /// SMTP 主机地址
+    #[serde(default)]
+    pub smtp_host: String,
+    /// SMTP 端口
+    #[serde(default)]
+    pub smtp_port: u16,
+    /// SMTP 用户名
+    #[serde(default)]
+    pub smtp_username: String,
+    /// SMTP 密码（建议通过环境变量注入）
+    #[serde(default)]
+    pub smtp_password: String,
+    /// 是否启用 TLS
+    #[serde(default)]
+    pub smtp_use_tls: bool,
+    /// 发件人地址
+    #[serde(default)]
+    pub from_address: String,
+    /// 发件人名称
+    #[serde(default)]
+    pub from_name: String,
+    /// 验证码有效期（分钟）
+    #[serde(default)]
+    pub verification_code_ttl: u64,
+}
+
+impl Default for MailConfig {
+    fn default() -> Self {
+        Self {
+            backend: MailBackend::default(),
+            smtp_host: String::default(),
+            smtp_port: 587,
+            smtp_username: String::default(),
+            smtp_password: String::default(),
+            smtp_use_tls: true,
+            from_address: String::default(),
+            from_name: String::default(),
+            verification_code_ttl: 10,
+        }
+    }
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -377,5 +437,30 @@ mod tests {
         assert_eq!(format_file_size(1024 * 1024), "1.0 MB");
         assert_eq!(format_file_size(10 * 1024 * 1024), "10.0 MB");
         assert_eq!(format_file_size(1024 * 1024 * 1024), "1.0 GB");
+    }
+
+    #[test]
+    fn test_app_config_includes_mail() {
+        let config = AppConfig {
+            server: ServerConfig::default(),
+            database: DatabaseConfig::default(),
+            jwt: JwtConfig::default(),
+            upload: UploadConfig::default(),
+            websocket: WebSocketConfig::default(),
+            reconnect: ReconnectConfig::default(),
+            logging: LoggingConfig::default(),
+            system: SystemConfig::default(),
+            admin: AdminConfig::default(),
+            audit: AuditConfig::default(),
+            redis: RedisConfig::default(),
+            batch_message: BatchMessageConfig {
+                batch_size: 0,
+                flush_interval_ms: 0,
+                max_queue_size: 0,
+            },
+            mail: MailConfig::default(),
+        };
+        assert_eq!(config.mail.from_address, "");
+        assert_eq!(config.mail.backend, MailBackend::Console);
     }
 }

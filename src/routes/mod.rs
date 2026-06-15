@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::{
     handlers::{
-        account_security, admin, audit, auth, config, file, message, message_reaction,
+        account_security, admin, audit, auth, auth_v2, config, file, message, message_reaction,
         notification, pin_message, room, security, ui_config, user, user_settings,
     },
     middleware::admin::admin_auth_middleware,
@@ -40,13 +40,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // 认证路由（公开访问）
     let auth_routes_router = Router::new()
         .nest(&format!("/api/{}/auth", API_VERSION), auth_routes())
-        .nest("/api/auth", auth_routes());
+        .nest("/api/auth", auth_routes())
+        .nest("/api/v2/auth", v2_auth_routes());
 
     // 创建受保护路由（需要认证）
     let protected_routes = Router::new()
         // 用户路由
         .nest(&format!("/api/{}/users", API_VERSION), user_routes())
         .nest("/api/users", user_routes())
+        .nest("/api/v2/users", v2_user_routes())
         // 聊天室路由
         .nest(&format!("/api/{}/rooms", API_VERSION), room_routes())
         .nest("/api/rooms", room_routes())
@@ -508,6 +510,25 @@ async fn api_version() -> axum::Json<serde_json::Value> {
             "recommended_routes": ["/api/v1/*"]
         }
     }))
+}
+
+/// v2 认证路由（公开访问）
+fn v2_auth_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/register/send-code", post(auth_v2::register_send_code))
+        .route("/register", post(auth_v2::register))
+        .route("/login/send-code", post(auth_v2::login_send_code))
+        .route("/login", post(auth_v2::login))
+        .route("/reset-password/send-code", post(auth_v2::reset_password_send_code))
+        .route("/reset-password", post(auth_v2::reset_password))
+        .route("/login-with-password", post(auth_v2::login_with_password))
+        .route("/refresh", post(auth_v2::refresh_token))
+}
+
+/// 用户登出路由（需要认证）
+fn v2_user_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/logout", post(auth_v2::logout))
 }
 
 #[cfg(test)]

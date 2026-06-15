@@ -300,16 +300,4 @@ impl BatchMessageService {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    
-    use crate::config::BatchMessageConfig;
 
-    #[test]
-    fn test_batch_config_default() {
-        let config = BatchMessageConfig::default();
-        assert_eq!(config.batch_size, 500);
-        assert_eq!(config.flush_interval_ms, 50);
-        assert_eq!(config.max_queue_size, 100000);
-    }
-}

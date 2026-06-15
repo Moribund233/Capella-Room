@@ -15,6 +15,7 @@ use crate::services::auth_service::AuthService;
 use crate::services::batch_message_service::BatchMessageService;
 use crate::services::file_service::FileService;
 use crate::services::ip_security_service::IpSecurityService;
+use crate::services::mail_service::MailService;
 use crate::services::message_service::MessageService;
 use crate::services::monitor_service::MonitorService;
 use crate::services::reaction_service::ReactionService;
@@ -23,6 +24,7 @@ use crate::services::pin_message_service::PinMessageService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
 use crate::services::user_settings_service::UserSettingsService;
+use crate::services::verification_code_service::VerificationCodeService;
 use crate::utils::logging::{
     init_global_log_broadcaster, LogBroadcaster, MetricsCollector, StructuredLogger,
 };
@@ -35,6 +37,8 @@ pub struct AppState {
     pub log_broadcaster: Arc<LogBroadcaster>,
     pub logger: Arc<StructuredLogger>,
     pub auth_service: AuthService,
+    pub mail_service: MailService,
+    pub verification_code_service: VerificationCodeService,
     pub user_service: UserService,
     pub room_service: RoomService,
     pub message_service: MessageService,
@@ -94,6 +98,12 @@ impl AppState {
         let shared_config = Arc::new(tokio::sync::RwLock::new(config));
 
         let auth_service = AuthService::with_shared_config(shared_config.clone());
+        let mail_service = MailService::new({
+            let config = shared_config.read().await;
+            config.mail.clone()
+        });
+        let verification_code_service =
+            VerificationCodeService::new(db.clone(), mail_service.clone());
         let user_service = UserService::new(db.clone());
         let room_service = RoomService::new(db.clone());
         let message_service = MessageService::new(db.clone());
@@ -172,6 +182,8 @@ impl AppState {
             log_broadcaster,
             logger,
             auth_service,
+            mail_service,
+            verification_code_service,
             user_service,
             room_service,
             message_service,
@@ -217,6 +229,14 @@ impl AppState {
 
     pub fn auth_service(&self) -> &AuthService {
         &self.auth_service
+    }
+
+    pub fn mail_service(&self) -> &MailService {
+        &self.mail_service
+    }
+
+    pub fn verification_code_service(&self) -> &VerificationCodeService {
+        &self.verification_code_service
     }
 
     pub fn user_service(&self) -> &UserService {
@@ -293,6 +313,17 @@ impl Clone for AppState {
             log_broadcaster: Arc::clone(&self.log_broadcaster),
             logger: Arc::clone(&self.logger),
             auth_service: AuthService::with_shared_config(self.config.clone()),
+            mail_service: MailService::new({
+                let config = self.config.blocking_read();
+                config.mail.clone()
+            }),
+            verification_code_service: VerificationCodeService::new(
+                self.db.clone(),
+                MailService::new({
+                    let config = self.config.blocking_read();
+                    config.mail.clone()
+                }),
+            ),
             user_service: UserService::new(self.db.clone()),
             room_service: RoomService::new(self.db.clone()),
             message_service: MessageService::new(self.db.clone()),
