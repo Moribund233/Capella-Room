@@ -31,7 +31,7 @@ impl UserService {
             r#"
             INSERT INTO users (username, email, password_hash, status, is_active, role)
             VALUES ($1, $2, $3, 'offline', true, 'user')
-            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             "#
         )
         .bind(username)
@@ -68,7 +68,7 @@ impl UserService {
             INSERT INTO users (username, email, password_hash, status, is_active, role)
             VALUES ($1, $2, $3, 'offline', true, 'super_admin')
             ON CONFLICT (email) DO UPDATE SET role = 'super_admin'
-            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             "#
         )
         .bind(username)
@@ -105,7 +105,7 @@ impl UserService {
             INSERT INTO users (username, email, password_hash, status, is_active, role)
             VALUES ($1, $2, $3, 'offline', true, 'admin')
             ON CONFLICT (email) DO UPDATE SET role = 'admin'
-            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             "#
         )
         .bind(username)
@@ -134,7 +134,7 @@ impl UserService {
     pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE id = $1
             "#
@@ -150,7 +150,7 @@ impl UserService {
     pub async fn get_user_by_email(&self, email: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE email = $1
             "#
@@ -166,7 +166,7 @@ impl UserService {
     pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE username = $1
             "#
@@ -193,7 +193,7 @@ impl UserService {
                 avatar_url = COALESCE($2, avatar_url),
                 updated_at = NOW()
             WHERE id = $3
-            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             "#
         )
         .bind(username)
@@ -240,7 +240,7 @@ impl UserService {
             UPDATE users
             SET role = $1, updated_at = NOW()
             WHERE id = $2
-            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             "#
         )
         .bind(role)
@@ -259,7 +259,7 @@ impl UserService {
     pub async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
@@ -285,7 +285,7 @@ impl UserService {
         // 查询用户列表
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE username ILIKE $1 OR email ILIKE $1
             ORDER BY created_at DESC
@@ -361,7 +361,7 @@ impl UserService {
     pub async fn get_online_users(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE status = 'online'
             ORDER BY updated_at DESC
@@ -385,7 +385,7 @@ impl UserService {
     ) -> Result<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE status = $1
             ORDER BY updated_at DESC
@@ -479,7 +479,7 @@ impl UserService {
             UPDATE users
             SET is_active = $1, updated_at = NOW()
             WHERE id = $2
-            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            RETURNING id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             "#
         )
         .bind(!disabled)
@@ -633,7 +633,7 @@ impl UserService {
     ) -> Result<Vec<UserInfo>> {
         let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, created_at, updated_at
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
             FROM users
             WHERE username ILIKE $1 AND is_active = true
             ORDER BY username

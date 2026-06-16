@@ -10,10 +10,11 @@ use tower::util::ServiceExt;
 use uuid::Uuid;
 
 use capella_room::{
-    config::{AppConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
+    config::{AppConfig, BatchMessageConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     state::AppState,
+    test_helpers,
     utils::logging::MetricsCollector,
     websocket::manager::WebSocketManager,
 };
@@ -41,7 +42,8 @@ async fn cleanup_database(db: &Database) {
         .ok();
 }
 
-async fn create_test_app() -> (Router, Arc<AppState>) {
+async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'static, ()>) {
+    let guard = test_helpers::db_guard().lock().await;
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -91,7 +93,8 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         admin: Default::default(),
         audit: Default::default(),
         redis: Default::default(),
-        batch_message: Default::default(),
+        batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
+        mail: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
@@ -108,7 +111,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
 
     let app = create_router(Arc::clone(&state));
 
-    (app, state)
+    (app, state, guard)
 }
 
 async fn create_test_user(state: &AppState, username: &str, email: &str) -> (Uuid, String) {
@@ -167,7 +170,7 @@ async fn create_test_super_admin(state: &AppState, username: &str, email: &str) 
 
 #[tokio::test]
 async fn test_admin_can_list_users() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) = create_test_admin(&state, "admin1", "admin1@test.com").await;
     let (_user_id, _user_token) = create_test_user(&state, "user1", "user1@test.com").await;
@@ -189,7 +192,7 @@ async fn test_admin_can_list_users() {
 
 #[tokio::test]
 async fn test_non_admin_cannot_access_admin_routes() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_user_id, user_token) = create_test_user(&state, "user2", "user2@test.com").await;
 
@@ -210,7 +213,7 @@ async fn test_non_admin_cannot_access_admin_routes() {
 
 #[tokio::test]
 async fn test_admin_can_update_user_role() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) = create_test_admin(&state, "admin2", "admin2@test.com").await;
     let (user_id, _user_token) = create_test_user(&state, "user3", "user3@test.com").await;
@@ -241,7 +244,7 @@ async fn test_admin_can_update_user_role() {
 
 #[tokio::test]
 async fn test_admin_cannot_demote_super_admin() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) = create_test_admin(&state, "admin3", "admin3@test.com").await;
     let (super_admin_id, _super_admin_token) =
@@ -265,7 +268,7 @@ async fn test_admin_cannot_demote_super_admin() {
 
 #[tokio::test]
 async fn test_admin_cannot_manage_other_admin() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin1_id, admin1_token) = create_test_admin(&state, "admin7", "admin7@test.com").await;
     let (admin2_id, _admin2_token) = create_test_admin(&state, "admin8", "admin8@test.com").await;
@@ -288,7 +291,7 @@ async fn test_admin_cannot_manage_other_admin() {
 
 #[tokio::test]
 async fn test_admin_cannot_delete_other_admin() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin1_id, admin1_token) = create_test_admin(&state, "admin9", "admin9@test.com").await;
     let (admin2_id, _admin2_token) = create_test_admin(&state, "admin10", "admin10@test.com").await;
@@ -310,7 +313,7 @@ async fn test_admin_cannot_delete_other_admin() {
 
 #[tokio::test]
 async fn test_super_admin_can_manage_admin() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_super_admin_id, super_admin_token) =
         create_test_super_admin(&state, "superadmin3", "superadmin3@test.com").await;
@@ -342,7 +345,7 @@ async fn test_super_admin_can_manage_admin() {
 
 #[tokio::test]
 async fn test_admin_can_delete_user() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) = create_test_admin(&state, "admin4", "admin4@test.com").await;
     let (user_id, _user_token) = create_test_user(&state, "user4", "user4@test.com").await;
@@ -367,7 +370,7 @@ async fn test_admin_can_delete_user() {
 
 #[tokio::test]
 async fn test_admin_can_list_configs() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) = create_test_admin(&state, "admin5", "admin5@test.com").await;
 
@@ -388,7 +391,7 @@ async fn test_admin_can_list_configs() {
 
 #[tokio::test]
 async fn test_admin_cannot_update_config() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) = create_test_admin(&state, "admin6", "admin6@test.com").await;
 
@@ -410,7 +413,7 @@ async fn test_admin_cannot_update_config() {
 
 #[tokio::test]
 async fn test_super_admin_can_update_config() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_super_admin_id, super_admin_token) =
         create_test_super_admin(&state, "superadmin2", "superadmin2@test.com").await;
@@ -471,7 +474,7 @@ async fn test_user_role_permissions() {
 
 #[tokio::test]
 async fn test_super_admin_initialization() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let has_super_admin_before = state.user_service().has_super_admin().await.unwrap();
     assert!(
@@ -498,7 +501,7 @@ async fn test_super_admin_initialization() {
 
 #[tokio::test]
 async fn test_activity_stats_single_query() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     // 创建测试用户
     let (user1_id, _) = create_test_user(&state, "statsuser1", "stats1@test.com").await;
@@ -590,7 +593,7 @@ async fn test_activity_stats_single_query() {
 
 #[tokio::test]
 async fn test_activity_stats_empty_database() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     // 清理数据库后查询
     let stats = state.message_service().get_activity_stats().await.unwrap();

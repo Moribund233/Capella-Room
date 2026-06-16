@@ -14,6 +14,7 @@ pub mod monitor_service;
 pub mod pin_message_service;
 pub mod reaction_service;
 pub mod notification_service;
+pub mod oauth_service;
 pub mod room_service;
 pub mod ui_config_service;
 pub mod user_service;

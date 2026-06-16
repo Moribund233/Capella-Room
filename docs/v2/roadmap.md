@@ -1,9 +1,9 @@
 # CapellaRoom v2 开发路线图
 
-> **更新日期**: 2026-06-15
+> **更新日期**: 2026-06-16
 > **定位**: 从实时聊天应用 → 实时社交基础设施
 > **架构**: CapellaRoom v2 = 规范化认证 + 消息安全体系 + 授权生态扩展
-> **当前进度**: Phase 1.1 ✅ / 1.2 ✅ / 1.3 ✅ | 1.4 ⏳ / 1.5 ⏳
+> **当前进度**: Phase 1 ✅ | 1.1 ✅ / 1.2 ✅ / 1.3 ✅ / 1.4 ✅ / 1.5 ✅
 
 ---
 
@@ -124,7 +124,7 @@ CREATE TABLE verification_codes (
 - `BatchMessageConfig` 整改：移除代码默认值，缺失/零值由 `validate_config()` 拒绝启动
 - 共享辅助函数 `issue_auth_tokens()` 集中处理登录礼仪（JWT + 会话 + 审计）
 
-### 1.4 v1 注册端点迁移（0.5 周）
+### 1.4 v1 注册端点迁移（0.5 周）✅ 已完成
 
 ```
 v1: POST /api/v1/auth/register  →  保留但限制为 admin 角色可调用的内部测试端点
@@ -135,11 +135,12 @@ v2 上线后外部用户注册必须走 /api/v2/auth/register + 邮箱验证码
 ```
 
 **变更内容**:
-- `/api/v1/auth/register` 添加 admin 权限校验（`require_role: Admin`）
-- 文档标记为"内部测试端点"
+- `/api/v1/auth/register` 从公共路由中移除，移至独立 `register_admin_router`，叠加 `auth_middleware` + `admin_auth_middleware`
+- 非管理员请求返回 403 FORBIDDEN，未认证请求返回 401
 - v1 login/refresh 保持不变（不影响现有客户端）
+- 4 个 TDD 测试覆盖：无认证、非 admin、正确 admin、保障 v1 login 不受影响
 
-### 1.5 用户表扩展（0.5 周）
+### 1.5 用户表扩展（0.5 周）✅ 已完成
 
 ```sql
 ALTER TABLE users
@@ -147,7 +148,12 @@ ALTER TABLE users
   ADD COLUMN email_verified     BOOLEAN NOT NULL DEFAULT false;
 ```
 
-**影响**: 聊天、通知等核心功能不受 `email_verified` 影响。但未验证邮箱的用户无法使用"忘记密码"等安全功能。
+**变更内容**:
+- 迁移 `018_add_email_verified_to_users.sql`：新增 `email_verified BOOLEAN NOT NULL DEFAULT false`、`email_verified_at TIMESTAMPTZ`
+- `src/models/user.rs`：新增字段 `email_verified: bool`、`email_verified_at: Option<DateTime<Utc>>`，使用 `#[sqlx(default)]` 保证兼容性
+- `src/services/user_service.rs`：全部 14 处 `query_as::<_, User>` 的 SQL 查询更新 SELECT/RETURNING 子句
+- v1 API 的 `UserResponse` 不暴露 `email_verified` 字段
+- 2 个 TDD 测试覆盖：新用户创建 `email_verified = false`、User 结构体字段存在性验证
 
 ---
 
@@ -459,12 +465,12 @@ DELETE /api/v2/users/me/sso-links/:id
 
 | Phase | 模块 | 预估工时 | 状态 | 依赖 |
 |:---:|---|:---:|:---:|:---:|
-| **1** | **认证体系规范化** | **4 周** | 🟡 **进行中** | 无 |
+| **1** | **认证体系规范化** | **4 周** | ✅ **完成** | 无 |
 | 1.1 | 邮件服务基础设施 | 1 周 | ✅ 完成 | 无 |
 | 1.2 | 验证码生成与存储 | 0.5 周 | ✅ 完成 | 1.1 |
 | 1.3 | v2 认证 API | 1.5 周 | ✅ 完成 | 1.2 |
-| 1.4 | v1 注册端点迁移 | 0.5 周 | ⏳ 待开始 | 1.3 |
-| 1.5 | 用户表扩展 | 0.5 周 | ⏳ 待开始 | 1.3 |
+| 1.4 | v1 注册端点迁移 | 0.5 周 | ✅ 完成 | 1.3 |
+| 1.5 | 用户表扩展 | 0.5 周 | ✅ 完成 | 1.3 |
 | **2** | **消息安全体系** | **5 周** | 无 |
 | 2.1 | 消息加密 | 3 周 | 无 |
 | 2.2 | 消息智能审核 | 2 周 | 2.1 |
@@ -501,4 +507,4 @@ DELETE /api/v2/users/me/sso-links/:id
 ---
 
 *文档版本: 1.0.0*
-*最后更新: 2026-06-15*
+*最后更新: 2026-06-16*

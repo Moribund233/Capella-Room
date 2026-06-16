@@ -14,11 +14,13 @@ use capella_room::{
     db::Database,
     routes::create_router,
     state::AppState,
+    test_helpers,
     utils::logging::MetricsCollector,
     websocket::manager::WebSocketManager,
 };
 
-async fn create_test_app() -> (Router, Arc<AppState>) {
+async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'static, ()>) {
+    let guard = test_helpers::db_guard().lock().await;
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -72,9 +74,11 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
         },
         redis: Default::default(),
         batch_message: BatchMessageConfig {
+            batch_size: 50,
             flush_interval_ms: 5000,
-            ..Default::default()
+            max_queue_size: 1000,
         },
+        mail: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
@@ -91,7 +95,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
 
     let app = create_router(Arc::clone(&state));
 
-    (app, state)
+    (app, state, guard)
 }
 
 async fn cleanup_database(db: &Database) {
@@ -142,7 +146,7 @@ async fn create_test_message(state: &AppState, room_id: Uuid, sender_id: Uuid, c
 
 #[tokio::test]
 async fn test_pin_message_success() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (user_id, token) = create_test_user(&state, "pinuser1", "pinuser1@test.com").await;
     let room_id = create_test_room(&state, "Pin Test Room", user_id).await;
@@ -166,7 +170,7 @@ async fn test_pin_message_success() {
 
 #[tokio::test]
 async fn test_pin_message_requires_auth() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (user_id, _) = create_test_user(&state, "pinuser2", "pinuser2@test.com").await;
     let room_id = create_test_room(&state, "Pin Auth Test", user_id).await;
@@ -188,7 +192,7 @@ async fn test_pin_message_requires_auth() {
 
 #[tokio::test]
 async fn test_unpin_message_success() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (user_id, token) = create_test_user(&state, "pinuser3", "pinuser3@test.com").await;
     let room_id = create_test_room(&state, "Unpin Test Room", user_id).await;
@@ -219,7 +223,7 @@ async fn test_unpin_message_success() {
 
 #[tokio::test]
 async fn test_list_pinned_messages() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (user_id, token) = create_test_user(&state, "pinuser4", "pinuser4@test.com").await;
     let room_id = create_test_room(&state, "List Pinned Room", user_id).await;
@@ -267,7 +271,7 @@ async fn test_list_pinned_messages() {
 
 #[tokio::test]
 async fn test_pin_nonexistent_message_returns_not_found() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_, token) = create_test_user(&state, "pinuser5", "pinuser5@test.com").await;
     let fake_id = Uuid::new_v4();

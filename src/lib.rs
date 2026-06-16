@@ -13,5 +13,6 @@ pub mod redis;
 pub mod routes;
 pub mod services;
 pub mod state;
+pub mod test_helpers;
 pub mod utils;
 pub mod websocket;

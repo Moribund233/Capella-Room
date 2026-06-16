@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 // 引入被测模块
 use capella_room::{
-    config::{ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
+    config::{BatchMessageConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
@@ -78,6 +78,28 @@ async fn read_next_message(
         return Some(result);
     }
     None
+}
+
+/// 排空连接缓冲区中残留的消息（如异步延迟到达的 RoomMessageSummary）
+/// 使用短超时确保不影响后续消息读取
+async fn drain_pending(
+    read: &mut futures::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    >,
+) {
+    loop {
+        match tokio::time::timeout(Duration::from_millis(300), read.next()).await {
+            Ok(Some(Ok(Message::Text(text)))) => {
+                // 丢弃所有残留消息
+                let _ = text;
+                continue;
+            }
+            Ok(Some(Ok(_))) => continue,
+            _ => break,
+        }
+    }
 }
 
 /// 测试辅助函数：创建测试数据库连接
@@ -162,7 +184,8 @@ async fn setup_test_server() -> (TestServer, Database) {
             archive_hour: 3,
         },
         redis: Default::default(),
-        batch_message: Default::default(),
+        batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
+        mail: Default::default(),
     };
 
     let metrics_collector = Arc::new(MetricsCollector::new());
@@ -713,6 +736,9 @@ mod websocket_message_tests {
             panic!("Expected Text message");
         };
 
+        // 排空可能残留的 RoomMessageSummary
+        drain_pending(&mut read).await;
+
         // 编辑消息
         let edit_msg = WebSocketMessage::EditMessage {
             message_id,
@@ -802,6 +828,9 @@ mod websocket_message_tests {
         } else {
             panic!("Expected Text message");
         };
+
+        // 排空可能残留的 RoomMessageSummary
+        drain_pending(&mut read).await;
 
         // 删除消息
         let delete_msg = WebSocketMessage::DeleteMessage { message_id };

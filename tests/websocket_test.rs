@@ -20,7 +20,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
 
 use capella_room::{
-    config::{ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
+    config::{BatchMessageConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
@@ -158,7 +158,8 @@ async fn setup_test_server() -> (TestServer, Database) {
         system: Default::default(),
         admin: Default::default(),
         redis: Default::default(),
-        batch_message: Default::default(),
+        batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
+        mail: Default::default(),
     };
 
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
@@ -321,8 +322,13 @@ impl WebSocketClient {
             .await
             .expect("Join timeout");
 
-        // 额外延迟确保服务端完全处理加入请求
-        sleep(Duration::from_millis(100)).await;
+        // 排空加入后残留消息（OnlineUsers、UserJoined 等）
+        sleep(Duration::from_millis(200)).await;
+        while timeout(Duration::from_millis(100), read_next_message(&mut self.read))
+            .await
+            .is_ok()
+        {
+        }
     }
 
     /// 发送聊天消息

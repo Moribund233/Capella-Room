@@ -8,10 +8,11 @@ use axum::Router;
 use uuid::Uuid;
 
 use capella_room::{
-    config::{AppConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
+    config::{AppConfig, BatchMessageConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     state::AppState,
+    test_helpers,
     utils::logging::MetricsCollector,
     websocket::{
         manager::WebSocketManager,
@@ -36,7 +37,8 @@ async fn cleanup_database(db: &Database) {
 }
 
 /// 创建测试应用
-async fn create_test_app() -> (Router, Arc<AppState>) {
+async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'static, ()>) {
+    let guard = test_helpers::db_guard().lock().await;
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -91,7 +93,8 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             archive_hour: 3,
         },
         redis: Default::default(),
-        batch_message: Default::default(),
+        batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
+        mail: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
@@ -108,7 +111,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
 
     let app = create_router(Arc::clone(&state));
 
-    (app, state)
+    (app, state, guard)
 }
 
 /// 创建测试管理员
@@ -228,7 +231,7 @@ fn test_pending_action_info_creation() {
 
 #[tokio::test]
 async fn test_send_pending_action_notification() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin1", "admin1@test.com").await;
 
@@ -263,7 +266,7 @@ async fn test_send_pending_action_notification() {
 
 #[tokio::test]
 async fn test_get_pending_actions() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin2", "admin2@test.com").await;
 
@@ -300,7 +303,7 @@ async fn test_get_pending_actions() {
 
 #[tokio::test]
 async fn test_handle_pending_action_approve() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin3", "admin3@test.com").await;
 
@@ -358,7 +361,7 @@ async fn test_handle_pending_action_approve() {
 
 #[tokio::test]
 async fn test_handle_pending_action_reject() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin4", "admin4@test.com").await;
 
@@ -406,7 +409,7 @@ async fn test_handle_pending_action_reject() {
 
 #[tokio::test]
 async fn test_handle_pending_action_snooze() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin5", "admin5@test.com").await;
 
@@ -455,7 +458,7 @@ async fn test_handle_pending_action_snooze() {
 
 #[tokio::test]
 async fn test_send_config_reload_notification() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin6", "admin6@test.com").await;
 
@@ -494,7 +497,7 @@ async fn test_send_config_reload_notification() {
 
 #[tokio::test]
 async fn test_get_pending_actions_by_type() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin7", "admin7@test.com").await;
 
@@ -553,7 +556,7 @@ async fn test_get_pending_actions_by_type() {
 
 #[tokio::test]
 async fn test_pending_action_not_found() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "admin8", "admin8@test.com").await;
 
@@ -573,7 +576,7 @@ async fn test_pending_action_not_found() {
 
 #[tokio::test]
 async fn test_pending_action_wrong_user() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin1_id, _token1) = create_test_admin(&state, "admin9", "admin9@test.com").await;
     let (admin2_id, _token2) = create_test_admin(&state, "admin10", "admin10@test.com").await;

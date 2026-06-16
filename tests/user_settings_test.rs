@@ -10,10 +10,11 @@ use tower::util::ServiceExt;
 use uuid::Uuid;
 
 use capella_room::{
-    config::{AppConfig, AuditConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
+    config::{AppConfig, AuditConfig, BatchMessageConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     routes::create_router,
     state::AppState,
+    test_helpers,
     utils::logging::MetricsCollector,
     websocket::manager::WebSocketManager,
 };
@@ -49,7 +50,8 @@ async fn cleanup_database(db: &Database) {
         .ok();
 }
 
-async fn create_test_app() -> (Router, Arc<AppState>) {
+async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'static, ()>) {
+    let guard = test_helpers::db_guard().lock().await;
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -109,7 +111,8 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             archive_hour: 3,
         },
         redis: Default::default(),
-        batch_message: Default::default(),
+        batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
+        mail: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
@@ -126,7 +129,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
 
     let app = create_router(Arc::clone(&state));
 
-    (app, state)
+    (app, state, guard)
 }
 
 async fn create_test_user(state: &AppState, username: &str, email: &str) -> (Uuid, String) {
@@ -173,7 +176,7 @@ async fn parse_body(response: axum::response::Response) -> Value {
 
 #[tokio::test]
 async fn test_get_settings_returns_defaults() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "set_user1", "set_user1@test.com").await;
 
     let response = app
@@ -209,7 +212,7 @@ async fn test_get_settings_returns_defaults() {
 
 #[tokio::test]
 async fn test_patch_settings_updates_specific_groups() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "set_user2", "set_user2@test.com").await;
 
     // Patch notification + privacy groups
@@ -270,7 +273,7 @@ async fn test_patch_settings_updates_specific_groups() {
 
 #[tokio::test]
 async fn test_patch_settings_no_side_effects_on_other_groups() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "set_user3", "set_user3@test.com").await;
 
     // Only update language
@@ -318,7 +321,7 @@ async fn test_patch_settings_no_side_effects_on_other_groups() {
 
 #[tokio::test]
 async fn test_settings_persist_across_calls() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "set_user4", "set_user4@test.com").await;
 
     // Update privacy
@@ -369,7 +372,7 @@ async fn test_settings_persist_across_calls() {
 
 #[tokio::test]
 async fn test_settings_require_auth() {
-    let (app, _state) = create_test_app().await;
+    let (app, _state, _guard) = create_test_app().await;
 
     // No auth header
     let response = app
@@ -393,7 +396,7 @@ async fn test_settings_require_auth() {
 
 #[tokio::test]
 async fn test_room_settings_defaults() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "rset_user1", "rset_user1@test.com").await;
     let (_user_id, room_id) = create_test_room(&state, &token, "room-defaults-test").await;
 
@@ -423,7 +426,7 @@ async fn test_room_settings_defaults() {
 
 #[tokio::test]
 async fn test_room_settings_update_and_get() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "rset_user2", "rset_user2@test.com").await;
     let (_user_id, room_id) = create_test_room(&state, &token, "room-update-test").await;
 
@@ -481,7 +484,7 @@ async fn test_room_settings_update_and_get() {
 
 #[tokio::test]
 async fn test_room_settings_delete_resets_to_default() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "rset_user3", "rset_user3@test.com").await;
     let (_user_id, room_id) = create_test_room(&state, &token, "room-delete-test").await;
 
@@ -539,7 +542,7 @@ async fn test_room_settings_delete_resets_to_default() {
 
 #[tokio::test]
 async fn test_list_room_settings() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user_id, token) = create_test_user(&state, "rset_user4", "rset_user4@test.com").await;
 
     let (_u1, room1) = create_test_room(&state, &token, "list-room1").await;
@@ -632,7 +635,7 @@ async fn test_list_room_settings() {
 
 #[tokio::test]
 async fn test_room_settings_isolated_per_user() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
     let (_user1_id, token1) = create_test_user(&state, "rset_user5a", "rset_user5a@test.com").await;
     let (_user2_id, token2) = create_test_user(&state, "rset_user5b", "rset_user5b@test.com").await;
 

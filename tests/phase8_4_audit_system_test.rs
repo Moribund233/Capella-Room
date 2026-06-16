@@ -10,11 +10,12 @@ use tower::util::ServiceExt;
 use uuid::Uuid;
 
 use capella_room::{
-    config::{AppConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
+    config::{AppConfig, BatchMessageConfig, ConfigManager, DatabaseConfig, JwtConfig, UploadConfig},
     db::Database,
     models::audit::{AuditEventType, AuditSeverity, CreateAuditLogRequest},
     routes::create_router,
     state::AppState,
+    test_helpers,
     utils::logging::MetricsCollector,
     websocket::manager::WebSocketManager,
 };
@@ -56,7 +57,8 @@ async fn cleanup_database(db: &Database) {
 }
 
 /// 创建测试应用
-async fn create_test_app() -> (Router, Arc<AppState>) {
+async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'static, ()>) {
+    let guard = test_helpers::db_guard().lock().await;
     dotenvy::from_filename(".env.test").ok();
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -111,7 +113,8 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
             archive_hour: 3,
         },
         redis: Default::default(),
-        batch_message: Default::default(),
+        batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
+        mail: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 
@@ -128,7 +131,7 @@ async fn create_test_app() -> (Router, Arc<AppState>) {
 
     let app = create_router(Arc::clone(&state));
 
-    (app, state)
+    (app, state, guard)
 }
 
 /// 创建测试用户
@@ -192,7 +195,7 @@ async fn create_test_super_admin(state: &AppState, username: &str, email: &str) 
 
 #[tokio::test]
 async fn test_audit_service_can_create_log() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser1", "audituser1@test.com").await;
 
@@ -210,7 +213,7 @@ async fn test_audit_service_can_create_log() {
 
 #[tokio::test]
 async fn test_audit_service_can_query_logs() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser2", "audituser2@test.com").await;
 
@@ -242,7 +245,7 @@ async fn test_audit_service_can_query_logs() {
 
 #[tokio::test]
 async fn test_audit_service_can_get_log_by_id() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser3", "audituser3@test.com").await;
 
@@ -282,7 +285,7 @@ async fn test_audit_service_can_get_log_by_id() {
 
 #[tokio::test]
 async fn test_audit_service_can_log_admin_action() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (admin_id, _token) = create_test_admin(&state, "auditadmin1", "auditadmin1@test.com").await;
     let (target_user_id, _token) =
@@ -299,7 +302,7 @@ async fn test_audit_service_can_log_admin_action() {
 
 #[tokio::test]
 async fn test_audit_service_can_log_user_login() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser4", "audituser4@test.com").await;
 
@@ -320,7 +323,7 @@ async fn test_audit_service_can_log_user_login() {
 
 #[tokio::test]
 async fn test_audit_service_can_get_stats() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser5", "audituser5@test.com").await;
 
@@ -360,7 +363,7 @@ async fn test_audit_service_can_get_stats() {
 
 #[tokio::test]
 async fn test_audit_service_can_export_logs() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser6", "audituser6@test.com").await;
 
@@ -391,7 +394,7 @@ async fn test_audit_service_can_export_logs() {
 
 #[tokio::test]
 async fn test_admin_can_list_audit_logs() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     // 使用 SuperAdmin 确保有权限访问审计 API
     let (_admin_id, admin_token) =
@@ -421,7 +424,7 @@ async fn test_admin_can_list_audit_logs() {
 
 #[tokio::test]
 async fn test_admin_can_get_audit_stats() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) =
         create_test_admin(&state, "auditadmin3", "auditadmin3@test.com").await;
@@ -443,7 +446,7 @@ async fn test_admin_can_get_audit_stats() {
 
 #[tokio::test]
 async fn test_admin_can_query_alerts() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) =
         create_test_admin(&state, "auditadmin4", "auditadmin4@test.com").await;
@@ -465,7 +468,7 @@ async fn test_admin_can_query_alerts() {
 
 #[tokio::test]
 async fn test_admin_can_list_alert_rules() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) =
         create_test_admin(&state, "auditadmin5", "auditadmin5@test.com").await;
@@ -487,7 +490,7 @@ async fn test_admin_can_list_alert_rules() {
 
 #[tokio::test]
 async fn test_login_creates_audit_log() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     // 创建用户
     let password = "TestPassword123";
@@ -548,7 +551,7 @@ async fn test_login_creates_audit_log() {
 
 #[tokio::test]
 async fn test_admin_action_creates_audit_log() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_admin_id, admin_token) =
         create_test_super_admin(&state, "superadmin1", "superadmin1@test.com").await;
@@ -598,7 +601,7 @@ async fn test_admin_action_creates_audit_log() {
 
 #[tokio::test]
 async fn test_non_admin_cannot_access_audit_api() {
-    let (app, state) = create_test_app().await;
+    let (app, state, _guard) = create_test_app().await;
 
     let (_user_id, user_token) =
         create_test_user(&state, "normaluser1", "normaluser1@test.com").await;
@@ -620,7 +623,7 @@ async fn test_non_admin_cannot_access_audit_api() {
 
 #[tokio::test]
 async fn test_audit_log_query_by_event_type() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser8", "audituser8@test.com").await;
 
@@ -663,7 +666,7 @@ async fn test_audit_log_query_by_event_type() {
 
 #[tokio::test]
 async fn test_audit_log_query_by_severity() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) = create_test_user(&state, "audituser9", "audituser9@test.com").await;
 
@@ -710,7 +713,7 @@ async fn test_audit_log_query_by_severity() {
 /// 4. 验证：正常日志不会被事务中毒影响（旧行为会被整个事务 abort 掉）
 #[tokio::test]
 async fn test_audit_log_fk_violation_does_not_poison_batch() {
-    let (_app, state) = create_test_app().await;
+    let (_app, state, _guard) = create_test_app().await;
 
     let (user_id, _token) =
         create_test_user(&state, "fk_test_user", "fk_test_user@test.com").await;

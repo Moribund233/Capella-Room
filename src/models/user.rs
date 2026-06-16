@@ -63,6 +63,10 @@ pub struct User {
     /// 账号状态：true=启用, false=禁用
     pub is_active: bool,
     pub role: UserRole,
+    #[sqlx(default)]
+    pub email_verified: bool,
+    #[sqlx(default)]
+    pub email_verified_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

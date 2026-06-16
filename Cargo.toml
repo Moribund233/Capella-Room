@@ -67,6 +67,9 @@ sysinfo = "0.30"
 # 随机数生成
 rand = "0.8"
 
+# OAuth
+bcrypt = "0.15"
+
 [dev-dependencies]
 # 测试依赖
 reqwest = { version = "0.11", features = ["json"] }

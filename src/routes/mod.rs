@@ -43,6 +43,19 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .nest("/api/auth", auth_routes())
         .nest("/api/v2/auth", v2_auth_routes());
 
+    // v1 注册端点（需要管理员权限）
+    let register_admin_router = Router::new()
+        .route("/api/v1/auth/register", post(auth::register))
+        .route("/api/auth/register", post(auth::register))
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            admin_auth_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            auth_middleware,
+        ));
+
     // 创建受保护路由（需要认证）
     let protected_routes = Router::new()
         // 用户路由
@@ -100,6 +113,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // 合并所有路由
     public_routes
         .merge(auth_routes_router)
+        .merge(register_admin_router)
         .merge(protected_routes)
         .merge(admin_routes)
         .with_state(state)
@@ -108,7 +122,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 /// 认证路由（公开访问）
 fn auth_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/register", post(auth::register))
         .route("/login", post(auth::login))
         .route("/refresh", post(auth::refresh_token))
 }
