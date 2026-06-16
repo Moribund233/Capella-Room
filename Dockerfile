@@ -68,7 +68,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git/db \
-    cargo build --release --locked
+    cargo build --release
 
 # =============================================================================
 # 阶段 4: 运行器

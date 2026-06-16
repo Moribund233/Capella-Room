@@ -33,5 +33,20 @@ export default defineConfig(({ mode }) => {
       host: env.VITE_HOST || '0.0.0.0',
       open: env.VITE_OPEN_BROWSER === 'true',
     },
+    // 生产构建去除 console 和 debugger（Vite 8 Rolldown 方式）
+    ...(mode === 'production' && {
+      build: {
+        rolldownOptions: {
+          output: {
+            minify: {
+              compress: {
+                dropConsole: true,
+                dropDebugger: true,
+              },
+            },
+          },
+        },
+      },
+    }),
   }
 })
