@@ -1,4 +1,5 @@
 use std::env;
+use std::sync::Arc;
 
 use uuid::Uuid;
 
@@ -6,6 +7,7 @@ use capella_room::{
     config::{DatabaseConfig, JwtConfig},
     db::Database,
     error::AppError,
+    models::user::UserRole,
     services::{auth_service::AuthService, oauth_service::OAuthService, user_service::UserService},
 };
 
@@ -76,6 +78,233 @@ async fn cleanup_database(db: &Database) {
 
 fn setup_service(db: Database) -> OAuthService {
     OAuthService::new(db, "test_oauth_secret")
+}
+
+fn create_token_for_user(user_id: Uuid, username: &str) -> String {
+    let auth_service = AuthService::new(JwtConfig {
+        secret: Some("test_secret_key_for_testing_purposes_only".to_string()),
+        expiration_hours: 24,
+    });
+    let tokens = auth_service
+        .generate_token_pair(user_id, username, UserRole::User)
+        .unwrap();
+    tokens.access_token
+}
+
+struct OAuthTestServer {
+    base_url: String,
+    db: Database,
+}
+
+impl OAuthTestServer {
+    fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    fn db(&self) -> &Database {
+        &self.db
+    }
+}
+
+async fn start_oauth_test_server() -> Option<OAuthTestServer> {
+    load_test_env();
+    std::env::set_var("JWT_SECRET", "test_secret_key_for_testing_purposes_only");
+
+    let database_url = env::var("DATABASE_URL").ok()?;
+
+    let db_config = DatabaseConfig {
+        url: Some(database_url),
+        max_connections: 5,
+        acquire_timeout_secs: 30,
+        idle_timeout_secs: 600,
+    };
+
+    let db = Database::new(&db_config).await.ok()?;
+    db.migrate().await.ok()?;
+
+    let ws_manager = capella_room::websocket::manager::WebSocketManager::new();
+    let metrics_collector = Arc::new(
+        capella_room::utils::logging::MetricsCollector::new(),
+    );
+
+    let config_db = Database::new(&db_config).await.ok()?;
+
+    let state = capella_room::state::AppState::new(
+        db.clone(),
+        ws_manager,
+        capella_room::config::ConfigLoader::load().ok()?,
+        metrics_collector,
+        Arc::new(capella_room::config::ConfigManager::new(
+            config_db,
+            capella_room::config::ConfigLoader::load().ok()?,
+            None,
+        )),
+        None,
+    )
+    .await
+    .ok()?;
+
+    let app = capella_room::routes::create_router(state);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .ok()?;
+    let addr = listener.local_addr().ok()?;
+    let base_url = format!("http://{}", addr);
+
+    tokio::spawn(async move {
+        axum::serve(listener, app.into_make_service())
+            .await
+            .unwrap();
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    Some(OAuthTestServer { base_url, db })
+}
+
+async fn create_user_get_token(
+    user_service: &UserService,
+    username: &str,
+) -> Option<(Uuid, String)> {
+    let (user_id, _) = create_test_user(user_service, username).await;
+    let token = create_token_for_user(user_id, username);
+    Some((user_id, token))
+}
+
+#[cfg(test)]
+mod oauth_app_api_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_create_app_returns_201_with_client_secret() {
+        let server = match start_oauth_test_server().await {
+            Some(s) => s,
+            None => {
+                eprintln!("Skipping test: DATABASE_URL not set or server failed to start");
+                return;
+            }
+        };
+
+        let user_service = UserService::new(server.db().clone());
+        let (_user_id, token) = match create_user_get_token(&user_service, "oauth_api_create").await {
+            Some(t) => t,
+            None => {
+                eprintln!("Skipping: could not create test user");
+                return;
+            }
+        };
+
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .post(format!("{}/api/v2/oauth/apps", server.base_url()))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({
+                "name": "My API App",
+                "description": "Created via API",
+                "redirect_uris": ["http://localhost:3000/callback"],
+                "scopes": ["read", "write"]
+            }))
+            .send()
+            .await
+            .expect("Request failed");
+
+        assert_eq!(
+            resp.status(),
+            201,
+            "create app should return 201"
+        );
+        let json: serde_json::Value = resp.json().await.unwrap();
+        assert!(json.get("client_secret").is_some(), "response should include client_secret");
+        assert_eq!(json["name"], "My API App");
+    }
+
+    #[tokio::test]
+    async fn test_list_apps_returns_200_with_user_apps() {
+        let server = match start_oauth_test_server().await {
+            Some(s) => s,
+            None => {
+                eprintln!("Skipping test: DATABASE_URL not set or server failed to start");
+                return;
+            }
+        };
+
+        let user_service = UserService::new(server.db().clone());
+        let (_user_id, token) = match create_user_get_token(&user_service, "oauth_api_list").await {
+            Some(t) => t,
+            None => {
+                eprintln!("Skipping: could not create test user");
+                return;
+            }
+        };
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(format!("{}/api/v2/oauth/apps", server.base_url()))
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .expect("Request failed");
+
+        assert_eq!(resp.status(), 200, "list apps should return 200");
+        let apps: Vec<serde_json::Value> = resp.json().await.unwrap();
+        assert!(apps.is_empty(), "new user should have no apps");
+    }
+
+    #[tokio::test]
+    async fn test_delete_app_by_non_owner_returns_404() {
+        let server = match start_oauth_test_server().await {
+            Some(s) => s,
+            None => {
+                eprintln!("Skipping test: DATABASE_URL not set or server failed to start");
+                return;
+            }
+        };
+
+        let user_service = UserService::new(server.db().clone());
+        let (_owner_id, owner_token) = match create_user_get_token(&user_service, "oauth_del_owner").await {
+            Some(t) => t,
+            None => {
+                eprintln!("Skipping: could not create owner user");
+                return;
+            }
+        };
+        let (_non_owner_id, non_owner_token) = match create_user_get_token(&user_service, "oauth_del_nonowner").await {
+            Some(t) => t,
+            None => {
+                eprintln!("Skipping: could not create non-owner user");
+                return;
+            }
+        };
+
+        let client = reqwest::Client::new();
+        let create_resp = client
+            .post(format!("{}/api/v2/oauth/apps", server.base_url()))
+            .header("Authorization", format!("Bearer {}", owner_token))
+            .json(&serde_json::json!({
+                "name": "App to Delete",
+                "redirect_uris": ["http://localhost:3000/callback"],
+                "scopes": ["read"]
+            }))
+            .send()
+            .await
+            .expect("Failed to create app");
+        assert_eq!(create_resp.status(), 201, "create must succeed first");
+        let app: serde_json::Value = create_resp.json().await.unwrap();
+        let app_id = app["id"].as_str().unwrap().to_string();
+
+        let del_resp = client
+            .delete(format!("{}/api/v2/oauth/apps/{}", server.base_url(), app_id))
+            .header("Authorization", format!("Bearer {}", non_owner_token))
+            .send()
+            .await
+            .expect("Request failed");
+
+        assert_eq!(
+            del_resp.status(),
+            404,
+            "non-owner delete should return 404"
+        );
+    }
 }
 
 #[cfg(test)]

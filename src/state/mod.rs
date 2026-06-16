@@ -18,8 +18,9 @@ use crate::services::ip_security_service::IpSecurityService;
 use crate::services::mail_service::MailService;
 use crate::services::message_service::MessageService;
 use crate::services::monitor_service::MonitorService;
-use crate::services::reaction_service::ReactionService;
 use crate::services::notification_service::NotificationService;
+use crate::services::oauth_service::OAuthService;
+use crate::services::reaction_service::ReactionService;
 use crate::services::pin_message_service::PinMessageService;
 use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
@@ -51,6 +52,7 @@ pub struct AppState {
     pub ip_security_service: Arc<IpSecurityService>,
     pub user_settings_service: UserSettingsService,
     pub account_security_service: AccountSecurityService,
+    pub oauth_service: OAuthService,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
     pub redis_manager: Option<Arc<RedisManager>>,
@@ -152,6 +154,11 @@ impl AppState {
         )?);
 
         let account_security_service = AccountSecurityService::new(db.clone().pool().clone());
+        let oauth_secret = {
+            let config = shared_config.read().await;
+            config.jwt.secret.clone().unwrap_or_else(|| "default_oauth_secret".to_string())
+        };
+        let oauth_service = OAuthService::new(db.clone(), &oauth_secret);
 
         // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
         if let Some(ref redis_mgr) = redis_manager {
@@ -196,6 +203,7 @@ impl AppState {
             ip_security_service,
             user_settings_service: (*user_settings_service_arc).clone(),
             account_security_service,
+            oauth_service,
             config: shared_config,
             config_manager: config_manager.clone(),
             redis_manager,
@@ -336,6 +344,10 @@ impl Clone for AppState {
             ip_security_service: Arc::clone(&self.ip_security_service),
             user_settings_service: UserSettingsService::new(self.db.clone().pool().clone()),
             account_security_service: AccountSecurityService::new(self.db.clone().pool().clone()),
+            oauth_service: OAuthService::new(
+                self.db.clone(),
+                self.config.blocking_read().jwt.secret.as_deref().unwrap_or("default_oauth_secret"),
+            ),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
             redis_manager: self.redis_manager.clone(),
