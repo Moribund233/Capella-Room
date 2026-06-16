@@ -4,6 +4,7 @@
     "back": "Back",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "create": "Create",
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
@@ -346,11 +347,25 @@
     "notifications": "Notifications",
     "themeDark": "Dark Theme",
     "themeLight": "Light Theme",
-    "personalization": "Personalization"
+    "personalization": "Personalization",
+    "groupMain": "Common",
+    "groupSystem": "System"
   },
   "connection": {
     "disconnected": "Connection lost",
     "connecting": "Connecting…",
     "reconnecting": "Reconnecting…"
+  },
+  "room": {
+    "create": "Create Room",
+    "nameLabel": "Room Name",
+    "namePlaceholder": "Enter room name",
+    "nameRequired": "Room name is required",
+    "nameMaxLength": "Name must be 50 characters or less",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Enter room description (optional)",
+    "privateLabel": "Private Room",
+    "privateHint": "Private rooms require an invitation to join",
+    "maxMembersLabel": "Max Members"
   }
 }

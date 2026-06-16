@@ -172,13 +172,6 @@ onMounted(async () => {
   await roomStore.fetchMyRooms()
   await settingsStore.loadSettings()
 
-  // 同步 i18n locale 与 store 中的语言设置
-  const storeLang = settingsStore.localeSettings.language
-  const i18nLang = storeLang === 'zh-CN' ? 'zh' : storeLang === 'ja-JP' ? 'ja' : 'en'
-  if (locale.value !== i18nLang) {
-    locale.value = i18nLang
-  }
-
   loading.value = false
 })
 

@@ -268,6 +268,33 @@ function switchLanguage(code: string) {
   }
 }
 
+.topnav nav a.btn-primary {
+  color: #fff;
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+// 移动端适配
+@media (max-width: 768px) {
+  .topnav nav a:not(.btn-primary) {
+    display: none;
+  }
+
+  .topnav nav {
+    gap: 12px;
+  }
+
+  .container {
+    padding-inline: 16px;
+  }
+
+  .topnav-inner {
+    padding-block: 10px;
+  }
+}
+
 // 语言切换器
 .lang-switcher {
   position: relative;

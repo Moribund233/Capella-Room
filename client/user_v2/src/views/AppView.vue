@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoomStore } from '@/stores/room'
 import { useMessageStore } from '@/stores/message'
-import { useWebSocketStore } from '@/stores/websocket'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useMessageActions } from '@/composables/useMessageActions'
 import { useResponsive } from '@/composables/useResponsive'
@@ -36,17 +35,8 @@ import type {
 
 const roomStore = useRoomStore()
 const messageStore = useMessageStore()
-const wsStore = useWebSocketStore()
 const { t } = useI18n()
 const { isMobile, showMemberPanel: canShowMemberPanel } = useResponsive()
-
-const connectionBanner = computed(() => {
-  const state = wsStore.connectionState
-  if (state === 'disconnected') return { text: t('connection.disconnected'), type: 'error' }
-  if (state === 'reconnecting') return { text: t('connection.reconnecting'), type: 'warning' }
-  if (state === 'connecting') return { text: t('connection.connecting'), type: 'warning' }
-  return null
-})
 
 const { currentRoom, members } = storeToRefs(roomStore)
 const hasRoom = ref(false)
@@ -218,18 +208,6 @@ function handleJumpToSearch(msgId: string) {
 
 <template>
   <div class="app-view">
-    <!-- 连接状态提示 -->
-    <transition name="banner-slide">
-      <div
-        v-if="connectionBanner"
-        class="connection-banner"
-        :class="`connection-banner--${connectionBanner.type}`"
-      >
-        <span class="connection-banner__dot" />
-        {{ connectionBanner.text }}
-      </div>
-    </transition>
-
     <!-- 侧边栏遮罩（移动端） -->
     <transition name="fade">
       <div
@@ -352,57 +330,6 @@ function handleJumpToSearch(msgId: string) {
   &__member-panel {
     flex-shrink: 0;
   }
-}
-
-// 连接状态横幅
-.connection-banner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  pointer-events: none;
-
-  &--error {
-    background: color-mix(in oklch, var(--accent-pink) 20%, transparent);
-    color: var(--accent-pink);
-  }
-
-  &--warning {
-    background: color-mix(in oklch, var(--accent-orange) 20%, transparent);
-    color: var(--accent-orange);
-  }
-
-  &__dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: currentColor;
-    animation: banner-pulse 1.5s ease-in-out infinite;
-  }
-}
-
-@keyframes banner-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-.banner-slide-enter-active,
-.banner-slide-leave-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-
-.banner-slide-enter-from,
-.banner-slide-leave-to {
-  transform: translateY(-100%);
-  opacity: 0;
 }
 
 // 移动端遮罩

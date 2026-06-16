@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { NavBar } from '@/components/nav'
 import { useResponsive } from '@/composables/useResponsive'
+import GlobalModal from '@/components/common/GlobalModal.vue'
+import { useGlobalModal } from '@/composables/useGlobalModal'
 
 const { isMobile } = useResponsive()
+useGlobalModal()
 </script>
 
 <template>
@@ -24,6 +27,9 @@ const { isMobile } = useResponsive()
 
     <!-- 移动端底部导航栏 -->
     <NavBar v-if="isMobile" class="main-layout__mobile-nav" />
+
+    <!-- 全局弹窗 -->
+    <GlobalModal />
   </div>
 </template>
 

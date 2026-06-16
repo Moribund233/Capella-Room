@@ -3,11 +3,17 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
+import { useWebSocketStore } from '@/stores/websocket'
 import { useResponsive } from '@/composables/useResponsive'
 import { useThemeStore } from '@/stores/theme'
 import { useNotificationStore } from '@/stores/notification'
-import { QuickBar } from '@/components/quick'
-import type { QuickItem } from '@/components/quick'
+import { useGlobalModal } from '@/composables/useGlobalModal'
+import NotificationContent from '@/components/notification/NotificationContent.vue'
+import PersonalizationModal from '@/components/quick/PersonalizationModal.vue'
+import CreateRoomModal from '@/components/quick/CreateRoomModal.vue'
+import { QuickBar, QuickDial } from '@/components/quick'
+import type { QuickItem, QuickGroup } from '@/components/quick'
 import { supportedLocales, setLocale, getCurrentLocale } from '@/i18n'
 import {
   ChatRound,
@@ -18,15 +24,25 @@ import {
   Sunny,
   Bell,
   Connection,
+  Setting,
+  CirclePlus,
+  Brush,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+const wsStore = useWebSocketStore()
 const themeStore = useThemeStore()
 const notificationStore = useNotificationStore()
+const globalModal = useGlobalModal()
 const { isMobile } = useResponsive()
+
+// 禁用自动属性继承，避免多根节点警告
+// class 将显式绑定到 <nav> 元素
+defineOptions({ inheritAttrs: false })
 
 /**
  * 导航项配置
@@ -83,12 +99,55 @@ function cycleLocale() {
   const idx = codes.indexOf(currentLocale.value.code)
   const next = codes[(idx + 1) % codes.length] as 'en' | 'zh' | 'ja'
   setLocale(next)
+  const serverLang = next === 'zh' ? 'zh-CN' : next === 'ja' ? 'ja-JP' : 'en-US'
+  settingsStore.updateLocaleSettings({ language: serverLang })
+}
+
+/**
+ * 打开创建房间弹窗
+ */
+function openCreateRoomModal() {
+  globalModal.open({
+    title: t('room.create'),
+    component: CreateRoomModal,
+    preset: 'card',
+    closable: true,
+    componentProps: {
+      onCreated: (roomId: string) => {
+        globalModal.close()
+        if (wsStore.isConnected) {
+          wsStore.send('JoinRoom', { room_id: roomId })
+        }
+        router.push(`/room/${roomId}`)
+      },
+      onCancel: () => {
+        globalModal.close()
+      },
+    },
+  })
+}
+
+function openPersonalization() {
+  globalModal.open({
+    title: t('quick.personalization'),
+    component: PersonalizationModal,
+    preset: 'card',
+    closable: true,
+  })
 }
 
 /**
  * QuickBar 配置 - 全局快捷操作
  */
 const quickItems = computed<QuickItem[]>(() => [
+  {
+    key: 'createRoom',
+    display: 'visible',
+    type: 'action',
+    icon: CirclePlus,
+    label: t('room.create'),
+    onClick: openCreateRoomModal,
+  },
   {
     key: 'notifications',
     display: 'visible',
@@ -97,8 +156,25 @@ const quickItems = computed<QuickItem[]>(() => [
     label: t('quick.notifications'),
     badge: notificationStore.unreadCount,
     onClick: () => {
-      notificationStore.togglePanel()
+      if (globalModal.modalState.value.visible) {
+        globalModal.close()
+      } else {
+        globalModal.open({
+          title: t('quick.notifications'),
+          component: NotificationContent,
+          preset: 'card',
+          closable: true,
+        })
+      }
     },
+  },
+  {
+    key: 'personalization',
+    display: 'visible',
+    type: 'action',
+    icon: Brush,
+    label: t('quick.personalization'),
+    onClick: openPersonalization,
   },
   {
     key: 'theme',
@@ -111,13 +187,52 @@ const quickItems = computed<QuickItem[]>(() => [
     },
   },
 ])
+
+/**
+ * QuickDial 分组配置 - 仅移动端使用
+ * 分组1：常用操作 | 分组2：系统设置
+ */
+const quickGroups = computed<QuickGroup[]>(() => [
+  {
+    key: 'main',
+    icon: Compass,
+    label: t('quick.groupMain') || '常用',
+    items: quickItems.value,
+  },
+  {
+    key: 'system',
+    icon: Setting,
+    label: t('quick.groupSystem') || '系统',
+    items: [
+      {
+        key: 'locale',
+        display: 'visible',
+        type: 'action',
+        icon: currentLocale.value.flag,
+        label: currentLocale.value.name,
+        onClick: cycleLocale,
+      },
+      {
+        key: 'logout',
+        display: 'visible',
+        type: 'action',
+        icon: SwitchButton,
+        label: t('common.logout'),
+        onClick: handleLogout,
+      },
+    ],
+  },
+])
 </script>
 
 <template>
-  <nav class="nav-bar" :class="{ 'nav-bar--mobile': isMobile }">
+  <nav class="nav-bar" :class="{ 'nav-bar--mobile': isMobile }" v-bind="$attrs">
     <!-- 桌面端：Logo区域 -->
     <div v-if="!isMobile" class="nav-bar__logo">
-      <img src="/favicon.svg" alt="CapellaRoom" class="logo-img" />
+      <div class="nav-bar__logo-wrapper">
+        <img src="/favicon.svg" alt="CapellaRoom" class="logo-img" />
+        <span class="nav-bar__status-dot" :class="`nav-bar__status-dot--${wsStore.connectionState}`" />
+      </div>
     </div>
 
     <!-- 导航项 -->
@@ -169,20 +284,10 @@ const quickItems = computed<QuickItem[]>(() => [
       </div>
     </div>
 
-    <!-- 移动端：登出按钮 -->
-    <div v-if="isMobile" class="nav-bar__logout">
-      <button
-        class="nav-bar__logout-btn"
-        @click="handleLogout"
-        :title="t('common.logout')"
-        :aria-label="t('common.logout')"
-      >
-        <el-icon :size="20">
-          <SwitchButton />
-        </el-icon>
-      </button>
-    </div>
   </nav>
+
+  <!-- 移动端 FAB 快捷拨号 -->
+  <QuickDial v-if="isMobile" :groups="quickGroups" />
 </template>
 
 <style scoped lang="scss">
@@ -206,12 +311,60 @@ const quickItems = computed<QuickItem[]>(() => [
   justify-content: center;
   border-bottom: 1px solid var(--el-border-color-light);
   flex-shrink: 0;
+}
+
+.nav-bar__logo-wrapper {
+  position: relative;
+  display: inline-flex;
 
   .logo-img {
     width: 32px;
     height: 32px;
     filter: var(--logo-filter);
   }
+}
+
+/* 连接状态呼吸灯 */
+.nav-bar__status-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--el-bg-color);
+  transition: background 0.3s ease;
+
+  &--connected {
+    background: #22c55e;
+    animation: breathe-green 2.5s ease-in-out infinite;
+  }
+
+  &--connecting,
+  &--reconnecting {
+    background: #f59e0b;
+    animation: breathe-amber 1.2s ease-in-out infinite;
+  }
+
+  &--disconnected {
+    background: #ef4444;
+    animation: breathe-red 2.5s ease-in-out infinite;
+  }
+}
+
+@keyframes breathe-green {
+  0%, 100% { box-shadow: 0 0 3px 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 6px 2px rgba(34, 197, 94, 0.7); }
+}
+
+@keyframes breathe-amber {
+  0%, 100% { box-shadow: 0 0 3px 0 rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 0 6px 2px rgba(245, 158, 11, 0.7); }
+}
+
+@keyframes breathe-red {
+  0%, 100% { box-shadow: 0 0 3px 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.7); }
 }
 
 /* Nav items */

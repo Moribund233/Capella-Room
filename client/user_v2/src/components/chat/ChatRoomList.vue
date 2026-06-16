@@ -108,7 +108,7 @@ function closeMobile() {
     <!-- 侧边栏头部 -->
     <div class="sidebar-header" @click="goToProfile">
       <span>{{ t('common.appName') }}</span>
-      <el-icon><ArrowDown /></el-icon>
+      <el-icon @click.stop><ArrowDown /></el-icon>
     </div>
 
     <!-- 搜索 -->

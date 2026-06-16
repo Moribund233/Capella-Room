@@ -4,6 +4,7 @@
     "back": "戻る",
     "cancel": "キャンセル",
     "confirm": "確認",
+    "create": "作成",
     "save": "保存",
     "delete": "削除",
     "edit": "編集",
@@ -346,11 +347,25 @@
     "notifications": "通知",
     "themeDark": "ダークテーマ",
     "themeLight": "ライトテーマ",
-    "personalization": "パーソナライゼーション"
+    "personalization": "パーソナライゼーション",
+    "groupMain": "一般",
+    "groupSystem": "システム"
   },
   "connection": {
     "disconnected": "接続が切れました",
     "connecting": "接続中…",
     "reconnecting": "再接続中…"
+  },
+  "room": {
+    "create": "ルームを作成",
+    "nameLabel": "ルーム名",
+    "namePlaceholder": "ルーム名を入力",
+    "nameRequired": "ルーム名を入力してください",
+    "nameMaxLength": "ルーム名は50文字以内にしてください",
+    "descriptionLabel": "説明",
+    "descriptionPlaceholder": "ルームの説明を入力（任意）",
+    "privateLabel": "非公開ルーム",
+    "privateHint": "非公開ルームは招待が必要です",
+    "maxMembersLabel": "最大メンバー数"
   }
 }

@@ -4,6 +4,7 @@
     "back": "返回",
     "cancel": "取消",
     "confirm": "确认",
+    "create": "创建",
     "save": "保存",
     "delete": "删除",
     "edit": "编辑",
@@ -345,12 +346,26 @@
     "notifications": "通知",
     "themeDark": "深色主题",
     "themeLight": "浅色主题",
-    "personalization": "个性化"
+    "personalization": "个性化",
+    "groupMain": "常用",
+    "groupSystem": "系统"
   },
   "connection": {
     "disconnected": "连接已断开",
     "connecting": "正在连接…",
     "reconnecting": "正在重连…"
+  },
+  "room": {
+    "create": "创建房间",
+    "nameLabel": "房间名称",
+    "namePlaceholder": "请输入房间名称",
+    "nameRequired": "请输入房间名称",
+    "nameMaxLength": "名称不能超过50个字符",
+    "descriptionLabel": "房间描述",
+    "descriptionPlaceholder": "请输入房间描述（可选）",
+    "privateLabel": "私密房间",
+    "privateHint": "私密房间需要邀请才能加入",
+    "maxMembersLabel": "最大成员数"
   },
   "notFound": {
     "title": "页面未找到",

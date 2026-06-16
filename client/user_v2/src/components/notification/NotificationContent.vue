@@ -2,7 +2,17 @@
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotificationStore } from '@/stores/notification'
-import { Bell, Check, Delete, ArrowDown, Loading, InfoFilled, SuccessFilled, WarningFilled, CircleCloseFilled, Close } from '@element-plus/icons-vue'
+import {
+  Bell,
+  Check,
+  Delete,
+  ArrowDown,
+  Loading,
+  InfoFilled,
+  SuccessFilled,
+  WarningFilled,
+  CircleCloseFilled,
+} from '@element-plus/icons-vue'
 import type { NotificationItem } from '@/types/notification'
 
 const { t } = useI18n()
@@ -95,132 +105,138 @@ function handleLoadMore() {
 </script>
 
 <template>
-  <ElDrawer
-    :model-value="notificationStore.isPanelOpen"
-    :title="t('quick.notifications')"
-    size="420px"
-    @close="notificationStore.closePanel()"
-  >
-    <template #header="{ close, titleId, titleClass }">
-      <div class="notification-drawer__header">
-        <div class="notification-drawer__title">
-          <el-icon :size="18"><Bell /></el-icon>
-          <span :id="titleId" :class="titleClass">{{ t('quick.notifications') }}</span>
-          <span v-if="unreadCount > 0" class="notification-drawer__badge">
-            {{ unreadCount }}
-          </span>
-        </div>
-        <div class="notification-drawer__actions">
-          <el-button
-            v-if="unreadCount > 0"
-            text
-            :icon="Check"
-            size="small"
-            title="全部已读"
-            @click="handleMarkAllAsRead"
-          />
-          <el-button
-            v-if="hasNotifications"
-            text
-            :icon="Delete"
-            size="small"
-            title="清空全部"
-            @click="handleClearAll"
-          />
-          <el-button text :icon="Close" size="small" @click="close" />
-        </div>
+  <div class="notification-content">
+    <!-- 头部操作栏 -->
+    <div class="notification-content__toolbar">
+      <div class="notification-content__toolbar-left">
+        <el-icon :size="16"><Bell /></el-icon>
+        <span>{{ t('quick.notifications') }}</span>
+        <span v-if="unreadCount > 0" class="notification-content__badge">
+          {{ unreadCount }}
+        </span>
       </div>
-    </template>
-
-    <div class="notification-drawer__body">
-      <div v-if="loading && !hasNotifications" class="notification-drawer__loading">
-        <el-icon class="is-loading" :size="24"><Loading /></el-icon>
-        <span>{{ t('common.loading') }}</span>
+      <div class="notification-content__toolbar-right">
+        <el-button
+          v-if="unreadCount > 0"
+          text
+          :icon="Check"
+          size="small"
+          @click="handleMarkAllAsRead"
+        >
+          {{ t('notification.markAllRead') }}
+        </el-button>
+        <el-button
+          v-if="hasNotifications"
+          text
+          :icon="Delete"
+          size="small"
+          @click="handleClearAll"
+        >
+          {{ t('notification.clearAll') }}
+        </el-button>
       </div>
-
-      <ElEmpty v-else-if="!hasNotifications" description="暂无通知" />
-
-      <template v-else>
-        <ElScrollbar class="notification-drawer__list">
-          <div
-            v-for="(items, date) in groupedNotifications"
-            :key="date"
-            class="notification-drawer__group"
-          >
-            <div class="notification-drawer__date">{{ date }}</div>
-            <div
-              v-for="notification in items"
-              :key="notification.id"
-              class="notification-drawer__item"
-              :class="{ 'is-unread': !notification.isRead }"
-            >
-              <el-icon
-                :size="14"
-                class="notification-drawer__type-icon"
-                :style="{ color: getTypeColor(notification.type) }"
-              >
-                <component :is="typeIconMap[notification.type] || InfoFilled" />
-              </el-icon>
-
-              <div class="notification-drawer__content">
-                <div class="notification-drawer__item-header">
-                  <span class="notification-drawer__item-title">{{ notification.title }}</span>
-                  <span class="notification-drawer__time">{{ formatTime(notification.createdAt) }}</span>
-                </div>
-                <p class="notification-drawer__item-text">{{ notification.content }}</p>
-              </div>
-
-              <div class="notification-drawer__item-actions">
-                <el-button
-                  v-if="!notification.isRead"
-                  text
-                  :icon="Check"
-                  size="small"
-                  title="标记已读"
-                  @click="handleMarkAsRead(notification.id)"
-                />
-                <el-button
-                  text
-                  :icon="Delete"
-                  size="small"
-                  title="删除"
-                  @click="handleDelete(notification.id)"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div v-if="hasMore" class="notification-drawer__load-more">
-            <el-button
-              :loading="loading"
-              :icon="ArrowDown"
-              @click="handleLoadMore"
-            >
-              {{ loading ? '加载中...' : '加载更多' }}
-            </el-button>
-          </div>
-        </ElScrollbar>
-      </template>
     </div>
-  </ElDrawer>
+
+    <!-- 加载中 -->
+    <div v-if="loading && !hasNotifications" class="notification-content__loading">
+      <el-icon class="is-loading" :size="24"><Loading /></el-icon>
+      <span>{{ t('common.loading') }}</span>
+    </div>
+
+    <!-- 空状态 -->
+    <ElEmpty v-else-if="!hasNotifications">
+      <template #description>
+        <span>{{ t('notification.noNotifications') }}</span>
+      </template>
+    </ElEmpty>
+
+    <!-- 通知列表 -->
+    <ElScrollbar v-else class="notification-content__list">
+      <div
+        v-for="(items, date) in groupedNotifications"
+        :key="date"
+        class="notification-content__group"
+      >
+        <div class="notification-content__date">{{ date }}</div>
+        <div
+          v-for="notification in items"
+          :key="notification.id"
+          class="notification-content__item"
+          :class="{ 'is-unread': !notification.isRead }"
+        >
+          <el-icon
+            :size="14"
+            class="notification-content__type-icon"
+            :style="{ color: getTypeColor(notification.type) }"
+          >
+            <component :is="typeIconMap[notification.type] || InfoFilled" />
+          </el-icon>
+
+          <div class="notification-content__body">
+            <div class="notification-content__item-header">
+              <span class="notification-content__item-title">{{ notification.title }}</span>
+              <span class="notification-content__time">{{ formatTime(notification.createdAt) }}</span>
+            </div>
+            <p class="notification-content__item-text">{{ notification.content }}</p>
+          </div>
+
+          <div class="notification-content__item-actions">
+            <el-button
+              v-if="!notification.isRead"
+              text
+              :icon="Check"
+              size="small"
+              @click="handleMarkAsRead(notification.id)"
+            />
+            <el-button
+              text
+              :icon="Delete"
+              size="small"
+              @click="handleDelete(notification.id)"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div v-if="hasMore" class="notification-content__load-more">
+        <el-button
+          :loading="loading"
+          :icon="ArrowDown"
+          @click="handleLoadMore"
+        >
+          {{ loading ? t('common.loading') : t('common.loadMore') }}
+        </el-button>
+      </div>
+    </ElScrollbar>
+  </div>
 </template>
 
 <style scoped lang="scss">
-.notification-drawer__header {
+.notification-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 300px;
+}
+
+.notification-content__toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  flex-shrink: 0;
 }
 
-.notification-drawer__title {
+.notification-content__toolbar-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 600;
+  font-size: 14px;
 }
 
-.notification-drawer__badge {
+.notification-content__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -234,19 +250,13 @@ function handleLoadMore() {
   border-radius: 9px;
 }
 
-.notification-drawer__actions {
+.notification-content__toolbar-right {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.notification-drawer__body {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.notification-drawer__loading {
+.notification-content__loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -254,31 +264,31 @@ function handleLoadMore() {
   gap: 12px;
   padding: 48px 0;
   color: var(--el-text-color-secondary);
-}
-
-.notification-drawer__list {
   flex: 1;
-  padding: 8px 0;
 }
 
-.notification-drawer__group {
+.notification-content__list {
+  flex: 1;
+  margin: 0 -20px;
+  padding: 0 20px;
+}
+
+.notification-content__group {
   margin-bottom: 16px;
 }
 
-.notification-drawer__date {
+.notification-content__date {
   font-size: 12px;
   font-weight: 500;
   color: var(--el-text-color-secondary);
-  padding: 4px 16px;
-  margin-bottom: 4px;
+  padding: 8px 0 4px;
 }
 
-.notification-drawer__item {
+.notification-content__item {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 16px;
-  margin: 0 8px;
+  padding: 10px 12px;
   border-radius: 8px;
   transition: background 0.15s;
   margin-bottom: 2px;
@@ -286,7 +296,7 @@ function handleLoadMore() {
   &:hover {
     background: var(--el-fill-color-light);
 
-    .notification-drawer__item-actions {
+    .notification-content__item-actions {
       opacity: 1;
     }
   }
@@ -300,24 +310,24 @@ function handleLoadMore() {
   }
 }
 
-.notification-drawer__type-icon {
+.notification-content__type-icon {
   margin-top: 2px;
   flex-shrink: 0;
 }
 
-.notification-drawer__content {
+.notification-content__body {
   flex: 1;
   min-width: 0;
 }
 
-.notification-drawer__item-header {
+.notification-content__item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.notification-drawer__item-title {
+.notification-content__item-title {
   font-size: 13px;
   font-weight: 500;
   color: var(--el-text-color-primary);
@@ -326,14 +336,14 @@ function handleLoadMore() {
   white-space: nowrap;
 }
 
-.notification-drawer__time {
+.notification-content__time {
   font-size: 11px;
   color: var(--el-text-color-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.notification-drawer__item-text {
+.notification-content__item-text {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin: 4px 0 0;
@@ -345,7 +355,7 @@ function handleLoadMore() {
   -webkit-box-orient: vertical;
 }
 
-.notification-drawer__item-actions {
+.notification-content__item-actions {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -354,9 +364,9 @@ function handleLoadMore() {
   transition: opacity 0.15s;
 }
 
-.notification-drawer__load-more {
+.notification-content__load-more {
   display: flex;
   justify-content: center;
-  padding: 16px;
+  padding: 16px 0;
 }
 </style>

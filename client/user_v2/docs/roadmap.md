@@ -63,6 +63,17 @@
 | A7 | **系统日志订阅** — WS Logs 实时查看界面 (user_v2 用户无权限) | ❌ 已取消 |
 | A8 | **删除账号** — ProfileView 危险区域 + 后端自服务 API | ✅ |
 
+### Phase A+ — UI 与功能补齐 🟡 高优先级
+
+| # | 任务 | 涉及文件 | 预估 | 状态 |
+|---|------|---------|:----:|:----:|
+| A9 | **新建房间 UI** — API/Store 已就绪，缺侧边栏入口按钮 + CreateRoomModal 对话框（房间名/描述/公开/私密/最大人数） | `ChatRoomList.vue`（加按钮）, `components/chat/CreateRoomModal.vue` | 2h | 🆕 |
+| A10 | **创建房间路由修复** — `useRoom.ts` 创建后跳转到不存在的 `/room/${room.id}`，改为 `/app` | `composables/useRoom.ts:37` | 0.5h | 🆕 |
+| A11 | **PinnedMessagesPanel 接入 AppView** — 组件已存在但未 export 且未接入视图；需在 ChatHeader 添加置顶消息入口按钮 | `chat/index.ts`, `ChatHeader.vue`, `AppView.vue` | 2h | 🆕 |
+| A12 | **组件导出修复** — `PinnedMessagesPanel`、`EditHistoryPanel`、`GifPicker`、`EmojiPicker` 存在但未在 barrel export 中导出，可能导致导入报错或 Tree-shaking 异常 | `components/chat/index.ts` | 0.5h | 🆕 |
+| A13 | **全局错误边界** — 缺少 ErrorBoundary 组件捕获渲染/API 异常，防止白屏 | `components/error/ErrorBoundary.vue`, `AppView.vue` | 1h | 🆕 |
+| A14 | **用户卡片/弹窗** — 查看其他用户资料（头像/状态/操作），点击头像或用户名触发 UserProfileModal；缺少 `StartDirectChatModal` | `components/user/` | 2h | 🆕 |
+
 ### Phase B — 动画与用户体验优化 ✓ 高优先级
 
 > 设计规范参考: `prototype/new_user_client/` — 暗色主题 `#7c5cfc` 紫色品牌色, 过渡 100-200ms ease, 响应式断点 900/860/840/640px

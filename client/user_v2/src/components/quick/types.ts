@@ -53,3 +53,17 @@ export interface QuickItem {
   /** 子菜单选择回调 */
   onSelect?: (childKey: string) => void
 }
+
+/**
+ * QuickDial 分组配置
+ */
+export interface QuickGroup {
+  /** 分组唯一标识 */
+  key: string
+  /** 分组图标（显示在 FAB 上） */
+  icon: unknown
+  /** 分组标签 */
+  label: string
+  /** 该分组的 Quick 项列表 */
+  items: QuickItem[]
+}
