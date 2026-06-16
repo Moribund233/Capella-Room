@@ -4,6 +4,7 @@ pub mod file;
 pub mod message;
 pub mod verification_code;
 pub mod message_reaction;
+pub mod oauth;
 pub mod pinned_message;
 pub mod response;
 pub mod room;
