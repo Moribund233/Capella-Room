@@ -8,6 +8,8 @@
 export interface QuickChildItem {
   /** 唯一标识 */
   key: string
+  /** 图标组件 */
+  icon?: unknown
   /** 显示标签 */
   label: string
   /** 是否禁用 */

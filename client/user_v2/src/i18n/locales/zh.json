@@ -12,6 +12,8 @@
     "search": "搜索",
     "loading": "加载中...",
     "error": "错误",
+    "boundaryTitle": "渲染出错了",
+    "boundaryRetry": "重试",
     "success": "成功",
     "warning": "警告",
     "logout": "退出登录"
@@ -108,6 +110,7 @@
     "noMessages": "暂无消息",
     "noMembers": "暂无成员",
     "selectRoom": "选择一个房间开始聊天",
+    "directMessages": "直接消息",
     "searchMessages": "搜索消息",
     "showMemberList": "显示成员列表",
     "hideMemberList": "隐藏成员列表",
@@ -143,6 +146,7 @@
     "pinMessage": "置顶消息",
     "unpinMessage": "取消置顶",
     "pinnedMessage": "已置顶",
+    "pinnedMessages": "置顶消息",
     "owner": "创建者",
     "admin": "管理员",
     "welcome": {
@@ -348,7 +352,10 @@
     "themeLight": "浅色主题",
     "personalization": "个性化",
     "groupMain": "常用",
-    "groupSystem": "系统"
+    "groupSystem": "系统",
+    "sidebarCollapse": "收起侧边栏",
+    "sidebarExpand": "展开侧边栏",
+    "more": "更多"
   },
   "connection": {
     "disconnected": "连接已断开",

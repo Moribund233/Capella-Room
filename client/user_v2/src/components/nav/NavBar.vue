@@ -27,6 +27,9 @@ import {
   Setting,
   CirclePlus,
   Brush,
+  Fold,
+  Expand,
+  MoreFilled,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -38,7 +41,7 @@ const wsStore = useWebSocketStore()
 const themeStore = useThemeStore()
 const notificationStore = useNotificationStore()
 const globalModal = useGlobalModal()
-const { isMobile } = useResponsive()
+const { isMobile, sidebarCollapsed, toggleSidebar } = useResponsive()
 
 // 禁用自动属性继承，避免多根节点警告
 // class 将显式绑定到 <nav> 元素
@@ -118,7 +121,7 @@ function openCreateRoomModal() {
         if (wsStore.isConnected) {
           wsStore.send('JoinRoom', { room_id: roomId })
         }
-        router.push(`/room/${roomId}`)
+        router.push('/app')
       },
       onCancel: () => {
         globalModal.close()
@@ -137,16 +140,18 @@ function openPersonalization() {
 }
 
 /**
- * QuickBar 配置 - 全局快捷操作
+ * QuickBar 配置 - 桌面端快捷操作
+ * 外显：侧边栏切换、通知、主题
+ * More 菜单：创建房间、个性化、语言、登出
  */
 const quickItems = computed<QuickItem[]>(() => [
   {
-    key: 'createRoom',
+    key: 'toggleSidebar',
     display: 'visible',
     type: 'action',
-    icon: CirclePlus,
-    label: t('room.create'),
-    onClick: openCreateRoomModal,
+    icon: sidebarCollapsed.value ? Expand : Fold,
+    label: sidebarCollapsed.value ? t('quick.sidebarExpand') : t('quick.sidebarCollapse'),
+    onClick: toggleSidebar,
   },
   {
     key: 'notifications',
@@ -169,14 +174,6 @@ const quickItems = computed<QuickItem[]>(() => [
     },
   },
   {
-    key: 'personalization',
-    display: 'visible',
-    type: 'action',
-    icon: Brush,
-    label: t('quick.personalization'),
-    onClick: openPersonalization,
-  },
-  {
     key: 'theme',
     display: 'visible',
     type: 'action',
@@ -186,23 +183,107 @@ const quickItems = computed<QuickItem[]>(() => [
       themeStore.toggleLightDark()
     },
   },
+  {
+    key: 'more',
+    display: 'visible',
+    type: 'menu',
+    icon: MoreFilled,
+    label: t('quick.more'),
+    children: [
+      { key: 'createRoom', icon: CirclePlus, label: t('room.create') },
+      { key: 'personalization', icon: Brush, label: t('quick.personalization') },
+      { key: 'locale', icon: currentLocale.value.flag, label: currentLocale.value.name },
+      { key: 'logout', icon: SwitchButton, label: t('common.logout') },
+    ],
+    onSelect: (childKey: string) => {
+      switch (childKey) {
+        case 'createRoom':
+          openCreateRoomModal()
+          break
+        case 'personalization':
+          openPersonalization()
+          break
+        case 'locale':
+          cycleLocale()
+          break
+        case 'logout':
+          handleLogout()
+          break
+      }
+    },
+  },
 ])
 
 /**
  * QuickDial 分组配置 - 仅移动端使用
- * 分组1：常用操作 | 分组2：系统设置
+ * 全部以独立按钮展示，无子菜单
  */
 const quickGroups = computed<QuickGroup[]>(() => [
   {
     key: 'main',
     icon: Compass,
-    label: t('quick.groupMain') || '常用',
-    items: quickItems.value,
+    label: t('quick.groupMain'),
+    items: [
+      {
+        key: 'toggleSidebar',
+        display: 'visible',
+        type: 'action',
+        icon: sidebarCollapsed.value ? Expand : Fold,
+        label: sidebarCollapsed.value ? t('quick.sidebarExpand') : t('quick.sidebarCollapse'),
+        onClick: toggleSidebar,
+      },
+      {
+        key: 'createRoom',
+        display: 'visible',
+        type: 'action',
+        icon: CirclePlus,
+        label: t('room.create'),
+        onClick: openCreateRoomModal,
+      },
+      {
+        key: 'notifications',
+        display: 'visible',
+        type: 'action',
+        icon: Bell,
+        label: t('quick.notifications'),
+        badge: notificationStore.unreadCount,
+        onClick: () => {
+          if (globalModal.modalState.value.visible) {
+            globalModal.close()
+          } else {
+            globalModal.open({
+              title: t('quick.notifications'),
+              component: NotificationContent,
+              preset: 'card',
+              closable: true,
+            })
+          }
+        },
+      },
+      {
+        key: 'personalization',
+        display: 'visible',
+        type: 'action',
+        icon: Brush,
+        label: t('quick.personalization'),
+        onClick: openPersonalization,
+      },
+      {
+        key: 'theme',
+        display: 'visible',
+        type: 'action',
+        icon: themeStore.isDark ? Moon : Sunny,
+        label: themeStore.isDark ? t('quick.themeDark') : t('quick.themeLight'),
+        onClick: () => {
+          themeStore.toggleLightDark()
+        },
+      },
+    ],
   },
   {
     key: 'system',
     icon: Setting,
-    label: t('quick.groupSystem') || '系统',
+    label: t('quick.groupSystem'),
     items: [
       {
         key: 'locale',
@@ -231,7 +312,6 @@ const quickGroups = computed<QuickGroup[]>(() => [
     <div v-if="!isMobile" class="nav-bar__logo">
       <div class="nav-bar__logo-wrapper">
         <img src="/favicon.svg" alt="CapellaRoom" class="logo-img" />
-        <span class="nav-bar__status-dot" :class="`nav-bar__status-dot--${wsStore.connectionState}`" />
       </div>
     </div>
 
@@ -251,37 +331,9 @@ const quickGroups = computed<QuickGroup[]>(() => [
       </button>
     </div>
 
-    <!-- 底部区域：QuickBar + 退出按钮 -->
+    <!-- 底部区域：QuickBar -->
     <div v-if="!isMobile" class="nav-bar__footer">
-      <!-- QuickBar 快捷栏 -->
-      <div class="nav-bar__quick">
-        <QuickBar :items="quickItems" />
-      </div>
-
-      <!-- 语言切换 -->
-      <div class="nav-bar__locale">
-        <button
-          class="nav-bar__locale-btn"
-          @click="cycleLocale"
-          :title="currentLocale.name"
-        >
-          <span class="nav-bar__locale-text">{{ currentLocale.flag }}</span>
-        </button>
-      </div>
-
-      <!-- 退出按钮 -->
-      <div class="nav-bar__logout">
-        <button
-          class="nav-bar__logout-btn"
-          @click="handleLogout"
-          :title="t('common.logout')"
-          :aria-label="t('common.logout')"
-        >
-          <el-icon :size="20">
-            <SwitchButton />
-          </el-icon>
-        </button>
-      </div>
+      <QuickBar :items="quickItems" />
     </div>
 
   </nav>
@@ -300,7 +352,6 @@ const quickGroups = computed<QuickGroup[]>(() => [
   background: var(--el-bg-color);
   border-right: 1px solid var(--el-border-color-light);
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 /* Logo区域 */
@@ -322,49 +373,6 @@ const quickGroups = computed<QuickGroup[]>(() => [
     height: 32px;
     filter: var(--logo-filter);
   }
-}
-
-/* 连接状态呼吸灯 */
-.nav-bar__status-dot {
-  position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 2px solid var(--el-bg-color);
-  transition: background 0.3s ease;
-
-  &--connected {
-    background: #22c55e;
-    animation: breathe-green 2.5s ease-in-out infinite;
-  }
-
-  &--connecting,
-  &--reconnecting {
-    background: #f59e0b;
-    animation: breathe-amber 1.2s ease-in-out infinite;
-  }
-
-  &--disconnected {
-    background: #ef4444;
-    animation: breathe-red 2.5s ease-in-out infinite;
-  }
-}
-
-@keyframes breathe-green {
-  0%, 100% { box-shadow: 0 0 3px 0 rgba(34, 197, 94, 0.4); }
-  50% { box-shadow: 0 0 6px 2px rgba(34, 197, 94, 0.7); }
-}
-
-@keyframes breathe-amber {
-  0%, 100% { box-shadow: 0 0 3px 0 rgba(245, 158, 11, 0.4); }
-  50% { box-shadow: 0 0 6px 2px rgba(245, 158, 11, 0.7); }
-}
-
-@keyframes breathe-red {
-  0%, 100% { box-shadow: 0 0 3px 0 rgba(239, 68, 68, 0.4); }
-  50% { box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.7); }
 }
 
 /* Nav items */
@@ -418,77 +426,15 @@ const quickGroups = computed<QuickGroup[]>(() => [
 /* 底部区域 */
 .nav-bar__footer {
   width: 100%;
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
   border-top: 1px solid var(--el-border-color-light);
   flex-shrink: 0;
 }
 
-/* QuickBar 区域 */
-.nav-bar__quick {
-  width: 100%;
-  padding: 8px 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border-bottom: 1px solid var(--el-border-color-light);
-}
 
-/* 语言切换 */
-.nav-bar__locale {
-  width: 100%;
-  padding: 6px 0;
-  display: flex;
-  justify-content: center;
-}
-
-.nav-bar__locale-btn {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--el-text-color-regular);
-
-  &:hover {
-    background: var(--el-color-primary-light-9);
-  }
-}
-
-/* 登出按钮 */
-.nav-bar__logout {
-  width: 100%;
-  padding: 8px 0;
-  display: flex;
-  justify-content: center;
-}
-
-.nav-bar__logout-btn {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  color: var(--el-text-color-secondary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    color: var(--el-color-danger);
-    background: var(--el-color-danger-light-9);
-  }
-}
 
 /* 移动端样式 */
 .nav-bar--mobile {

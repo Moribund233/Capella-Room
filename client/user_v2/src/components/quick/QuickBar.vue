@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import type { QuickItem } from './types'
 
@@ -21,6 +21,9 @@ const emit = defineEmits<{
   (e: 'select', key: string, childKey?: string): void
 }>()
 
+/** 当前展开的菜单 key */
+const openMenuKey = ref<string | null>(null)
+
 /**
  * 外显的项
  */
@@ -37,7 +40,6 @@ const dropdownItems = computed(() =>
 
 /**
  * 处理点击
- * @param item - Quick项
  */
 function handleClick(item: QuickItem): void {
   if (item.onClick) {
@@ -47,9 +49,14 @@ function handleClick(item: QuickItem): void {
 }
 
 /**
+ * 切换菜单展开
+ */
+function toggleMenu(key: string): void {
+  openMenuKey.value = openMenuKey.value === key ? null : key
+}
+
+/**
  * 处理子菜单选择
- * @param parentKey - 父项key
- * @param childKey - 子项key
  */
 function handleChildSelect(parentKey: string, childKey: string): void {
   const item = props.items.find((i) => i.key === parentKey)
@@ -57,44 +64,68 @@ function handleChildSelect(parentKey: string, childKey: string): void {
     item.onSelect(childKey)
   }
   emit('select', parentKey, childKey)
+  openMenuKey.value = null
 }
+
+/** 点击外部关闭菜单 */
+function onDocumentClick(e: MouseEvent): void {
+  const target = e.target as HTMLElement
+  if (!target.closest('.quick-bar__menu-wrapper')) {
+    openMenuKey.value = null
+  }
+}
+
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onUnmounted(() => document.removeEventListener('click', onDocumentClick))
 </script>
 
 <template>
   <div class="quick-bar">
     <!-- 外显按钮区域 -->
     <template v-for="item in visibleItems" :key="item.key">
-      <!-- 有子菜单的项 -->
-      <el-dropdown
+      <!-- 有子菜单的项（自定义面板） -->
+      <div
         v-if="item.children && item.children.length > 0"
-        trigger="click"
-        placement="right"
-        @command="(cmd: string) => handleChildSelect(item.key, cmd)"
+        class="quick-bar__menu-wrapper"
       >
         <button
           class="quick-bar__item"
-          :class="{ 'quick-bar__item--active': item.isActive }"
+          :class="{
+            'quick-bar__item--active': item.isActive || openMenuKey === item.key,
+          }"
           :title="item.label"
-          @click="handleClick(item)"
+          @click.stop="toggleMenu(item.key)"
         >
           <el-icon :size="20">
             <component :is="item.icon" />
           </el-icon>
           <span v-if="item.badge" class="quick-bar__badge">{{ item.badge }}</span>
         </button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item
+
+        <transition name="scale">
+          <div
+            v-if="openMenuKey === item.key"
+            class="quick-bar__panel"
+          >
+            <button
               v-for="child in item.children"
               :key="child.key"
-              :command="child.key"
+              class="quick-bar__panel-item"
               :disabled="child.disabled"
+              :title="child.label"
+              @click.stop="handleChildSelect(item.key, child.key)"
             >
-              {{ child.label }}
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+              <template v-if="child.icon">
+                <span v-if="typeof child.icon === 'string'" class="quick-bar__panel-emoji">{{ child.icon }}</span>
+                <el-icon v-else :size="20">
+                  <component :is="child.icon" />
+                </el-icon>
+              </template>
+              <span v-else class="quick-bar__panel-label">{{ child.label }}</span>
+            </button>
+          </div>
+        </transition>
+      </div>
 
       <!-- 普通按钮 -->
       <button
@@ -134,7 +165,6 @@ function handleChildSelect(parentKey: string, childKey: string): void {
       <template #dropdown>
         <el-dropdown-menu>
           <template v-for="item in dropdownItems" :key="item.key">
-            <!-- 有子菜单的项 -->
             <template v-if="item.children && item.children.length > 0">
               <el-dropdown-item divided disabled>
                 {{ item.label }}
@@ -149,7 +179,6 @@ function handleChildSelect(parentKey: string, childKey: string): void {
               </el-dropdown-item>
             </template>
 
-            <!-- 普通项 -->
             <el-dropdown-item
               v-else
               :command="item.key"
@@ -218,5 +247,74 @@ function handleChildSelect(parentKey: string, childKey: string): void {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 菜单弹出面板 */
+.quick-bar__menu-wrapper {
+  position: relative;
+}
+
+.quick-bar__panel {
+  position: absolute;
+  left: 100%;
+  bottom: 0;
+  margin-left: 8px;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--el-border-color-light, #e4e7ed);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 500;
+  white-space: nowrap;
+}
+
+.quick-bar__panel-item {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--message-hover, #f0f0f0);
+    color: var(--fg, #303133);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.quick-bar__panel-label {
+  font-size: 13px;
+  color: var(--fg, #303133);
+}
+
+.quick-bar__panel-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* 面板展开动画 */
+.scale-enter-active,
+.scale-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.scale-enter-from,
+.scale-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+  transform-origin: left center;
 }
 </style>

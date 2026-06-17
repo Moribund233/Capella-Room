@@ -13,7 +13,7 @@ export const ROUTE_NAMES = {
 export const ROUTE_PATHS = {
   LOGIN: '/login',
   REGISTER: '/register',
-  CHAT: '/',
+  CHAT: '/app',
   CHAT_ROOM: '/room/:roomId',
   PROFILE: '/profile',
   DISCOVER: '/discover',

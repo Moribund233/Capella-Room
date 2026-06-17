@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
 import { useRoomStore } from '@/stores/room'
 import { useMessageStore } from '@/stores/message'
 import { useWebSocket } from '@/composables/useWebSocket'
@@ -17,6 +16,7 @@ import {
   ChatWelcome,
   SearchMessagesPanel,
   RoomSettingsModal,
+  PinnedMessagesPanel,
 } from '@/components/chat'
 import ChatMessageListComponent from '@/components/chat/ChatMessageList.vue'
 import type { Message } from '@/types/message'
@@ -35,8 +35,7 @@ import type {
 
 const roomStore = useRoomStore()
 const messageStore = useMessageStore()
-const { t } = useI18n()
-const { isMobile, showMemberPanel: canShowMemberPanel } = useResponsive()
+const { isMobile, showMemberPanel: canShowMemberPanel, sidebarCollapsed, toggleSidebar } = useResponsive()
 
 const { currentRoom, members } = storeToRefs(roomStore)
 const hasRoom = ref(false)
@@ -45,7 +44,6 @@ const hasRoom = ref(false)
 const messageActions = useMessageActions()
 
 // 面板状态
-const showSidebar = ref(!isMobile.value)
 const showMemberPanel = ref(false)
 
 // 消息列表组件引用（用于滚动到指定消息）
@@ -55,6 +53,11 @@ const chatMessageListRef = ref<InstanceType<typeof ChatMessageListComponent> | n
 const ws = useWebSocket()
 
 onMounted(() => {
+  // 移动端默认收起侧边栏
+  if (isMobile.value) {
+    sidebarCollapsed.value = true
+  }
+
   // 加载房间列表
   roomStore.fetchMyRooms()
 
@@ -140,7 +143,7 @@ watch(currentRoom, (room) => {
   if (room) {
     // 移动端选择房间后自动隐藏侧边栏
     if (isMobile.value) {
-      showSidebar.value = false
+      sidebarCollapsed.value = true
     }
     showMemberPanel.value = false
 
@@ -175,14 +178,9 @@ function handleJumpToThread(msgId: string | undefined) {
   chatMessageListRef.value?.scrollToMessage(msgId)
 }
 
-// 切换侧边栏（移动端）
-function toggleSidebar() {
-  showSidebar.value = !showSidebar.value
-}
-
 function closeMobileSidebar() {
   if (isMobile.value) {
-    showSidebar.value = false
+    sidebarCollapsed.value = true
   }
 }
 
@@ -192,6 +190,12 @@ const { notify: browserNotify } = useBrowserNotification()
 // 切换成员面板
 function toggleMemberPanel() {
   showMemberPanel.value = !showMemberPanel.value
+}
+
+// 置顶消息
+const showPinned = ref(false)
+function togglePinned() {
+  showPinned.value = !showPinned.value
 }
 
 // 消息搜索
@@ -211,7 +215,7 @@ function handleJumpToSearch(msgId: string) {
     <!-- 侧边栏遮罩（移动端） -->
     <transition name="fade">
       <div
-        v-if="isMobile && showSidebar"
+        v-if="isMobile && !sidebarCollapsed"
         class="sidebar-overlay"
         @click="closeMobileSidebar"
       />
@@ -220,11 +224,11 @@ function handleJumpToSearch(msgId: string) {
     <!-- 侧边栏 -->
     <transition name="slide-left">
       <div
-        v-if="!isMobile || showSidebar"
+        v-if="!sidebarCollapsed"
         class="app-view__sidebar"
         :class="{ 'app-view__sidebar--mobile': isMobile }"
       >
-        <ChatRoomList @close-mobile="closeMobileSidebar" />
+        <ChatRoomList />
       </div>
     </transition>
 
@@ -238,6 +242,7 @@ function handleJumpToSearch(msgId: string) {
           :is-mobile="isMobile"
           @toggle-sidebar="toggleSidebar"
           @toggle-member-panel="toggleMemberPanel"
+          @toggle-pinned="togglePinned"
           @toggle-search="toggleSearch"
           @toggle-settings="showRoomSettings = !showRoomSettings"
         />
@@ -279,6 +284,16 @@ function handleJumpToSearch(msgId: string) {
           :members="members"
           :total-count="members.length"
         />
+      </div>
+    </transition>
+
+    <!-- 置顶消息面板 -->
+    <transition name="slide-right">
+      <div
+        v-if="hasRoom && showPinned && canShowMemberPanel"
+        class="app-view__pinned-panel"
+      >
+        <PinnedMessagesPanel @jump-to-message="handleJumpToSearch" />
       </div>
     </transition>
 
@@ -329,6 +344,14 @@ function handleJumpToSearch(msgId: string) {
 
   &__member-panel {
     flex-shrink: 0;
+  }
+
+  &__pinned-panel {
+    flex-shrink: 0;
+    width: 320px;
+    border-left: 1px solid var(--border);
+    background: var(--bg);
+    overflow-y: auto;
   }
 }
 

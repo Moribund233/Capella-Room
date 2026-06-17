@@ -19,6 +19,7 @@ const emit = defineEmits<{
   toggleMemberPanel: []
   toggleSearch: []
   toggleSettings: []
+  togglePinned: []
 }>()
 
 function getInitial(name: string) {
@@ -71,12 +72,19 @@ const onlineCount = computed(() =>
         {{ onlineCount }}/{{ members.length }}
       </span>
 
+      <el-tooltip :content="t('chat.pinnedMessages')" placement="bottom">
+        <button class="header-btn" @click="emit('togglePinned')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+          </svg>
+        </button>
+      </el-tooltip>
+
       <el-tooltip :content="t('chat.searchMessages')" placement="bottom">
         <button class="header-btn" @click="emit('toggleSearch')">
           <el-icon :size="20"><Search /></el-icon>
         </button>
       </el-tooltip>
-
 
       <el-tooltip :content="t('chat.members')" placement="bottom">
         <button class="header-btn" @click="emit('toggleMemberPanel')">

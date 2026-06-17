@@ -16,6 +16,10 @@ const breakpoints = {
 
 // 使用全局状态确保所有组件共享同一个响应式数据
 const windowWidth = ref(0)
+const sidebarCollapsed = ref(false)
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 let resizeListener: (() => void) | null = null
 let listenerCount = 0
 
@@ -75,12 +79,6 @@ export function useResponsive() {
     if (windowWidth.value < breakpoints.l) return 'tablet'
     return 'desktop'
   })
-
-  const sidebarCollapsed = ref(false)
-
-  function toggleSidebar() {
-    sidebarCollapsed.value = !sidebarCollapsed.value
-  }
 
   const showMemberPanel = computed(() => windowWidth.value > 900)
   const showRightPanel = computed(() => windowWidth.value > 860)

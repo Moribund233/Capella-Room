@@ -12,6 +12,8 @@
     "search": "Search",
     "loading": "Loading...",
     "error": "Error",
+    "boundaryTitle": "Something went wrong",
+    "boundaryRetry": "Retry",
     "success": "Success",
     "warning": "Warning",
     "logout": "Logout"
@@ -107,7 +109,8 @@
     "noRooms": "No rooms yet",
     "noMessages": "No messages yet",
     "noMembers": "No members yet",
-    "selectRoom": "Select a room to start chatting",
+        "selectRoom": "Select a room to start chatting",
+    "directMessages": "Direct Messages",
     "searchMessages": "Search messages",
     "showMemberList": "Show member list",
     "hideMemberList": "Hide member list",
@@ -143,6 +146,7 @@
     "pinMessage": "Pin message",
     "unpinMessage": "Unpin message",
     "pinnedMessage": "Pinned message",
+    "pinnedMessages": "Pinned messages",
     "owner": "owner",
     "admin": "admin",
     "welcome": {
@@ -349,7 +353,10 @@
     "themeLight": "Light Theme",
     "personalization": "Personalization",
     "groupMain": "Common",
-    "groupSystem": "System"
+    "groupSystem": "System",
+    "sidebarCollapse": "Collapse sidebar",
+    "sidebarExpand": "Expand sidebar",
+    "more": "More"
   },
   "connection": {
     "disconnected": "Connection lost",

@@ -44,6 +44,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     EmojiPicker: typeof import('./src/components/chat/EmojiPicker.vue')['default']
+    ErrorBoundary: typeof import('./src/components/error/ErrorBoundary.vue')['default']
     GifPicker: typeof import('./src/components/chat/GifPicker.vue')['default']
     GlobalModal: typeof import('./src/components/common/GlobalModal.vue')['default']
     NavBar: typeof import('./src/components/nav/NavBar.vue')['default']
@@ -57,6 +58,11 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SearchMessagesPanel: typeof import('./src/components/chat/SearchMessagesPanel.vue')['default']
+    SidebarCategory: typeof import('./src/components/sidebar/SidebarCategory.vue')['default']
+    SidebarChannelItem: typeof import('./src/components/sidebar/SidebarChannelItem.vue')['default']
+    SidebarHeader: typeof import('./src/components/sidebar/SidebarHeader.vue')['default']
+    SidebarUserSection: typeof import('./src/components/sidebar/SidebarUserSection.vue')['default']
+    UserProfileModal: typeof import('./src/components/user/UserProfileModal.vue')['default']
   }
 }
 
@@ -94,6 +100,7 @@ declare global {
   const ElTag: typeof import('element-plus/es')['ElTag']
   const ElTooltip: typeof import('element-plus/es')['ElTooltip']
   const EmojiPicker: typeof import('./src/components/chat/EmojiPicker.vue')['default']
+  const ErrorBoundary: typeof import('./src/components/error/ErrorBoundary.vue')['default']
   const GifPicker: typeof import('./src/components/chat/GifPicker.vue')['default']
   const GlobalModal: typeof import('./src/components/common/GlobalModal.vue')['default']
   const NavBar: typeof import('./src/components/nav/NavBar.vue')['default']
@@ -107,4 +114,9 @@ declare global {
   const RouterLink: typeof import('vue-router')['RouterLink']
   const RouterView: typeof import('vue-router')['RouterView']
   const SearchMessagesPanel: typeof import('./src/components/chat/SearchMessagesPanel.vue')['default']
+  const SidebarCategory: typeof import('./src/components/sidebar/SidebarCategory.vue')['default']
+  const SidebarChannelItem: typeof import('./src/components/sidebar/SidebarChannelItem.vue')['default']
+  const SidebarHeader: typeof import('./src/components/sidebar/SidebarHeader.vue')['default']
+  const SidebarUserSection: typeof import('./src/components/sidebar/SidebarUserSection.vue')['default']
+  const UserProfileModal: typeof import('./src/components/user/UserProfileModal.vue')['default']
 }

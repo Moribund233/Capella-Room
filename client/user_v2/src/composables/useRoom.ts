@@ -34,7 +34,7 @@ export function useRoom() {
       if (wsStore.isConnected) {
         wsStore.send('JoinRoom', { room_id: room.id })
       }
-      router.push(`/room/${room.id}`)
+      router.push(ROUTE_PATHS.CHAT)
     }
     return room
   }
