@@ -149,6 +149,7 @@
     "pinnedMessages": "Pinned messages",
     "owner": "owner",
     "admin": "admin",
+    "logout": "Logout",
     "welcome": {
       "title": "Welcome to CapellaRoom",
       "description": "Select a channel from the sidebar to start chatting"

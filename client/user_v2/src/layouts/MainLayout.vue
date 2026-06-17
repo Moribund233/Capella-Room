@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { NavBar } from '@/components/nav'
 import { useResponsive } from '@/composables/useResponsive'
+import { useRoomStore } from '@/stores/room'
+import { storeToRefs } from 'pinia'
 import GlobalModal from '@/components/common/GlobalModal.vue'
 import { useGlobalModal } from '@/composables/useGlobalModal'
 
 const { isMobile } = useResponsive()
+const { currentRoom } = storeToRefs(useRoomStore())
 useGlobalModal()
 </script>
 
@@ -14,7 +17,7 @@ useGlobalModal()
     <NavBar v-if="!isMobile" class="main-layout__navbar" />
 
     <!-- 主内容区 -->
-    <main class="main-layout__content" :class="{ 'main-layout--mobile': isMobile }">
+    <main class="main-layout__content">
       <!-- 页面内容 -->
       <div class="main-layout__page">
         <router-view v-slot="{ Component }">
@@ -25,8 +28,8 @@ useGlobalModal()
       </div>
     </main>
 
-    <!-- 移动端底部导航栏 -->
-    <NavBar v-if="isMobile" class="main-layout__mobile-nav" />
+    <!-- 移动端底部导航栏（进入房间后全屏隐藏） -->
+    <NavBar v-if="isMobile && !currentRoom" class="main-layout__mobile-nav" />
 
     <!-- 全局弹窗 -->
     <GlobalModal />
@@ -63,12 +66,6 @@ useGlobalModal()
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-/* 移动端样式 */
-.main-layout--mobile {
-  /* 移动端底部导航栏空间 */
-  padding-bottom: 0;
 }
 
 /* 移动端底部导航栏 */

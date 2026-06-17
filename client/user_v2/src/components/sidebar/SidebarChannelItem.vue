@@ -15,6 +15,7 @@ defineProps<{
 
 const emit = defineEmits<{
   select: []
+  close: []
 }>()
 </script>
 
@@ -58,6 +59,18 @@ const emit = defineEmits<{
     >
       {{ item.unreadCount > 99 ? '99+' : item.unreadCount }}
     </span>
+
+    <button
+      v-if="item.isActive"
+      class="channel-item__close"
+      title="关闭房间"
+      @click.stop="emit('close')"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -159,6 +172,27 @@ const emit = defineEmits<{
     min-width: 20px;
     text-align: center;
     flex-shrink: 0;
+  }
+
+  &__close {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    margin-left: 2px;
+
+    &:hover {
+      background: var(--message-hover);
+      color: var(--fg);
+    }
   }
 }
 </style>

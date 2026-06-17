@@ -149,6 +149,7 @@
     "pinnedMessages": "置顶消息",
     "owner": "创建者",
     "admin": "管理员",
+    "logout": "退出登录",
     "welcome": {
       "title": "欢迎来到 CapellaRoom",
       "description": "从侧边栏选择一个频道开始聊天"

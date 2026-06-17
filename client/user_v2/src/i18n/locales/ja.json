@@ -149,6 +149,7 @@
     "pinnedMessages": "ピン留めメッセージ",
     "owner": "所有者",
     "admin": "管理者",
+    "logout": "ログアウト",
     "welcome": {
       "title": "CapellaRoom へようこそ",
       "description": "サイドバーからチャンネルを選択して会話を始めましょう"

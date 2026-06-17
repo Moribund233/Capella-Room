@@ -11,6 +11,7 @@ export const useRoomStore = defineStore('room', () => {
   const members = ref<RoomMember[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const roomOrder = ref<string[]>(JSON.parse(localStorage.getItem('room-order') || '[]'))
 
   // 获取认证状态
   const getAuthStore = () => useAuthStore()
@@ -278,6 +279,11 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
+  function setRoomOrder(order: string[]) {
+    roomOrder.value = order
+    localStorage.setItem('room-order', JSON.stringify(order))
+  }
+
   function $reset() {
     rooms.value = []
     currentRoom.value = null
@@ -305,10 +311,12 @@ export const useRoomStore = defineStore('room', () => {
     kickMember,
     setMemberRole,
     leaveRoom,
+	roomOrder,
     clearCurrentRoom,
     updateRoomLastMessage,
     incrementUnreadCount,
     clearUnreadCount,
+    setRoomOrder,
     $reset,
   }
 })

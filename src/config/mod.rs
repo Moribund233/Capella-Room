@@ -6,8 +6,8 @@ pub mod listener;
 pub mod loader;
 pub mod manager;
 
-pub use listener::{start_config_listeners, LoggingConfigListener, WebSocketConfigListener};
 pub use listener::BatchMessageConfigListener;
+pub use listener::{start_config_listeners, LoggingConfigListener, WebSocketConfigListener};
 pub use loader::ConfigLoader;
 pub use manager::{ConfigChangeEvent, ConfigManager};
 
@@ -207,17 +207,12 @@ pub struct BatchMessageConfig {
 }
 
 /// 邮件后端类型
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum MailBackend {
+    #[default]
     Console,
     Smtp,
-}
-
-impl Default for MailBackend {
-    fn default() -> Self {
-        Self::Console
-    }
 }
 
 /// 邮件服务配置

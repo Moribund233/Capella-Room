@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url))
       },
     },
+	optimizeDeps: {
+      exclude: ['vue'],
+    },
     server: {
       port: parseInt(env.VITE_PORT || '5173'),
       host: env.VITE_HOST || '0.0.0.0',

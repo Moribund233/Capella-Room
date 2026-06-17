@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'update:items': [items: ChannelItemData[]]
   select: [item: ChannelItemData]
+  close: [item: ChannelItemData]
 }>()
 
 const localItems = ref<ChannelItemData[]>(props.items.slice())
@@ -71,6 +72,7 @@ function toggleCollapse() {
             <SidebarChannelItem
               :item="element"
               @select="emit('select', element)"
+              @close="emit('close', element)"
             />
           </template>
         </VDraggable>
@@ -81,6 +83,7 @@ function toggleCollapse() {
             :key="item.id"
             :item="item"
             @select="emit('select', item)"
+            @close="emit('close', item)"
           />
         </template>
       </div>

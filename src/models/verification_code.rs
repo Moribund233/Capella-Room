@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// 验证码用途
@@ -20,13 +21,17 @@ impl VerificationPurpose {
             VerificationPurpose::ResetPassword => "reset_password",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for VerificationPurpose {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "register" => Some(VerificationPurpose::Register),
-            "login" => Some(VerificationPurpose::Login),
-            "reset_password" => Some(VerificationPurpose::ResetPassword),
-            _ => None,
+            "register" => Ok(VerificationPurpose::Register),
+            "login" => Ok(VerificationPurpose::Login),
+            "reset_password" => Ok(VerificationPurpose::ResetPassword),
+            _ => Err(()),
         }
     }
 }
@@ -45,7 +50,7 @@ pub struct VerificationCode {
 
 impl VerificationCode {
     pub fn purpose_enum(&self) -> Option<VerificationPurpose> {
-        VerificationPurpose::from_str(&self.purpose)
+        self.purpose.parse().ok()
     }
 }
 
@@ -77,15 +82,27 @@ mod tests {
     fn test_verification_purpose_as_str() {
         assert_eq!(VerificationPurpose::Register.as_str(), "register");
         assert_eq!(VerificationPurpose::Login.as_str(), "login");
-        assert_eq!(VerificationPurpose::ResetPassword.as_str(), "reset_password");
+        assert_eq!(
+            VerificationPurpose::ResetPassword.as_str(),
+            "reset_password"
+        );
     }
 
     #[test]
     fn test_verification_purpose_from_str() {
-        assert_eq!(VerificationPurpose::from_str("register"), Some(VerificationPurpose::Register));
-        assert_eq!(VerificationPurpose::from_str("login"), Some(VerificationPurpose::Login));
-        assert_eq!(VerificationPurpose::from_str("reset_password"), Some(VerificationPurpose::ResetPassword));
-        assert_eq!(VerificationPurpose::from_str("unknown"), None);
+        assert_eq!(
+            VerificationPurpose::from_str("register"),
+            Ok(VerificationPurpose::Register)
+        );
+        assert_eq!(
+            VerificationPurpose::from_str("login"),
+            Ok(VerificationPurpose::Login)
+        );
+        assert_eq!(
+            VerificationPurpose::from_str("reset_password"),
+            Ok(VerificationPurpose::ResetPassword)
+        );
+        assert_eq!(VerificationPurpose::from_str("unknown"), Err(()));
     }
 
     #[test]

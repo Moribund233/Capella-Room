@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMessageStore } from '@/stores/message'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useResponsive } from '@/composables/useResponsive'
-import { SidebarHeader, SidebarUserSection } from '@/components/sidebar'
+import { SidebarHeader, SidebarCategory, SidebarUserSection } from '@/components/sidebar'
 import type { ChannelItemData } from '@/components/sidebar/SidebarChannelItem.vue'
 import type { Room } from '@/types/room'
 import type { DirectRoom } from '@/types/room'
@@ -33,6 +33,22 @@ const filteredRooms = computed(() => {
   return rooms.value.filter((r) => r.name.toLowerCase().includes(q))
 })
 
+const sortedRooms = computed(() => {
+  const order = roomStore.roomOrder
+  if (order.length === 0) return filteredRooms.value
+  const map = new Map(filteredRooms.value.map((r) => [r.id, r]))
+  const sorted: Room[] = []
+  for (const id of order) {
+    const room = map.get(id)
+    if (room) {
+      sorted.push(room)
+      map.delete(id)
+    }
+  }
+  for (const room of map.values()) sorted.push(room)
+  return sorted
+})
+
 const filteredDirectRooms = computed(() => {
   if (!searchQuery.value.trim()) return directRooms.value
   const q = searchQuery.value.toLowerCase()
@@ -42,7 +58,7 @@ const filteredDirectRooms = computed(() => {
 })
 
 const channelItems = computed<ChannelItemData[]>(() =>
-  filteredRooms.value.map((r) => ({
+  sortedRooms.value.map((r) => ({
     id: r.id,
     name: r.name,
     type: 'channel' as const,
@@ -107,6 +123,10 @@ function selectDirectRoom(dm: DirectRoom) {
   if (isMobile.value) sidebarCollapsed.value = true
 }
 
+function handleChannelReorder(items: ChannelItemData[]) {
+  roomStore.setRoomOrder(items.map((i) => i.id))
+}
+
 function handleChannelSelect(item: ChannelItemData) {
   const room = rooms.value.find((r) => r.id === item.id)
   if (room) selectRoom(room)
@@ -115,6 +135,12 @@ function handleChannelSelect(item: ChannelItemData) {
 function handleDMSelect(item: ChannelItemData) {
   const dm = directRooms.value.find((r) => r.id === item.id)
   if (dm) selectDirectRoom(dm)
+}
+
+function closeRoom() {
+  roomStore.currentRoom = null
+  directRoomStore.setCurrentDirectRoom(null)
+  messageStore.switchRoom('')
 }
 
 function goToProfile() {
@@ -137,10 +163,32 @@ onMounted(() => {
       v-model="searchQuery"
     />
 
-    <div class="room-sidebar__list">
-      <div v-if="channelItems.length > 0 || roomStore.loading"></div>
+    <SidebarUserSection
+      :is-mobile="isMobile"
+      @open-profile="goToProfile"
+      @open-settings="goToProfile"
+      @logout="handleLogout"
+    />
 
-      <div v-if="dmItems.length > 0"></div>
+    <div class="room-sidebar__list">
+      <SidebarCategory
+        v-if="channelItems.length > 0 || roomStore.loading"
+        :name="t('chat.channels')"
+        :items="channelItems"
+        draggable
+        @select="handleChannelSelect"
+        @close="closeRoom"
+        @update:items="handleChannelReorder"
+      />
+
+      <SidebarCategory
+        v-if="dmItems.length > 0"
+        :name="t('chat.directMessages') || 'Direct Messages'"
+        :items="dmItems"
+        draggable
+        @select="handleDMSelect"
+        @close="closeRoom"
+      />
 
       <div v-if="roomStore.loading" class="room-sidebar__loading">
         <div v-for="i in 4" :key="i" class="room-sidebar__skeleton">
@@ -155,11 +203,6 @@ onMounted(() => {
         <el-empty :description="t('chat.noRooms')" :image-size="48" />
       </div>
     </div>
-
-    <SidebarUserSection
-      @open-settings="goToProfile"
-      @logout="handleLogout"
-    />
   </aside>
 </template>
 
@@ -192,12 +235,14 @@ onMounted(() => {
   }
 }
 
-// 移动端覆盖：用户区放在顶部
-@media (max-width: 768px) {
+// 桌面端：用户区放底部
+@media (min-width: 769px) {
   .room-sidebar {
-    .user-section {
-      border-top: none;
-      border-bottom: 1px solid var(--border);
+    .room-sidebar__list {
+      order: 2;
+    }
+    :deep(.user-section) {
+      order: 3;
     }
   }
 }
