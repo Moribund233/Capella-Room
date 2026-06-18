@@ -38,12 +38,12 @@ const groupedNotifications = computed(() => {
 
 function getTypeColor(type: NotificationItem['type']): string {
   const map: Record<string, string> = {
-    info: 'var(--el-color-info)',
-    success: 'var(--el-color-success)',
-    warning: 'var(--el-color-warning)',
-    error: 'var(--el-color-danger)',
+    info: 'var(--accent-blue)',
+    success: 'var(--accent-green)',
+    warning: 'var(--accent-orange)',
+    error: 'var(--accent-pink)',
   }
-  return map[type] || 'var(--el-color-info)'
+  return map[type] || 'var(--accent-blue)'
 }
 
 const typeIconMap: Record<string, unknown> = {
@@ -227,7 +227,7 @@ function handleLoadMore() {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: var(--el-color-danger);
+  background: var(--accent-pink);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
@@ -253,7 +253,7 @@ function handleLoadMore() {
   justify-content: center;
   gap: 12px;
   padding: 48px 0;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
 }
 
 .notification-drawer__list {
@@ -268,7 +268,7 @@ function handleLoadMore() {
 .notification-drawer__date {
   font-size: 12px;
   font-weight: 500;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   padding: 4px 16px;
   margin-bottom: 4px;
 }
@@ -284,7 +284,7 @@ function handleLoadMore() {
   margin-bottom: 2px;
 
   &:hover {
-    background: var(--el-fill-color-light);
+    background: var(--message-hover);
 
     .notification-drawer__item-actions {
       opacity: 1;
@@ -292,10 +292,10 @@ function handleLoadMore() {
   }
 
   &.is-unread {
-    background: var(--el-color-primary-light-9);
+    background: var(--accent-soft);
 
     &:hover {
-      background: var(--el-color-primary-light-8);
+      background: color-mix(in oklch, var(--accent) 24%, transparent);
     }
   }
 }
@@ -320,7 +320,7 @@ function handleLoadMore() {
 .notification-drawer__item-title {
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+  color: var(--fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -328,14 +328,14 @@ function handleLoadMore() {
 
 .notification-drawer__time {
   font-size: 11px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .notification-drawer__item-text {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   margin: 4px 0 0;
   line-height: 1.5;
   overflow: hidden;

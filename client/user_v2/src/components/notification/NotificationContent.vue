@@ -48,12 +48,12 @@ const groupedNotifications = computed(() => {
 
 function getTypeColor(type: NotificationItem['type']): string {
   const map: Record<string, string> = {
-    info: 'var(--el-color-info)',
-    success: 'var(--el-color-success)',
-    warning: 'var(--el-color-warning)',
-    error: 'var(--el-color-danger)',
+    info: 'var(--accent-blue)',
+    success: 'var(--accent-green)',
+    warning: 'var(--accent-orange)',
+    error: 'var(--accent-pink)',
   }
-  return map[type] || 'var(--el-color-info)'
+  return map[type] || 'var(--accent-blue)'
 }
 
 const typeIconMap: Record<string, unknown> = {
@@ -224,7 +224,7 @@ function handleLoadMore() {
   align-items: center;
   justify-content: space-between;
   padding: 0 0 12px;
-  border-bottom: 1px solid var(--el-border-color-light);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -243,7 +243,7 @@ function handleLoadMore() {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: var(--el-color-danger);
+  background: var(--accent-pink);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
@@ -263,7 +263,7 @@ function handleLoadMore() {
   justify-content: center;
   gap: 12px;
   padding: 48px 0;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   flex: 1;
 }
 
@@ -280,7 +280,7 @@ function handleLoadMore() {
 .notification-content__date {
   font-size: 12px;
   font-weight: 500;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   padding: 8px 0 4px;
 }
 
@@ -294,7 +294,7 @@ function handleLoadMore() {
   margin-bottom: 2px;
 
   &:hover {
-    background: var(--el-fill-color-light);
+    background: var(--message-hover);
 
     .notification-content__item-actions {
       opacity: 1;
@@ -302,10 +302,10 @@ function handleLoadMore() {
   }
 
   &.is-unread {
-    background: var(--el-color-primary-light-9);
+    background: var(--accent-soft);
 
     &:hover {
-      background: var(--el-color-primary-light-8);
+      background: color-mix(in oklch, var(--accent) 24%, transparent);
     }
   }
 }
@@ -330,7 +330,7 @@ function handleLoadMore() {
 .notification-content__item-title {
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+  color: var(--fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -338,14 +338,14 @@ function handleLoadMore() {
 
 .notification-content__time {
   font-size: 11px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .notification-content__item-text {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   margin: 4px 0 0;
   line-height: 1.5;
   overflow: hidden;

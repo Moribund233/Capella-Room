@@ -307,6 +307,9 @@
       }
     }
   },
+  "social": {
+    "title": "社交"
+  },
   "friends": {
     "title": "好友",
     "friends": "好友",
@@ -333,7 +336,7 @@
     "requestSent": "好友请求已发送！"
   },
   "discover": {
-    "title": "发现",
+    "title": "探索",
     "subtitle": "探索社区，找到属于你的空间",
     "searchPlaceholder": "搜索房间...",
     "all": "全部",
@@ -345,7 +348,8 @@
     "featured": "推荐",
     "trending": "趋势",
     "join": "加入",
-    "view": "查看"
+    "view": "查看",
+    "noResult": "未找到结果"
   },
   "quick": {
     "notifications": "通知",

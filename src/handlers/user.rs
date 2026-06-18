@@ -467,3 +467,67 @@ pub async fn remove_friend(
 
     Ok(Json(ApiResponse::success_with_message("已删除好友")))
 }
+
+/// 推荐用户查询参数
+#[derive(Debug, Deserialize)]
+pub struct RecommendedUsersQuery {
+    /// 返回数量限制（默认12，最大24）
+    #[serde(default = "default_recommended_limit")]
+    pub limit: i64,
+}
+
+fn default_recommended_limit() -> i64 {
+    12
+}
+
+/// 获取推荐用户（在线优先 + 随机补充）
+/// 返回在线用户 + 随机用户，排除当前用户和已添加的好友
+pub async fn get_recommended_users(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Query(query): Query<RecommendedUsersQuery>,
+) -> Result<Json<ApiResponse<Vec<crate::models::user::UserInfo>>>> {
+    let user_id = state
+        .auth_service()
+        .extract_user_id(&claims)
+        .map_err(|_| AppError::Auth("无效的用户ID".to_string()))?;
+
+    let limit = query.limit.clamp(1, 24);
+
+    // 1. 获取当前用户的好友 ID（用于排除）
+    let friend_ids = state.user_service().get_friend_ids(user_id).await?;
+
+    // 构建排除列表：当前用户 + 所有好友
+    let mut exclude_ids = vec![user_id];
+    exclude_ids.extend(friend_ids.iter());
+
+    // 2. 获取在线用户 ID
+    let online_ids = state.ws_manager.get_online_user_ids();
+
+    // 过滤掉需要排除的用户
+    let online_candidate_ids: Vec<Uuid> = online_ids
+        .into_iter()
+        .filter(|id| !exclude_ids.contains(id))
+        .collect();
+
+    // 3. 获取在线用户的详细信息
+    let mut result = if !online_candidate_ids.is_empty() {
+        state.user_service().get_users_by_ids(&online_candidate_ids).await?
+    } else {
+        Vec::new()
+    };
+
+    // 4. 如果在线用户不足 limit 个，用随机用户补充
+    let remaining = limit - result.len() as i64;
+    if remaining > 0 {
+        // 将已选中的在线用户 ID 也加入排除列表
+        let selected_ids: Vec<Uuid> = result.iter().map(|u| u.id).collect();
+        let mut full_exclude = exclude_ids;
+        full_exclude.extend(selected_ids);
+
+        let random_users = state.user_service().get_random_users(&full_exclude, remaining).await?;
+        result.extend(random_users);
+    }
+
+    Ok(Json(ApiResponse::success(result)))
+}

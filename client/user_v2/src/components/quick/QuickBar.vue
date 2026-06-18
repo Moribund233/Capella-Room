@@ -259,8 +259,8 @@ onUnmounted(() => document.removeEventListener('click', onDocumentClick))
   left: 100%;
   bottom: 0;
   margin-left: 8px;
-  background: var(--el-bg-color, #fff);
-  border: 1px solid var(--el-border-color-light, #e4e7ed);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   padding: 6px;

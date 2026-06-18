@@ -2,6 +2,7 @@ import httpClient from '@/services/http'
 import type { ApiResponse } from '@/types/api'
 import type { User } from '@/types/user'
 import type { Room } from '@/types/room'
+import type { UserInfo } from '@/types/user'
 
 export interface UserStats {
   joined_rooms: number
@@ -84,5 +85,13 @@ export const userApi = {
    */
   deleteAccount(): Promise<ApiResponse<void>> {
     return httpClient.delete('/users/me')
+  },
+
+  /**
+   * 获取推荐用户（在线优先 + 随机补充）
+   * @param limit 返回数量（默认12，最大24）
+   */
+  getRecommendedUsers(limit: number = 12): Promise<ApiResponse<UserInfo[]>> {
+    return httpClient.get('/users/recommended', { params: { limit } })
   }
 }

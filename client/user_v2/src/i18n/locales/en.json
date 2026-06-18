@@ -308,6 +308,9 @@
       }
     }
   },
+  "social": {
+    "title": "Social"
+  },
   "friends": {
     "title": "Friends",
     "friends": "Friends",
@@ -334,7 +337,7 @@
     "requestSent": "Friend request sent!"
   },
   "discover": {
-    "title": "Discover",
+    "title": "Explore",
     "subtitle": "Explore communities and find your space",
     "searchPlaceholder": "Search rooms...",
     "all": "All",
@@ -343,6 +346,7 @@
     "gaming": "Gaming",
     "music": "Music",
     "art": "Art",
+    "noResult": "No results found",
     "featured": "Featured",
     "trending": "Trending",
     "join": "Join",

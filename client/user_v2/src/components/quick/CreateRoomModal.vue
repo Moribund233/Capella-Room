@@ -158,13 +158,13 @@ function handleCancel(): void {
 .privacy-label {
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+  color: var(--fg);
 }
 
 .privacy-hint {
   margin: 0;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   line-height: 1.4;
 }
 
@@ -174,6 +174,6 @@ function handleCancel(): void {
   gap: 10px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--border);
 }
 </style>

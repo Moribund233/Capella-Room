@@ -1130,4 +1130,79 @@ impl UserService {
             request_accept_rate,
         })
     }
+
+    /// 批量获取用户信息（通过 ID 列表）
+    pub async fn get_users_by_ids(&self, user_ids: &[Uuid]) -> Result<Vec<UserInfo>> {
+        if user_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let users = sqlx::query_as::<_, User>(
+            r#"
+            SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
+            FROM users
+            WHERE id = ANY($1) AND is_active = true
+            ORDER BY username
+            "#,
+        )
+        .bind(user_ids)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(users.into_iter().map(|u| UserInfo::new(u.id, u.username, u.avatar_url)).collect())
+    }
+
+    /// 获取用户的好友 ID 列表
+    pub async fn get_friend_ids(&self, user_id: Uuid) -> Result<Vec<Uuid>> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(
+            r#"
+            SELECT
+                CASE
+                    WHEN user_id_a = $1 THEN user_id_b
+                    ELSE user_id_a
+                END as friend_id
+            FROM friendships
+            WHERE user_id_a = $1 OR user_id_b = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
+
+    /// 获取随机用户（排除指定 ID）
+    pub async fn get_random_users(&self, exclude_ids: &[Uuid], limit: i64) -> Result<Vec<UserInfo>> {
+        let users = if exclude_ids.is_empty() {
+            sqlx::query_as::<_, User>(
+                r#"
+                SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
+                FROM users
+                WHERE is_active = true
+                ORDER BY RANDOM()
+                LIMIT $1
+                "#,
+            )
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?
+        } else {
+            sqlx::query_as::<_, User>(
+                r#"
+                SELECT id, username, email, password_hash, avatar_url, status, is_active, role, email_verified, email_verified_at, created_at, updated_at
+                FROM users
+                WHERE is_active = true AND id != ALL($1)
+                ORDER BY RANDOM()
+                LIMIT $2
+                "#,
+            )
+            .bind(exclude_ids)
+            .bind(limit)
+            .fetch_all(self.db.pool())
+            .await?
+        };
+
+        Ok(users.into_iter().map(|u| UserInfo::new(u.id, u.username, u.avatar_url)).collect())
+    }
 }

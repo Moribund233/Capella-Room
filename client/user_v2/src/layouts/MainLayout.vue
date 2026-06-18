@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { NavBar } from '@/components/nav'
 import { useResponsive } from '@/composables/useResponsive'
 import { useRoomStore } from '@/stores/room'
@@ -7,8 +9,19 @@ import GlobalModal from '@/components/common/GlobalModal.vue'
 import { useGlobalModal } from '@/composables/useGlobalModal'
 
 const { isMobile } = useResponsive()
-const { currentRoom } = storeToRefs(useRoomStore())
+const route = useRoute()
+const roomStore = useRoomStore()
+const { currentRoom } = storeToRefs(roomStore)
 useGlobalModal()
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path !== '/app') {
+      roomStore.clearCurrentRoom()
+    }
+  },
+)
 </script>
 
 <template>

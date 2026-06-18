@@ -5,43 +5,57 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFriendStore } from '@/stores/friend'
 import { useDirectRoomStore } from '@/stores/directRoom'
-import { searchApi } from '@/api/search'
+import { useRoomStore } from '@/stores/room'
 import type { Friend } from '@/types/friend'
-import type { UserSearchItem } from '@/types/search'
+import type { Room } from '@/types/room'
 import {
   UserFilled,
-  Plus,
-  ChatDotRound,
   Delete,
   CircleCheck,
   CloseBold,
-  Search,
 } from '@element-plus/icons-vue'
 
-type TabType = 'friends' | 'received' | 'sent'
+type TabType = 'friends' | 'rooms' | 'requests'
 
 const router = useRouter()
 const { t } = useI18n()
 const friendStore = useFriendStore()
 const directRoomStore = useDirectRoomStore()
+const roomStore = useRoomStore()
 
 const activeTab = ref<TabType>('friends')
-
-const tabs = computed(() => [
-  { key: 'friends' as TabType, label: t('friends.friends'), icon: UserFilled, count: friendStore.friends.length },
-  { key: 'received' as TabType, label: t('friends.received'), icon: CircleCheck, count: friendStore.pendingReceivedCount },
-  { key: 'sent' as TabType, label: t('friends.sent'), icon: CloseBold, count: 0 },
-])
 
 const friends = computed(() => friendStore.friends)
 const receivedRequests = computed(() => friendStore.receivedRequests)
 const sentRequests = computed(() => friendStore.sentRequests)
 const loading = computed(() => friendStore.loading)
 
-const showAddDialog = ref(false)
-const searchKeyword = ref('')
-const searchResults = ref<UserSearchItem[]>([])
-const searching = ref(false)
+const onlineFriends = computed(() =>
+  friends.value.filter(f => f.friend.status === 'online')
+)
+const offlineFriends = computed(() =>
+  friends.value.filter(f => f.friend.status !== 'online')
+)
+
+const myRooms = computed(() => roomStore.rooms)
+
+// detail panel
+const selectedFriend = ref<Friend | null>(null)
+const showDetail = ref(false)
+
+function openDetail(friend: Friend) {
+  selectedFriend.value = friend
+  showDetail.value = true
+}
+
+function closeDetail() {
+  showDetail.value = false
+  selectedFriend.value = null
+}
+
+const hasPendingRequests = computed(() =>
+  receivedRequests.value.some(r => r.status === 'pending')
+)
 
 async function handleAccept(requestId: string) {
   const ok = await friendStore.handleFriendRequest(requestId, true)
@@ -65,7 +79,10 @@ async function handleDeleteFriend(friend: Friend) {
       type: 'warning',
     })
     const ok = await friendStore.deleteFriend(friend.id)
-    if (ok) ElMessage.success(t('friends.deleteFriend'))
+    if (ok) {
+      ElMessage.success(t('friends.deleteFriend'))
+      closeDetail()
+    }
   } catch { }
 }
 
@@ -76,61 +93,40 @@ async function handleSendMessage(friend: Friend) {
   }
 }
 
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-
-async function doSearch() {
-  const q = searchKeyword.value.trim()
-  if (!q) {
-    searchResults.value = []
-    return
-  }
-  searching.value = true
-  try {
-    const res = await searchApi.searchUsers({ keyword: q, limit: 10 })
-    if (res.success && res.data) {
-      searchResults.value = res.data.users
-    } else {
-      searchResults.value = []
-    }
-  } catch {
-    searchResults.value = []
-  } finally {
-    searching.value = false
-  }
-}
-
-function onSearchInput() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(doSearch, 400)
-}
-
-async function handleAddFriend(userId: string) {
-  const ok = await friendStore.sendFriendRequest({ target_user_id: userId })
-  if (ok) {
-    ElMessage.success(t('friends.requestSent'))
-    searchKeyword.value = ''
-    searchResults.value = []
-    friendStore.fetchSentRequests()
-  } else {
-    ElMessage.error(friendStore.error || t('friends.sendRequest'))
-  }
-}
-
-function getStatusClass(status: string) {
-  switch (status) {
-    case 'online': return 'status-online'
-    case 'away': return 'status-away'
-    case 'busy': return 'status-busy'
-    default: return 'status-offline'
-  }
-}
-
-function getStatusLabel(status: string) {
-  return status.charAt(0).toUpperCase() + status.slice(1)
+function handleEnterRoom(roomId: string) {
+  roomStore.fetchRoomDetail(roomId)
+  router.push('/app')
 }
 
 function getInitial(name: string) {
   return name.charAt(0).toUpperCase()
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'online': return '在线'
+    case 'away': return '离开'
+    case 'busy': return '忙碌'
+    default: return '离线'
+  }
+}
+
+function getStatusTagClass(status: string) {
+  switch (status) {
+    case 'online': return 'tag-online'
+    case 'away': return 'tag-idle'
+    case 'busy': return 'tag-busy'
+    default: return 'tag-offline'
+  }
+}
+
+function getDotClass(status: string) {
+  switch (status) {
+    case 'online': return 'dot-online'
+    case 'away': return 'dot-idle'
+    case 'busy': return 'dot-busy'
+    default: return 'dot-offline'
+  }
 }
 
 onMounted(() => {
@@ -138,382 +134,917 @@ onMounted(() => {
   friendStore.fetchReceivedRequests()
   friendStore.fetchSentRequests()
   friendStore.clearUnreadRequestCount()
+  roomStore.fetchMyRooms()
 })
 </script>
 
 <template>
-  <div class="friends-view">
-    <div class="friends-view__header">
-      <div class="friends-view__header-left">
-        <el-icon :size="24"><UserFilled /></el-icon>
-        <h1>{{ t('friends.title') }}</h1>
+  <div class="social-page">
+    <!-- ambient glow -->
+    <div class="ambient" />
+
+    <div class="social-inner">
+      <!-- masthead -->
+      <div class="masthead">
+        <div class="masthead-eyebrow">{{ t('social.title') }}</div>
+        <h1>
+          <span class="grad">{{ t('social.title') }}</span> · 你的人际网络
+        </h1>
+        <p>管理你的好友和房间，从这里开始每一次对话</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="showAddDialog = true">
-        {{ t('friends.addFriend') }}
-      </el-button>
-    </div>
 
-    <el-tabs v-model="activeTab" class="friends-view__tabs">
-      <el-tab-pane
-        v-for="tab in tabs"
-        :key="tab.key"
-        :name="tab.key"
-        :label="tab.label"
-      >
-        <template #label>
-          <span class="tab-label">
-            <el-icon><component :is="tab.icon" /></el-icon>
-            <span>{{ tab.label }}</span>
-            <el-tag v-if="tab.count > 0" size="small" type="danger" class="tab-badge">
-              {{ tab.count }}
-            </el-tag>
-          </span>
-        </template>
-      </el-tab-pane>
-    </el-tabs>
+      <!-- segmented tabs -->
+      <div class="segmented">
+        <button
+          class="seg-item"
+          :class="{ active: activeTab === 'friends' }"
+          @click="activeTab = 'friends'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          {{ t('friends.friends') }}
+          <span v-if="friends.length > 0" class="seg-badge">{{ friends.length }}</span>
+        </button>
+        <button
+          class="seg-item"
+          :class="{ active: activeTab === 'rooms' }"
+          @click="activeTab = 'rooms'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          {{ t('chat.rooms') }}
+          <span v-if="myRooms.length > 0" class="seg-badge">{{ myRooms.length }}</span>
+        </button>
+        <button
+          class="seg-item"
+          :class="{ active: activeTab === 'requests' }"
+          @click="activeTab = 'requests'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          {{ t('friends.received') }}
+          <span v-if="hasPendingRequests" class="seg-badge seg-badge-warn">{{ receivedRequests.length }}</span>
+        </button>
+      </div>
 
-    <div class="friends-view__content">
-      <!-- 好友列表 -->
-      <div v-if="activeTab === 'friends'" class="friend-list">
+      <!-- === FRIENDS TAB === -->
+      <div v-if="activeTab === 'friends'" class="tab-content">
         <div v-if="loading" class="list-placeholder">{{ t('common.loading') }}</div>
-        <div v-else-if="friends.length === 0" class="list-placeholder">
-          {{ t('friends.noFriends') }}
+        <div v-else-if="friends.length === 0" class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <p>{{ t('friends.noFriends') }}</p>
         </div>
-        <div v-else class="friend-cards">
-          <div v-for="friend in friends" :key="friend.id" class="friend-card">
-            <div class="friend-card__avatar">
-              <img v-if="friend.friend.avatar_url" :src="friend.friend.avatar_url" :alt="friend.friend.username" class="avatar-img" />
-              <div v-else class="avatar-placeholder">{{ getInitial(friend.friend.username) }}</div>
-              <span class="status-dot" :class="getStatusClass(friend.friend.status)" />
+        <template v-else>
+          <div v-if="onlineFriends.length > 0" class="section">
+            <div class="section-header">
+              <h2 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                在线 · {{ onlineFriends.length }}
+              </h2>
             </div>
-            <div class="friend-card__body">
-              <span class="friend-name">{{ friend.friend.username }}</span>
-              <span class="friend-status" :class="getStatusClass(friend.friend.status)">
-                {{ getStatusLabel(friend.friend.status) }}
+            <div class="card-list">
+              <div
+                v-for="friend in onlineFriends"
+                :key="friend.id"
+                class="friend-card"
+                @click="openDetail(friend)"
+              >
+                <div class="friend-card-avatar" :class="getDotClass(friend.friend.status)">
+                  <span class="avatar-text">{{ getInitial(friend.friend.username) }}</span>
+                </div>
+                <div class="friend-card-body">
+                  <div class="friend-card-name">{{ friend.friend.username }}</div>
+                  <div class="friend-card-meta">
+                    <span :class="['status-tag', getStatusTagClass(friend.friend.status)]">
+                      {{ getStatusLabel(friend.friend.status) }}
+                    </span>
+                  </div>
+                </div>
+                <div class="friend-card-actions" @click.stop>
+                  <span class="btn btn-primary btn-xs" @click="handleSendMessage(friend)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    聊天
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="offlineFriends.length > 0" class="section">
+            <div class="section-header">
+              <h2 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                离线 · {{ offlineFriends.length }}
+              </h2>
+            </div>
+            <div class="card-list">
+              <div
+                v-for="friend in offlineFriends"
+                :key="friend.id"
+                class="friend-card"
+                @click="openDetail(friend)"
+              >
+                <div class="friend-card-avatar" :class="getDotClass(friend.friend.status)">
+                  <span class="avatar-text">{{ getInitial(friend.friend.username) }}</span>
+                </div>
+                <div class="friend-card-body">
+                  <div class="friend-card-name">{{ friend.friend.username }}</div>
+                  <div class="friend-card-meta">
+                    <span :class="['status-tag', getStatusTagClass(friend.friend.status)]">
+                      {{ getStatusLabel(friend.friend.status) }}
+                    </span>
+                  </div>
+                </div>
+                <div class="friend-card-actions" @click.stop>
+                  <span class="btn btn-primary btn-xs" @click="handleSendMessage(friend)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    聊天
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- === ROOMS TAB === -->
+      <div v-if="activeTab === 'rooms'" class="tab-content">
+        <div v-if="myRooms.length === 0" class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <p>{{ t('chat.noRooms') }}</p>
+        </div>
+        <div v-else class="card-list">
+          <div
+            v-for="room in myRooms"
+            :key="room.id"
+            class="room-card"
+          >
+            <div class="room-card-icon">
+              {{ getInitial(room.name) }}
+            </div>
+            <div class="room-card-body">
+              <div class="room-card-name">{{ room.name }}</div>
+              <div class="room-card-meta">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                {{ room.member_count }} 人
+              </div>
+            </div>
+            <div class="friend-card-actions">
+              <span class="btn btn-primary btn-xs" @click="handleEnterRoom(room.id)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                进入
               </span>
             </div>
-            <div class="friend-card__actions">
-              <el-tooltip :content="t('friends.sendMessage')" placement="top">
-                <el-button circle size="small" :icon="ChatDotRound" @click="handleSendMessage(friend)" />
-              </el-tooltip>
-              <el-tooltip :content="t('friends.deleteFriend')" placement="top">
-                <el-button circle size="small" :icon="Delete" type="danger" plain @click="handleDeleteFriend(friend)" />
-              </el-tooltip>
-            </div>
           </div>
         </div>
       </div>
 
-      <!-- 收到的请求 -->
-      <div v-if="activeTab === 'received'" class="friend-list">
+      <!-- === REQUESTS TAB === -->
+      <div v-if="activeTab === 'requests'" class="tab-content">
         <div v-if="loading" class="list-placeholder">{{ t('common.loading') }}</div>
-        <div v-else-if="receivedRequests.length === 0" class="list-placeholder">
-          {{ t('friends.noReceived') }}
+        <div v-else-if="receivedRequests.length === 0 && sentRequests.length === 0" class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <p>{{ t('friends.noReceived') }}</p>
         </div>
-        <div v-else class="friend-cards">
-          <div v-for="req in receivedRequests" :key="req.id" class="friend-card">
-            <div class="friend-card__avatar">
-              <img v-if="req.sender.avatar_url" :src="req.sender.avatar_url" :alt="req.sender.username" class="avatar-img" />
-              <div v-else class="avatar-placeholder">{{ getInitial(req.sender.username) }}</div>
+        <template v-else>
+          <div v-if="receivedRequests.length > 0" class="section">
+            <div class="section-header">
+              <h2 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                {{ t('friends.received') }}
+              </h2>
             </div>
-            <div class="friend-card__body">
-              <span class="friend-name">{{ req.sender.username }}</span>
-              <span v-if="req.message" class="friend-message">{{ req.message }}</span>
-              <span v-if="req.status === 'pending'" class="friend-status status-pending">{{ t('friends.waiting') }}</span>
-              <span v-else-if="req.status === 'accepted'" class="friend-status status-online">{{ t('friends.accepted') }}</span>
-              <span v-else class="friend-status status-offline">{{ t('friends.rejected') }}</span>
-            </div>
-            <div v-if="req.status === 'pending'" class="friend-card__actions">
-              <el-button type="primary" size="small" :icon="CircleCheck" @click="handleAccept(req.id)">
-                {{ t('friends.accept') }}
-              </el-button>
-              <el-button size="small" :icon="CloseBold" @click="handleReject(req.id)">
-                {{ t('friends.reject') }}
-              </el-button>
+            <div class="card-list">
+              <div v-for="req in receivedRequests" :key="req.id" class="request-card">
+                <div class="friend-card-avatar dot-online">
+                  <span class="avatar-text">{{ getInitial(req.sender.username) }}</span>
+                </div>
+                <div class="friend-card-body">
+                  <div class="friend-card-name">{{ req.sender.username }}</div>
+                  <div v-if="req.message" class="request-message">{{ req.message }}</div>
+                  <div class="friend-card-meta">
+                    <span v-if="req.status === 'pending'" class="status-tag tag-idle">{{ t('friends.waiting') }}</span>
+                    <span v-else-if="req.status === 'accepted'" class="status-tag tag-online">{{ t('friends.accepted') }}</span>
+                    <span v-else class="status-tag tag-offline">{{ t('friends.rejected') }}</span>
+                  </div>
+                </div>
+                <div v-if="req.status === 'pending'" class="friend-card-actions">
+                  <span class="btn btn-primary btn-xs" @click="handleAccept(req.id)">{{ t('friends.accept') }}</span>
+                  <span class="btn btn-ghost btn-xs" @click="handleReject(req.id)">{{ t('friends.reject') }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- 已发送的请求 -->
-      <div v-if="activeTab === 'sent'" class="friend-list">
-        <div v-if="loading" class="list-placeholder">{{ t('common.loading') }}</div>
-        <div v-else-if="sentRequests.length === 0" class="list-placeholder">
-          {{ t('friends.noSent') }}
-        </div>
-        <div v-else class="friend-cards">
-          <div v-for="req in sentRequests" :key="req.id" class="friend-card">
-            <div class="friend-card__avatar">
-              <img v-if="req.receiver.avatar_url" :src="req.receiver.avatar_url" :alt="req.receiver.username" class="avatar-img" />
-              <div v-else class="avatar-placeholder">{{ getInitial(req.receiver.username) }}</div>
+          <div v-if="sentRequests.length > 0" class="section">
+            <div class="section-header">
+              <h2 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                {{ t('friends.sent') }}
+              </h2>
             </div>
-            <div class="friend-card__body">
-              <span class="friend-name">{{ req.receiver.username }}</span>
-              <span v-if="req.status === 'pending'" class="friend-status status-pending">{{ t('friends.pending') }}</span>
-              <span v-else-if="req.status === 'accepted'" class="friend-status status-online">{{ t('friends.accepted') }}</span>
-              <span v-else class="friend-status status-offline">{{ t('friends.rejected') }}</span>
-            </div>
-            <div v-if="req.status === 'pending'" class="friend-card__actions">
-              <el-button size="small" @click="handleCancel(req.id)">
-                {{ t('friends.cancelRequest') }}
-              </el-button>
+            <div class="card-list">
+              <div v-for="req in sentRequests" :key="req.id" class="request-card">
+                <div class="friend-card-avatar dot-offline">
+                  <span class="avatar-text">{{ getInitial(req.receiver.username) }}</span>
+                </div>
+                <div class="friend-card-body">
+                  <div class="friend-card-name">{{ req.receiver.username }}</div>
+                  <div class="friend-card-meta">
+                    <span v-if="req.status === 'pending'" class="status-tag tag-idle">{{ t('friends.pending') }}</span>
+                    <span v-else-if="req.status === 'accepted'" class="status-tag tag-online">{{ t('friends.accepted') }}</span>
+                    <span v-else class="status-tag tag-offline">{{ t('friends.rejected') }}</span>
+                  </div>
+                </div>
+                <div v-if="req.status === 'pending'" class="friend-card-actions">
+                  <span class="btn btn-ghost btn-xs" @click="handleCancel(req.id)">{{ t('friends.cancelRequest') }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
     </div>
 
-    <!-- 添加好友弹窗 -->
-    <el-dialog
-      v-model="showAddDialog"
-      :title="t('friends.addFriend')"
-      width="400px"
-      :close-on-click-modal="false"
-    >
-      <div class="add-friend-body">
-        <el-input
-          v-model="searchKeyword"
-          :placeholder="t('friends.searchPlaceholder')"
-          :prefix-icon="Search"
-          @input="onSearchInput"
-          clearable
-        />
-        <div v-if="searching" class="search-status">{{ t('common.loading') }}</div>
-        <div v-else-if="searchKeyword && !searching && searchResults.length === 0 && !searching" class="search-status">
-          {{ t('friends.searchNoResult') }}
+    <!-- detail slide-over -->
+    <Transition name="slide">
+      <div v-if="showDetail" class="detail-overlay" @click="closeDetail" />
+    </Transition>
+    <Transition name="slide">
+      <div v-if="showDetail && selectedFriend" class="detail-panel">
+        <div class="detail-header">
+          <span class="detail-header-title">{{ t('friends.viewProfile') }}</span>
+          <button class="detail-close" @click="closeDetail">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
-        <div v-if="searchResults.length > 0" class="search-results">
-          <div v-for="user in searchResults" :key="user.id" class="search-result-item">
-            <div class="result-avatar">
-              <img v-if="user.avatar_url" :src="user.avatar_url" :alt="user.username" class="avatar-img" />
-              <div v-else class="avatar-placeholder-sm">{{ getInitial(user.username) }}</div>
+        <div class="detail-body">
+          <div class="detail-avatar">
+            {{ getInitial(selectedFriend.friend.username) }}
+          </div>
+          <h2 class="detail-name">{{ selectedFriend.friend.username }}</h2>
+          <div class="detail-status">
+            <span :class="['detail-dot', getDotClass(selectedFriend.friend.status)]" />
+            {{ getStatusLabel(selectedFriend.friend.status) }}
+          </div>
+
+          <div class="detail-stats">
+            <div class="detail-stat">
+              <div class="detail-stat-value">{{ myRooms.length }}</div>
+              <div class="detail-stat-label">共同房间</div>
             </div>
-            <span class="result-name">{{ user.username }}</span>
-            <el-button size="small" type="primary" @click="handleAddFriend(user.id)">
-              {{ t('friends.addFriend') }}
-            </el-button>
+            <div class="detail-stat">
+              <div class="detail-stat-value">—</div>
+              <div class="detail-stat-label">消息</div>
+            </div>
+            <div class="detail-stat">
+              <div class="detail-stat-value">—</div>
+              <div class="detail-stat-label">成为好友</div>
+            </div>
+          </div>
+
+          <div class="detail-actions">
+            <button class="detail-action-btn primary" @click="handleSendMessage(selectedFriend)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              {{ t('friends.sendMessage') }}
+            </button>
+            <button class="detail-action-btn danger" @click="handleDeleteFriend(selectedFriend)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              {{ t('friends.deleteFriend') }}
+            </button>
           </div>
         </div>
       </div>
-    </el-dialog>
+    </Transition>
+
   </div>
 </template>
 
 <style scoped lang="scss">
-.friends-view {
+.social-page {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-  overflow: hidden;
-  max-width: 720px;
-  margin: 0 auto;
-  width: 100%;
+  overflow-y: auto;
+  position: relative;
 }
 
-.friends-view__header {
+.ambient {
+  position: fixed;
+  top: -30vh;
+  left: -10vw;
+  width: 60vw;
+  height: 60vh;
+  background: radial-gradient(ellipse, color-mix(in oklch, var(--accent) 5%, transparent), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.social-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 48px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+.masthead {
+  margin-bottom: 28px;
+}
+
+.masthead-eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+.masthead h1 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.5vw, 38px);
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+.masthead .grad {
+  background: linear-gradient(135deg, var(--accent-pink) 0%, var(--accent) 60%, var(--accent-blue) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.masthead p {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 420px;
+}
+
+/* ─── Segmented tabs ─── */
+.segmented {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+  margin-bottom: 28px;
+}
+
+.seg-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.seg-item:hover {
+  color: var(--fg);
+}
+
+.seg-item.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.seg-item svg {
+  width: 16px;
+  height: 16px;
+}
+
+.seg-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+}
+
+.seg-item.active .seg-badge {
+  background: color-mix(in oklch, white 20%, transparent);
+  color: #fff;
+}
+
+.seg-badge-warn {
+  background: color-mix(in oklch, var(--accent-orange) 18%, transparent);
+  color: var(--accent-orange);
+}
+
+.seg-item.active .seg-badge-warn {
+  background: color-mix(in oklch, white 20%, transparent);
+  color: #fff;
+}
+
+/* ─── Sections ─── */
+.tab-content {
+  min-height: 200px;
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  flex-shrink: 0;
-
-  &-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      margin: 0;
-      color: var(--el-text-color-primary);
-    }
-  }
+  margin-bottom: 12px;
 }
 
-.friends-view__tabs {
-  flex-shrink: 0;
-}
-
-.tab-label {
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.tab-badge {
-  margin-left: 4px;
+.section-title svg {
+  width: 14px;
+  height: 14px;
 }
 
-.friends-view__content {
+/* ─── Card list ─── */
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ─── Friend card ─── */
+.friend-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.15s;
+  cursor: default;
+}
+
+.friend-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 4%, var(--surface));
+}
+
+.friend-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+  position: relative;
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+}
+
+.friend-card-avatar::after {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+
+.dot-online::after { background: var(--accent-green); }
+.dot-idle::after { background: var(--accent-orange); }
+.dot-busy::after { background: var(--accent-pink); }
+.dot-offline::after { background: var(--muted); }
+
+.avatar-text {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.friend-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.friend-card-meta {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friend-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.friend-card:hover .friend-card-actions {
+  opacity: 1;
+}
+
+/* ─── Status tags ─── */
+.status-tag {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+}
+
+.tag-online { background: color-mix(in oklch, var(--accent-green) 15%, transparent); color: var(--accent-green); }
+.tag-idle { background: color-mix(in oklch, var(--accent-orange) 15%, transparent); color: var(--accent-orange); }
+.tag-busy { background: color-mix(in oklch, var(--accent-pink) 15%, transparent); color: var(--accent-pink); }
+.tag-offline { background: var(--message-hover); color: var(--muted); }
+
+/* ─── Room card ─── */
+.room-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.15s;
+  cursor: default;
+}
+
+.room-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 4%, var(--surface));
+}
+
+.room-card:hover .friend-card-actions {
+  opacity: 1;
+}
+
+.room-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+}
+
+.room-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.room-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.room-card-meta {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-card-meta svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── Request card ─── */
+.request-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.15s;
+}
+
+.request-card:hover {
+  border-color: var(--accent);
+}
+
+.request-message {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Detail panel ─── */
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0;
+}
+
+.detail-header-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s;
+}
+
+.detail-close:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.detail-body {
   flex: 1;
   overflow-y: auto;
-  margin-top: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.detail-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+}
+
+.detail-name {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.detail-status {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.detail-dot.dot-online { background: var(--accent-green); }
+.detail-dot.dot-idle { background: var(--accent-orange); }
+.detail-dot.dot-busy { background: var(--accent-pink); }
+.detail-dot.dot-offline { background: var(--muted); }
+
+.detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.detail-stat {
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.detail-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.detail-stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.detail-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.detail-action-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.detail-action-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.detail-action-btn.primary:hover {
+  background: color-mix(in oklch, var(--accent) 85%, black);
+}
+
+.detail-action-btn.danger {
+  color: var(--accent-pink);
+}
+
+.detail-action-btn.danger:hover {
+  border-color: var(--accent-pink);
+  background: color-mix(in oklch, var(--accent-pink) 10%, transparent);
+}
+
+.detail-action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ─── Transitions ─── */
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.25s ease;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-from .detail-panel,
+.slide-leave-to .detail-panel {
+  transform: translateX(100%);
+}
+
+/* ─── Buttons ─── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: color-mix(in oklch, var(--accent) 85%, black);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+.btn-ghost:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.btn-xs {
+  padding: 4px 10px;
+  font-size: 11px;
+  gap: 4px;
+}
+
+/* ─── Empty / placeholder ─── */
+.empty {
+  text-align: center;
+  padding: 64px 16px;
+  color: var(--muted);
+}
+
+.empty svg {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
+  opacity: 0.2;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 14px;
 }
 
 .list-placeholder {
   text-align: center;
   padding: 48px 16px;
-  color: var(--el-text-color-placeholder);
+  color: var(--muted);
   font-size: 14px;
 }
 
-.friend-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.friend-card {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: var(--el-bg-color-page);
-  border: 1px solid var(--el-border-color-light);
-  transition: background 0.2s;
-
-  &:hover {
-    background: var(--el-color-primary-light-9);
+/* ─── Responsive ─── */
+@media (max-width: 820px) {
+  .social-inner {
+    padding: 24px 16px 80px;
   }
 
-  &__avatar {
-    position: relative;
-    flex-shrink: 0;
-    margin-right: 12px;
-
-    .avatar-img, .avatar-placeholder {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .avatar-placeholder {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--el-color-primary-light-8);
-      color: var(--el-color-primary);
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .status-dot {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 2px solid var(--el-bg-color-page);
-    }
-  }
-
-  &__body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-
-    .friend-name {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--el-text-color-primary);
-    }
-
-    .friend-message {
-      font-size: 12px;
-      color: var(--el-text-color-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .friend-status {
-      font-size: 12px;
-    }
-  }
-
-  &__actions {
-    flex-shrink: 0;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-left: 12px;
-  }
-}
-
-.status-online { color: var(--el-color-success); }
-.status-away { color: var(--el-color-warning); }
-.status-busy { color: var(--el-color-danger); }
-.status-offline { color: var(--el-text-color-placeholder); }
-.status-pending { color: var(--el-color-warning); }
-
-.status-online { background: var(--el-color-success); }
-.status-away { background: var(--el-color-warning); }
-.status-busy { background: var(--el-color-danger); }
-.status-offline { background: var(--el-text-color-placeholder); }
-
-.add-friend-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.search-status {
-  text-align: center;
-  padding: 24px;
-  color: var(--el-text-color-placeholder);
-  font-size: 13px;
-}
-
-.search-results {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.search-result-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--el-bg-color-page);
-  gap: 10px;
-
-  .result-avatar {
-    flex-shrink: 0;
-
-    .avatar-img {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .avatar-placeholder-sm {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--el-color-primary-light-8);
-      color: var(--el-color-primary);
-      font-size: 14px;
-      font-weight: 600;
-    }
-  }
-
-  .result-name {
-    flex: 1;
-    font-size: 14px;
-    color: var(--el-text-color-primary);
+  .detail-panel {
+    width: 100vw;
   }
 }
 </style>

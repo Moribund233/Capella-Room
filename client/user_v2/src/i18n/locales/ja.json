@@ -308,6 +308,9 @@
       }
     }
   },
+  "social": {
+    "title": "ソーシャル"
+  },
   "friends": {
     "title": "友達",
     "friends": "友達",
@@ -334,7 +337,7 @@
     "requestSent": "友達リクエストを送信しました！"
   },
   "discover": {
-    "title": "発見",
+    "title": "探検",
     "subtitle": "コミュニティを探索して、あなたの空間を見つけよう",
     "searchPlaceholder": "ルームを検索...",
     "all": "すべて",
@@ -343,6 +346,7 @@
     "gaming": "ゲーム",
     "music": "音楽",
     "art": "アート",
+    "noResult": "結果が見つかりません",
     "featured": "おすすめ",
     "trending": "トレンド",
     "join": "参加",

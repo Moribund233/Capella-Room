@@ -773,9 +773,9 @@ const imageQualityOptions = [
 }
 
 .container {
-  max-width: 720px;
+  max-width: 860px;
   margin-inline: auto;
-  padding-inline: 24px;
+  padding-inline: 48px;
 
   &.loading {
     padding-top: 40px;

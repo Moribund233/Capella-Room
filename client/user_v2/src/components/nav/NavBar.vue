@@ -52,8 +52,8 @@ defineOptions({ inheritAttrs: false })
  */
 const navItems = [
   { name: 'chat', path: '/app', icon: ChatRound, labelKey: 'chat.rooms' },
+  { name: 'friends', path: '/friends', icon: Connection, labelKey: 'social.title' },
   { name: 'discover', path: '/discover', icon: Compass, labelKey: 'discover.title' },
-  { name: 'friends', path: '/friends', icon: Connection, labelKey: 'friends.title' },
   { name: 'profile', path: '/profile', icon: User, labelKey: 'profile.title' },
 ]
 
@@ -349,8 +349,8 @@ const quickGroups = computed<QuickGroup[]>(() => [
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: var(--el-bg-color);
-  border-right: 1px solid var(--el-border-color-light);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -360,7 +360,7 @@ const quickGroups = computed<QuickGroup[]>(() => [
   padding: 16px 0;
   display: flex;
   justify-content: center;
-  border-bottom: 1px solid var(--el-border-color-light);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -395,19 +395,19 @@ const quickGroups = computed<QuickGroup[]>(() => [
   border: none;
   background: transparent;
   border-radius: 8px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
 
   &:hover {
-    color: var(--el-color-primary);
-    background: var(--el-color-primary-light-9);
+    color: var(--accent);
+    background: var(--accent-soft);
   }
 
   &--active {
-    color: var(--el-color-primary);
-    background: var(--el-color-primary-light-9);
+    color: var(--accent);
+    background: var(--accent-soft);
 
     &::before {
       content: '';
@@ -417,7 +417,7 @@ const quickGroups = computed<QuickGroup[]>(() => [
       transform: translateY(-50%);
       width: 3px;
       height: 20px;
-      background: var(--el-color-primary);
+      background: var(--accent);
       border-radius: 0 3px 3px 0;
     }
   }
@@ -430,7 +430,7 @@ const quickGroups = computed<QuickGroup[]>(() => [
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-top: 1px solid var(--el-border-color-light);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -442,7 +442,7 @@ const quickGroups = computed<QuickGroup[]>(() => [
   height: 56px;
   flex-direction: row;
   border-right: none;
-  border-top: 1px solid var(--el-border-color-light);
+  border-top: 1px solid var(--border);
   position: fixed;
   bottom: 0;
   left: 0;
@@ -465,7 +465,7 @@ const quickGroups = computed<QuickGroup[]>(() => [
     &:hover,
     &--active {
       background: transparent;
-      color: var(--el-color-primary);
+      color: var(--accent);
     }
 
     &--active::before {
@@ -473,22 +473,14 @@ const quickGroups = computed<QuickGroup[]>(() => [
     }
 
     &--active::after {
-      content: '';
-      position: absolute;
-      bottom: 4px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 4px;
-      height: 4px;
-      background: var(--el-color-primary);
-      border-radius: 50%;
+      display: none;
     }
   }
 
   .nav-bar__logout {
     width: auto;
     padding: 0 8px;
-    border-left: 1px solid var(--el-border-color-light);
+    border-left: 1px solid var(--border);
   }
 
   .nav-bar__footer {

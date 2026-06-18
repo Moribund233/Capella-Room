@@ -437,6 +437,11 @@ impl WebSocketManager {
         self.connections.len()
     }
 
+    /// 获取所有在线用户 ID 列表
+    pub fn get_online_user_ids(&self) -> Vec<Uuid> {
+        self.connections.iter().map(|entry| *entry.key()).collect()
+    }
+
     /// 获取活跃连接数（与总连接数相同）
     pub fn get_connection_count(&self) -> usize {
         self.connections.len()

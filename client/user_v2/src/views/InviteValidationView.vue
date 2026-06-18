@@ -119,7 +119,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--el-bg-color-page);
+  background: var(--bg);
   padding: 20px;
 }
 
@@ -138,7 +138,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
 }
 
 .is-loading {

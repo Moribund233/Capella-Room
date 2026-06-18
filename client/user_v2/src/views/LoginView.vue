@@ -294,31 +294,31 @@ function switchTab(tab: 'login' | 'register') {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--el-bg-color-page);
+  background: var(--bg);
   padding: 20px;
 }
 
 .auth-card {
   width: 100%;
   max-width: 420px;
-  background: var(--el-bg-color);
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
   padding: 32px;
-  box-shadow: var(--el-box-shadow-light);
+  border: 1px solid var(--border);
 }
 
 .back-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   text-decoration: none;
   font-size: 14px;
   margin-bottom: 24px;
 }
 
 .back-link:hover {
-  color: var(--el-color-primary);
+  color: var(--accent);
 }
 
 .auth-logo {
@@ -340,16 +340,17 @@ function switchTab(tab: 'login' | 'register') {
 .auth-logo span {
   font-size: 24px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: var(--fg);
 }
 
 .auth-tabs {
   display: flex;
   gap: 8px;
   margin-bottom: 24px;
-  background: var(--el-fill-color-light);
+  background: var(--bg);
   padding: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
 }
 
 .auth-tab {
@@ -357,7 +358,7 @@ function switchTab(tab: 'login' | 'register') {
   padding: 10px;
   border: none;
   background: transparent;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -366,9 +367,8 @@ function switchTab(tab: 'login' | 'register') {
 }
 
 .auth-tab.active {
-  background: var(--el-bg-color);
-  color: var(--el-text-color-primary);
-  box-shadow: var(--el-box-shadow-lighter);
+  background: var(--surface);
+  color: var(--fg);
 }
 
 .tab-content {
@@ -386,7 +386,7 @@ function switchTab(tab: 'login' | 'register') {
 .form-field label {
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+  color: var(--fg);
 }
 
 .field-header {
@@ -397,7 +397,7 @@ function switchTab(tab: 'login' | 'register') {
 
 .forgot-link {
   font-size: 13px;
-  color: var(--el-color-primary);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -435,12 +435,12 @@ function switchTab(tab: 'login' | 'register') {
 .auth-footer {
   text-align: center;
   font-size: 14px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
   margin-top: 16px;
 }
 
 .auth-footer a {
-  color: var(--el-color-primary);
+  color: var(--accent);
   text-decoration: none;
 }
 

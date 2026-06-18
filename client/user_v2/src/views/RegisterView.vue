@@ -154,16 +154,16 @@ function goToLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--el-bg-color-page);
+  background: var(--bg);
 }
 
 .register-container {
   width: 100%;
   max-width: 400px;
   padding: 40px;
-  background: var(--el-bg-color);
-  border-radius: 12px;
-  box-shadow: var(--el-box-shadow-light);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
 }
 
 .title {
@@ -171,13 +171,13 @@ function goToLogin() {
   margin-bottom: 8px;
   font-size: 28px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: var(--fg);
 }
 
 .subtitle {
   text-align: center;
   margin-bottom: 32px;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
 }
 
 .register-form {
@@ -191,6 +191,6 @@ function goToLogin() {
 
 .footer {
   text-align: center;
-  color: var(--el-text-color-secondary);
+  color: var(--muted);
 }
 </style>

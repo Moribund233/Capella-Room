@@ -12,6 +12,12 @@ export interface User {
   created_at: string
 }
 
+export interface UserInfo {
+  id: string
+  username: string
+  avatar_url: string | null
+}
+
 export interface LoginCredentials {
   email: string
   password: string

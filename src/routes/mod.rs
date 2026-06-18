@@ -192,6 +192,8 @@ fn user_routes() -> Router<Arc<AppState>> {
         .route("/:user_id", get(user::get_user_by_id))
         // 搜索用户
         .route("/search", get(user::search_users))
+        // 推荐用户（在线优先 + 随机补充）
+        .route("/recommended", get(user::get_recommended_users))
         // 好友功能
         .route("/friends", get(user::get_friends))
         .route("/friends/requests", post(user::send_friend_request))

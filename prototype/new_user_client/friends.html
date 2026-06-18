@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>社交 · Wave</title>
+  <style>
+    :root {
+      --bg:      #0b0b14;
+      --surface: #141420;
+      --sidebar-bg: #11111c;
+      --fg:      #ececf1;
+      --muted:   #8b8b9e;
+      --border:  #262636;
+      --accent:  #7c5cfc;
+      --accent-soft: color-mix(in oklch, var(--accent) 18%, transparent);
+      --accent-pink: #e85d9a;
+      --accent-green: #3ba55d;
+      --accent-orange: #f09042;
+      --accent-blue: #4a9eff;
+      --message-hover: color-mix(in oklch, var(--accent) 10%, transparent);
+      --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      --radius: 12px;
+      --radius-lg: 18px;
+      --radius-full: 9999px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ─── Layout ─── */
+    .page { display: flex; min-height: 100vh; }
+
+    /* ─── Sidebar ─── */
+    .sidebar {
+      width: 220px; background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      padding: 20px 12px; display: flex; flex-direction: column;
+      gap: 4px; flex-shrink: 0;
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; margin-bottom: 20px;
+    }
+    .sidebar-logo-mark {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+      border-radius: 8px; display: grid; place-items: center;
+      font-size: 16px; font-weight: 700; color: #fff;
+    }
+    .sidebar-logo span { font-size: 17px; font-weight: 600; }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: 8px;
+      font-size: 14px; font-weight: 500;
+      color: var(--muted); transition: all 0.15s;
+      cursor: default;
+    }
+    .sidebar-item:hover { background: var(--message-hover); color: var(--fg); }
+    .sidebar-item.active { background: var(--accent-soft); color: var(--accent); }
+    .sidebar-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    /* ─── Main ─── */
+    .main { flex: 1; overflow-y: auto; min-width: 0; position: relative; }
+
+    /* ambient glow */
+    .main::before {
+      content: '';
+      position: fixed; top: -30vh; left: -10vw;
+      width: 60vw; height: 60vh;
+      background: radial-gradient(ellipse, color-mix(in oklch, var(--accent) 5%, transparent), transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .main::after {
+      content: '';
+      position: fixed; bottom: -20vh; right: -10vw;
+      width: 50vw; height: 50vh;
+      background: radial-gradient(ellipse, color-mix(in oklch, var(--accent-pink) 4%, transparent), transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .main > * { position: relative; z-index: 1; }
+
+    /* ─── Inner ─── */
+    .inner {
+      max-width: 1040px; margin: 0 auto;
+      padding: 40px 48px 80px;
+    }
+
+    /* ─── Masthead ─── */
+    .masthead { margin-bottom: 32px; }
+    .masthead-eyebrow {
+      font-size: 13px; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
+      letter-spacing: 2px; margin-bottom: 6px;
+    }
+    .masthead h1 {
+      font-family: var(--font-display);
+      font-size: clamp(34px, 4vw, 44px);
+      font-weight: 700; margin: 0 0 6px;
+      letter-spacing: -0.03em; line-height: 1.08;
+    }
+    .masthead h1 .grad {
+      background: linear-gradient(135deg, var(--accent-pink) 0%, var(--accent) 60%, var(--accent-blue) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .masthead p {
+      font-size: 16px; color: var(--muted);
+      margin: 0; max-width: 420px;
+    }
+
+    /* ─── Segmented tabs ─── */
+    .segmented {
+      display: inline-flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .seg-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border-radius: 8px;
+      border: none; background: transparent;
+      color: var(--muted); font-size: 14px; font-weight: 500;
+      font-family: var(--font-body);
+      cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .seg-item:hover { color: var(--fg); }
+    .seg-item.active {
+      background: var(--accent); color: #fff;
+    }
+    .seg-item svg { width: 16px; height: 16px; }
+    .seg-badge {
+      font-size: 11px; font-weight: 600;
+      background: var(--accent-soft); color: var(--accent);
+      padding: 1px 7px; border-radius: var(--radius-full);
+    }
+    .seg-item.active .seg-badge {
+      background: color-mix(in oklch, white 20%, transparent);
+      color: #fff;
+    }
+
+    /* ─── Section ─── */
+    .section { margin-bottom: 36px; }
+    .section:last-child { margin-bottom: 0; }
+    .section-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 15px; font-weight: 600; margin: 0;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;
+    }
+    .section-count {
+      font-size: 13px; color: var(--muted);
+    }
+
+    /* ─── Friend card ─── */
+    .friend-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .friend-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: all 0.15s;
+      cursor: default;
+    }
+    .friend-card:hover {
+      border-color: var(--accent);
+      background: color-mix(in oklch, var(--accent) 4%, var(--surface));
+    }
+    .friend-card-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 16px; font-weight: 600; color: #fff;
+      flex-shrink: 0; position: relative;
+    }
+    .friend-card-avatar .dot {
+      position: absolute; bottom: 1px; right: 1px;
+      width: 11px; height: 11px; border-radius: 50%;
+      border: 2px solid var(--surface);
+    }
+    .dot.online { background: var(--accent-green); }
+    .dot.idle { background: var(--accent-orange); }
+    .dot.offline { background: var(--muted); }
+
+    .friend-card-body { flex: 1; min-width: 0; }
+    .friend-card-name {
+      font-size: 15px; font-weight: 600;
+      margin: 0 0 2px;
+    }
+    .friend-card-meta {
+      font-size: 13px; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .friend-card-meta .status-tag {
+      font-size: 11px; padding: 1px 8px;
+      border-radius: var(--radius-full);
+    }
+    .status-tag.online { background: color-mix(in oklch, var(--accent-green) 15%, transparent); color: var(--accent-green); }
+    .status-tag.idle { background: color-mix(in oklch, var(--accent-orange) 15%, transparent); color: var(--accent-orange); }
+    .status-tag.offline { background: var(--message-hover); color: var(--muted); }
+
+    .friend-card-actions {
+      display: flex; gap: 6px; flex-shrink: 0;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .friend-card:hover .friend-card-actions { opacity: 1; }
+
+    /* ─── Detail panel (slide-over) ─── */
+    .detail-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    .detail-overlay.open { display: block; }
+
+    .detail-panel {
+      position: fixed; top: 0; right: 0;
+      width: 400px; height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 101;
+      display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+    }
+    .detail-panel.open { transform: translateX(0); }
+
+    .detail-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 24px 0;
+    }
+    .detail-close {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); cursor: pointer;
+      display: grid; place-items: center;
+      transition: all 0.15s;
+    }
+    .detail-close:hover { border-color: var(--fg); color: var(--fg); }
+    .detail-close svg { width: 16px; height: 16px; }
+
+    .detail-body {
+      flex: 1; overflow-y: auto; padding: 24px;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+    }
+    .detail-avatar {
+      width: 80px; height: 80px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 28px; font-weight: 600; color: #fff;
+      margin-bottom: 16px;
+    }
+    .detail-name { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+    .detail-status {
+      font-size: 14px; color: var(--muted);
+      margin: 0 0 24px; display: flex; align-items: center; gap: 6px;
+    }
+    .detail-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px; width: 100%; margin-bottom: 24px;
+    }
+    .detail-stat {
+      text-align: center;
+      padding: 12px; border-radius: var(--radius);
+      background: var(--bg);
+    }
+    .detail-stat-value {
+      font-size: 18px; font-weight: 700; margin-bottom: 2px;
+    }
+    .detail-stat-label {
+      font-size: 12px; color: var(--muted);
+    }
+    .detail-actions {
+      display: flex; flex-direction: column; gap: 10px;
+      width: 100%;
+    }
+    .detail-action-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: transparent;
+      color: var(--fg); font-size: 15px; font-weight: 500;
+      font-family: var(--font-body); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .detail-action-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .detail-action-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .detail-action-btn.primary:hover { background: color-mix(in oklch, var(--accent) 85%, black); }
+    .detail-action-btn svg { width: 18px; height: 18px; }
+    .detail-action-btn.danger { color: var(--accent-pink); }
+    .detail-action-btn.danger:hover { border-color: var(--accent-pink); background: color-mix(in oklch, var(--accent-pink) 10%, transparent); }
+
+    /* ─── Room card ─── */
+    .room-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .room-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: all 0.15s;
+      cursor: default;
+    }
+    .room-card:hover {
+      border-color: var(--accent);
+      background: color-mix(in oklch, var(--accent) 4%, var(--surface));
+    }
+    .room-card-icon {
+      width: 44px; height: 44px; border-radius: var(--radius);
+      display: grid; place-items: center;
+      font-size: 18px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .room-card-body { flex: 1; min-width: 0; }
+    .room-card-name {
+      font-size: 15px; font-weight: 600;
+      margin: 0 0 2px;
+    }
+    .room-card-meta {
+      font-size: 13px; color: var(--muted);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .room-card-meta svg { width: 14px; height: 14px; }
+    .room-card-meta-item { display: flex; align-items: center; gap: 4px; }
+    .room-card-actions {
+      display: flex; gap: 6px; flex-shrink: 0;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .room-card:hover .room-card-actions { opacity: 1; }
+
+    /* ─── Request card ─── */
+    .request-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .request-card-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 15px; font-weight: 600; color: #fff;
+      flex-shrink: 0;
+    }
+    .request-card-body { flex: 1; min-width: 0; }
+    .request-card-name { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
+    .request-card-meta { font-size: 12px; color: var(--muted); }
+    .request-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    /* ─── FAB ─── */
+    .fab {
+      position: fixed; bottom: 32px; right: 32px;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--accent); border: none;
+      color: #fff; cursor: pointer;
+      display: grid; place-items: center;
+      box-shadow: 0 4px 20px rgba(124,92,252,0.4);
+      transition: transform 0.15s;
+      z-index: 10;
+    }
+    .fab:hover { transform: scale(1.08); }
+    .fab:active { transform: scale(0.95); }
+    .fab svg { width: 22px; height: 22px; }
+
+    /* ─── Buttons ─── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 16px; border-radius: var(--radius-full);
+      border: 1px solid transparent;
+      font-size: 13px; font-weight: 500;
+      font-family: var(--font-body);
+      cursor: pointer; transition: all 0.12s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 85%, black); }
+    .btn-ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+    .btn-ghost:hover { border-color: var(--fg); color: var(--fg); }
+    .btn-pink { background: var(--accent-pink); color: #fff; border-color: var(--accent-pink); }
+    .btn-pink:hover { background: color-mix(in oklch, var(--accent-pink) 85%, black); }
+    .btn-xs { padding: 4px 10px; font-size: 11px; gap: 4px; }
+
+    /* ─── Empty ─── */
+    .empty {
+      text-align: center; padding: 48px 16px; color: var(--muted);
+    }
+    .empty svg { width: 40px; height: 40px; margin: 0 auto 12px; opacity: 0.2; }
+    .empty p { margin: 0; font-size: 14px; }
+    .empty .btn { margin-top: 16px; }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 820px) {
+      .sidebar { display: none; }
+      .inner { padding: 24px 16px 80px; }
+      .detail-panel { width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-mark">W</div>
+        <span>Wave</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          发现
+        </div>
+        <div class="sidebar-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          社交
+        </div>
+        <div class="sidebar-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          消息
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="inner">
+        <div class="masthead">
+          <div class="masthead-eyebrow">Social · 社交</div>
+          <h1>
+            <span class="grad">你的人际网络</span>
+          </h1>
+          <p>管理你的好友和房间，从这里开始每一次对话</p>
+        </div>
+
+        <!-- Segmented tabs -->
+        <div class="segmented">
+          <span class="seg-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            好友
+            <span class="seg-badge">12</span>
+          </span>
+          <span class="seg-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            我的房间
+            <span class="seg-badge">8</span>
+          </span>
+          <span class="seg-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            好友请求
+            <span class="seg-badge" style="background: color-mix(in oklch, var(--accent-orange) 18%, transparent); color: var(--accent-orange);">3</span>
+          </span>
+        </div>
+
+        <!-- === Tab: 好友 === -->
+        <div>
+          <div class="section-header">
+            <h2 class="section-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              在线 · 8
+            </h2>
+            <span class="section-count">共 12 位好友</span>
+          </div>
+
+          <div class="friend-list">
+            <div class="friend-card" onclick="document.querySelector('.detail-panel').classList.toggle('open'); document.querySelector('.detail-overlay').classList.toggle('open')">
+              <div class="friend-card-avatar" style="background: linear-gradient(135deg, var(--accent), var(--accent-pink));">
+                A
+                <span class="dot online"></span>
+              </div>
+              <div class="friend-card-body">
+                <div class="friend-card-name">Alex Chen</div>
+                <div class="friend-card-meta">
+                  <span class="status-tag online">在线</span>
+                  正在 AI 讨论组
+                </div>
+              </div>
+              <div class="friend-card-actions">
+                <span class="btn btn-primary btn-xs">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  聊天
+                </span>
+              </div>
+            </div>
+
+            <div class="friend-card" onclick="document.querySelector('.detail-panel').classList.toggle('open'); document.querySelector('.detail-overlay').classList.toggle('open')">
+              <div class="friend-card-avatar" style="background: linear-gradient(135deg, var(--accent-pink), #c04a7a);">
+                M
+                <span class="dot online"></span>
+              </div>
+              <div class="friend-card-body">
+                <div class="friend-card-name">Mia Wang</div>
+                <div class="friend-card-meta">
+                  <span class="status-tag online">在线</span>
+                  正在设计交流
+                </div>
+              </div>
+              <div class="friend-card-actions">
+                <span class="btn btn-primary btn-xs">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  聊天
+                </span>
+              </div>
+            </div>
+
+            <div class="friend-card" onclick="document.querySelector('.detail-panel').classList.toggle('open'); document.querySelector('.detail-overlay').classList.toggle('open')">
+              <div class="friend-card-avatar" style="background: linear-gradient(135deg, var(--accent-green), #2d8a47);">
+                J
+                <span class="dot idle"></span>
+              </div>
+              <div class="friend-card-body">
+                <div class="friend-card-name">James Liu</div>
+                <div class="friend-card-meta">
+                  <span class="status-tag idle">离开</span>
+                  游戏开黑 · 50 分钟未活动
+                </div>
+              </div>
+              <div class="friend-card-actions">
+                <span class="btn btn-primary btn-xs">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  聊天
+                </span>
+              </div>
+            </div>
+
+            <div class="friend-card" onclick="document.querySelector('.detail-panel').classList.toggle('open'); document.querySelector('.detail-overlay').classList.toggle('open')">
+              <div class="friend-card-avatar" style="background: linear-gradient(135deg, var(--accent-blue), #3a7ed4);">
+                S
+                <span class="dot offline"></span>
+              </div>
+              <div class="friend-card-body">
+                <div class="friend-card-name">Sarah Kim</div>
+                <div class="friend-card-meta">
+                  <span class="status-tag offline">离线</span>
+                  最后在线 2 小时前
+                </div>
+              </div>
+              <div class="friend-card-actions">
+                <span class="btn btn-primary btn-xs">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  聊天
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-header" style="margin-top: 28px;">
+            <h2 class="section-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              离线 · 4
+            </h2>
+          </div>
+
+          <div class="friend-list">
+            <div class="friend-card">
+              <div class="friend-card-avatar" style="background: linear-gradient(135deg, var(--accent-orange), #d07a32);">
+                T
+                <span class="dot offline"></span>
+              </div>
+              <div class="friend-card-body">
+                <div class="friend-card-name">Tom Zhang</div>
+                <div class="friend-card-meta">
+                  <span class="status-tag offline">离线</span>
+                  最后在线 3 小时前
+                </div>
+              </div>
+              <div class="friend-card-actions">
+                <span class="btn btn-primary btn-xs">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  聊天
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- === Tab: 我的房间 (hidden) ===
+        <div style="display:none">
+          ...
+        </div>
+        -->
+
+        <!-- === Tab: 好友请求 (hidden) ===
+        <div style="display:none">
+          ...
+        </div>
+        -->
+      </div>
+    </main>
+
+    <!-- FAB -->
+    <button class="fab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+
+    <!-- Detail overlay + panel -->
+    <div class="detail-overlay" onclick="this.classList.remove('open'); document.querySelector('.detail-panel').classList.remove('open')"></div>
+    <div class="detail-panel">
+      <div class="detail-header">
+        <span style="font-size:16px; font-weight:600;">好友详情</span>
+        <button class="detail-close" onclick="document.querySelector('.detail-panel').classList.remove('open'); document.querySelector('.detail-overlay').classList.remove('open')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="detail-body">
+        <div class="detail-avatar" style="background: linear-gradient(135deg, var(--accent), var(--accent-pink));">A</div>
+        <h2 class="detail-name">Alex Chen</h2>
+        <div class="detail-status">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-green);display:inline-block;"></span>
+          在线 · 正在 AI 讨论组
+        </div>
+
+        <div class="detail-stats">
+          <div class="detail-stat">
+            <div class="detail-stat-value">12</div>
+            <div class="detail-stat-label">共同房间</div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-value">48</div>
+            <div class="detail-stat-label">消息总数</div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-value">3 天</div>
+            <div class="detail-stat-label">成为好友</div>
+          </div>
+        </div>
+
+        <div class="detail-actions">
+          <span class="detail-action-btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            发送消息
+          </span>
+          <span class="detail-action-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            查看个人资料
+          </span>
+          <span class="detail-action-btn danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            删除好友
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Simple tab switching (demo)
+    document.querySelectorAll('.seg-item').forEach((item, i) => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.seg-item').forEach(el => el.classList.remove('active'))
+        item.classList.add('active')
+      })
+    })
+  </script>
+</body>
+</html>
