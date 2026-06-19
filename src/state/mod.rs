@@ -13,6 +13,7 @@ use crate::services::audit_log_consumer::AuditLogConsumerHandler;
 use crate::services::audit_service::AuditService;
 use crate::services::auth_service::AuthService;
 use crate::services::batch_message_service::BatchMessageService;
+use crate::services::custom_event_service::CustomEventService;
 use crate::services::file_service::FileService;
 use crate::services::ip_security_service::IpSecurityService;
 use crate::services::mail_service::MailService;
@@ -26,6 +27,7 @@ use crate::services::room_service::RoomService;
 use crate::services::user_service::UserService;
 use crate::services::user_settings_service::UserSettingsService;
 use crate::services::verification_code_service::VerificationCodeService;
+use crate::services::webhook_service::WebhookService;
 use crate::utils::logging::{
     init_global_log_broadcaster, LogBroadcaster, MetricsCollector, StructuredLogger,
 };
@@ -53,6 +55,8 @@ pub struct AppState {
     pub user_settings_service: UserSettingsService,
     pub account_security_service: AccountSecurityService,
     pub oauth_service: OAuthService,
+    pub webhook_service: WebhookService,
+    pub custom_event_service: CustomEventService,
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
     pub redis_manager: Option<Arc<RedisManager>>,
@@ -154,11 +158,14 @@ impl AppState {
         )?);
 
         let account_security_service = AccountSecurityService::new(db.clone().pool().clone());
-        let oauth_secret = {
+        let oauth_config = {
             let config = shared_config.read().await;
-            config.jwt.secret.clone().unwrap_or_else(|| "default_oauth_secret".to_string())
+            config.oauth.clone()
         };
-        let oauth_service = OAuthService::new(db.clone(), &oauth_secret);
+        let oauth_service = OAuthService::new(db.clone(), oauth_config);
+
+        let webhook_service = WebhookService::new(db.clone());
+        let custom_event_service = CustomEventService::new(db.clone());
 
         // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
         if let Some(ref redis_mgr) = redis_manager {
@@ -204,6 +211,8 @@ impl AppState {
             user_settings_service: (*user_settings_service_arc).clone(),
             account_security_service,
             oauth_service,
+            webhook_service,
+            custom_event_service,
             config: shared_config,
             config_manager: config_manager.clone(),
             redis_manager,
@@ -253,6 +262,18 @@ impl AppState {
 
     pub fn room_service(&self) -> &RoomService {
         &self.room_service
+    }
+
+    pub fn oauth_service(&self) -> &OAuthService {
+        &self.oauth_service
+    }
+
+    pub fn webhook_service(&self) -> &WebhookService {
+        &self.webhook_service
+    }
+
+    pub fn custom_event_service(&self) -> &CustomEventService {
+        &self.custom_event_service
     }
 
     pub fn message_service(&self) -> &MessageService {
@@ -346,8 +367,10 @@ impl Clone for AppState {
             account_security_service: AccountSecurityService::new(self.db.clone().pool().clone()),
             oauth_service: OAuthService::new(
                 self.db.clone(),
-                self.config.blocking_read().jwt.secret.as_deref().unwrap_or("default_oauth_secret"),
+                self.config.blocking_read().oauth.clone(),
             ),
+            webhook_service: WebhookService::new(self.db.clone()),
+            custom_event_service: CustomEventService::new(self.db.clone()),
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
             redis_manager: self.redis_manager.clone(),

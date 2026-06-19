@@ -70,9 +70,14 @@ rand = "0.8"
 # OAuth
 bcrypt = "0.15"
 
+# HTTP client for webhooks
+reqwest = { version = "0.11", features = ["json"] }
+
+# HMAC signing for webhook payloads
+hmac = "0.12"
+
 [dev-dependencies]
 # 测试依赖
-reqwest = { version = "0.11", features = ["json"] }
 mockall = "0.12"
 tokio-tungstenite = "0.21"
 http = "1.0"

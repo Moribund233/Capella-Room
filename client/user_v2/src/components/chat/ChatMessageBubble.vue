@@ -5,9 +5,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useMessageStore } from '@/stores/message'
 import { formatTime } from '@/utils/date'
 import { renderMarkdown } from '@/utils/markdown'
+import { getAvatarColor } from '@/utils/avatar'
 import type { Message } from '@/types/message'
 import { ElMessageBox } from 'element-plus'
-import { ChatRound, Edit, CircleClose, Document } from '@element-plus/icons-vue'
+import { ChatRound, Edit, CircleClose, Document, Comment, Star } from '@element-plus/icons-vue'
 import EmojiPicker from './EmojiPicker.vue'
 import EditHistoryPanel from './EditHistoryPanel.vue'
 
@@ -36,6 +37,8 @@ const showEmojiPicker = ref(false)
 const showEditHistory = ref(false)
 const imageLoaded = ref(false)
 const imageError = ref(false)
+const imageRetries = ref(0)
+const IMAGE_MAX_RETRIES = 2
 
 const displayName = computed(() => props.message.sender.username)
 const displayTime = computed(() => formatTime(props.message.created_at))
@@ -50,7 +53,24 @@ const currentUserId = computed(() => authStore.user?.id ?? '')
 watch(() => props.message.id, () => {
   imageLoaded.value = false
   imageError.value = false
+  imageRetries.value = 0
 })
+
+function onImageError() {
+  if (imageRetries.value < IMAGE_MAX_RETRIES) {
+    imageRetries.value++
+    imageError.value = false
+    imageLoaded.value = false
+  } else {
+    imageError.value = true
+  }
+}
+
+function retryImage() {
+  imageRetries.value = 0
+  imageError.value = false
+  imageLoaded.value = false
+}
 
 function hasReacted(emoji: string): boolean {
   const r = props.message.reactions?.find((r) => r.emoji === emoji)
@@ -67,15 +87,6 @@ function handleReactionClick(emoji: string) {
 
 function handleEmojiSelect(emoji: string) {
   handleReactionClick(emoji)
-}
-
-function getAvatarColor(name: string): string {
-  const colors = ['var(--accent)', 'var(--accent-pink)', 'var(--accent-green)', 'var(--accent-orange)', 'var(--accent-blue)']
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colors[Math.abs(hash) % colors.length]!
 }
 
 function getInitial(name: string): string {
@@ -137,7 +148,7 @@ function handleEdit() {
         <!-- 操作栏（悬停显示） -->
         <div class="bubble-actions">
           <button :title="t('chat.react')" @click="showEmojiPicker = !showEmojiPicker">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <el-icon :size="16"><Comment /></el-icon>
           </button>
           <button
             :title="isPinned ? t('chat.unpinMessage') : t('chat.pinMessage')"
@@ -147,7 +158,7 @@ function handleEdit() {
               : messageStore.pinMessage(message.id, message.room_id)
             "
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <el-icon :size="16"><Star /></el-icon>
           </button>
           <button :title="t('chat.reply')" @click="emit('reply', message)">
             <el-icon :size="16"><ChatRound /></el-icon>
@@ -186,7 +197,7 @@ function handleEdit() {
             <span class="bubble-time">{{ displayTime }}</span>
             <span v-if="isEdited" class="bubble-edited" @click.stop="showEditHistory = !showEditHistory">({{ t('chat.edited') }})</span>
             <span v-if="isPinned" class="bubble-pinned" :title="t('chat.pinnedMessage')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              <el-icon :size="12"><Star /></el-icon>
             </span>
           </div>
 
@@ -219,10 +230,10 @@ function handleEdit() {
               loading="lazy"
               @click.stop
               @load="imageLoaded = true"
-              @error="imageError = true"
+              @error="onImageError"
             />
-            <div v-if="imageError" class="bubble-image__error" @click="imageError = false; imageLoaded = false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="24" height="24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div v-if="imageError" class="bubble-image__error" @click="retryImage">
+              <el-icon :size="24"><CircleClose /></el-icon>
               <span>加载失败，点击重试</span>
             </div>
           </div>

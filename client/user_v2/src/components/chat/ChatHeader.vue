@@ -2,9 +2,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  Search, Setting, UserFilled,
+  Search, Setting, UserFilled, Menu, Star,
 } from '@element-plus/icons-vue'
 import type { Room, RoomMember } from '@/types/room'
+import { getAvatarColor } from '@/utils/avatar'
 
 const { t } = useI18n()
 
@@ -26,9 +27,8 @@ function getInitial(name: string) {
   return name.charAt(0).toUpperCase()
 }
 
-function getColor(index: number) {
-  const colors = ['var(--accent)', 'var(--accent-pink)', 'var(--accent-green)', 'var(--accent-orange)', 'var(--accent-blue)']
-  return colors[index % colors.length]
+function getColor(name: string) {
+  return getAvatarColor(name)
 }
 
 const onlineCount = computed(() =>
@@ -41,11 +41,7 @@ const onlineCount = computed(() =>
   <div class="chat-header">
     <!-- 移动端菜单切换 -->
     <button v-if="isMobile" class="mobile-toggle" @click="emit('toggleSidebar')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <line x1="3" y1="6" x2="21" y2="6" />
-        <line x1="3" y1="12" x2="21" y2="12" />
-        <line x1="3" y1="18" x2="21" y2="18" />
-      </svg>
+      <el-icon :size="22"><Menu /></el-icon>
     </button>
 
     <!-- 房间信息 -->
@@ -62,7 +58,7 @@ const onlineCount = computed(() =>
           v-for="(member, idx) in members.slice(0, 5)"
           :key="member.user_id"
           class="mini-avatar"
-          :style="{ background: getColor(idx), zIndex: 5 - idx }"
+          :style="{ background: getColor(member.username), zIndex: 5 - idx }"
         >
           {{ getInitial(member.username) }}
         </div>
@@ -74,9 +70,7 @@ const onlineCount = computed(() =>
 
       <el-tooltip :content="t('chat.pinnedMessages')" placement="bottom">
         <button class="header-btn" @click="emit('togglePinned')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-          </svg>
+          <el-icon :size="20"><Star /></el-icon>
         </button>
       </el-tooltip>
 

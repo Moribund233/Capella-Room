@@ -4,16 +4,19 @@ pub mod audit;
 pub mod auth;
 pub mod auth_v2;
 pub mod config;
+pub mod custom_event;
 pub mod file;
 pub mod message;
 pub mod message_reaction;
 pub mod notification;
+pub mod oauth;
 pub mod pin_message;
 pub mod room;
 pub mod security;
 pub mod ui_config;
 pub mod user;
 pub mod user_settings;
+pub mod webhook;
 
 // HTTP请求处理器模块
 // - admin: 管理员处理器（用户管理、系统配置管理）

@@ -76,11 +76,11 @@ export function useMessageActions() {
   }
 
   // 发送消息（带回复）
-  function sendMessage(content: string) {
+  function sendMessage(content: string, messageType?: string) {
     const roomId = roomStore.currentRoom?.id
     if (!roomId) return
     const replyToId = replyingTo.value?.id ?? null
-    messageStore.sendMessage(roomId, content, replyToId)
+    messageStore.sendMessage(roomId, content, replyToId, messageType)
     replyingTo.value = null
   }
 
@@ -92,12 +92,6 @@ export function useMessageActions() {
   // 关闭搜索
   function closeSearch() {
     showSearch.value = false
-  }
-
-  // 跳转到消息
-  function jumpToMessage(messageId: string) {
-    // TODO: 实现滚动到指定消息的功能
-    console.log('[useMessageActions] jumpToMessage:', messageId)
   }
 
   const typingTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -147,7 +141,6 @@ export function useMessageActions() {
     sendMessage,
     openSearch,
     closeSearch,
-    jumpToMessage,
     addTypingUser,
     removeTypingUser,
     clearTypingUsers,

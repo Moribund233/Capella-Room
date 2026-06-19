@@ -160,6 +160,8 @@ async fn setup_test_server() -> (TestServer, Database) {
         redis: Default::default(),
         batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
         mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
     };
 
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
@@ -337,6 +339,7 @@ impl WebSocketClient {
             room_id,
             content,
             reply_to: None,
+            message_type: None,
         };
         self.write
             .send(Message::Text(chat_msg.to_json().unwrap()))

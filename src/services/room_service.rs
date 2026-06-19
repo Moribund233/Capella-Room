@@ -82,7 +82,7 @@ impl RoomService {
     ) -> Result<Vec<RoomResponse>> {
         let mut timer = PerformanceTimer::new("db_list_rooms");
         let rows = if let Some(uid) = user_id {
-            // 登录用户：可以看到所有公开房间 + 自己加入的私有房间
+            // 登录用户：可以看到所有公开房间 + 自己加入的私有房间（仅群聊）
             if let Some(query) = search {
                 sqlx::query_as::<_, RoomRow>(
                     r#"
@@ -95,6 +95,7 @@ impl RoomService {
                         u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
+                        r.room_type,
                         r.created_at,
                         r.updated_at,
                         COUNT(rm.user_id) as member_count,
@@ -116,6 +117,7 @@ impl RoomService {
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
                     ))
                     AND r.name ILIKE $2
+                    AND r.room_type = 'group'
                     GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $3 OFFSET $4
@@ -139,6 +141,7 @@ impl RoomService {
                         u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
+                        r.room_type,
                         r.created_at,
                         r.updated_at,
                         COUNT(rm.user_id) as member_count,
@@ -156,9 +159,10 @@ impl RoomService {
                 WHERE m.is_deleted = false
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
-                    WHERE r.is_private = false OR EXISTS (
+                    WHERE (r.is_private = false OR EXISTS (
                         SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
-                    )
+                    ))
+                    AND r.room_type = 'group'
                     GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $2 OFFSET $3
@@ -171,7 +175,7 @@ impl RoomService {
                 .await?
             }
         } else {
-            // 未登录用户：只能看到公开房间
+            // 未登录用户：只能看到公开房间（仅群聊）
             if let Some(query) = search {
                 sqlx::query_as::<_, RoomRow>(
                     r#"
@@ -184,6 +188,7 @@ impl RoomService {
                         u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
+                        r.room_type,
                         r.created_at,
                         r.updated_at,
                         COUNT(rm.user_id) as member_count,
@@ -203,6 +208,7 @@ impl RoomService {
             ) lm ON lm.room_id = r.id
                     WHERE r.is_private = false
                     AND r.name ILIKE $1
+                    AND r.room_type = 'group'
                     GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $2 OFFSET $3
@@ -225,6 +231,7 @@ impl RoomService {
                         u.avatar_url as owner_avatar_url,
                         r.is_private,
                         r.max_members,
+                        r.room_type,
                         r.created_at,
                         r.updated_at,
                         COUNT(rm.user_id) as member_count,
@@ -243,6 +250,7 @@ impl RoomService {
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
                     WHERE r.is_private = false
+                    AND r.room_type = 'group'
                     GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                     ORDER BY r.created_at DESC
                     LIMIT $1 OFFSET $2
@@ -259,7 +267,7 @@ impl RoomService {
         Ok(rows.into_iter().map(|r| r.into_response()).collect())
     }
 
-    /// 获取最近更新的聊天室列表
+    /// 获取最近更新的聊天室列表（仅群聊）
     /// 按 updated_at 降序排序，返回最近活跃的房间
     pub async fn list_recent_rooms(
         &self,
@@ -268,7 +276,7 @@ impl RoomService {
         offset: i64,
     ) -> Result<Vec<RoomResponse>> {
         let rows = if let Some(uid) = user_id {
-            // 登录用户：可以看到所有公开房间 + 自己加入的私有房间
+            // 登录用户：可以看到所有公开房间 + 自己加入的私有房间（仅群聊）
             sqlx::query_as::<_, RoomRow>(
                 r#"
                 SELECT
@@ -280,6 +288,7 @@ impl RoomService {
                     u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
+                    r.room_type,
                     r.created_at,
                     r.updated_at,
                     COUNT(rm.user_id) as member_count,
@@ -297,9 +306,10 @@ impl RoomService {
                 WHERE m.is_deleted = false
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
-                WHERE r.is_private = false OR EXISTS (
+                WHERE (r.is_private = false OR EXISTS (
                     SELECT 1 FROM room_members WHERE room_id = r.id AND user_id = $1
-                )
+                ))
+                AND r.room_type = 'group'
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.updated_at DESC
                 LIMIT $2 OFFSET $3
@@ -311,7 +321,7 @@ impl RoomService {
             .fetch_all(self.db.pool())
             .await?
         } else {
-            // 未登录用户：只能看到公开房间
+            // 未登录用户：只能看到公开房间（仅群聊）
             sqlx::query_as::<_, RoomRow>(
                 r#"
                 SELECT
@@ -323,6 +333,7 @@ impl RoomService {
                     u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
+                    r.room_type,
                     r.created_at,
                     r.updated_at,
                     COUNT(rm.user_id) as member_count,
@@ -341,6 +352,7 @@ impl RoomService {
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
                 WHERE r.is_private = false
+                AND r.room_type = 'group'
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.updated_at DESC
                 LIMIT $1 OFFSET $2
@@ -382,6 +394,7 @@ impl RoomService {
                 u.avatar_url as owner_avatar_url,
                 r.is_private,
                 r.max_members,
+                r.room_type,
                 r.created_at,
                 r.updated_at,
                 COUNT(rm.user_id) as member_count,
@@ -834,7 +847,7 @@ impl RoomService {
         Ok(count.0)
     }
 
-    /// 获取用户加入的聊天室
+    /// 获取用户加入的聊天室（仅群聊，排除私聊）
     pub async fn get_user_rooms(&self, user_id: Uuid) -> Result<Vec<RoomResponse>> {
         let rows = sqlx::query_as::<_, RoomRow>(
             r#"
@@ -847,6 +860,7 @@ impl RoomService {
                 u.avatar_url as owner_avatar_url,
                 r.is_private,
                 r.max_members,
+                r.room_type,
                 r.created_at,
                 r.updated_at,
                 COUNT(rm2.user_id) as member_count,
@@ -865,7 +879,7 @@ impl RoomService {
                 WHERE m.is_deleted = false
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
-            WHERE rm.user_id = $1
+            WHERE rm.user_id = $1 AND r.room_type = 'group'
             GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
             ORDER BY r.created_at DESC
             "#,
@@ -892,7 +906,7 @@ impl RoomService {
         Ok(matches!(role, Some(MemberRole::Owner)))
     }
 
-    /// 管理员：获取所有房间列表（包括私有房间）
+    /// 管理员：获取所有房间列表（包括私有房间，仅群聊）
     pub async fn list_all_rooms(
         &self,
         search: Option<&str>,
@@ -911,6 +925,7 @@ impl RoomService {
                     u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
+                    r.room_type,
                     r.created_at,
                     r.updated_at,
                     COUNT(rm.user_id) as member_count,
@@ -928,7 +943,7 @@ impl RoomService {
                 WHERE m.is_deleted = false
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
-                WHERE r.name ILIKE $1
+                WHERE r.name ILIKE $1 AND r.room_type = 'group'
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.created_at DESC
                 LIMIT $2 OFFSET $3
@@ -951,6 +966,7 @@ impl RoomService {
                     u.avatar_url as owner_avatar_url,
                     r.is_private,
                     r.max_members,
+                    r.room_type,
                     r.created_at,
                     r.updated_at,
                     COUNT(rm.user_id) as member_count,
@@ -968,6 +984,7 @@ impl RoomService {
                 WHERE m.is_deleted = false
                 ORDER BY m.room_id, m.created_at DESC
             ) lm ON lm.room_id = r.id
+                WHERE r.room_type = 'group'
                 GROUP BY r.id, u.username, u.avatar_url, lm.id, lm.content, lm.sender_name, lm.created_at
                 ORDER BY r.created_at DESC
                 LIMIT $1 OFFSET $2
@@ -1026,6 +1043,7 @@ struct RoomRow {
     pub owner_avatar_url: Option<String>,
     pub is_private: bool,
     pub max_members: i32,
+    pub room_type: RoomType,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub member_count: i64,

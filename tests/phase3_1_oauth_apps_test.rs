@@ -4,7 +4,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use capella_room::{
-    config::{DatabaseConfig, JwtConfig},
+    config::{DatabaseConfig, JwtConfig, OAuthConfig},
     db::Database,
     error::AppError,
     models::user::UserRole,
@@ -77,7 +77,7 @@ async fn cleanup_database(db: &Database) {
 }
 
 fn setup_service(db: Database) -> OAuthService {
-    OAuthService::new(db, "test_oauth_secret")
+    OAuthService::new(db, OAuthConfig::default())
 }
 
 fn create_token_for_user(user_id: Uuid, username: &str) -> String {

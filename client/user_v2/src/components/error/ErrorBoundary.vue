@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { WarningFilled } from '@element-plus/icons-vue'
 
 const { t } = useI18n()
 
@@ -22,11 +23,7 @@ function handleRetry() {
 <template>
   <div v-if="error" class="error-boundary">
     <div class="error-boundary__icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
+      <el-icon :size="48"><WarningFilled /></el-icon>
     </div>
     <h3 class="error-boundary__title">{{ t('error.boundaryTitle') }}</h3>
     <p class="error-boundary__message">{{ error.message }}</p>

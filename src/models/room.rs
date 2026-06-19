@@ -15,6 +15,7 @@ pub struct Room {
     pub owner_id: Uuid,
     pub is_private: bool,
     pub max_members: i32,
+    pub room_type: RoomType,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

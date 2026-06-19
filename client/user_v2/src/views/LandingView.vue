@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, ArrowDown } from '@element-plus/icons-vue'
+import { ArrowRight, ArrowDown, ChatRound, Connection, Comment } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
@@ -116,31 +116,21 @@ function switchLanguage(code: string) {
           <div class="grid-3">
             <el-card class="feature-card" shadow="never">
               <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+                <el-icon><ChatRound /></el-icon>
               </div>
               <h3 class="h3">{{ t('landing.features.channels.title') }}</h3>
               <p class="feature-desc">{{ t('landing.features.channels.description') }}</p>
             </el-card>
             <el-card class="feature-card" shadow="never">
               <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17 12a5 5 0 01-5 5M7 12a5 5 0 015-5"/>
-                  <path d="M12 17a5 5 0 005-5M12 7a5 5 0 00-5 5"/>
-                </svg>
+                <el-icon><Connection /></el-icon>
               </div>
               <h3 class="h3">{{ t('landing.features.threads.title') }}</h3>
               <p class="feature-desc">{{ t('landing.features.threads.description') }}</p>
             </el-card>
             <el-card class="feature-card" shadow="never">
               <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                  <line x1="9" y1="9" x2="9.01" y2="9"/>
-                  <line x1="15" y1="9" x2="15.01" y2="9"/>
-                </svg>
+                <el-icon><Comment /></el-icon>
               </div>
               <h3 class="h3">{{ t('landing.features.expressions.title') }}</h3>
               <p class="feature-desc">{{ t('landing.features.expressions.description') }}</p>

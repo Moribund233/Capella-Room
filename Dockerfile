@@ -104,8 +104,9 @@ COPY --from=builder /app/config.toml /app/config.toml
 # 设置权限
 RUN chown -R appuser:appuser /app
 
-# 切换到非 root 用户
-USER appuser
+# 复制入口脚本
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # 暴露端口
 EXPOSE 3000
@@ -114,5 +115,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-# 启动命令
-ENTRYPOINT ["/app/server"]
+# 运行时以 root 启动，entrypoint 修复上传目录权限后自动降权到 appuser
+USER root
+ENTRYPOINT ["/app/entrypoint.sh"]

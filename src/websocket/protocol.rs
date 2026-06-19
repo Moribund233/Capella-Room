@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::message::MessageType;
 use crate::models::room::MessagePreview;
 
 /// 被引用消息的信息（用于 WebSocket 传输）
@@ -80,6 +81,8 @@ pub enum WebSocketMessage {
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         reply_to: Option<Uuid>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message_type: Option<MessageType>,
     },
 
     /// 收到聊天消息（广播）
@@ -89,6 +92,7 @@ pub enum WebSocketMessage {
         sender_id: Uuid,
         sender_name: String,
         content: String,
+        message_type: MessageType,
         #[serde(skip_serializing_if = "Option::is_none")]
         reply_to: Option<Uuid>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -408,6 +412,48 @@ pub enum WebSocketMessage {
         last_message: MessagePreview,
         unread_count: u32,
     },
+
+    // ========== 外部服务自定义事件 ==========
+    /// 外部服务发送自定义事件（需要 OAuth 身份）
+    CustomEvent {
+        event_name: String,
+        room_id: Uuid,
+        data: serde_json::Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        persistent: Option<bool>,
+    },
+
+    /// 转发给客户端的自定义事件
+    CustomEventForward {
+        event_name: String,
+        room_id: Uuid,
+        source_app: String,
+        data: serde_json::Value,
+        timestamp: DateTime<Utc>,
+    },
+
+    /// 客户端请求获取错过的自定义事件
+    GetMissedCustomEvents {
+        room_id: Uuid,
+        since: DateTime<Utc>,
+    },
+
+    /// 服务端返回错过的自定义事件
+    MissedCustomEvents {
+        room_id: Uuid,
+        events: Vec<CustomEventForwardPayload>,
+        has_more: bool,
+    },
+}
+
+/// 自定义事件转发 payload（用于 MissedCustomEvents）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomEventForwardPayload {
+    pub id: Uuid,
+    pub event_name: String,
+    pub source_app: String,
+    pub data: serde_json::Value,
+    pub timestamp: DateTime<Utc>,
 }
 
 /// 通知类型枚举
@@ -605,6 +651,7 @@ impl WebSocketMessage {
         sender_id: Uuid,
         sender_name: &str,
         content: &str,
+        message_type: MessageType,
         reply_to: Option<Uuid>,
         reply_to_message: Option<ReplyToInfo>,
     ) -> Self {
@@ -614,6 +661,7 @@ impl WebSocketMessage {
             sender_id,
             sender_name: sender_name.to_string(),
             content: content.to_string(),
+            message_type,
             reply_to,
             reply_to_message,
             created_at: Utc::now(),
@@ -676,6 +724,7 @@ mod tests {
             room_id,
             content: "Hello, World!".to_string(),
             reply_to: None,
+            message_type: None,
         };
 
         let json = original.to_json().unwrap();
@@ -686,10 +735,12 @@ mod tests {
                 room_id: r,
                 content: c,
                 reply_to,
+                message_type,
             } => {
                 assert_eq!(r, room_id);
                 assert_eq!(c, "Hello, World!");
                 assert!(reply_to.is_none());
+                assert!(message_type.is_none());
             }
             _ => panic!("Expected ChatMessage"),
         }

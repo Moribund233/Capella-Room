@@ -8,8 +8,9 @@ use std::sync::Arc;
 
 use crate::{
     handlers::{
-        account_security, admin, audit, auth, auth_v2, config, file, message, message_reaction,
-        notification, pin_message, room, security, ui_config, user, user_settings,
+        account_security, admin, audit, auth, auth_v2, config, custom_event, file, message,
+        message_reaction, notification, oauth, pin_message, room, security, ui_config, user,
+        user_settings, webhook,
     },
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
@@ -39,9 +40,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
     // 认证路由（公开访问）
     let auth_routes_router = Router::new()
-        .nest(&format!("/api/{}/auth", API_VERSION), auth_routes())
-        .nest("/api/auth", auth_routes())
-        .nest("/api/v2/auth", v2_auth_routes());
+        .nest(&format!("/api/{}/auth/", API_VERSION), auth_routes())
+        .nest("/api/auth/", auth_routes())
+        .nest("/api/v2/auth/", v2_auth_routes());
 
     // v1 注册端点（需要管理员权限）
     let register_admin_router = Router::new()
@@ -59,26 +60,36 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // 创建受保护路由（需要认证）
     let protected_routes = Router::new()
         // 用户路由
-        .nest(&format!("/api/{}/users", API_VERSION), user_routes())
-        .nest("/api/users", user_routes())
-        .nest("/api/v2/users", v2_user_routes())
+        .nest(&format!("/api/{}/users/", API_VERSION), user_routes())
+        .nest("/api/users/", user_routes())
+        .nest("/api/v2/users/", v2_user_routes())
         // 聊天室路由
-        .nest(&format!("/api/{}/rooms", API_VERSION), room_routes())
-        .nest("/api/rooms", room_routes())
+        .nest(&format!("/api/{}/rooms/", API_VERSION), room_routes())
+        .nest("/api/rooms/", room_routes())
         // 消息路由
-        .nest(&format!("/api/{}/messages", API_VERSION), message_routes())
-        .nest("/api/messages", message_routes())
+        .nest(&format!("/api/{}/messages/", API_VERSION), message_routes())
+        .nest("/api/messages/", message_routes())
         // 通知路由
         .nest(
-            &format!("/api/{}/notifications", API_VERSION),
+            &format!("/api/{}/notifications/", API_VERSION),
             notification_routes(),
         )
-        .nest("/api/notifications", notification_routes())
+        .nest("/api/notifications/", notification_routes())
         // 文件路由
-        .nest(&format!("/api/{}/files", API_VERSION), file_routes())
-        .nest(&format!("/api/{}/upload", API_VERSION), upload_routes())
+        .nest(&format!("/api/{}/files/", API_VERSION), file_routes())
+        .nest("/api/files", file_routes())
+        .nest(&format!("/api/{}/upload/", API_VERSION), upload_routes())
+        .nest("/api/upload", upload_routes())
         // UI 配置路由
-        .nest(&format!("/api/{}/ui", API_VERSION), ui_config_routes())
+        .nest(&format!("/api/{}/ui/", API_VERSION), ui_config_routes())
+        // OAuth 受保护路由（App CRUD, mappings, userinfo）
+        .merge(oauth_protected_routes())
+        // 房间资源绑定路由
+        .merge(room_resource_routes())
+        // Webhook 订阅路由
+        .merge(webhook_routes())
+        // 自定义事件 HTTP API 路由
+        .merge(custom_event_routes())
         // 添加审计中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -92,8 +103,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
     // 创建管理员路由（需要管理员权限）
     let admin_routes = Router::new()
-        .nest(&format!("/api/{}/admin", API_VERSION), admin_router())
-        .nest("/api/admin", admin_router())
+        .nest(&format!("/api/{}/admin/", API_VERSION), admin_router())
+        .nest("/api/admin/", admin_router())
         // 添加管理员认证中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -113,6 +124,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // 合并所有路由
     public_routes
         .merge(auth_routes_router)
+        .merge(oauth_browser_routes())   // /oauth/authorize, /oauth/token
+        .route("/oauth/userinfo", get(oauth::userinfo))  // OAuth token auth (no app auth middleware)
         .merge(register_admin_router)
         .merge(protected_routes)
         .merge(admin_routes)
@@ -544,6 +557,47 @@ fn v2_auth_routes() -> Router<Arc<AppState>> {
 fn v2_user_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/logout", post(auth_v2::logout))
+}
+
+/// OAuth 浏览器路由（公开访问）
+fn oauth_browser_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/oauth/authorize", get(oauth::authorize_get).post(oauth::authorize_post))
+        .route("/oauth/authorize/consent", post(oauth::authorize_consent))
+        .route("/oauth/token", post(oauth::token))
+}
+
+/// OAuth 受保护路由（需要认证）
+fn oauth_protected_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/oauth/apps", post(oauth::create_app).get(oauth::list_apps))
+        .route("/oauth/apps/:app_id", get(oauth::get_app).put(oauth::update_app).delete(oauth::delete_app))
+        .route("/oauth/apps/:app_id/rotate-secret", post(oauth::rotate_secret))
+        .route("/oauth/mappings", post(oauth::create_mapping).get(oauth::lookup_mapping))
+        .route("/oauth/mappings/:mapping_id", delete(oauth::delete_mapping_handler))
+        .route("/oauth/resources", get(oauth::lookup_resource))
+}
+
+/// 房间资源绑定路由（需要认证）
+fn room_resource_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/rooms/:room_id/resources", post(oauth::bind_resource).get(oauth::list_bindings))
+        .route("/rooms/:room_id/resources/:binding_id", put(oauth::update_binding).delete(oauth::unbind_resource))
+}
+
+/// Webhook 订阅路由（需要认证）
+fn webhook_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/webhook/subscriptions", post(webhook::create_subscription).get(webhook::list_subscriptions))
+        .route("/webhook/subscriptions/:subscription_id", get(webhook::list_subscriptions).put(webhook::update_subscription).delete(webhook::delete_subscription))
+        .route("/webhook/subscriptions/:subscription_id/deliveries", get(webhook::get_deliveries))
+        .route("/webhook/subscriptions/:subscription_id/deliveries/:delivery_id/redeliver", post(webhook::redeliver))
+}
+
+/// 自定义事件 HTTP API 路由（需要认证）
+fn custom_event_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/rooms/:room_id/custom-events", post(custom_event::send_custom_event).get(custom_event::get_missed_events))
 }
 
 #[cfg(test)]

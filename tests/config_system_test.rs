@@ -57,6 +57,11 @@ heartbeat_timeout_secs = 90
 auth_timeout_secs = 30
 message_buffer_size = 100
 
+[batch_message]
+batch_size = 500
+flush_interval_ms = 50
+max_queue_size = 100000
+
 [reconnect]
 base_delay_ms = 1000
 max_delay_ms = 30000
@@ -73,6 +78,16 @@ description = "Test Description"
 version = "1.0.0"
 maintenance_mode = false
 maintenance_message = "Test message"
+
+[oauth]
+access_token_ttl = 3600
+refresh_token_ttl = 2592000
+authorization_code_ttl = 300
+
+[webhook]
+retry_scan_interval_secs = 30
+default_timeout_ms = 5000
+default_max_retries = 3
 "#;
     let temp_file = create_temp_config(config_content);
     let path = temp_file.path().to_str().unwrap();
@@ -120,6 +135,11 @@ heartbeat_timeout_secs = 120
 auth_timeout_secs = 60
 message_buffer_size = 200
 
+[batch_message]
+batch_size = 1000
+flush_interval_ms = 100
+max_queue_size = 50000
+
 [reconnect]
 base_delay_ms = 2000
 max_delay_ms = 60000
@@ -141,6 +161,16 @@ maintenance_message = "Under maintenance"
 enabled = false
 username = "admin"
 email = "admin@test.com"
+
+[oauth]
+access_token_ttl = 7200
+refresh_token_ttl = 604800
+authorization_code_ttl = 600
+
+[webhook]
+retry_scan_interval_secs = 30
+default_timeout_ms = 5000
+default_max_retries = 3
 "#;
     let temp_file = create_temp_config(config_content);
     let path = temp_file.path().to_str().unwrap();

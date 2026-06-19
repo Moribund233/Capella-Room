@@ -8,12 +8,22 @@ import { useDirectRoomStore } from '@/stores/directRoom'
 import { useRoomStore } from '@/stores/room'
 import type { Friend } from '@/types/friend'
 import type { Room } from '@/types/room'
+import { getAvatarGradient, getAvatarShadow } from '@/utils/avatar'
+import BaseButton from '@/components/common/BaseButton.vue'
 import {
   UserFilled,
   Delete,
   CircleCheck,
   CloseBold,
+  User,
+  Grid,
+  Clock,
+  ChatRound,
+  ArrowRight,
+  Promotion,
+  Close,
 } from '@element-plus/icons-vue'
+import { Shield } from '@lucide/vue'
 
 type TabType = 'friends' | 'rooms' | 'requests'
 
@@ -102,12 +112,33 @@ function getInitial(name: string) {
   return name.charAt(0).toUpperCase()
 }
 
+function getAvatarStyle(name: string) {
+  return {
+    background: getAvatarGradient(name),
+    boxShadow: getAvatarShadow('md'),
+  }
+}
+
+function getRoomAvatarStyle(name: string) {
+  return {
+    background: getAvatarGradient(name + '_room'),
+    boxShadow: getAvatarShadow('sm'),
+  }
+}
+
+function getDetailAvatarStyle(name: string) {
+  return {
+    background: getAvatarGradient(name + '_detail'),
+    boxShadow: getAvatarShadow('lg'),
+  }
+}
+
 function getStatusLabel(status: string) {
   switch (status) {
-    case 'online': return '在线'
-    case 'away': return '离开'
-    case 'busy': return '忙碌'
-    default: return '离线'
+    case 'online': return t('friends.online')
+    case 'away': return t('friends.away')
+    case 'busy': return t('friends.busy')
+    default: return t('friends.offline')
   }
 }
 
@@ -148,9 +179,9 @@ onMounted(() => {
       <div class="masthead">
         <div class="masthead-eyebrow">{{ t('social.title') }}</div>
         <h1>
-          <span class="grad">{{ t('social.title') }}</span> · 你的人际网络
+          <span class="grad">{{ t('social.title') }}</span> · {{ t('social.subtitle') }}
         </h1>
-        <p>管理你的好友和房间，从这里开始每一次对话</p>
+        <p>{{ t('social.subtitle') }}</p>
       </div>
 
       <!-- segmented tabs -->
@@ -160,7 +191,7 @@ onMounted(() => {
           :class="{ active: activeTab === 'friends' }"
           @click="activeTab = 'friends'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          <el-icon :size="16"><User /></el-icon>
           {{ t('friends.friends') }}
           <span v-if="friends.length > 0" class="seg-badge">{{ friends.length }}</span>
         </button>
@@ -169,8 +200,8 @@ onMounted(() => {
           :class="{ active: activeTab === 'rooms' }"
           @click="activeTab = 'rooms'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          {{ t('chat.rooms') }}
+          <el-icon :size="16"><Grid /></el-icon>
+          {{ t('friends.rooms') }}
           <span v-if="myRooms.length > 0" class="seg-badge">{{ myRooms.length }}</span>
         </button>
         <button
@@ -178,8 +209,8 @@ onMounted(() => {
           :class="{ active: activeTab === 'requests' }"
           @click="activeTab = 'requests'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          {{ t('friends.received') }}
+          <el-icon :size="16"><Shield /></el-icon>
+          {{ t('friends.requests') }}
           <span v-if="hasPendingRequests" class="seg-badge seg-badge-warn">{{ receivedRequests.length }}</span>
         </button>
       </div>
@@ -188,15 +219,15 @@ onMounted(() => {
       <div v-if="activeTab === 'friends'" class="tab-content">
         <div v-if="loading" class="list-placeholder">{{ t('common.loading') }}</div>
         <div v-else-if="friends.length === 0" class="empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <el-icon :size="40"><UserFilled /></el-icon>
           <p>{{ t('friends.noFriends') }}</p>
         </div>
         <template v-else>
           <div v-if="onlineFriends.length > 0" class="section">
             <div class="section-header">
               <h2 class="section-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                在线 · {{ onlineFriends.length }}
+                <el-icon :size="14"><Clock /></el-icon>
+                {{ t('friends.online') }} · {{ onlineFriends.length }}
               </h2>
             </div>
             <div class="card-list">
@@ -206,7 +237,7 @@ onMounted(() => {
                 class="friend-card"
                 @click="openDetail(friend)"
               >
-                <div class="friend-card-avatar" :class="getDotClass(friend.friend.status)">
+                <div class="friend-card-avatar" :class="getDotClass(friend.friend.status)" :style="getAvatarStyle(friend.friend.username)">
                   <span class="avatar-text">{{ getInitial(friend.friend.username) }}</span>
                 </div>
                 <div class="friend-card-body">
@@ -218,10 +249,10 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="friend-card-actions" @click.stop>
-                  <span class="btn btn-primary btn-xs" @click="handleSendMessage(friend)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    聊天
-                  </span>
+                  <BaseButton variant="primary" size="sm" @click="handleSendMessage(friend)">
+                    <el-icon :size="14"><ChatRound /></el-icon>
+                    {{ t('friends.chat') }}
+                  </BaseButton>
                 </div>
               </div>
             </div>
@@ -230,8 +261,8 @@ onMounted(() => {
           <div v-if="offlineFriends.length > 0" class="section">
             <div class="section-header">
               <h2 class="section-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                离线 · {{ offlineFriends.length }}
+                <el-icon :size="14"><Clock /></el-icon>
+                {{ t('friends.offline') }} · {{ offlineFriends.length }}
               </h2>
             </div>
             <div class="card-list">
@@ -241,7 +272,7 @@ onMounted(() => {
                 class="friend-card"
                 @click="openDetail(friend)"
               >
-                <div class="friend-card-avatar" :class="getDotClass(friend.friend.status)">
+                <div class="friend-card-avatar" :class="getDotClass(friend.friend.status)" :style="getAvatarStyle(friend.friend.username)">
                   <span class="avatar-text">{{ getInitial(friend.friend.username) }}</span>
                 </div>
                 <div class="friend-card-body">
@@ -254,8 +285,8 @@ onMounted(() => {
                 </div>
                 <div class="friend-card-actions" @click.stop>
                   <span class="btn btn-primary btn-xs" @click="handleSendMessage(friend)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    聊天
+                    <el-icon :size="14"><ChatRound /></el-icon>
+                    {{ t('friends.chat') }}
                   </span>
                 </div>
               </div>
@@ -267,7 +298,7 @@ onMounted(() => {
       <!-- === ROOMS TAB === -->
       <div v-if="activeTab === 'rooms'" class="tab-content">
         <div v-if="myRooms.length === 0" class="empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <el-icon :size="40"><Grid /></el-icon>
           <p>{{ t('chat.noRooms') }}</p>
         </div>
         <div v-else class="card-list">
@@ -276,20 +307,20 @@ onMounted(() => {
             :key="room.id"
             class="room-card"
           >
-            <div class="room-card-icon">
+            <div class="room-card-icon" :style="getRoomAvatarStyle(room.name)">
               {{ getInitial(room.name) }}
             </div>
             <div class="room-card-body">
               <div class="room-card-name">{{ room.name }}</div>
               <div class="room-card-meta">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                {{ room.member_count }} 人
+                <el-icon :size="14"><User /></el-icon>
+                {{ room.member_count }} {{ t('friends.members') }}
               </div>
             </div>
             <div class="friend-card-actions">
               <span class="btn btn-primary btn-xs" @click="handleEnterRoom(room.id)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                进入
+                <el-icon :size="14"><ArrowRight /></el-icon>
+                {{ t('friends.enter') }}
               </span>
             </div>
           </div>
@@ -300,20 +331,20 @@ onMounted(() => {
       <div v-if="activeTab === 'requests'" class="tab-content">
         <div v-if="loading" class="list-placeholder">{{ t('common.loading') }}</div>
         <div v-else-if="receivedRequests.length === 0 && sentRequests.length === 0" class="empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <el-icon :size="40"><Shield /></el-icon>
           <p>{{ t('friends.noReceived') }}</p>
         </div>
         <template v-else>
           <div v-if="receivedRequests.length > 0" class="section">
             <div class="section-header">
               <h2 class="section-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <el-icon :size="14"><Shield /></el-icon>
                 {{ t('friends.received') }}
               </h2>
             </div>
             <div class="card-list">
               <div v-for="req in receivedRequests" :key="req.id" class="request-card">
-                <div class="friend-card-avatar dot-online">
+                <div class="friend-card-avatar dot-online" :style="getAvatarStyle(req.sender.username)">
                   <span class="avatar-text">{{ getInitial(req.sender.username) }}</span>
                 </div>
                 <div class="friend-card-body">
@@ -336,13 +367,13 @@ onMounted(() => {
           <div v-if="sentRequests.length > 0" class="section">
             <div class="section-header">
               <h2 class="section-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                <el-icon :size="14"><Promotion /></el-icon>
                 {{ t('friends.sent') }}
               </h2>
             </div>
             <div class="card-list">
               <div v-for="req in sentRequests" :key="req.id" class="request-card">
-                <div class="friend-card-avatar dot-offline">
+                <div class="friend-card-avatar dot-offline" :style="getAvatarStyle(req.receiver.username)">
                   <span class="avatar-text">{{ getInitial(req.receiver.username) }}</span>
                 </div>
                 <div class="friend-card-body">
@@ -372,11 +403,11 @@ onMounted(() => {
         <div class="detail-header">
           <span class="detail-header-title">{{ t('friends.viewProfile') }}</span>
           <button class="detail-close" @click="closeDetail">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <el-icon :size="16"><Close /></el-icon>
           </button>
         </div>
         <div class="detail-body">
-          <div class="detail-avatar">
+          <div class="detail-avatar" :style="getDetailAvatarStyle(selectedFriend.friend.username)">
             {{ getInitial(selectedFriend.friend.username) }}
           </div>
           <h2 class="detail-name">{{ selectedFriend.friend.username }}</h2>
@@ -388,25 +419,25 @@ onMounted(() => {
           <div class="detail-stats">
             <div class="detail-stat">
               <div class="detail-stat-value">{{ myRooms.length }}</div>
-              <div class="detail-stat-label">共同房间</div>
+              <div class="detail-stat-label">{{ t('friends.commonRooms') }}</div>
             </div>
             <div class="detail-stat">
               <div class="detail-stat-value">—</div>
-              <div class="detail-stat-label">消息</div>
+              <div class="detail-stat-label">{{ t('friends.messages') }}</div>
             </div>
             <div class="detail-stat">
               <div class="detail-stat-value">—</div>
-              <div class="detail-stat-label">成为好友</div>
+              <div class="detail-stat-label">{{ t('friends.friendsSince') }}</div>
             </div>
           </div>
 
           <div class="detail-actions">
             <button class="detail-action-btn primary" @click="handleSendMessage(selectedFriend)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <el-icon :size="18"><ChatRound /></el-icon>
               {{ t('friends.sendMessage') }}
             </button>
             <button class="detail-action-btn danger" @click="handleDeleteFriend(selectedFriend)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <el-icon :size="18"><Delete /></el-icon>
               {{ t('friends.deleteFriend') }}
             </button>
           </div>
@@ -598,13 +629,14 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: all 0.15s;
+  transition: all 0.2s;
   cursor: default;
 }
 
 .friend-card:hover {
   border-color: var(--accent);
-  background: color-mix(in oklch, var(--accent) 4%, var(--surface));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 92, 252, 0.12);
 }
 
 .friend-card-avatar {
@@ -618,7 +650,6 @@ onMounted(() => {
   color: #fff;
   flex-shrink: 0;
   position: relative;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 }
 
 .friend-card-avatar::after {
@@ -694,13 +725,14 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: all 0.15s;
+  transition: all 0.2s;
   cursor: default;
 }
 
 .room-card:hover {
   border-color: var(--accent);
-  background: color-mix(in oklch, var(--accent) 4%, var(--surface));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 92, 252, 0.12);
 }
 
 .room-card:hover .friend-card-actions {
@@ -717,7 +749,6 @@ onMounted(() => {
   font-weight: 700;
   color: #fff;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 }
 
 .room-card-body {
@@ -753,11 +784,13 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: all 0.15s;
+  transition: all 0.2s;
 }
 
 .request-card:hover {
   border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 92, 252, 0.12);
 }
 
 .request-message {
@@ -840,7 +873,6 @@ onMounted(() => {
   font-weight: 600;
   color: #fff;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 }
 
 .detail-name {

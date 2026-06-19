@@ -242,6 +242,12 @@ impl ConfigLoader {
                 config.redis.config_sync_enabled = e;
             }
         }
+
+        // OAuth 配置
+        if let Ok(secret) = std::env::var("OAUTH_JWT_SECRET") {
+            debug!("Loading oauth.jwt_secret from environment");
+            config.oauth.jwt_secret = Some(secret);
+        }
     }
 
     fn validate_config(config: &mut AppConfig) -> Result<()> {

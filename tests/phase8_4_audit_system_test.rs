@@ -115,6 +115,8 @@ async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'s
         redis: Default::default(),
         batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
         mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
     };
     let config_manager = ConfigManager::new(db.clone(), config.clone(), None);
 

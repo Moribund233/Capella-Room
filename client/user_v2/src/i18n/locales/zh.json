@@ -150,10 +150,28 @@
     "owner": "创建者",
     "admin": "管理员",
     "logout": "退出登录",
+    "searchRooms": "搜索房间",
+    "filterAll": "全部",
+    "filterGroups": "群组",
+    "filterDMs": "私聊",
+    "noResults": "无搜索结果",
+    "unreadMessages": "未读消息",
+    "mentionMessages": "提及消息",
     "welcome": {
       "title": "欢迎来到 CapellaRoom",
       "description": "从侧边栏选择一个频道开始聊天"
     }
+  },
+  "sidebar": {
+    "dragToReorder": "拖拽排序",
+    "closeRoom": "关闭房间",
+    "collapseSidebar": "收起侧边栏",
+    "expandSidebar": "展开侧边栏",
+    "searchPlaceholder": "搜索房间或好友...",
+    "filterByType": "按类型筛选",
+    "showAll": "显示全部",
+    "showGroups": "显示群组",
+    "showDMs": "显示私聊"
   },
   "profile": {
     "title": "个人资料",
@@ -308,11 +326,14 @@
     }
   },
   "social": {
-    "title": "社交"
+    "title": "社交",
+    "subtitle": "管理你的好友和房间，从这里开始每一次对话"
   },
   "friends": {
     "title": "好友",
     "friends": "好友",
+    "rooms": "房间",
+    "requests": "请求",
     "received": "收到的请求",
     "sent": "已发送",
     "addFriend": "添加好友",
@@ -329,15 +350,28 @@
     "accepted": "已接受",
     "rejected": "已拒绝",
     "noFriends": "暂无好友",
+    "noRooms": "暂无房间",
     "noReceived": "暂无好友请求",
     "noSent": "暂无已发送的请求",
     "searchPlaceholder": "搜索用户名...",
     "searchNoResult": "未找到用户",
-    "requestSent": "好友请求已发送！"
+    "requestSent": "好友请求已发送！",
+    "online": "在线",
+    "away": "离开",
+    "busy": "忙碌",
+    "offline": "离线",
+    "chat": "聊天",
+    "enter": "进入",
+    "members": "人",
+    "commonRooms": "共同房间",
+    "messages": "消息",
+    "friendsSince": "成为好友"
   },
   "discover": {
     "title": "探索",
-    "subtitle": "探索社区，找到属于你的空间",
+    "findYour": "找到你的",
+    "nextBase": "下一个据点",
+    "subtitle": "搜房间、找朋友、看排行 —— 发现社区里正在发生的事情",
     "searchPlaceholder": "搜索房间...",
     "all": "全部",
     "popular": "热门",
@@ -345,11 +379,24 @@
     "gaming": "游戏",
     "music": "音乐",
     "art": "艺术",
+    "noResult": "未找到结果",
     "featured": "推荐",
     "trending": "趋势",
+    "trendingRooms": "热门房间",
+    "viewMore": "查看更多",
+    "recommendedUsers": "可能感兴趣的人",
+    "noRecommendedUsers": "暂时没有推荐用户，去搜索添加新朋友吧",
+    "recentActive": "最近活跃",
     "join": "加入",
     "view": "查看",
-    "noResult": "未找到结果"
+    "preview": "预览",
+    "sendMessage": "发消息",
+    "searchResults": "搜到",
+    "clearSearch": "清空搜索",
+    "users": "用户",
+    "onlineCount": "在线",
+    "members": "人",
+    "createPrivateFailed": "创建私聊失败"
   },
   "quick": {
     "notifications": "通知",

@@ -38,6 +38,10 @@ pub struct AppConfig {
     pub batch_message: BatchMessageConfig,
     #[serde(default)]
     pub mail: MailConfig,
+    #[serde(default)]
+    pub oauth: OAuthConfig,
+    #[serde(default)]
+    pub webhook: WebhookConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -263,6 +267,66 @@ impl Default for MailConfig {
     }
 }
 
+/// OAuth 2.0 配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct OAuthConfig {
+    /// OAuth JWT 签名密钥（独立于应用 JWT）
+    #[serde(default)]
+    pub jwt_secret: Option<String>,
+    /// access_token 有效期（秒），默认 3600
+    #[serde(default = "default_access_token_ttl")]
+    pub access_token_ttl: i64,
+    /// refresh_token 有效期（秒），默认 2592000 (30 天)
+    #[serde(default = "default_refresh_token_ttl")]
+    pub refresh_token_ttl: i64,
+    /// 授权码有效期（秒），默认 300 (5 分钟)
+    #[serde(default = "default_auth_code_ttl")]
+    pub authorization_code_ttl: i64,
+}
+
+fn default_access_token_ttl() -> i64 { 3600 }
+fn default_refresh_token_ttl() -> i64 { 2592000 }
+fn default_auth_code_ttl() -> i64 { 300 }
+
+impl Default for OAuthConfig {
+    fn default() -> Self {
+        Self {
+            jwt_secret: None,
+            access_token_ttl: 3600,
+            refresh_token_ttl: 2592000,
+            authorization_code_ttl: 300,
+        }
+    }
+}
+
+/// Webhook 配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebhookConfig {
+    /// 后台重试扫描间隔（秒），默认 30
+    #[serde(default = "default_retry_scan_interval")]
+    pub retry_scan_interval_secs: u64,
+    /// 默认 HTTP 超时（毫秒），默认 5000
+    #[serde(default = "default_webhook_timeout_ms")]
+    pub default_timeout_ms: u64,
+    /// 默认最大重试次数，默认 3
+    #[serde(default = "default_max_retries")]
+    pub default_max_retries: i32,
+}
+
+fn default_retry_scan_interval() -> u64 { 30 }
+fn default_webhook_timeout_ms() -> u64 { 5000 }
+fn default_max_retries() -> i32 { 3 }
+
+impl Default for WebhookConfig {
+    fn default() -> Self {
+        Self {
+            retry_scan_interval_secs: 30,
+            default_timeout_ms: 5000,
+            default_max_retries: 3,
+        }
+    }
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct SystemConfigRecord {
     pub key: String,
@@ -454,6 +518,8 @@ mod tests {
                 max_queue_size: 0,
             },
             mail: MailConfig::default(),
+            oauth: OAuthConfig::default(),
+            webhook: WebhookConfig::default(),
         };
         assert_eq!(config.mail.from_address, "");
         assert_eq!(config.mail.backend, MailBackend::Console);

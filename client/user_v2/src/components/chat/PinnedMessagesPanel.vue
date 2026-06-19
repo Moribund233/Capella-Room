@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessageStore } from '@/stores/message'
+import { Star } from '@element-plus/icons-vue'
 
 const { t } = useI18n()
 const messageStore = useMessageStore()
@@ -24,7 +25,7 @@ function getInitial(name: string): string {
 <template>
   <div v-if="pinned.length > 0" class="pinned-bar">
     <div class="pinned-bar__header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+      <el-icon :size="14"><Star /></el-icon>
       <span class="pinned-bar__count">{{ pinned.length }}</span>
     </div>
     <div class="pinned-bar__list">
@@ -46,7 +47,7 @@ function getInitial(name: string): string {
           :title="t('chat.unpinMessage')"
           @click.stop="handleUnpin(pin.message_id, pin.room_id)"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+          <el-icon :size="13"><Star /></el-icon>
         </button>
       </div>
     </div>

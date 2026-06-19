@@ -22,6 +22,7 @@ use crate::{
     utils::logging::{PerformanceTimer, StructuredLogger},
     websocket::protocol::{MissedMessage, ReplyToInfo, UserInfo, UserStatus, WebSocketMessage},
 };
+use crate::models::message::MessageType;
 
 /// 连接上下文
 /// 封装 WebSocket 连接的相关信息，便于传递和扩展
@@ -702,8 +703,9 @@ async fn handle_message(
             room_id,
             content,
             reply_to,
+            message_type,
         } => {
-            handle_chat_message(room_id, user_id, username, content, reply_to, state, tx).await?;
+            handle_chat_message(room_id, user_id, username, content, reply_to, message_type, state, tx).await?;
         }
 
         // 正在输入
@@ -801,6 +803,20 @@ async fn handle_message(
         // 取消订阅系统日志
         WebSocketMessage::UnsubscribeLogs => {
             handle_unsubscribe_logs(user_id, state, tx).await?;
+        }
+
+        // ========== 外部服务自定义事件 ==========
+        WebSocketMessage::CustomEvent {
+            event_name,
+            room_id,
+            data,
+            persistent,
+        } => {
+            handle_custom_event(user_id, &event_name, room_id, data, persistent, state, tx).await?;
+        }
+
+        WebSocketMessage::GetMissedCustomEvents { room_id, since } => {
+            handle_get_missed_custom_events(user_id, room_id, since, state, tx).await?;
         }
 
         // 其他消息类型
@@ -1106,6 +1122,16 @@ async fn do_join_room(
         let _ = tx.send(json).await;
     }
 
+    // Webhook: room.user_joined
+    let _ = state.webhook_service().dispatch_event(
+        "room.user_joined",
+        serde_json::json!({
+            "room_id": room_id,
+            "user_id": user_id,
+            "username": username,
+        }),
+    ).await;
+
     StructuredLogger::room_join(user_id, username, room_id);
 }
 
@@ -1146,6 +1172,16 @@ async fn handle_leave_room(
             .await;
     }
 
+    // Webhook: room.user_left
+    let _ = state.webhook_service().dispatch_event(
+        "room.user_left",
+        serde_json::json!({
+            "room_id": room_id,
+            "user_id": user_id,
+            "username": username,
+        }),
+    ).await;
+
     StructuredLogger::room_leave(user_id, username, room_id);
     Ok(())
 }
@@ -1158,6 +1194,7 @@ async fn handle_chat_message(
     username: &str,
     content: String,
     reply_to: Option<Uuid>,
+    message_type: Option<MessageType>,
     state: &Arc<AppState>,
     tx: &mpsc::Sender<String>,
 ) -> anyhow::Result<()> {
@@ -1202,12 +1239,13 @@ async fn handle_chat_message(
     let created_at = chrono::Utc::now();
 
     // 5. 将消息加入批量写入队列（异步，不阻塞）
+    let resolved_type = message_type.unwrap_or(MessageType::Text);
     let pending_message = PendingMessage {
         id: temp_message_id,
         room_id,
         sender_id: user_id,
         content: content.clone(),
-        message_type: crate::models::message::MessageType::Text,
+        message_type: resolved_type.clone(),
         reply_to,
         created_at,
     };
@@ -1246,6 +1284,7 @@ async fn handle_chat_message(
         sender_id: user_id,
         sender_name: username.to_string(),
         content: content.clone(),
+        message_type: resolved_type.clone(),
         reply_to,
         reply_to_message,
         created_at,
@@ -1312,6 +1351,17 @@ async fn handle_chat_message(
             &state_for_async,
         )
         .await;
+
+        // Webhook: message.created
+        let _ = state_for_async.webhook_service().dispatch_event(
+            "message.created",
+            serde_json::json!({
+                "message_id": temp_message_id,
+                "room_id": room_id,
+                "sender_id": user_id,
+                "content": content_for_mentions,
+            }),
+        ).await;
     });
 
     StructuredLogger::message_sent(
@@ -1552,6 +1602,16 @@ async fn handle_edit_message(
                     .await;
             }
 
+            // Webhook: message.edited
+            let _ = state.webhook_service().dispatch_event(
+                "message.edited",
+                serde_json::json!({
+                    "message_id": message_id,
+                    "room_id": room_id,
+                    "new_content": updated.content,
+                }),
+            ).await;
+
             info!(
                 "Message {} edited by user {} in room {}",
                 message_id, user_id, room_id
@@ -1615,6 +1675,15 @@ async fn handle_delete_message(
                     .broadcast_to_room_all(room_id, json)
                     .await;
             }
+
+            // Webhook: message.deleted
+            let _ = state.webhook_service().dispatch_event(
+                "message.deleted",
+                serde_json::json!({
+                    "message_id": message_id,
+                    "room_id": room_id,
+                }),
+            ).await;
 
             info!(
                 "Message {} deleted by user {} in room {}",
@@ -2135,6 +2204,98 @@ async fn handle_unpin_message(
                 let _ = tx.send(json).await;
             }
         }
+    }
+
+    Ok(())
+}
+
+// ========== 外部服务自定义事件处理 ==========
+
+async fn handle_custom_event(
+    user_id: Uuid,
+    event_name: &str,
+    room_id: Uuid,
+    data: serde_json::Value,
+    persistent: Option<bool>,
+    state: &Arc<AppState>,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    if !event_name.contains(':') {
+        let error_msg = WebSocketMessage::error("INVALID_EVENT_NAME", "Event name must contain ':' (namespace:event)");
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
+
+    let member = state.room_service().get_room_member(room_id, user_id).await?;
+    if member.is_none() {
+        let error_msg = WebSocketMessage::error("NOT_IN_ROOM", "You are not in this room");
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
+
+    let is_persistent = persistent.unwrap_or(false);
+    if is_persistent {
+        state.custom_event_service().store_event(
+            event_name, room_id, "self", &data,
+        ).await?;
+    }
+
+    let forward = WebSocketMessage::CustomEventForward {
+        event_name: event_name.to_string(),
+        room_id,
+        source_app: "self".to_string(),
+        data,
+        timestamp: chrono::Utc::now(),
+    };
+    if let Ok(json) = forward.to_json() {
+        state.ws_manager().broadcast_to_room_all(room_id, json).await;
+    }
+
+    Ok(())
+}
+
+async fn handle_get_missed_custom_events(
+    user_id: Uuid,
+    room_id: Uuid,
+    since: chrono::DateTime<chrono::Utc>,
+    state: &Arc<AppState>,
+    tx: &mpsc::Sender<String>,
+) -> anyhow::Result<()> {
+    let member = state.room_service().get_room_member(room_id, user_id).await?;
+    if member.is_none() {
+        let error_msg = WebSocketMessage::error("NOT_IN_ROOM", "You are not in this room");
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
+
+    let events = state.custom_event_service()
+        .get_missed_events(room_id, since, 51).await?;
+    let has_more = events.len() > 50;
+    let events = if has_more { events[..50].to_vec() } else { events };
+
+    let payloads: Vec<_> = events.into_iter().map(|e| {
+        crate::websocket::protocol::CustomEventForwardPayload {
+            id: e.id,
+            event_name: e.event_name,
+            source_app: e.source_app,
+            data: e.data,
+            timestamp: e.created_at,
+        }
+    }).collect();
+
+    let response = WebSocketMessage::MissedCustomEvents {
+        room_id,
+        events: payloads,
+        has_more,
+    };
+    if let Ok(json) = response.to_json() {
+        let _ = tx.send(json).await;
     }
 
     Ok(())

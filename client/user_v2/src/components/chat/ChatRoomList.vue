@@ -10,6 +10,7 @@ import { useMessageStore } from '@/stores/message'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useResponsive } from '@/composables/useResponsive'
 import { SidebarHeader, SidebarCategory, SidebarUserSection } from '@/components/sidebar'
+import { Refresh } from '@element-plus/icons-vue'
 import type { ChannelItemData } from '@/components/sidebar/SidebarChannelItem.vue'
 import type { Room } from '@/types/room'
 import type { DirectRoom } from '@/types/room'
@@ -26,35 +27,146 @@ const { isMobile, sidebarCollapsed } = useResponsive()
 const { rooms, currentRoom } = storeToRefs(roomStore)
 const { directRooms } = storeToRefs(directRoomStore)
 const searchQuery = ref('')
+const filterType = ref<'all' | 'groups' | 'dms'>('all')
+
+// Pull-to-refresh state
+const isRefreshing = ref(false)
+const pullDistance = ref(0)
+const isPulling = ref(false)
+const touchStartY = ref(0)
+const listRef = ref<HTMLElement | null>(null)
+const pullThreshold = 80
+
+function handleTouchStart(e: TouchEvent) {
+  if (!isMobile.value || isRefreshing.value) return
+  const list = listRef.value
+  if (!list || list.scrollTop > 0) return
+  
+  const touch = e.touches[0]
+  if (!touch) return
+  isPulling.value = true
+  touchStartY.value = touch.clientY
+  pullDistance.value = 0
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!isPulling.value || !isMobile.value || isRefreshing.value) return
+  
+  const touch = e.touches[0]
+  if (!touch) return
+  
+  const list = listRef.value
+  if (!list || list.scrollTop > 0) {
+    isPulling.value = false
+    pullDistance.value = 0
+    return
+  }
+  
+  const deltaY = touch.clientY - touchStartY.value
+  
+  // Only allow pulling down
+  if (deltaY > 0) {
+    pullDistance.value = Math.min(deltaY * 0.5, pullThreshold * 1.5)
+    e.preventDefault()
+  }
+}
+
+function handleTouchEnd() {
+  if (!isPulling.value || !isMobile.value) return
+  
+  if (pullDistance.value >= pullThreshold) {
+    refreshRooms()
+  }
+  
+  isPulling.value = false
+  pullDistance.value = 0
+}
+
+async function refreshRooms() {
+  if (isRefreshing.value) return
+  
+  isRefreshing.value = true
+  try {
+    await Promise.all([
+      roomStore.fetchMyRooms(),
+      directRoomStore.fetchDirectRooms(),
+    ])
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
 const filteredRooms = computed(() => {
-  if (!searchQuery.value.trim()) return rooms.value
-  const q = searchQuery.value.toLowerCase()
-  return rooms.value.filter((r) => r.name.toLowerCase().includes(q))
+  let result = rooms.value
+  
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter((r) => r.name.toLowerCase().includes(q))
+  }
+  
+  // Apply type filter
+  if (filterType.value === 'dms') {
+    return [] // Hide groups when filtering for DMs
+  }
+  
+  return result
 })
 
 const sortedRooms = computed(() => {
   const order = roomStore.roomOrder
-  if (order.length === 0) return filteredRooms.value
-  const map = new Map(filteredRooms.value.map((r) => [r.id, r]))
-  const sorted: Room[] = []
-  for (const id of order) {
-    const room = map.get(id)
-    if (room) {
-      sorted.push(room)
-      map.delete(id)
+  let filtered = filteredRooms.value
+
+  // 如果有自定义排序，使用自定义排序
+  if (order.length > 0) {
+    const map = new Map(filtered.map((r) => [r.id, r]))
+    const sorted: Room[] = []
+    for (const id of order) {
+      const room = map.get(id)
+      if (room) {
+        sorted.push(room)
+        map.delete(id)
+      }
     }
+    for (const room of map.values()) sorted.push(room)
+    return sorted
   }
-  for (const room of map.values()) sorted.push(room)
-  return sorted
+
+  // 否则使用默认排序：未读优先 → 私有房间排后 → 最后更新时间
+  return [...filtered].sort((a, b) => {
+    // 未读消息优先
+    const aUnread = a.unread_count || 0
+    const bUnread = b.unread_count || 0
+    if (aUnread > 0 && bUnread === 0) return -1
+    if (aUnread === 0 && bUnread > 0) return 1
+
+    // 私有房间排后面
+    if (a.is_private !== b.is_private) {
+      return a.is_private ? 1 : -1
+    }
+
+    // 最后更新时间
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  })
 })
 
 const filteredDirectRooms = computed(() => {
-  if (!searchQuery.value.trim()) return directRooms.value
-  const q = searchQuery.value.toLowerCase()
-  return directRooms.value.filter((r) =>
-    r.target_user.username.toLowerCase().includes(q),
-  )
+  let result = directRooms.value
+  
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter((r) =>
+      r.target_user.username.toLowerCase().includes(q),
+    )
+  }
+  
+  // Apply type filter
+  if (filterType.value === 'groups') {
+    return [] // Hide DMs when filtering for groups
+  }
+  
+  return result
 })
 
 const channelItems = computed<ChannelItemData[]>(() =>
@@ -65,19 +177,36 @@ const channelItems = computed<ChannelItemData[]>(() =>
     unreadCount: currentRoom.value?.id === r.id ? 0 : (r.unread_count || 0),
     isActive: currentRoom.value?.id === r.id,
     isPrivate: r.is_private,
+    lastMessage: r.last_message?.content,
+    memberCount: r.member_count,
   })),
 )
 
-const dmItems = computed<ChannelItemData[]>(() =>
-  filteredDirectRooms.value.map((r) => ({
-    id: r.id,
-    name: r.target_user.username,
-    type: 'dm' as const,
-    unreadCount: currentRoom.value?.id === r.id ? 0 : (r.unread_count || 0),
-    isActive: currentRoom.value?.id === r.id,
-    userStatus: 'offline',
-  })),
-)
+const dmItems = computed<ChannelItemData[]>(() => {
+  let filtered = filteredDirectRooms.value
+
+  // 排序：未读优先 → 最后更新时间
+  return [...filtered]
+    .sort((a, b) => {
+      // 未读消息优先
+      const aUnread = a.unread_count || 0
+      const bUnread = b.unread_count || 0
+      if (aUnread > 0 && bUnread === 0) return -1
+      if (aUnread === 0 && bUnread > 0) return 1
+
+      // 最后更新时间
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+    .map((r) => ({
+      id: r.id,
+      name: r.target_user.username,
+      type: 'dm' as const,
+      unreadCount: currentRoom.value?.id === r.id ? 0 : (r.unread_count || 0),
+      isActive: currentRoom.value?.id === r.id,
+      userStatus: 'offline',
+      lastMessage: r.last_message?.content,
+    }))
+})
 
 function selectRoom(room: Room) {
   if (currentRoom.value?.id === room.id) return
@@ -105,6 +234,7 @@ function selectDirectRoom(dm: DirectRoom) {
     is_private: true,
     max_members: 2,
     member_count: 2,
+    room_type: 'direct',
     created_at: dm.created_at,
     updated_at: dm.created_at,
     unread_count: dm.unread_count,
@@ -161,6 +291,8 @@ onMounted(() => {
   <aside class="room-sidebar">
     <SidebarHeader
       v-model="searchQuery"
+      :filter="filterType"
+      @update:filter="filterType = $event"
     />
 
     <SidebarUserSection
@@ -170,7 +302,27 @@ onMounted(() => {
       @logout="handleLogout"
     />
 
-    <div class="room-sidebar__list">
+    <div 
+      ref="listRef"
+      class="room-sidebar__list"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
+      <!-- Pull-to-refresh indicator -->
+      <div 
+        v-if="isMobile && (isRefreshing || pullDistance > 0)"
+        class="room-sidebar__refresh"
+        :style="{ height: `${isRefreshing ? 50 : pullDistance}px` }"
+      >
+        <div 
+          class="room-sidebar__refresh-spinner"
+          :class="{ 'room-sidebar__refresh-spinner--active': isRefreshing }"
+        >
+          <el-icon :size="20"><Refresh /></el-icon>
+        </div>
+      </div>
+
       <SidebarCategory
         v-if="channelItems.length > 0 || roomStore.loading"
         :name="t('chat.channels')"
@@ -222,6 +374,23 @@ onMounted(() => {
     padding: 4px 4px 8px;
   }
 
+  &__refresh {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: height 0.2s ease;
+  }
+
+  &__refresh-spinner {
+    color: var(--accent);
+    transition: transform 0.2s ease;
+
+    &--active {
+      animation: spin 1s linear infinite;
+    }
+  }
+
   &__loading {
     padding: 8px;
   }
@@ -232,6 +401,15 @@ onMounted(() => {
 
   &__empty {
     padding: 24px 8px;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 

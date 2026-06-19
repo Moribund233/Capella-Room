@@ -7,6 +7,7 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import { useMessageActions } from '@/composables/useMessageActions'
 import { useResponsive } from '@/composables/useResponsive'
 import { useBrowserNotification } from '@/composables/useBrowserNotification'
+import { useSwipeGesture } from '@/composables/useSwipeGesture'
 import {
   ChatRoomList,
   ChatHeader,
@@ -51,6 +52,21 @@ const chatMessageListRef = ref<InstanceType<typeof ChatMessageListComponent> | n
 
 // WebSocket 订阅
 const ws = useWebSocket()
+
+// 移动端滑动手势
+const mainContentRef = ref<HTMLElement | null>(null)
+useSwipeGesture(mainContentRef, {
+  onSwipeRight: () => {
+    if (isMobile.value && sidebarCollapsed.value) {
+      sidebarCollapsed.value = false
+    }
+  },
+  onSwipeLeft: () => {
+    if (isMobile.value && !sidebarCollapsed.value) {
+      sidebarCollapsed.value = true
+    }
+  },
+})
 
 onMounted(() => {
   // 移动端默认收起侧边栏
@@ -153,9 +169,9 @@ watch(currentRoom, (room) => {
 })
 
 // 发送消息
-function handleSend(content: string) {
+function handleSend(content: string, messageType?: string) {
   if (!currentRoom.value) return
-  messageActions.sendMessage(content)
+  messageActions.sendMessage(content, messageType)
 }
 
 // 开始回复
@@ -233,7 +249,7 @@ function handleJumpToSearch(msgId: string) {
     </transition>
 
     <!-- 主聊天区 -->
-    <div class="app-view__main">
+    <div ref="mainContentRef" class="app-view__main">
       <template v-if="hasRoom && currentRoom">
         <!-- 聊天头部 -->
         <ChatHeader
@@ -376,17 +392,18 @@ function handleJumpToSearch(msgId: string) {
 
 .slide-left-enter-active,
 .slide-left-leave-active {
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
 }
 
 .slide-left-enter-from,
 .slide-left-leave-to {
   transform: translateX(-100%);
+  opacity: 0;
 }
 
 .slide-right-enter-active,
 .slide-right-leave-active {
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-right-enter-from,

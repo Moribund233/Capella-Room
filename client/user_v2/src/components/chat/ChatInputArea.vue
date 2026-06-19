@@ -5,7 +5,7 @@ import { useWebSocketStore } from '@/stores/websocket'
 import { uploadApi } from '@/api/upload'
 import { ElMessage } from 'element-plus'
 import type { ReplyToMessage } from '@/types/message'
-import { Close, UploadFilled, Promotion, Loading } from '@element-plus/icons-vue'
+import { Close, UploadFilled, Promotion, Loading, Comment, Picture } from '@element-plus/icons-vue'
 import EmojiPicker from './EmojiPicker.vue'
 import GifPicker from './GifPicker.vue'
 const { t } = useI18n()
@@ -18,7 +18,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  send: [content: string]
+  send: [content: string, messageType?: string]
   cancelReply: []
   cancelEdit: []
 }>()
@@ -165,7 +165,7 @@ async function handleFileSelected(event: Event) {
       ? await uploadApi.uploadImage(file, 'message')
       : await uploadApi.uploadFile(file, 'message')
     if (res.success && res.data) {
-      emit('send', res.data.url)
+      emit('send', res.data.url, isImage ? 'image' : 'file')
     } else {
       ElMessage.error(res.message || t('common.error'))
     }
@@ -228,13 +228,8 @@ onUnmounted(() => {
           <el-icon :size="20"><UploadFilled /></el-icon>
         </button>
         <div class="emoji-btn-wrapper">
-          <button :title="t('chat.emoji')" @click="toggleEmojiPicker">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-              <line x1="9" y1="9" x2="9.01" y2="9"/>
-              <line x1="15" y1="9" x2="15.01" y2="9"/>
-            </svg>
+          <button :title="t('chat.emoji')" @click.stop="toggleEmojiPicker">
+            <el-icon :size="20"><Comment /></el-icon>
           </button>
           <EmojiPicker
             :visible="showEmojiPicker"
@@ -258,11 +253,8 @@ onUnmounted(() => {
 
       <div class="input-tools">
         <div class="gif-btn-wrapper">
-          <button :title="t('chat.gif')" @click="toggleGifPicker">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <path d="M9 12h6"/>
-            </svg>
+          <button :title="t('chat.gif')" @click.stop="toggleGifPicker">
+            <el-icon :size="20"><Picture /></el-icon>
           </button>
           <GifPicker
             :visible="showGifPicker"
@@ -386,10 +378,11 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 4px 8px;
-  transition: border-color 0.15s;
+  transition: border-color 0.25s, box-shadow 0.25s;
 
   &--focused {
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 12px rgba(124, 92, 252, 0.15);
   }
 
   textarea {

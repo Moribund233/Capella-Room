@@ -141,6 +141,8 @@ mod config_tests {
             redis: Default::default(),
             batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
             mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
         };
 
         let cloned = config.clone();
@@ -186,6 +188,8 @@ mod config_tests {
             redis: Default::default(),
             batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
             mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
         };
 
         let debug_str = format!("{:?}", config);
@@ -426,6 +430,8 @@ mod integration_tests {
             redis: Default::default(),
             batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
             mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
         };
 
         assert_eq!(config.server.port, 3000);
@@ -495,6 +501,8 @@ mod acceptance_tests {
             redis: Default::default(),
             batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
             mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
         };
 
         // 验证所有配置字段可访问

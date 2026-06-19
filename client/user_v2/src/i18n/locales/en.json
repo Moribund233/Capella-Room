@@ -150,10 +150,28 @@
     "owner": "owner",
     "admin": "admin",
     "logout": "Logout",
+    "searchRooms": "Search rooms",
+    "filterAll": "All",
+    "filterGroups": "Groups",
+    "filterDMs": "DMs",
+    "noResults": "No results",
+    "unreadMessages": "Unread messages",
+    "mentionMessages": "Mention messages",
     "welcome": {
       "title": "Welcome to CapellaRoom",
       "description": "Select a channel from the sidebar to start chatting"
     }
+  },
+  "sidebar": {
+    "dragToReorder": "Drag to reorder",
+    "closeRoom": "Close room",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "searchPlaceholder": "Search rooms or friends...",
+    "filterByType": "Filter by type",
+    "showAll": "Show all",
+    "showGroups": "Show groups",
+    "showDMs": "Show DMs"
   },
   "profile": {
     "title": "Profile",
@@ -309,11 +327,14 @@
     }
   },
   "social": {
-    "title": "Social"
+    "title": "Social",
+    "subtitle": "Manage your friends and rooms, start every conversation from here"
   },
   "friends": {
     "title": "Friends",
     "friends": "Friends",
+    "rooms": "Rooms",
+    "requests": "Requests",
     "received": "Received",
     "sent": "Sent",
     "addFriend": "Add Friend",
@@ -330,15 +351,28 @@
     "accepted": "Accepted",
     "rejected": "Rejected",
     "noFriends": "No friends yet",
+    "noRooms": "No rooms yet",
     "noReceived": "No pending requests",
     "noSent": "No sent requests",
     "searchPlaceholder": "Search username...",
     "searchNoResult": "No users found",
-    "requestSent": "Friend request sent!"
+    "requestSent": "Friend request sent!",
+    "online": "Online",
+    "away": "Away",
+    "busy": "Busy",
+    "offline": "Offline",
+    "chat": "Chat",
+    "enter": "Enter",
+    "members": "members",
+    "commonRooms": "Common rooms",
+    "messages": "Messages",
+    "friendsSince": "Friends since"
   },
   "discover": {
     "title": "Explore",
-    "subtitle": "Explore communities and find your space",
+    "findYour": "Find Your",
+    "nextBase": "Next Base",
+    "subtitle": "Search rooms, find friends, see rankings — discover what's happening in the community",
     "searchPlaceholder": "Search rooms...",
     "all": "All",
     "popular": "Popular",
@@ -349,8 +383,21 @@
     "noResult": "No results found",
     "featured": "Featured",
     "trending": "Trending",
+    "trendingRooms": "Trending Rooms",
+    "viewMore": "View More",
+    "recommendedUsers": "People you may know",
+    "noRecommendedUsers": "No recommendations yet, try searching to add new friends",
+    "recentActive": "Recently Active",
     "join": "Join",
-    "view": "View"
+    "view": "View",
+    "preview": "Preview",
+    "sendMessage": "Send Message",
+    "searchResults": "Found",
+    "clearSearch": "Clear Search",
+    "users": "Users",
+    "onlineCount": "online",
+    "members": "members",
+    "createPrivateFailed": "Failed to create private chat"
   },
   "quick": {
     "notifications": "Notifications",

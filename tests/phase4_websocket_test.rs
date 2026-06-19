@@ -186,6 +186,8 @@ async fn setup_test_server() -> (TestServer, Database) {
         redis: Default::default(),
         batch_message: BatchMessageConfig { batch_size: 50, flush_interval_ms: 5000, max_queue_size: 1000 },
         mail: Default::default(),
+        oauth: Default::default(),
+        webhook: Default::default(),
     };
 
     let metrics_collector = Arc::new(MetricsCollector::new());

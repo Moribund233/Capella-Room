@@ -28,6 +28,7 @@ export interface ChatMessagePayload {
   room_id: string
   content: string
   reply_to?: string | null
+  message_type?: string
 }
 
 /** 加入房间 */
@@ -157,6 +158,7 @@ export interface NewMessagePayload {
   sender_id: string
   sender_name: string
   content: string
+  message_type: string
   reply_to: string | null
   reply_to_message: ReplyToMessage | null
   created_at: string

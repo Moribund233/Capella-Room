@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Message, ArrowLeft } from '@element-plus/icons-vue'
+import { Globe, CodeSquare } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -211,20 +212,11 @@ function switchTab(tab: 'login' | 'register') {
 
         <div class="social-row">
           <el-button size="large" class="social-btn" disabled>
-            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2"/>
-              <path d="M22 5l-10 7L2 5"/>
-            </svg>
+            <el-icon class="social-icon"><Globe /></el-icon>
             {{ t('auth.google') }}
           </el-button>
           <el-button size="large" class="social-btn" disabled>
-            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 8a6 6 0 016-6v6a6 6 0 01-6 6"/>
-              <path d="M2 16a6 6 0 016-6v6a6 6 0 01-6 6"/>
-              <circle cx="8" cy="8" r="2"/>
-              <circle cx="8" cy="16" r="2"/>
-              <circle cx="16" cy="8" r="2"/>
-            </svg>
+            <el-icon class="social-icon"><CodeSquare /></el-icon>
             {{ t('auth.github') }}
           </el-button>
         </div>

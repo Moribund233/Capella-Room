@@ -117,6 +117,24 @@ async fn main() -> Result<()> {
         }
     });
 
+    // 启动 Webhook 重试任务
+    let webhook_service = state.webhook_service().clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            match webhook_service.retry_failed_deliveries().await {
+                Ok(count) if count > 0 => {
+                    tracing::info!("Retried {} failed webhook deliveries", count);
+                }
+                Err(e) => {
+                    tracing::warn!("Webhook retry task error: {}", e);
+                }
+                _ => {}
+            }
+        }
+    });
+
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

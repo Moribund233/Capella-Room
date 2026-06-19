@@ -150,10 +150,28 @@
     "owner": "所有者",
     "admin": "管理者",
     "logout": "ログアウト",
+    "searchRooms": "ルームを検索",
+    "filterAll": "すべて",
+    "filterGroups": "グループ",
+    "filterDMs": "DM",
+    "noResults": "結果なし",
+    "unreadMessages": "未読メッセージ",
+    "mentionMessages": "メンションメッセージ",
     "welcome": {
       "title": "CapellaRoom へようこそ",
       "description": "サイドバーからチャンネルを選択して会話を始めましょう"
     }
+  },
+  "sidebar": {
+    "dragToReorder": "ドラッグして並べ替え",
+    "closeRoom": "ルームを閉じる",
+    "collapseSidebar": "サイドバーを折りたたむ",
+    "expandSidebar": "サイドバーを展開",
+    "searchPlaceholder": "ルームまたは友達を検索...",
+    "filterByType": "タイプでフィルター",
+    "showAll": "すべて表示",
+    "showGroups": "グループを表示",
+    "showDMs": "DMを表示"
   },
   "profile": {
     "title": "プロフィール",
@@ -309,11 +327,14 @@
     }
   },
   "social": {
-    "title": "ソーシャル"
+    "title": "ソーシャル",
+    "subtitle": "友達とルームを管理し、ここからすべての会話を始めましょう"
   },
   "friends": {
     "title": "友達",
     "friends": "友達",
+    "rooms": "ルーム",
+    "requests": "リクエスト",
     "received": "受信したリクエスト",
     "sent": "送信済み",
     "addFriend": "友達を追加",
@@ -330,15 +351,28 @@
     "accepted": "承認済み",
     "rejected": "拒否済み",
     "noFriends": "友達がいません",
+    "noRooms": "ルームがありません",
     "noReceived": "リクエストはありません",
     "noSent": "送信済みリクエストはありません",
     "searchPlaceholder": "ユーザー名で検索...",
     "searchNoResult": "ユーザーが見つかりません",
-    "requestSent": "友達リクエストを送信しました！"
+    "requestSent": "友達リクエストを送信しました！",
+    "online": "オンライン",
+    "away": "離席中",
+    "busy": "取り込み中",
+    "offline": "オフライン",
+    "chat": "チャット",
+    "enter": "入る",
+    "members": "メンバー",
+    "commonRooms": "共通ルーム",
+    "messages": "メッセージ",
+    "friendsSince": "友達になった"
   },
   "discover": {
     "title": "探検",
-    "subtitle": "コミュニティを探索して、あなたの空間を見つけよう",
+    "findYour": "見つけよう",
+    "nextBase": "次の拠点",
+    "subtitle": "ルームを検索し、友達を見つけ、ランキングをチェック — コミュニティで起きていることを発見しよう",
     "searchPlaceholder": "ルームを検索...",
     "all": "すべて",
     "popular": "人気",
@@ -349,8 +383,21 @@
     "noResult": "結果が見つかりません",
     "featured": "おすすめ",
     "trending": "トレンド",
+    "trendingRooms": "トレンドルーム",
+    "viewMore": "もっと見る",
+    "recommendedUsers": "知り合いかもしれない人",
+    "noRecommendedUsers": "おすすめはまだありません。検索して新しい友達を追加しましょう",
+    "recentActive": "最近アクティブ",
     "join": "参加",
-    "view": "表示"
+    "view": "表示",
+    "preview": "プレビュー",
+    "sendMessage": "メッセージを送る",
+    "searchResults": "検索結果",
+    "clearSearch": "検索をクリア",
+    "users": "ユーザー",
+    "onlineCount": "オンライン",
+    "members": "メンバー",
+    "createPrivateFailed": "プライベートチャットの作成に失敗しました"
   },
   "quick": {
     "notifications": "通知",

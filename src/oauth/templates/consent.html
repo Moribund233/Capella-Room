@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授权请求 - CapellaRoom</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1d23; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { background: #252830; border-radius: 12px; padding: 40px; width: 100%; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .app-icon { width: 48px; height: 48px; background: #5865f2; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .app-info h1 { font-size: 18px; font-weight: 600; color: #fff; }
+        .app-info p { font-size: 13px; color: #b5bac1; }
+        .divider { height: 1px; background: #3f4147; margin: 24px 0; }
+        .scope-title { font-size: 13px; font-weight: 600; color: #b5bac1; margin-bottom: 12px; text-transform: uppercase; }
+        .scope-list { list-style: none; margin-bottom: 24px; }
+        .scope-list li { padding: 10px 16px; background: #1e2124; border: 1px solid #3f4147; border-radius: 8px; margin-bottom: 8px; font-size: 14px; color: #e0e0e0; display: flex; align-items: center; gap: 10px; }
+        .scope-icon { width: 20px; text-align: center; font-size: 14px; }
+        .user-info { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding: 12px 16px; background: #1e2124; border-radius: 8px; }
+        .user-avatar { width: 32px; height: 32px; background: #3f4147; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #b5bac1; }
+        .user-name { font-size: 14px; color: #fff; }
+        .actions { display: flex; gap: 12px; }
+        .btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn-approve { background: #3ba55d; color: #fff; }
+        .btn-approve:hover { background: #2d7d46; }
+        .btn-deny { background: #3f4147; color: #b5bac1; }
+        .btn-deny:hover { background: #4f5159; }
+        .scope-desc { font-size: 12px; color: #8e9297; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <div class="app-icon">{{app_name_short}}</div>
+            <div class="app-info">
+                <h1>{{app_name}}</h1>
+                <p>请求访问你的账号</p>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <p class="scope-title">应用将获得以下权限</p>
+        <ul class="scope-list">
+            <li><span class="scope-icon">&#128100;</span> 查看你的用户信息</li>
+            <li><span class="scope-icon">&#128196;</span> 读取消息历史</li>
+            <li><span class="scope-icon">&#128276;</span> 接收通知</li>
+        </ul>
+
+        <div class="user-info">
+            <div class="user-avatar">{{username}}</div>
+            <span class="user-name">{{username}}</span>
+        </div>
+
+        <form method="POST" action="/oauth/authorize/consent">
+            <input type="hidden" name="auth_session_token" value="{{auth_session_token}}">
+            <input type="hidden" name="client_id" value="{{client_id}}">
+            <input type="hidden" name="redirect_uri" value="{{redirect_uri}}">
+            <input type="hidden" name="state" value="{{state}}">
+            <input type="hidden" name="scope" value="{{scope}}">
+            <input type="hidden" name="response_type" value="{{response_type}}">
+
+            <div class="actions">
+                <button type="submit" name="approve" value="false" class="btn btn-deny">拒绝</button>
+                <button type="submit" name="approve" value="true" class="btn btn-approve">授权</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

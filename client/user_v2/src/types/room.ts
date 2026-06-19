@@ -12,6 +12,7 @@ export interface Room {
   is_private: boolean
   max_members: number
   member_count: number
+  room_type: 'group' | 'direct'
   created_at: string
   updated_at: string
   unread_count?: number

@@ -9,6 +9,7 @@ pub mod error;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
+pub mod oauth;
 pub mod redis;
 pub mod routes;
 pub mod services;

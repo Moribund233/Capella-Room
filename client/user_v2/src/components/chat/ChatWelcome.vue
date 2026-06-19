@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
 import { useDirectRoomStore } from '@/stores/directRoom'
+import { Lock, ChatRound } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
 const roomStore = useRoomStore()
@@ -43,7 +44,7 @@ const activeRooms = computed(() => {
 interface RecentItem {
   id: string
   name: string
-  prefix: string
+  prefix: Component
   unreadCount: number
   lastContent: string
   lastSender: string
@@ -55,7 +56,7 @@ const recentItems = computed<RecentItem[]>(() => {
     ...rooms.value.map(r => ({
       id: r.id,
       name: r.name,
-      prefix: r.is_private ? '🔒' : '#',
+      prefix: r.is_private ? Lock : ChatRound,
       unreadCount: r.unread_count || 0,
       lastContent: r.last_message?.content ?? '',
       lastSender: r.last_message?.sender_name ?? '',
@@ -64,7 +65,7 @@ const recentItems = computed<RecentItem[]>(() => {
     ...directRooms.value.map(r => ({
       id: r.id,
       name: r.target_user.username,
-      prefix: '💬',
+      prefix: ChatRound,
       unreadCount: r.unread_count || 0,
       lastContent: r.last_message?.content ?? '',
       lastSender: r.last_message?.sender_name ?? '',
@@ -126,7 +127,7 @@ function formatTime(dateStr: string): string {
             class="recent-item"
           >
             <div class="recent-item__top">
-              <span class="recent-item__prefix">{{ item.prefix }}</span>
+              <el-icon class="recent-item__prefix"><component :is="item.prefix" /></el-icon>
               <span class="recent-item__name">{{ item.name }}</span>
               <span v-if="item.unreadCount > 0" class="recent-item__badge">
                 {{ item.unreadCount > 99 ? '99+' : item.unreadCount }}
@@ -267,8 +268,9 @@ function formatTime(dateStr: string): string {
   }
 
   &__prefix {
-    font-size: 15px;
+    font-size: 14px;
     flex-shrink: 0;
+    color: var(--muted);
   }
 
   &__name {

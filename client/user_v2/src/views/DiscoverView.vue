@@ -10,6 +10,8 @@ import { userApi } from '@/api/user'
 import type { Room } from '@/types/room'
 import type { UserSearchItem } from '@/types/search'
 import type { UserInfo } from '@/types/user'
+import { getAvatarGradient, getAvatarShadow } from '@/utils/avatar'
+import { Search, User, UserFilled, Clock, Grid, TrendCharts } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -127,67 +129,27 @@ async function handleChat(userId: string) {
     await roomStore.joinRoom(res.data.id)
     router.push('/app')
   } else {
-    ElMessage.error('创建私聊失败')
+    ElMessage.error(t('discover.createPrivateFailed'))
   }
 }
 
 function formatOnline(room: Room): string {
   const count = getRoomCount(room)
-  if (count >= 1000) return `${Math.floor(count / 1000)}k 在线`
-  return `${count} 在线`
+  if (count >= 1000) return `${Math.floor(count / 1000)}k ${t('discover.onlineCount')}`
+  return `${count} ${t('discover.onlineCount')}`
 }
 
-function hashStr(s: string): number {
-  let h = 0
-  for (let i = 0; i < s.length; i++) {
-    h = (h * 31 + s.charCodeAt(i)) | 0
-  }
-  return Math.abs(h)
+// 使用统一的渐变工具函数
+function getRoomGradientLocal(name: string) {
+  return { background: getAvatarGradient(name) }
 }
 
-const roomGradients = [
-  'linear-gradient(135deg, var(--accent), var(--accent-blue))',
-  'linear-gradient(135deg, var(--accent-pink), var(--accent-orange))',
-  'linear-gradient(135deg, var(--accent-green), var(--accent-blue))',
-  'linear-gradient(135deg, var(--accent-orange), var(--accent-pink))',
-  'linear-gradient(135deg, var(--accent-blue), var(--accent-green))',
-  'linear-gradient(135deg, var(--accent), var(--accent-pink))',
-  'linear-gradient(135deg, var(--accent-pink), var(--accent))',
-  'linear-gradient(135deg, var(--accent-green), var(--accent-orange))',
-]
-
-const bannerGradients = [
-  'linear-gradient(135deg, var(--accent) 0%, var(--accent-blue) 100%)',
-  'linear-gradient(135deg, var(--accent-pink) 0%, var(--accent) 100%)',
-  'linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-pink) 100%)',
-  'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-green) 100%)',
-  'linear-gradient(135deg, var(--accent-green) 0%, var(--accent-blue) 100%)',
-  'linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-orange) 100%)',
-  'linear-gradient(135deg, var(--accent) 0%, var(--accent-orange) 100%)',
-  'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-pink) 100%)',
-]
-
-const userGradients = [
-  'linear-gradient(135deg, var(--accent-pink), var(--accent))',
-  'linear-gradient(135deg, var(--accent-blue), var(--accent-pink))',
-  'linear-gradient(135deg, var(--accent-orange), var(--accent-blue))',
-  'linear-gradient(135deg, var(--accent-green), var(--accent-orange))',
-  'linear-gradient(135deg, var(--accent), var(--accent-green))',
-  'linear-gradient(135deg, var(--accent-pink), var(--accent-orange))',
-  'linear-gradient(135deg, var(--accent-blue), var(--accent))',
-  'linear-gradient(135deg, var(--accent-orange), var(--accent-green))',
-]
-
-function getRoomGradient(name: string) {
-  return { background: roomGradients[hashStr(name) % roomGradients.length] }
+function getBannerGradientLocal(name: string) {
+  return { background: getAvatarGradient(name + '_banner') }
 }
 
-function getBannerGradient(name: string) {
-  return { background: bannerGradients[hashStr(name + '_banner') % bannerGradients.length] }
-}
-
-function getUserGradient(name: string) {
-  return { background: userGradients[hashStr(name) % userGradients.length] }
+function getUserGradientLocal(name: string) {
+  return { background: getAvatarGradient(name + '_user') }
 }
 
 onMounted(async () => {
@@ -218,11 +180,11 @@ async function loadRecommendedUsers() {
       <!-- masthead -->
       <div class="masthead">
         <div class="masthead-eyebrow">{{ t('discover.title') }}</div>
-        <h1>找到你的<br /><span class="grad">下一个据点</span></h1>
-        <p>搜房间、找朋友、看排行 —— 发现社区里正在发生的事情</p>
+        <h1>{{ t('discover.findYour') }}<br /><span class="grad">{{ t('discover.nextBase') }}</span></h1>
+        <p>{{ t('discover.subtitle') }}</p>
 
         <div class="search-box">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <el-icon :size="20"><Search /></el-icon>
           <input
             v-model="searchQuery"
             type="text"
@@ -237,10 +199,10 @@ async function loadRecommendedUsers() {
         <div class="content-section">
           <div class="section-header">
             <h2 class="section-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              搜到 "{{ searchQuery }}"
+              <el-icon :size="18"><Search /></el-icon>
+              {{ t('discover.searchResults') }} "{{ searchQuery }}"
             </h2>
-            <span class="section-action" @click="clearSearch">清空搜索</span>
+            <span class="section-action" @click="clearSearch">{{ t('discover.clearSearch') }}</span>
           </div>
 
           <div v-if="searching" class="list-placeholder">{{ t('common.loading') }}</div>
@@ -251,8 +213,8 @@ async function loadRecommendedUsers() {
                 :key="room.id"
                 class="hero-card"
               >
-                <div class="hero-card-banner" :style="getBannerGradient(room.name)">
-                  <div class="hero-card-icon" :style="getRoomGradient(room.name)">{{ getInitial(room.name) }}</div>
+                <div class="hero-card-banner" :style="getBannerGradientLocal(room.name)">
+                  <div class="hero-card-icon" :style="getRoomGradientLocal(room.name)">{{ getInitial(room.name) }}</div>
                 </div>
                 <div class="hero-card-body">
                   <h3 class="hero-card-name">{{ room.name }}</h3>
@@ -261,30 +223,30 @@ async function loadRecommendedUsers() {
                 <hr class="glow-divider" />
                 <div class="hero-card-footer">
                   <div class="hero-card-stats">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    <el-icon :size="14"><User /></el-icon>
                     {{ getRoomCount(room) }}
                   </div>
-                  <span class="btn btn-primary btn-xs" @click="handleJoinRoom(room.id)">加入</span>
+                  <span class="btn btn-primary btn-xs" @click="handleJoinRoom(room.id)">{{ t('discover.join') }}</span>
                 </div>
               </div>
             </div>
 
             <div v-if="searchResultsUsers.length > 0" class="search-users-section">
-              <h3 class="search-group-title">用户</h3>
+              <h3 class="search-group-title">{{ t('discover.users') }}</h3>
               <div class="card-list">
                 <div
                   v-for="user in searchResultsUsers"
                   :key="user.id"
                   class="search-user-row"
                 >
-                  <div class="search-user-avatar" :style="getUserGradient(user.username)">{{ getInitial(user.username) }}</div>
+                  <div class="search-user-avatar" :style="getUserGradientLocal(user.username)">{{ getInitial(user.username) }}</div>
                   <span class="search-user-name">{{ user.username }}</span>
                 </div>
               </div>
             </div>
 
             <div v-if="!searching && searchResultsRooms.length === 0 && searchResultsUsers.length === 0" class="empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <el-icon :size="40"><Search /></el-icon>
               <p>{{ t('discover.noResult') }}</p>
             </div>
           </template>
@@ -297,15 +259,15 @@ async function loadRecommendedUsers() {
         <div class="content-section">
           <div class="section-header">
             <h2 class="section-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              热门房间
+              <el-icon :size="18"><TrendCharts /></el-icon>
+              {{ t('discover.trendingRooms') }}
             </h2>
-            <span class="section-action">查看更多 →</span>
+            <span class="section-action">{{ t('discover.viewMore') }} →</span>
           </div>
 
           <div v-if="loadingFeatured" class="list-placeholder">{{ t('common.loading') }}</div>
           <div v-else-if="featuredRooms.length === 0" class="empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <el-icon :size="40"><Grid /></el-icon>
             <p>{{ t('chat.noRooms') }}</p>
           </div>
           <div v-else class="trending-stack">
@@ -315,15 +277,15 @@ async function loadRecommendedUsers() {
               class="trending-card"
             >
               <span class="trending-rank" :class="`r${idx + 1}`">{{ idx + 1 }}</span>
-              <div class="trending-icon" :style="getRoomGradient(room.name)">{{ getInitial(room.name) }}</div>
+              <div class="trending-icon" :style="getRoomGradientLocal(room.name)">{{ getInitial(room.name) }}</div>
               <div class="trending-body">
                 <div class="trending-name">{{ room.name }}</div>
                 <div class="trending-online">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <el-icon :size="12"><Clock /></el-icon>
                   {{ formatOnline(room) }}
                 </div>
               </div>
-              <span class="btn btn-primary btn-xs" @click="handleJoinRoom(room.id)">加入</span>
+              <span class="btn btn-primary btn-xs" @click="handleJoinRoom(room.id)">{{ t('discover.join') }}</span>
             </div>
           </div>
         </div>
@@ -332,15 +294,15 @@ async function loadRecommendedUsers() {
         <div class="content-section">
           <div class="section-header">
             <h2 class="section-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              可能感兴趣的人
+              <el-icon :size="18"><UserFilled /></el-icon>
+              {{ t('discover.recommendedUsers') }}
             </h2>
           </div>
 
           <div v-if="loadingRecommended" class="list-placeholder">{{ t('common.loading') }}</div>
           <div v-else-if="recommendedUsers.length === 0" class="empty" style="padding: 28px 16px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <p>暂时没有推荐用户，去搜索添加新朋友吧</p>
+            <el-icon :size="40"><UserFilled /></el-icon>
+            <p>{{ t('discover.noRecommendedUsers') }}</p>
           </div>
           <div v-else class="user-carousel">
             <div
@@ -348,12 +310,12 @@ async function loadRecommendedUsers() {
               :key="user.id"
               class="user-card"
             >
-              <div class="user-card-avatar" :style="getUserGradient(user.username)">
+              <div class="user-card-avatar" :style="getUserGradientLocal(user.username)">
                 <div class="user-card-online" />
                 {{ getInitial(user.username) }}
               </div>
               <div class="user-card-name">{{ user.username }}</div>
-              <span class="btn btn-primary btn-xs" @click="handleChat(user.id)">发消息</span>
+              <span class="btn btn-primary btn-xs" @click="handleChat(user.id)">{{ t('discover.sendMessage') }}</span>
             </div>
           </div>
         </div>
@@ -362,14 +324,14 @@ async function loadRecommendedUsers() {
         <div class="content-section">
           <div class="section-header">
             <h2 class="section-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              最近活跃
+              <el-icon :size="18"><TrendCharts /></el-icon>
+              {{ t('discover.recentActive') }}
             </h2>
           </div>
 
           <div v-if="loadingRecent" class="list-placeholder">{{ t('common.loading') }}</div>
           <div v-else-if="recentRooms.length === 0" class="empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <el-icon :size="40"><TrendCharts /></el-icon>
             <p>{{ t('chat.noRooms') }}</p>
           </div>
           <div v-else class="carousel">
@@ -379,16 +341,16 @@ async function loadRecommendedUsers() {
               class="compact-card"
             >
               <div class="compact-card-header">
-                <div class="compact-card-icon" :style="getRoomGradient(room.name)">{{ getInitial(room.name) }}</div>
+                <div class="compact-card-icon" :style="getRoomGradientLocal(room.name)">{{ getInitial(room.name) }}</div>
                 <div class="compact-card-info">
                   <div class="compact-card-name">{{ room.name }}</div>
-                  <div class="compact-card-meta">{{ getRoomCount(room) }} 人</div>
+                  <div class="compact-card-meta">{{ getRoomCount(room) }} {{ t('discover.members') }}</div>
                 </div>
               </div>
               <p v-if="room.description" class="compact-card-desc">{{ room.description }}</p>
               <div class="compact-card-actions">
-                <span class="btn btn-primary btn-xs" @click="handleJoinRoom(room.id)">加入</span>
-                <span class="btn btn-ghost btn-xs" @click="handleViewRoom(room.id)">预览</span>
+                <span class="btn btn-primary btn-xs" @click="handleJoinRoom(room.id)">{{ t('discover.join') }}</span>
+                <span class="btn btn-ghost btn-xs" @click="handleViewRoom(room.id)">{{ t('discover.preview') }}</span>
               </div>
             </div>
           </div>
@@ -679,7 +641,6 @@ async function loadRecommendedUsers() {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -719,8 +680,8 @@ async function loadRecommendedUsers() {
 
 .user-card:hover {
   border-color: var(--accent);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(124, 92, 252, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 92, 252, 0.12);
 }
 
 .user-card-avatar {
@@ -777,12 +738,14 @@ async function loadRecommendedUsers() {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: all 0.15s;
+  transition: all 0.2s;
   cursor: default;
 }
 
 .trending-card:hover {
   border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 92, 252, 0.12);
 }
 
 .trending-rank {
@@ -799,8 +762,8 @@ async function loadRecommendedUsers() {
 .trending-rank.r3 { color: var(--accent-blue); }
 
 .trending-icon {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   display: grid;
   place-items: center;
@@ -808,7 +771,6 @@ async function loadRecommendedUsers() {
   font-weight: 600;
   color: #fff;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 }
 
 .trending-body {
@@ -850,6 +812,7 @@ async function loadRecommendedUsers() {
 .compact-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 92, 252, 0.12);
 }
 
 .compact-card-header {
@@ -869,7 +832,6 @@ async function loadRecommendedUsers() {
   font-weight: 600;
   color: #fff;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 }
 
 .compact-card-info {

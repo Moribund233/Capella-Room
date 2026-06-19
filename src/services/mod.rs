@@ -1,3 +1,4 @@
+pub mod custom_event_service;
 pub mod mail_service;
 pub mod verification_code_service;
 pub mod account_security_service;
@@ -18,6 +19,7 @@ pub mod oauth_service;
 pub mod room_service;
 pub mod ui_config_service;
 pub mod user_service;
+pub mod webhook_service;
 
 pub mod user_settings_service;
 // 为了保持命名一致性，同时暴露 user_settings

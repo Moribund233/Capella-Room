@@ -1,5 +1,6 @@
 pub mod account_security;
 pub mod audit;
+pub mod custom_event;
 pub mod file;
 pub mod message;
 pub mod verification_code;
@@ -12,6 +13,7 @@ pub mod security;
 pub mod ui_config;
 pub mod user;
 pub mod user_settings;
+pub mod webhook;
 
 // 数据模型模块
 // - response: 统一响应结构（ApiResponse、PaginatedData 等）

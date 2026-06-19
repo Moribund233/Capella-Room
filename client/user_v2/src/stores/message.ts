@@ -43,7 +43,7 @@ export const useMessageStore = defineStore('message', () => {
         avatar_url: null,
       },
       content: payload.content,
-      message_type: 'text',
+      message_type: payload.message_type || 'text',
       reply_to: payload.reply_to,
       reply_to_message: replyToMessage,
       is_deleted: false,
@@ -101,7 +101,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   /** 发送消息（乐观更新） */
-  async function sendMessage(roomId: string, content: string, replyTo?: string | null) {
+  async function sendMessage(roomId: string, content: string, replyTo?: string | null, messageType?: string) {
     if (!content.trim()) return
 
     const wsStore = useWebSocketStore()
@@ -118,7 +118,7 @@ export const useMessageStore = defineStore('message', () => {
         avatar_url: authStore.user?.avatar_url ?? null,
       },
       content: content.trim(),
-      message_type: 'text',
+      message_type: messageType || 'text',
       reply_to: replyTo ?? null,
       reply_to_message: null,
       is_deleted: false,
@@ -131,11 +131,15 @@ export const useMessageStore = defineStore('message', () => {
     messages.value.push(optimistic)
 
     // 发送 WS 消息
-    wsStore.send('ChatMessage', {
+    const payload: Record<string, unknown> = {
       room_id: roomId,
       content: content.trim(),
       reply_to: replyTo ?? null,
-    })
+    }
+    if (messageType) {
+      payload.message_type = messageType
+    }
+    wsStore.send('ChatMessage', payload)
   }
 
   /** 标记某条消息为发送成功（根据临时 id 替换） */

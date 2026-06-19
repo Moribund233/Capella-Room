@@ -45,6 +45,9 @@
 - [x] 修复 `friend.ts` TS undefined 非空断言
 - [x] 修复 `typingUsers` 模板绑定 `.value`
 - [x] 修复 `updateMemberStatus`、`UpdateRoomData` store export 遗漏
+- [x] 移除 `useMessageActions.jumpToMessage` 死代码（实际跳转功能已通过 ChatMessageList.scrollToMessage 实现）
+- [x] 增强图片懒加载重试机制：自动重试(最多2次) + 手动点击重试
+- [x] 补全缺失的 git 跟踪文件：`BaseButton.vue`、`BaseBadge.vue`、`avatar.ts`
 
 ---
 
@@ -88,7 +91,7 @@
 | B6 | **Toast/通知动效** — 通知出现/消失动画 | `useNotification.ts`, `AppView.vue` | 1h | ✅ |
 | B7 | **响应式适配** — 移动端布局、侧边栏抽屉、触摸优化 | `AppView.vue`, `NavBar.vue`, `ChatRoomList.vue` | 4h | ✅ |
 | B8 | **在线状态指示器** — 头像绿点脉冲动画 + 状态切换过渡 | `ChatHeader.vue`, `ChatMemberPanel.vue` | 1.5h | ✅ |
-| B9 | **图片/文件懒加载** — 渐进加载、占位图 | `ChatMessageBubble.vue`, `FileUpload.vue` | 2h | ⚠️ 部分完成（缺重试） |
+| B9 | **图片/文件懒加载** — 渐进加载、占位图、自动重试(最多2次)+手动重试 | `ChatMessageBubble.vue` | 2h | ✅ |
 | B10 | **主题切换平滑过渡** — 亮/暗切换时颜色过渡动画 | `useTheme.ts`, `AppView.vue` | 1h | ✅ |
 
 ### Phase C — 后端功能补齐
@@ -96,7 +99,7 @@
 | # | 任务 | 涉及文件 | 预估 | 状态 |
 |---|------|---------|:----:|:----:|
 | C1 | **删除账号自服务 API** — `DELETE /api/v1/users/me` | `src/handlers/user.rs` | 2h | ✅ (随 A8 完成) |
-| C2 | **置顶消息** — DB迁移/Model/Service/API/WS/Test (后端) + API/Store/Types/Components/WS (前端) | 后端已完善 `/src/`; 前端 `client/user_v2/src/` | 前端~4h | 🟡 后端✅ 前端🟡 ChatMessageList已渲染、ChatHeader入口按钮已加、messageStore已支持pin/unpin |
+| C2 | **置顶消息** — DB迁移/Model/Service/API/WS/Test (后端) + API/Store/Types/Components/WS (前端) | 后端已完善 `/src/`; 前端 `client/user_v2/src/` | ✅ 前端✅ 后端✅ ChatMessageList渲染、ChatHeader入口、PinnedMessagesPanel、messageStore pin/unpin、jumpToMessage跳转 |
 | C3 | **消息线程** — parent_id 字段 + API + WS + UI | ❌ 已取消 |
 | C4 | **Admin 管理面板** — `client/admin/` 已有完整实现 | ❌ 已取消 |
 

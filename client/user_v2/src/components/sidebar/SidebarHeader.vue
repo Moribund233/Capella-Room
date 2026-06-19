@@ -2,20 +2,28 @@
 import { useI18n } from 'vue-i18n'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useResponsive } from '@/composables/useResponsive'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Close } from '@element-plus/icons-vue'
 
 defineProps<{
   modelValue: string
+  filter: 'all' | 'groups' | 'dms'
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  'update:filter': [value: 'all' | 'groups' | 'dms']
   close: []
 }>()
 
 const { t } = useI18n()
 const wsStore = useWebSocketStore()
 const { isMobile, sidebarCollapsed } = useResponsive()
+
+const filterOptions = [
+  { value: 'all', label: 'chat.filterAll' },
+  { value: 'groups', label: 'chat.filterGroups' },
+  { value: 'dms', label: 'chat.filterDMs' },
+]
 </script>
 
 <template>
@@ -30,24 +38,35 @@ const { isMobile, sidebarCollapsed } = useResponsive()
         class="sidebar-header__close"
         @click="sidebarCollapsed = true"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="20" height="20">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
+        <el-icon :size="20"><Close /></el-icon>
       </button>
     </div>
-    <div class="sidebar-header__search">
+    <div class="sidebar-header__controls">
       <el-input
         :model-value="modelValue"
         :placeholder="t('chat.findRoom')"
         size="small"
         clearable
+        class="sidebar-header__search"
         @input="emit('update:modelValue', $event)"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
+      <el-select
+        :model-value="filter"
+        size="small"
+        class="sidebar-header__filter"
+        @change="emit('update:filter', $event)"
+      >
+        <el-option
+          v-for="option in filterOptions"
+          :key="option.value"
+          :value="option.value"
+          :label="t(option.label)"
+        />
+      </el-select>
     </div>
   </div>
 </template>
@@ -115,6 +134,19 @@ const { isMobile, sidebarCollapsed } = useResponsive()
       background: #ef4444;
       animation: breathe-red 2.5s ease-in-out infinite;
     }
+  }
+
+  &__controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  &__search {
+    flex: 1;
+  }
+
+  &__filter {
+    width: 100px;
   }
 
   :deep(.el-input) {

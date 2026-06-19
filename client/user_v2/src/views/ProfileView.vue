@@ -9,14 +9,15 @@ import { useSettingsStore } from '@/stores/settings'
 import { uploadApi } from '@/api/upload'
 import { userApi } from '@/api/user'
 import type { LocaleSettings } from '@/types/settings'
+import { getAvatarGradient, getAvatarShadow } from '@/utils/avatar'
 import {
   Clock,
   User,
-  Message,
   Share,
   Star,
   Delete,
   SwitchButton,
+  ChatRound,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -30,6 +31,12 @@ const loading = ref(false)
 
 // 当前用户
 const currentUser = computed(() => authStore.user)
+
+// 头像样式
+const avatarStyle = computed(() => ({
+  background: getAvatarGradient(currentUser.value?.username || 'user'),
+  boxShadow: getAvatarShadow('lg'),
+}))
 
 // 头像上传
 const uploadingAvatar = ref(false)
@@ -286,471 +293,488 @@ const imageQualityOptions = [
       </div>
 
       <div v-else class="container">
-        <!-- 个人资料头部 -->
-        <div class="profile-header">
-          <div
-            class="profile-avatar"
-            :class="{ 'profile-avatar--uploading': uploadingAvatar }"
-            @click="triggerAvatarUpload"
-          >
-            <template v-if="currentUser?.avatar_url">
-              <img :src="currentUser.avatar_url" :alt="currentUser.username" class="profile-avatar__img" />
-            </template>
-            <template v-else>
-              <span>{{ getInitials(currentUser?.username || '') }}</span>
-            </template>
-            <div class="profile-avatar__overlay">
-              <span v-if="uploadingAvatar">…</span>
-              <span v-else>Change</span>
+        <div class="profile-grid">
+          <!-- 左侧边栏：头像 + 基本信息 + 统计 -->
+          <aside class="profile-sidebar">
+            <!-- 个人资料头部 -->
+            <div class="profile-header">
+              <div
+                class="profile-avatar"
+                :class="{ 'profile-avatar--uploading': uploadingAvatar }"
+                :style="avatarStyle"
+                @click="triggerAvatarUpload"
+              >
+                <template v-if="currentUser?.avatar_url">
+                  <img :src="currentUser.avatar_url" :alt="currentUser.username" class="profile-avatar__img" />
+                </template>
+                <template v-else>
+                  <span>{{ getInitials(currentUser?.username || '') }}</span>
+                </template>
+                <div class="profile-avatar__overlay">
+                  <span v-if="uploadingAvatar">…</span>
+                  <span v-else>Change</span>
+                </div>
+                <span class="status-big"></span>
+                <input
+                  ref="avatarInputRef"
+                  type="file"
+                  accept="image/*"
+                  style="display:none"
+                  @change="handleAvatarSelected"
+                />
+              </div>
+              <div class="profile-info">
+                <h1>{{ currentUser?.username || 'User' }}</h1>
+                <p class="handle">@{{ currentUser?.username }}</p>
+                <p class="email">{{ currentUser?.email }}</p>
+              </div>
             </div>
-            <span class="status-big"></span>
-            <input
-              ref="avatarInputRef"
-              type="file"
-              accept="image/*"
-              style="display:none"
-              @change="handleAvatarSelected"
-            />
-          </div>
-          <div class="profile-info">
-            <h1>{{ currentUser?.username || 'User' }}</h1>
-            <p class="handle">@{{ currentUser?.username }} · {{ currentUser?.email }}</p>
-            <div class="profile-meta">
-              <span>
-                <el-icon><Clock /></el-icon>
-                {{ t('profile.joined') }} {{ userStats.joinedDate }}
-              </span>
-              <span>
-                <el-icon><User /></el-icon>
-                {{ userStats.joinedRooms }} {{ t('profile.mutualServers') }}
-              </span>
-              <span v-if="currentUser?.role === 'admin' || currentUser?.role === 'super_admin'">
-                <el-icon><Star /></el-icon>
-                {{ t('profile.admin') }}
-              </span>
+
+            <!-- 统计卡片 -->
+            <div class="stats-card">
+              <div class="stat-item">
+                <div class="stat-value">{{ userStats.joinedRooms }}</div>
+                <div class="stat-label">{{ t('profile.mutualServers') }}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">—</div>
+                <div class="stat-label">好友</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">—</div>
+                <div class="stat-label">消息</div>
+              </div>
             </div>
+
+            <!-- 操作按钮 -->
             <div class="profile-actions">
-              <el-button type="primary" @click="handleMessage">
-                <el-icon><Message /></el-icon>
+              <button class="btn btn-primary" @click="handleMessage">
+                <el-icon><ChatRound /></el-icon>
                 {{ t('profile.message') }}
-              </el-button>
-              <el-button @click="handleShare">
+              </button>
+              <button class="btn btn-ghost" @click="handleShare">
                 <el-icon><Share /></el-icon>
                 {{ t('profile.shareProfile') }}
-              </el-button>
+              </button>
             </div>
-          </div>
-        </div>
 
-        <!-- 基本信息 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.basicInfo.title') }}</div>
-          <div class="info-item">
-            <span class="info-label">{{ t('profile.settings.basicInfo.username') }}</span>
-            <span class="info-value">{{ currentUser?.username }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">{{ t('profile.settings.basicInfo.email') }}</span>
-            <span class="info-value">{{ currentUser?.email }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">{{ t('profile.settings.basicInfo.role') }}</span>
-            <span class="info-value">{{ currentUser?.role || 'user' }}</span>
-          </div>
-        </div>
+            <!-- 基本信息 -->
+            <div class="info-card">
+              <div class="info-item">
+                <span class="info-label">{{ t('profile.settings.basicInfo.username') }}</span>
+                <span class="info-value">{{ currentUser?.username }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">{{ t('profile.settings.basicInfo.email') }}</span>
+                <span class="info-value">{{ currentUser?.email }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">{{ t('profile.settings.basicInfo.role') }}</span>
+                <span class="info-value">{{ currentUser?.role || 'user' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">{{ t('profile.joined') }}</span>
+                <span class="info-value">{{ userStats.joinedDate }}</span>
+              </div>
+            </div>
+          </aside>
 
-        <!-- 通知设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.notifications.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.enable') }}</h3>
-              <p>{{ t('profile.settings.notifications.enableDesc') }}</p>
+          <!-- 右侧内容：设置项 -->
+          <div class="profile-content">
+            <!-- 通知设置 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.notifications.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.enable') }}</h3>
+                  <p>{{ t('profile.settings.notifications.enableDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableNotification }"
+                  @click="updateNotification('enableNotification', !notificationSettings.enableNotification)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.directMessage') }}</h3>
+                  <p>{{ t('profile.settings.notifications.directMessageDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableDirectMessage }"
+                  :disabled="!notificationSettings.enableNotification"
+                  @click="updateNotification('enableDirectMessage', !notificationSettings.enableDirectMessage)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.mention') }}</h3>
+                  <p>{{ t('profile.settings.notifications.mentionDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableMention }"
+                  :disabled="!notificationSettings.enableNotification"
+                  @click="updateNotification('enableMention', !notificationSettings.enableMention)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.roomInvitation') }}</h3>
+                  <p>{{ t('profile.settings.notifications.roomInvitationDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableRoomInvitation }"
+                  :disabled="!notificationSettings.enableNotification"
+                  @click="updateNotification('enableRoomInvitation', !notificationSettings.enableRoomInvitation)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.system') }}</h3>
+                  <p>{{ t('profile.settings.notifications.systemDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableSystemNotification }"
+                  :disabled="!notificationSettings.enableNotification"
+                  @click="updateNotification('enableSystemNotification', !notificationSettings.enableSystemNotification)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.sound') }}</h3>
+                  <p>{{ t('profile.settings.notifications.soundDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableSound }"
+                  @click="updateNotification('enableSound', !notificationSettings.enableSound)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.notifications.desktop') }}</h3>
+                  <p>{{ t('profile.settings.notifications.desktopDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: notificationSettings.enableDesktopNotification }"
+                  @click="updateNotification('enableDesktopNotification', !notificationSettings.enableDesktopNotification)"
+                ></button>
+              </div>
             </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableNotification }"
-              @click="updateNotification('enableNotification', !notificationSettings.enableNotification)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.directMessage') }}</h3>
-              <p>{{ t('profile.settings.notifications.directMessageDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableDirectMessage }"
-              :disabled="!notificationSettings.enableNotification"
-              @click="updateNotification('enableDirectMessage', !notificationSettings.enableDirectMessage)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.mention') }}</h3>
-              <p>{{ t('profile.settings.notifications.mentionDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableMention }"
-              :disabled="!notificationSettings.enableNotification"
-              @click="updateNotification('enableMention', !notificationSettings.enableMention)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.roomInvitation') }}</h3>
-              <p>{{ t('profile.settings.notifications.roomInvitationDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableRoomInvitation }"
-              :disabled="!notificationSettings.enableNotification"
-              @click="updateNotification('enableRoomInvitation', !notificationSettings.enableRoomInvitation)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.system') }}</h3>
-              <p>{{ t('profile.settings.notifications.systemDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableSystemNotification }"
-              :disabled="!notificationSettings.enableNotification"
-              @click="updateNotification('enableSystemNotification', !notificationSettings.enableSystemNotification)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.sound') }}</h3>
-              <p>{{ t('profile.settings.notifications.soundDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableSound }"
-              @click="updateNotification('enableSound', !notificationSettings.enableSound)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.notifications.desktop') }}</h3>
-              <p>{{ t('profile.settings.notifications.desktopDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: notificationSettings.enableDesktopNotification }"
-              @click="updateNotification('enableDesktopNotification', !notificationSettings.enableDesktopNotification)"
-            ></button>
-          </div>
-        </div>
 
-        <!-- 隐私设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.privacy.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.privacy.onlineStatus') }}</h3>
-              <p>{{ t('profile.settings.privacy.onlineStatusDesc') }}</p>
+            <!-- 隐私设置 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.privacy.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.privacy.onlineStatus') }}</h3>
+                  <p>{{ t('profile.settings.privacy.onlineStatusDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="privacySettings.onlineStatusVisibility"
+                  @change="updatePrivacy('onlineStatusVisibility', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in visibilityOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.privacy.profile') }}</h3>
+                  <p>{{ t('profile.settings.privacy.profileDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="privacySettings.profileVisibility"
+                  @change="updatePrivacy('profileVisibility', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in visibilityOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.privacy.strangerMessage') }}</h3>
+                  <p>{{ t('profile.settings.privacy.strangerMessageDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: privacySettings.allowStrangerMessage }"
+                  @click="updatePrivacy('allowStrangerMessage', !privacySettings.allowStrangerMessage)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.privacy.roomInvite') }}</h3>
+                  <p>{{ t('profile.settings.privacy.roomInviteDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: privacySettings.allowRoomInvitation }"
+                  @click="updatePrivacy('allowRoomInvitation', !privacySettings.allowRoomInvitation)"
+                ></button>
+              </div>
             </div>
-            <select
-              class="select-input"
-              :value="privacySettings.onlineStatusVisibility"
-              @change="updatePrivacy('onlineStatusVisibility', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in visibilityOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.privacy.profile') }}</h3>
-              <p>{{ t('profile.settings.privacy.profileDesc') }}</p>
-            </div>
-            <select
-              class="select-input"
-              :value="privacySettings.profileVisibility"
-              @change="updatePrivacy('profileVisibility', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in visibilityOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.privacy.strangerMessage') }}</h3>
-              <p>{{ t('profile.settings.privacy.strangerMessageDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: privacySettings.allowStrangerMessage }"
-              @click="updatePrivacy('allowStrangerMessage', !privacySettings.allowStrangerMessage)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.privacy.roomInvite') }}</h3>
-              <p>{{ t('profile.settings.privacy.roomInviteDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: privacySettings.allowRoomInvitation }"
-              @click="updatePrivacy('allowRoomInvitation', !privacySettings.allowRoomInvitation)"
-            ></button>
-          </div>
-        </div>
 
-        <!-- 消息设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.message.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.message.preview') }}</h3>
-              <p>{{ t('profile.settings.message.previewDesc') }}</p>
+            <!-- 消息设置 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.message.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.message.preview') }}</h3>
+                  <p>{{ t('profile.settings.message.previewDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: messageSettings.showMessagePreview }"
+                  @click="updateMessage('showMessagePreview', !messageSettings.showMessagePreview)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.message.readReceipt') }}</h3>
+                  <p>{{ t('profile.settings.message.readReceiptDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: messageSettings.enableReadReceipt }"
+                  @click="updateMessage('enableReadReceipt', !messageSettings.enableReadReceipt)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.message.typing') }}</h3>
+                  <p>{{ t('profile.settings.message.typingDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: messageSettings.showTypingStatus }"
+                  @click="updateMessage('showTypingStatus', !messageSettings.showTypingStatus)"
+                ></button>
+              </div>
             </div>
-            <button
-              class="toggle"
-              :class="{ on: messageSettings.showMessagePreview }"
-              @click="updateMessage('showMessagePreview', !messageSettings.showMessagePreview)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.message.readReceipt') }}</h3>
-              <p>{{ t('profile.settings.message.readReceiptDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: messageSettings.enableReadReceipt }"
-              @click="updateMessage('enableReadReceipt', !messageSettings.enableReadReceipt)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.message.typing') }}</h3>
-              <p>{{ t('profile.settings.message.typingDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: messageSettings.showTypingStatus }"
-              @click="updateMessage('showTypingStatus', !messageSettings.showTypingStatus)"
-            ></button>
-          </div>
-        </div>
 
-        <!-- 语言与地区 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.locale.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.locale.language') }}</h3>
-              <p>{{ t('profile.settings.locale.languageDesc') }}</p>
+            <!-- 语言与地区 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.locale.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.locale.language') }}</h3>
+                  <p>{{ t('profile.settings.locale.languageDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="settingsStore.localeSettings.language"
+                  @change="updateLocale('language', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.locale.timezone') }}</h3>
+                  <p>{{ t('profile.settings.locale.timezoneDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="settingsStore.localeSettings.timezone"
+                  @change="updateLocale('timezone', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.locale.timeFormat') }}</h3>
+                  <p>{{ t('profile.settings.locale.timeFormatDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="settingsStore.localeSettings.timeFormat"
+                  @change="updateLocale('timeFormat', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in timeFormatOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.locale.dateFormat') }}</h3>
+                  <p>{{ t('profile.settings.locale.dateFormatDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="settingsStore.localeSettings.dateFormat"
+                  @change="updateLocale('dateFormat', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in dateFormatOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
             </div>
-            <select
-              class="select-input"
-              :value="settingsStore.localeSettings.language"
-              @change="updateLocale('language', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.locale.timezone') }}</h3>
-              <p>{{ t('profile.settings.locale.timezoneDesc') }}</p>
-            </div>
-            <select
-              class="select-input"
-              :value="settingsStore.localeSettings.timezone"
-              @change="updateLocale('timezone', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.locale.timeFormat') }}</h3>
-              <p>{{ t('profile.settings.locale.timeFormatDesc') }}</p>
-            </div>
-            <select
-              class="select-input"
-              :value="settingsStore.localeSettings.timeFormat"
-              @change="updateLocale('timeFormat', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in timeFormatOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.locale.dateFormat') }}</h3>
-              <p>{{ t('profile.settings.locale.dateFormatDesc') }}</p>
-            </div>
-            <select
-              class="select-input"
-              :value="settingsStore.localeSettings.dateFormat"
-              @change="updateLocale('dateFormat', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in dateFormatOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-        </div>
 
-        <!-- 无障碍设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.accessibility.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.accessibility.fontSize') }}</h3>
-              <p>{{ t('profile.settings.accessibility.fontSizeDesc') }}</p>
+            <!-- 无障碍设置 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.accessibility.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.accessibility.fontSize') }}</h3>
+                  <p>{{ t('profile.settings.accessibility.fontSizeDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="accessibilitySettings.fontSize"
+                  @change="updateAccessibility('fontSize', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in fontSizeOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.accessibility.highContrast') }}</h3>
+                  <p>{{ t('profile.settings.accessibility.highContrastDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: accessibilitySettings.highContrast }"
+                  @click="updateAccessibility('highContrast', !accessibilitySettings.highContrast)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.accessibility.reduceMotion') }}</h3>
+                  <p>{{ t('profile.settings.accessibility.reduceMotionDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: accessibilitySettings.reduceMotion }"
+                  @click="updateAccessibility('reduceMotion', !accessibilitySettings.reduceMotion)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.accessibility.compactMode') }}</h3>
+                  <p>{{ t('profile.settings.accessibility.compactModeDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: accessibilitySettings.compactMode }"
+                  @click="updateAccessibility('compactMode', !accessibilitySettings.compactMode)"
+                ></button>
+              </div>
             </div>
-            <select
-              class="select-input"
-              :value="accessibilitySettings.fontSize"
-              @change="updateAccessibility('fontSize', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in fontSizeOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.accessibility.highContrast') }}</h3>
-              <p>{{ t('profile.settings.accessibility.highContrastDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: accessibilitySettings.highContrast }"
-              @click="updateAccessibility('highContrast', !accessibilitySettings.highContrast)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.accessibility.reduceMotion') }}</h3>
-              <p>{{ t('profile.settings.accessibility.reduceMotionDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: accessibilitySettings.reduceMotion }"
-              @click="updateAccessibility('reduceMotion', !accessibilitySettings.reduceMotion)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.accessibility.compactMode') }}</h3>
-              <p>{{ t('profile.settings.accessibility.compactModeDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: accessibilitySettings.compactMode }"
-              @click="updateAccessibility('compactMode', !accessibilitySettings.compactMode)"
-            ></button>
-          </div>
-        </div>
 
-        <!-- 媒体设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.media.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.media.autoDownload') }}</h3>
-              <p>{{ t('profile.settings.media.autoDownloadDesc') }}</p>
+            <!-- 媒体设置 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.media.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.media.autoDownload') }}</h3>
+                  <p>{{ t('profile.settings.media.autoDownloadDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: mediaSettings.autoDownloadMedia }"
+                  @click="updateMedia('autoDownloadMedia', !mediaSettings.autoDownloadMedia)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.media.saveGallery') }}</h3>
+                  <p>{{ t('profile.settings.media.saveGalleryDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: mediaSettings.saveMediaGallery }"
+                  @click="updateMedia('saveMediaGallery', !mediaSettings.saveMediaGallery)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.media.imageQuality') }}</h3>
+                  <p>{{ t('profile.settings.media.imageQualityDesc') }}</p>
+                </div>
+                <select
+                  class="select-input"
+                  :value="mediaSettings.imageQuality"
+                  @change="updateMedia('imageQuality', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in imageQualityOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.media.autoPlayVideo') }}</h3>
+                  <p>{{ t('profile.settings.media.autoPlayVideoDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: mediaSettings.autoPlayVideo }"
+                  @click="updateMedia('autoPlayVideo', !mediaSettings.autoPlayVideo)"
+                ></button>
+              </div>
             </div>
-            <button
-              class="toggle"
-              :class="{ on: mediaSettings.autoDownloadMedia }"
-              @click="updateMedia('autoDownloadMedia', !mediaSettings.autoDownloadMedia)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.media.saveGallery') }}</h3>
-              <p>{{ t('profile.settings.media.saveGalleryDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: mediaSettings.saveMediaGallery }"
-              @click="updateMedia('saveMediaGallery', !mediaSettings.saveMediaGallery)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.media.imageQuality') }}</h3>
-              <p>{{ t('profile.settings.media.imageQualityDesc') }}</p>
-            </div>
-            <select
-              class="select-input"
-              :value="mediaSettings.imageQuality"
-              @change="updateMedia('imageQuality', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in imageQualityOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.media.autoPlayVideo') }}</h3>
-              <p>{{ t('profile.settings.media.autoPlayVideoDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: mediaSettings.autoPlayVideo }"
-              @click="updateMedia('autoPlayVideo', !mediaSettings.autoPlayVideo)"
-            ></button>
-          </div>
-        </div>
 
-        <!-- 安全设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('profile.settings.security.title') }}</div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.security.abnormalLogin') }}</h3>
-              <p>{{ t('profile.settings.security.abnormalLoginDesc') }}</p>
+            <!-- 安全设置 -->
+            <div class="settings-card">
+              <div class="settings-card-title">{{ t('profile.settings.security.title') }}</div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.security.abnormalLogin') }}</h3>
+                  <p>{{ t('profile.settings.security.abnormalLoginDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: securitySettings.enableAbnormalLoginAlert }"
+                  @click="updateSecurity('enableAbnormalLoginAlert', !securitySettings.enableAbnormalLoginAlert)"
+                ></button>
+              </div>
+              <div class="pref-group">
+                <div class="pref-label">
+                  <h3>{{ t('profile.settings.security.singleDevice') }}</h3>
+                  <p>{{ t('profile.settings.security.singleDeviceDesc') }}</p>
+                </div>
+                <button
+                  class="toggle"
+                  :class="{ on: securitySettings.enableSingleDeviceLogin }"
+                  @click="updateSecurity('enableSingleDeviceLogin', !securitySettings.enableSingleDeviceLogin)"
+                ></button>
+              </div>
             </div>
-            <button
-              class="toggle"
-              :class="{ on: securitySettings.enableAbnormalLoginAlert }"
-              @click="updateSecurity('enableAbnormalLoginAlert', !securitySettings.enableAbnormalLoginAlert)"
-            ></button>
-          </div>
-          <div class="pref-group">
-            <div class="pref-label">
-              <h3>{{ t('profile.settings.security.singleDevice') }}</h3>
-              <p>{{ t('profile.settings.security.singleDeviceDesc') }}</p>
-            </div>
-            <button
-              class="toggle"
-              :class="{ on: securitySettings.enableSingleDeviceLogin }"
-              @click="updateSecurity('enableSingleDeviceLogin', !securitySettings.enableSingleDeviceLogin)"
-            ></button>
-          </div>
-        </div>
 
-        <!-- 危险区域 -->
-        <div class="danger-zone">
-          <h3>{{ t('profile.settings.dangerZone.title') }}</h3>
-          <p>{{ t('profile.settings.dangerZone.description') }}</p>
-          <div class="danger-actions">
-            <el-button type="danger" plain @click="handleLogout">
-              <el-icon><SwitchButton /></el-icon>
-              {{ t('profile.settings.dangerZone.logout') }}
-            </el-button>
-            <el-button type="danger" plain @click="deleteAccount">
-              <el-icon><Delete /></el-icon>
-              {{ t('profile.settings.dangerZone.deleteAccount') }}
-            </el-button>
+            <!-- 危险区域 -->
+            <div class="danger-zone">
+              <h3>{{ t('profile.settings.dangerZone.title') }}</h3>
+              <p>{{ t('profile.settings.dangerZone.description') }}</p>
+              <div class="danger-actions">
+                <button class="btn btn-danger" @click="handleLogout">
+                  <el-icon><SwitchButton /></el-icon>
+                  {{ t('profile.settings.dangerZone.logout') }}
+                </button>
+                <button class="btn btn-danger-outline" @click="deleteAccount">
+                  <el-icon><Delete /></el-icon>
+                  {{ t('profile.settings.dangerZone.deleteAccount') }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -773,22 +797,37 @@ const imageQualityOptions = [
 }
 
 .container {
-  max-width: 860px;
+  max-width: 1100px;
   margin-inline: auto;
   padding-inline: 48px;
+  padding-block: 40px;
 
   &.loading {
     padding-top: 40px;
   }
 }
 
+// 双栏布局
+.profile-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+// 左侧边栏
+.profile-sidebar {
+  position: sticky;
+  top: 40px;
+}
+
 // 个人资料头部
 .profile-header {
-  padding: 40px 0 32px;
   display: flex;
-  gap: 28px;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
+  text-align: center;
+  margin-bottom: 24px;
 }
 
 .profile-avatar {
@@ -796,7 +835,6 @@ const imageQualityOptions = [
   height: 96px;
   min-width: 96px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-pink));
   display: grid;
   place-items: center;
   font-size: 36px;
@@ -805,6 +843,13 @@ const imageQualityOptions = [
   position: relative;
   cursor: pointer;
   overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 16px;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(124, 92, 252, 0.4);
+  }
 
   &--uploading {
     opacity: 0.7;
@@ -849,64 +894,148 @@ const imageQualityOptions = [
 }
 
 .profile-info {
-  flex: 1;
-
   h1 {
     font-family: var(--font-display);
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 600;
     margin-bottom: 4px;
   }
 }
 
 .handle {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--muted);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
-.profile-meta {
-  display: flex;
-  gap: 24px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-
-  span {
-    font-size: 13px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-
-    .el-icon {
-      font-size: 14px;
-    }
-  }
+.email {
+  font-size: 13px;
+  color: var(--muted);
 }
 
+// 统计卡片
+.stats-card {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+// 操作按钮
 .profile-actions {
   display: flex;
   gap: 10px;
-  margin-top: 16px;
-  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
-// 分区
-.section {
-  border-top: 1px solid var(--border);
-}
-
-.section-title {
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
   font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  padding: 24px 0 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex: 1;
+  justify-content: center;
+
+  &:active {
+    transform: translateY(1px);
+  }
 }
 
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+
+  &:hover {
+    background: color-mix(in oklch, var(--accent) 85%, black);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+
+  &:hover {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+}
+
+.btn-danger {
+  background: var(--accent-pink);
+  color: #fff;
+  border-color: var(--accent-pink);
+
+  &:hover {
+    background: color-mix(in oklch, var(--accent-pink) 85%, black);
+  }
+}
+
+.btn-danger-outline {
+  background: transparent;
+  color: var(--accent-pink);
+  border-color: color-mix(in oklch, var(--accent-pink) 40%, transparent);
+
+  &:hover {
+    background: color-mix(in oklch, var(--accent-pink) 10%, transparent);
+    border-color: var(--accent-pink);
+  }
+}
+
+// 信息卡片
+.info-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+// 设置卡片
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.settings-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--fg);
+}
+
+// 设置项
 .pref-group {
-  padding: 20px 0;
+  padding: 16px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -919,7 +1048,7 @@ const imageQualityOptions = [
 
 .pref-label {
   h3 {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
   }
 
@@ -979,10 +1108,12 @@ const imageQualityOptions = [
   font-size: 14px;
   min-width: 160px;
   cursor: pointer;
+  transition: border-color 0.25s, box-shadow 0.25s;
 
   &:focus {
     outline: none;
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 12px rgba(124, 92, 252, 0.15);
   }
 
   &:disabled {
@@ -1000,7 +1131,7 @@ const imageQualityOptions = [
 .info-item {
   display: flex;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--border);
 
   &:last-child {
@@ -1009,7 +1140,7 @@ const imageQualityOptions = [
 }
 
 .info-label {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -1023,7 +1154,7 @@ const imageQualityOptions = [
   padding: 20px;
   border: 1px solid color-mix(in oklch, var(--accent-orange) 40%, transparent);
   border-radius: var(--radius-lg);
-  margin: 24px 0 48px;
+  margin-bottom: 16px;
 
   h3 {
     font-size: 15px;
@@ -1046,14 +1177,39 @@ const imageQualityOptions = [
 }
 
 // 响应式
-@media (max-width: 640px) {
+@media (max-width: 900px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-sidebar {
+    position: static;
+  }
+
   .profile-header {
-    flex-direction: column;
+    flex-direction: row;
+    text-align: left;
     align-items: flex-start;
   }
 
-  .profile-meta {
-    gap: 12px;
+  .profile-avatar {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding-inline: 20px;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-avatar {
+    margin-bottom: 16px;
   }
 
   .pref-group {
@@ -1064,6 +1220,10 @@ const imageQualityOptions = [
 
   .select-input {
     width: 100%;
+  }
+
+  .stats-card {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 </style>

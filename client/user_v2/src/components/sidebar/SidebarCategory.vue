@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import VDraggable from 'vuedraggable'
 import SidebarChannelItem from './SidebarChannelItem.vue'
+import { ArrowRight } from '@element-plus/icons-vue'
 import type { ChannelItemData } from './SidebarChannelItem.vue'
 
 interface Props {
@@ -23,6 +24,8 @@ const emit = defineEmits<{
 }>()
 
 const localItems = ref<ChannelItemData[]>(props.items.slice())
+const focusedIndex = ref(-1)
+const itemRefs = ref<HTMLElement[]>([])
 
 watch(() => props.items, (next) => {
   localItems.value = next.slice()
@@ -37,21 +40,80 @@ const isCollapsed = ref(props.collapsed)
 function toggleCollapse() {
   isCollapsed.value = !isCollapsed.value
 }
+
+function handleKeydown(event: KeyboardEvent) {
+  if (isCollapsed.value) return
+  
+  const items = localItems.value
+  if (items.length === 0) return
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      focusedIndex.value = Math.min(focusedIndex.value + 1, items.length - 1)
+      focusItem(focusedIndex.value)
+      break
+    case 'ArrowUp':
+      event.preventDefault()
+      focusedIndex.value = Math.max(focusedIndex.value - 1, 0)
+      focusItem(focusedIndex.value)
+      break
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      if (focusedIndex.value >= 0 && focusedIndex.value < items.length) {
+        const selectedItem = items[focusedIndex.value]
+        if (selectedItem) {
+          emit('select', selectedItem)
+        }
+      }
+      break
+    case 'Home':
+      event.preventDefault()
+      focusedIndex.value = 0
+      focusItem(focusedIndex.value)
+      break
+    case 'End':
+      event.preventDefault()
+      focusedIndex.value = items.length - 1
+      focusItem(focusedIndex.value)
+      break
+  }
+}
+
+function focusItem(index: number) {
+  nextTick(() => {
+    const itemEl = itemRefs.value[index]
+    if (itemEl) {
+      itemEl.focus()
+      itemEl.scrollIntoView({ block: 'nearest' })
+    }
+  })
+}
+
+function setItemRef(el: any, index: number) {
+  if (el) {
+    itemRefs.value[index] = el.$el || el
+  }
+}
 </script>
 
 <template>
-  <div class="sidebar-category">
-    <div class="sidebar-category__header" @click="toggleCollapse">
-      <svg
+  <div class="sidebar-category" @keydown="handleKeydown">
+    <div 
+      class="sidebar-category__header" 
+      @click="toggleCollapse"
+      @keydown.enter="toggleCollapse"
+      @keydown.space.prevent="toggleCollapse"
+      :tabindex="0"
+      role="button"
+      :aria-expanded="!isCollapsed"
+    >
+      <el-icon
         class="sidebar-category__arrow"
         :class="{ 'sidebar-category__arrow--collapsed': isCollapsed }"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="12"
-        height="12"
-      >
-        <path d="M8 5l8 7-8 7" />
-      </svg>
+        :size="12"
+      ><ArrowRight /></el-icon>
       <span class="sidebar-category__name">{{ name }}</span>
       <span class="sidebar-category__count">{{ items.length }}</span>
     </div>
@@ -68,23 +130,35 @@ function toggleCollapse() {
           ghost-class="channel-item--ghost"
           @change="onChange"
         >
-          <template #item="{ element }">
-            <SidebarChannelItem
-              :item="element"
-              @select="emit('select', element)"
-              @close="emit('close', element)"
-            />
+          <template #item="{ element, index }">
+            <div 
+              :ref="(el) => setItemRef(el, index)"
+              :tabindex="focusedIndex === index ? 0 : -1"
+              @focus="focusedIndex = index"
+            >
+              <SidebarChannelItem
+                :item="element"
+                @select="emit('select', element)"
+                @close="emit('close', element)"
+              />
+            </div>
           </template>
         </VDraggable>
 
         <template v-else>
-          <SidebarChannelItem
-            v-for="item in items"
+          <div 
+            v-for="(item, index) in items"
             :key="item.id"
-            :item="item"
-            @select="emit('select', item)"
-            @close="emit('close', item)"
-          />
+            :ref="(el) => setItemRef(el, index)"
+            :tabindex="focusedIndex === index ? 0 : -1"
+            @focus="focusedIndex = index"
+          >
+            <SidebarChannelItem
+              :item="item"
+              @select="emit('select', item)"
+              @close="emit('close', item)"
+            />
+          </div>
         </template>
       </div>
     </div>

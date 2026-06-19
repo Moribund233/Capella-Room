@@ -10,6 +10,7 @@ services:
     image: capella-room:latest
     container_name: capella-room-prod
     network_mode: host
+    user: "1000:1000"
     env_file:
       - .env.production
     environment:
