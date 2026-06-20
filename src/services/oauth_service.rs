@@ -272,6 +272,7 @@ impl OAuthService {
         let refresh_token_hash = Self::hash_secret(&refresh_token_raw);
 
         let refresh_expires_at = Utc::now() + chrono::Duration::seconds(self.config.refresh_token_ttl);
+        let refresh_expires_in = self.config.refresh_token_ttl;
 
         sqlx::query(
             r#"INSERT INTO oauth_tokens (app_id, user_id, access_token, refresh_token_hash, scopes, expires_at, refresh_expires_at)
@@ -291,6 +292,8 @@ impl OAuthService {
             access_token,
             token_type: "Bearer".to_string(),
             expires_in: self.config.access_token_ttl,
+            refresh_token: refresh_token_raw,
+            refresh_expires_in,
             scope: Some(scopes.join(" ")),
         })
     }
@@ -397,6 +400,9 @@ impl OAuthService {
         let mapping = sqlx::query_as::<_, UserIdentityMapping>(
             r#"INSERT INTO user_identity_mappings (app_id, user_id, external_user_id, external_username)
                VALUES ($1, $2, $3, $4)
+               ON CONFLICT (app_id, external_user_id)
+               DO UPDATE SET updated_at = NOW(),
+                             external_username = EXCLUDED.external_username
                RETURNING id, user_id, app_id, external_user_id, external_username, mapped_at, updated_at"#,
         )
         .bind(app_id)
@@ -405,16 +411,7 @@ impl OAuthService {
         .bind(external_username)
         .fetch_one(self.db.pool())
         .await
-        .map_err(|e| match &e {
-            sqlx::Error::Database(db_err) => {
-                if db_err.constraint().map(|c| c.contains("unique")).unwrap_or(false) {
-                    AppError::Conflict("身份映射已存在".to_string())
-                } else {
-                    AppError::Database(e)
-                }
-            }
-            _ => AppError::Database(e),
-        })?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(mapping)
     }
@@ -473,7 +470,7 @@ impl OAuthService {
         .await
         .map_err(|e| match &e {
             sqlx::Error::Database(db_err) => {
-                if db_err.constraint().map(|c| c.contains("unique")).unwrap_or(false) {
+                if db_err.code().as_deref() == Some("23505") {
                     AppError::Conflict("资源绑定已存在".to_string())
                 } else {
                     AppError::Database(e)
@@ -553,6 +550,19 @@ impl OAuthService {
             return Err(AppError::NotFound);
         }
         Ok(())
+    }
+
+    pub async fn get_resource_binding(&self, binding_id: Uuid) -> Result<RoomResourceBinding> {
+        sqlx::query_as::<_, RoomResourceBinding>(
+            "SELECT * FROM room_resource_bindings WHERE id = $1"
+        )
+        .bind(binding_id)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => AppError::NotFound,
+            _ => AppError::Database(e),
+        })
     }
 
     // ═══════════════════════════════════════════════

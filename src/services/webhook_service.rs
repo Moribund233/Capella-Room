@@ -156,6 +156,7 @@ impl WebhookService {
             let sub_url = sub.url.clone();
             let sub_secret = sub.secret.clone();
             let sub_timeout = sub.timeout_ms;
+            let sub_retry_interval = sub.retry_interval_secs;
             let evt = event_type_owned.clone();
             tokio::spawn(async move {
                 let result = deliver_once(
@@ -175,13 +176,14 @@ impl WebhookService {
                     r#"UPDATE webhook_deliveries
                        SET status = $1, http_status = $2, response_body = $3,
                            completed_at = CASE WHEN $1 = 'success' THEN NOW() ELSE completed_at END,
-                           next_retry_at = CASE WHEN $1 = 'failed' THEN NOW() + INTERVAL '10 seconds' ELSE NULL END
+                           next_retry_at = CASE WHEN $1 = 'failed' THEN NOW() + $5 * INTERVAL '1 second' ELSE NULL END
                        WHERE id = $4"#
                 )
                 .bind(&status)
                 .bind(http_status)
                 .bind(response_body)
                 .bind(delivery_id)
+                .bind(sub_retry_interval)
                 .execute(db.pool())
                 .await;
             });

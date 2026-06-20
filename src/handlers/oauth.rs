@@ -1,4 +1,5 @@
 use axum::{
+    body::Bytes,
     extract::{Extension, Form, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
@@ -10,19 +11,14 @@ use validator::Validate;
 
 use crate::{
     error::{AppError, Result},
+    middleware::oauth_auth::{extract_user_id_from_auth, AppAuth},
     models::{
         oauth::*,
         response::ApiResponse,
     },
-    services::auth_service::Claims,
     state::AppState,
+    websocket::protocol::WebSocketMessage,
 };
-
-// ─── Helper ───
-
-fn extract_user_id(claims: &Claims) -> Result<Uuid> {
-    Uuid::parse_str(&claims.sub).map_err(|_| AppError::Auth("无效的用户 ID".to_string()))
-}
 
 // ═══════════════════════════════════════════════
 // 3.1 OAuth App CRUD
@@ -30,10 +26,10 @@ fn extract_user_id(claims: &Claims) -> Result<Uuid> {
 
 pub async fn create_app(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Json(request): Json<CreateOAuthAppRequest>,
 ) -> Result<(StatusCode, Json<ApiResponse<OAuthAppCreatedResponse>>)> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
     request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
 
     let scopes: Vec<String> = request.scopes.unwrap_or_default();
@@ -64,9 +60,9 @@ pub async fn create_app(
 
 pub async fn list_apps(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
 ) -> Result<Json<ApiResponse<Vec<OAuthAppResponse>>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
     let apps = state.oauth_service().list_apps(user_id).await?;
 
     let responses: Vec<OAuthAppResponse> = apps.into_iter().map(|a| OAuthAppResponse {
@@ -85,10 +81,10 @@ pub async fn list_apps(
 
 pub async fn get_app(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path(app_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<OAuthAppResponse>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
     let app = state.oauth_service().get_app(app_id).await?;
     if app.owner_id != user_id {
         return Err(AppError::Forbidden);
@@ -110,11 +106,11 @@ pub async fn get_app(
 
 pub async fn update_app(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path(app_id): Path<Uuid>,
     Json(request): Json<UpdateOAuthAppRequest>,
 ) -> Result<Json<ApiResponse<OAuthAppResponse>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
 
     let name = request.name.as_deref();
     let description_opt = request.description.flatten();
@@ -147,20 +143,20 @@ pub async fn update_app(
 
 pub async fn delete_app(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path(app_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
     state.oauth_service().delete_app(app_id, user_id).await?;
     Ok(Json(ApiResponse::success_with_message("应用已删除")))
 }
 
 pub async fn rotate_secret(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path(app_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<OAuthAppWithSecretResponse>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
     let new_secret = state.oauth_service().rotate_secret(app_id, user_id).await?;
     let app = state.oauth_service().get_app(app_id).await?;
 
@@ -328,8 +324,22 @@ pub async fn authorize_consent(
 
 pub async fn token(
     State(state): State<Arc<AppState>>,
-    Json(request): Json<TokenRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> Result<Json<TokenResponse>> {
+    let content_type = headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    let request: TokenRequest = if content_type.contains("json") {
+        serde_json::from_slice(&body)
+            .map_err(|e| AppError::Validation(format!("JSON 请求体格式错误: {}", e)))?
+    } else {
+        serde_urlencoded::from_bytes(&body)
+            .map_err(|e| AppError::Validation(format!("表单请求体格式错误: {}", e)))?
+    };
+
     match request.grant_type.as_str() {
         "authorization_code" => {
             let code = request.code.ok_or_else(|| AppError::Validation("缺少 code".to_string()))?;
@@ -400,11 +410,30 @@ pub async fn userinfo(
 
 pub async fn create_mapping(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Json(request): Json<CreateMappingRequest>,
 ) -> Result<(StatusCode, Json<ApiResponse<UserIdentityMapping>>)> {
-    let _user_id = extract_user_id(&claims)?;
     request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // 权限验证：OAuth token 必须匹配被映射的用户和 app
+    match &auth {
+        AppAuth::OAuth(oauth_claims) => {
+            let token_user_id = Uuid::parse_str(&oauth_claims.sub)
+                .map_err(|_| AppError::Auth("无效的 token sub".to_string()))?;
+            let token_app_id = Uuid::parse_str(&oauth_claims.aud)
+                .map_err(|_| AppError::Auth("无效的 token aud".to_string()))?;
+
+            if token_user_id != request.user_id {
+                return Err(AppError::Forbidden);
+            }
+            if token_app_id != request.app_id {
+                return Err(AppError::Forbidden);
+            }
+        }
+        AppAuth::User(_) => {
+            // CapellaRoom 内部用户可以直接创建映射
+        }
+    }
 
     let mapping = state.oauth_service().create_mapping(
         request.app_id,
@@ -418,7 +447,7 @@ pub async fn create_mapping(
 
 pub async fn lookup_mapping(
     State(state): State<Arc<AppState>>,
-    Extension(_claims): Extension<Claims>,
+    Extension(_auth): Extension<AppAuth>,
     Query(query): Query<MappingLookupQuery>,
 ) -> Result<Json<ApiResponse<Option<UserIdentityMapping>>>> {
     let mapping = state.oauth_service().lookup_mapping(query.app_id, &query.external_user_id).await?;
@@ -427,7 +456,7 @@ pub async fn lookup_mapping(
 
 pub async fn delete_mapping_handler(
     State(state): State<Arc<AppState>>,
-    Extension(_claims): Extension<Claims>,
+    Extension(_auth): Extension<AppAuth>,
     Path(mapping_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>> {
     state.oauth_service().delete_mapping(mapping_id).await?;
@@ -440,14 +469,13 @@ pub async fn delete_mapping_handler(
 
 pub async fn bind_resource(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path(room_id): Path<Uuid>,
     Json(request): Json<CreateResourceBindingRequest>,
 ) -> Result<(StatusCode, Json<ApiResponse<RoomResourceBinding>>)> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
     request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
 
-    // Check user is room admin/owner
     let member = state.room_service().get_room_member(room_id, user_id).await?;
     match member {
         Some(m) if matches!(m.role, crate::models::room::MemberRole::Owner | crate::models::room::MemberRole::Admin) => {}
@@ -455,12 +483,21 @@ pub async fn bind_resource(
     }
 
     let binding = state.oauth_service().create_resource_binding(room_id, request).await?;
+
+    // WS broadcast: resource bound
+    if let Ok(json) = (WebSocketMessage::ResourceBound {
+        room_id,
+        binding: serde_json::to_value(&binding).unwrap_or_default(),
+    }).to_json() {
+        let _ = state.ws_manager().broadcast_to_room_all(room_id, json).await;
+    }
+
     Ok((StatusCode::CREATED, Json(ApiResponse::success(binding))))
 }
 
 pub async fn list_bindings(
     State(state): State<Arc<AppState>>,
-    Extension(_claims): Extension<Claims>,
+    Extension(_auth): Extension<AppAuth>,
     Path(room_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<Vec<RoomResourceBinding>>>> {
     let bindings = state.oauth_service().list_resource_bindings(room_id).await?;
@@ -469,7 +506,7 @@ pub async fn list_bindings(
 
 pub async fn lookup_resource(
     State(state): State<Arc<AppState>>,
-    Extension(_claims): Extension<Claims>,
+    Extension(_auth): Extension<AppAuth>,
     Query(query): Query<ResourceLookupQuery>,
 ) -> Result<Json<ApiResponse<Option<RoomResourceBinding>>>> {
     let binding = state.oauth_service().lookup_resource(query.app_id, &query.resource_type, &query.resource_id).await?;
@@ -478,11 +515,11 @@ pub async fn lookup_resource(
 
 pub async fn update_binding(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path((room_id, binding_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<UpdateResourceBindingRequest>,
 ) -> Result<Json<ApiResponse<RoomResourceBinding>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
 
     let member = state.room_service().get_room_member(room_id, user_id).await?;
     match member {
@@ -497,15 +534,23 @@ pub async fn update_binding(
         request.metadata,
     ).await?;
 
+    // WS broadcast: resource binding updated
+    if let Ok(json) = (WebSocketMessage::ResourceBindingUpdated {
+        room_id,
+        binding: serde_json::to_value(&binding).unwrap_or_default(),
+    }).to_json() {
+        let _ = state.ws_manager().broadcast_to_room_all(room_id, json).await;
+    }
+
     Ok(Json(ApiResponse::success(binding)))
 }
 
 pub async fn unbind_resource(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    Extension(auth): Extension<AppAuth>,
     Path((room_id, binding_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<ApiResponse<()>>> {
-    let user_id = extract_user_id(&claims)?;
+    let user_id = extract_user_id_from_auth(&auth)?;
 
     let member = state.room_service().get_room_member(room_id, user_id).await?;
     match member {
@@ -513,6 +558,18 @@ pub async fn unbind_resource(
         _ => return Err(AppError::Forbidden),
     }
 
+    let binding = state.oauth_service().get_resource_binding(binding_id).await?;
     state.oauth_service().delete_resource_binding(binding_id).await?;
+
+    // WS broadcast: resource unbound
+    if let Ok(json) = (WebSocketMessage::ResourceUnbound {
+        room_id,
+        binding_id,
+        resource_type: binding.resource_type.clone(),
+        resource_id: binding.resource_id.clone(),
+    }).to_json() {
+        let _ = state.ws_manager().broadcast_to_room_all(room_id, json).await;
+    }
+
     Ok(Json(ApiResponse::success_with_message("资源已解绑")))
 }

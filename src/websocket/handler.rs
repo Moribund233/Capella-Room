@@ -1429,7 +1429,7 @@ async fn handle_mentions(
         room_id,
         mentioned_by: sender_id,
         mentioned_by_name: sender_name.to_string(),
-        content_preview,
+        content_preview: content_preview.clone(),
         created_at: *created_at,
     };
 
@@ -1441,6 +1441,18 @@ async fn handle_mentions(
     {
         warn!("Failed to send mention notifications: {}", e);
     }
+
+    // Webhook: user.mentioned
+    let _ = state.webhook_service().dispatch_event(
+        "user.mentioned",
+        serde_json::json!({
+            "room_id": room_id,
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "message_id": message_id,
+            "content_preview": content_preview,
+        }),
+    ).await;
 }
 
 /// 处理正在输入
@@ -1832,6 +1844,16 @@ async fn handle_update_status(
                 }
             }
 
+            // Webhook: user.status_changed
+            let _ = state.webhook_service().dispatch_event(
+                "user.status_changed",
+                serde_json::json!({
+                    "user_id": user_id,
+                    "username": username,
+                    "status": format!("{:?}", status),
+                }),
+            ).await;
+
             info!("User {} status updated to {:?}", user_id, status);
         }
         Err(e) => {
@@ -1995,6 +2017,18 @@ async fn handle_add_reaction(
                     .broadcast_to_room_all(room_id, json)
                     .await;
             }
+
+            // Webhook: reaction.added
+            let _ = state.webhook_service().dispatch_event(
+                "reaction.added",
+                serde_json::json!({
+                    "message_id": message_id,
+                    "room_id": room_id,
+                    "user_id": user_id,
+                    "emoji": emoji,
+                }),
+            ).await;
+
             info!(
                 "Reaction {} added by user {} to message {} in room {}",
                 emoji, user_id, message_id, room_id
@@ -2060,6 +2094,18 @@ async fn handle_remove_reaction(
                     .broadcast_to_room_all(room_id, json)
                     .await;
             }
+
+            // Webhook: reaction.removed
+            let _ = state.webhook_service().dispatch_event(
+                "reaction.removed",
+                serde_json::json!({
+                    "message_id": message_id,
+                    "room_id": room_id,
+                    "user_id": user_id,
+                    "emoji": emoji,
+                }),
+            ).await;
+
             info!(
                 "Reaction {} removed by user {} from message {} in room {}",
                 emoji, user_id, message_id, room_id

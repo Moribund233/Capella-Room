@@ -15,6 +15,7 @@ use crate::{
     middleware::admin::admin_auth_middleware,
     middleware::audit::audit_middleware,
     middleware::auth_middleware,
+    middleware::oauth_auth::oauth_auth_middleware,
     state::AppState,
     websocket::handler::ws_handler,
 };
@@ -82,14 +83,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .nest("/api/upload", upload_routes())
         // UI 配置路由
         .nest(&format!("/api/{}/ui/", API_VERSION), ui_config_routes())
-        // OAuth 受保护路由（App CRUD, mappings, userinfo）
-        .merge(oauth_protected_routes())
-        // 房间资源绑定路由
-        .merge(room_resource_routes())
-        // Webhook 订阅路由
-        .merge(webhook_routes())
-        // 自定义事件 HTTP API 路由
-        .merge(custom_event_routes())
         // 添加审计中间件
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
@@ -121,6 +114,17 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             auth_middleware,
         ));
 
+    // 创建 OAuth API 路由（接受 OAuth access_token 或 CapellaRoom JWT）
+    let oauth_api_routes = Router::new()
+        .merge(oauth_protected_routes())
+        .merge(room_resource_routes())
+        .merge(webhook_routes())
+        .merge(custom_event_routes())
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            oauth_auth_middleware,
+        ));
+
     // 合并所有路由
     public_routes
         .merge(auth_routes_router)
@@ -129,6 +133,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .merge(register_admin_router)
         .merge(protected_routes)
         .merge(admin_routes)
+        .merge(oauth_api_routes)
         .with_state(state)
 }
 
@@ -520,7 +525,7 @@ async fn liveness_check() -> axum::Json<serde_json::Value> {
 
 /// 检查数据库健康状态
 async fn check_database_health(state: &AppState) -> bool {
-    let result: Result<(i64,), _> = sqlx::query_as("SELECT 1")
+    let result: Result<(i32,), _> = sqlx::query_as("SELECT 1")
         .fetch_one(state.db().pool())
         .await;
     result.is_ok()

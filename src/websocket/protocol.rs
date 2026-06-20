@@ -444,6 +444,27 @@ pub enum WebSocketMessage {
         events: Vec<CustomEventForwardPayload>,
         has_more: bool,
     },
+
+    // ========== 资源绑定事件 ==========
+    /// 资源已绑定到房间
+    ResourceBound {
+        room_id: Uuid,
+        binding: serde_json::Value,
+    },
+
+    /// 资源绑定已更新
+    ResourceBindingUpdated {
+        room_id: Uuid,
+        binding: serde_json::Value,
+    },
+
+    /// 资源已解绑
+    ResourceUnbound {
+        room_id: Uuid,
+        binding_id: Uuid,
+        resource_type: String,
+        resource_id: String,
+    },
 }
 
 /// 自定义事件转发 payload（用于 MissedCustomEvents）

@@ -13,6 +13,7 @@ use crate::{error::AppError, services::auth_service::Claims, state::AppState};
 
 pub mod admin;
 pub mod audit;
+pub mod oauth_auth;
 
 /// 认证中间件
 /// 从Authorization头中提取JWT Token并验证
