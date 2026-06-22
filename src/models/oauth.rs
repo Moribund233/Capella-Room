@@ -123,7 +123,7 @@ pub struct OAuthAppWithSecretResponse {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthorizeRequest {
     pub response_type: String,
-    pub client_id: Uuid,
+    pub client_id: String,
     pub redirect_uri: String,
     pub state: Option<String>,
     pub scope: Option<String>,
@@ -133,7 +133,7 @@ pub struct AuthorizeRequest {
 pub struct AuthorizeFormRequest {
     pub email: String,
     pub password: String,
-    pub client_id: Uuid,
+    pub client_id: String,
     pub redirect_uri: String,
     pub response_type: String,
     pub state: Option<String>,
@@ -143,7 +143,7 @@ pub struct AuthorizeFormRequest {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConsentFormRequest {
     pub auth_session_token: String,
-    pub client_id: Uuid,
+    pub client_id: String,
     pub redirect_uri: String,
     pub response_type: String,
     pub state: Option<String>,
@@ -156,7 +156,7 @@ pub struct TokenRequest {
     pub grant_type: String,
     pub code: Option<String>,
     pub redirect_uri: Option<String>,
-    pub client_id: Uuid,
+    pub client_id: String,
     pub client_secret: String,
     pub refresh_token: Option<String>,
 }
@@ -217,6 +217,15 @@ pub struct RoomResourceBinding {
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct AutoCreateResourceRequest {
+    #[validate(length(min = 1, max = 64))]
+    pub resource_type: String,
+    #[validate(length(min = 1, max = 255))]
+    pub resource_id: String,
+    pub resource_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Validate)]

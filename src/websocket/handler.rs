@@ -152,20 +152,24 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
     let (tx, mut rx) = mpsc::channel::<String>(buffer_size);
 
     // 等待认证或重连消息
-    let (user_id, username, rooms_to_rejoin, is_reconnect, token) =
+    let (user_id, username, rooms_to_rejoin, is_reconnect, token, oauth_app_id, oauth_app_name) =
         match wait_for_auth(&mut receiver, &state).await {
             Ok(auth_result) => match auth_result {
                 AuthResult::NewConnection {
                     user_id,
                     username,
                     token,
-                } => (user_id, username, Vec::new(), false, token),
+                    oauth_app_id,
+                    oauth_app_name,
+                } => (user_id, username, Vec::new(), false, token, oauth_app_id, oauth_app_name),
                 AuthResult::Reconnection {
                     user_id,
                     username,
                     rooms_to_rejoin,
                     token,
-                } => (user_id, username, rooms_to_rejoin, true, token),
+                    oauth_app_id,
+                    oauth_app_name,
+                } => (user_id, username, rooms_to_rejoin, true, token, oauth_app_id, oauth_app_name),
             },
             Err(e) => {
                 warn!("WebSocket authentication failed: {}", e);
@@ -336,8 +340,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                 }
                 // 定时验证 Token 是否过期
                 _ = token_check_interval.tick() => {
-                    if let Err(e) = state_for_send.auth_service().verify_access_token(&token) {
-                        warn!("Token expired for user: {}, disconnecting: {}", user_id, e);
+                    let token_valid = match oauth_app_id {
+                        Some(_) => state_for_send.oauth_service().verify_access_token(&token).is_ok(),
+                        None => state_for_send.auth_service().verify_access_token(&token).is_ok(),
+                    };
+                    if !token_valid {
+                        warn!("Token expired for user: {}, disconnecting", user_id);
                         // 发送 Token 过期错误消息
                         let expired_msg = WebSocketMessage::error("TOKEN_EXPIRED", "Token expired, please reconnect");
                         if let Ok(json) = expired_msg.to_json() {
@@ -379,6 +387,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
     let state_clone = Arc::clone(&state);
     let tx_clone = tx.clone();
     let username_for_recv = username.clone();
+    let source_app_for_recv = oauth_app_name.clone();
 
     // 初始化连接状态为已认证（因为 wait_for_auth 已经成功返回）
     let connection_state = ConnectionState::Authenticated;
@@ -420,9 +429,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                             let uid = user_id;
                             let uname = username_for_recv.clone();
                             let lp = last_pong_clone.clone();
+                            let sa = source_app_for_recv.clone();
                             tokio::spawn(async move {
                                 if let Err(e) =
-                                    handle_message(ws_msg, uid, &uname, &state, &tx, &lp).await
+                                    handle_message(ws_msg, uid, &uname, &state, &tx, &lp, sa).await
                                 {
                                     warn!("Error handling message: {}", e);
                                 }
@@ -435,6 +445,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                                 &state_clone,
                                 &tx_clone,
                                 &last_pong_clone,
+                                source_app_for_recv.clone(),
                             )
                             .await
                             {
@@ -498,6 +509,8 @@ enum AuthResult {
         user_id: Uuid,
         username: String,
         token: String,
+        oauth_app_id: Option<Uuid>,
+        oauth_app_name: Option<String>,
     },
     /// 重连（携带需要恢复的房间列表）
     Reconnection {
@@ -505,6 +518,8 @@ enum AuthResult {
         username: String,
         rooms_to_rejoin: Vec<Uuid>,
         token: String,
+        oauth_app_id: Option<Uuid>,
+        oauth_app_name: Option<String>,
     },
 }
 
@@ -532,10 +547,12 @@ async fn wait_for_auth(
                         info!("Received authentication request");
                         authenticate_token(&token, state)
                             .await
-                            .map(|(user_id, username)| AuthResult::NewConnection {
+                            .map(|(user_id, username, oauth_app_id, oauth_app_name)| AuthResult::NewConnection {
                                 user_id,
                                 username,
                                 token: token.clone(),
+                                oauth_app_id,
+                                oauth_app_name,
                             })
                     }
                     // 重连请求
@@ -592,26 +609,43 @@ async fn wait_for_auth(
 
 /// 验证 Token 并返回用户信息
 ///
-/// 优化：优先从JWT claims中获取用户名，避免数据库查询
-async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uuid, String)> {
+/// 先尝试 OAuth access_token（外部服务），再回退到 CapellaRoom 系统 JWT
+/// 返回 (user_id, username, oauth_app_id, oauth_app_name)
+async fn authenticate_token(token: &str, state: &AppState) -> anyhow::Result<(Uuid, String, Option<Uuid>, Option<String>)> {
     debug!("Authenticating token");
 
+    // 先尝试 OAuth access_token
+    if let Ok(oauth_claims) = state.oauth_service().verify_access_token(token) {
+        debug!("OAuth token verified successfully");
+        let user_id = Uuid::parse_str(&oauth_claims.sub)
+            .map_err(|_| anyhow::anyhow!("Invalid user ID in OAuth token"))?;
+        let app_id = Uuid::parse_str(&oauth_claims.aud).ok();
+        let app_name = if let Some(aid) = app_id {
+            state.oauth_service().get_app(aid).await.ok().map(|a| a.name)
+        } else {
+            None
+        };
+        let user = state.user_service().get_user_by_id(user_id).await?
+            .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+        return Ok((user_id, user.username, app_id, app_name));
+    }
+
+    // 回退到 CapellaRoom 系统 JWT
     match state.auth_service().verify_access_token(token) {
         Ok(claims) => {
-            debug!("Token verified successfully");
+            debug!("JWT verified successfully");
             let user_id = state.auth_service().extract_user_id(&claims).map_err(|e| {
                 error!("Failed to extract user ID from claims: {}", e);
                 anyhow::anyhow!("Invalid user ID: {}", e)
             })?;
 
-            // 查询数据库验证用户仍然存在（比 JWT claims 更可靠）
             match state.user_service().get_user_by_id(user_id).await {
                 Ok(Some(user)) => {
                     debug!(
                         "User authenticated from database: {} ({})",
                         user.username, user_id
                     );
-                    Ok((user_id, user.username))
+                    Ok((user_id, user.username, None, None))
                 }
                 Ok(None) => {
                     error!("User not found: {}", user_id);
@@ -635,7 +669,7 @@ async fn handle_reconnect(token: &str, state: &AppState) -> anyhow::Result<AuthR
     debug!("Handling reconnection request");
 
     // 验证 token
-    let (user_id, username) = authenticate_token(token, state).await?;
+    let (user_id, username, oauth_app_id, oauth_app_name) = authenticate_token(token, state).await?;
 
     // 检查用户是否已有活跃连接
     let rooms_to_rejoin = if state.ws_manager().is_user_connected(user_id) {
@@ -658,6 +692,8 @@ async fn handle_reconnect(token: &str, state: &AppState) -> anyhow::Result<AuthR
         username,
         rooms_to_rejoin,
         token: token.to_string(),
+        oauth_app_id,
+        oauth_app_name,
     })
 }
 
@@ -669,6 +705,7 @@ async fn handle_message(
     state: &Arc<AppState>,
     tx: &mpsc::Sender<String>,
     last_pong: &Arc<std::sync::Mutex<Instant>>,
+    source_app: Option<String>,
 ) -> anyhow::Result<()> {
     match msg {
         // 心跳请求 - 回复 Pong（支持客户端主导的心跳）
@@ -812,7 +849,17 @@ async fn handle_message(
             data,
             persistent,
         } => {
-            handle_custom_event(user_id, &event_name, room_id, data, persistent, state, tx).await?;
+            handle_custom_event(
+                user_id,
+                &event_name,
+                room_id,
+                data,
+                persistent,
+                state,
+                tx,
+                source_app.as_deref(),
+            )
+            .await?;
         }
 
         WebSocketMessage::GetMissedCustomEvents { room_id, since } => {
@@ -2265,6 +2312,7 @@ async fn handle_custom_event(
     persistent: Option<bool>,
     state: &Arc<AppState>,
     tx: &mpsc::Sender<String>,
+    source_app: Option<&str>,
 ) -> anyhow::Result<()> {
     if !event_name.contains(':') {
         let error_msg = WebSocketMessage::error("INVALID_EVENT_NAME", "Event name must contain ':' (namespace:event)");
@@ -2283,17 +2331,37 @@ async fn handle_custom_event(
         return Ok(());
     }
 
+    let namespace = event_name.split(':').next().unwrap_or("unknown");
+    let source_app = match source_app {
+        // OAuth 连接：验证 namespace 与应用名匹配
+        Some(app_name) => {
+            if namespace != app_name {
+                let error_msg = WebSocketMessage::error(
+                    "INVALID_EVENT_NAME",
+                    &format!("Event namespace '{}' does not match OAuth app '{}'", namespace, app_name),
+                );
+                if let Ok(json) = error_msg.to_json() {
+                    let _ = tx.send(json).await;
+                }
+                return Ok(());
+            }
+            app_name.to_string()
+        }
+        // 普通用户连接：namespace 作为 source_app
+        None => namespace.to_string(),
+    };
+
     let is_persistent = persistent.unwrap_or(false);
     if is_persistent {
         state.custom_event_service().store_event(
-            event_name, room_id, "self", &data,
+            event_name, room_id, &source_app, &data,
         ).await?;
     }
 
     let forward = WebSocketMessage::CustomEventForward {
         event_name: event_name.to_string(),
         room_id,
-        source_app: "self".to_string(),
+        source_app,
         data,
         timestamp: chrono::Utc::now(),
     };

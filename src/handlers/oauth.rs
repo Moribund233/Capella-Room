@@ -11,7 +11,7 @@ use validator::Validate;
 
 use crate::{
     error::{AppError, Result},
-    middleware::oauth_auth::{extract_user_id_from_auth, AppAuth},
+    middleware::oauth_auth::{extract_app_id_from_auth, extract_user_id_from_auth, AppAuth},
     models::{
         oauth::*,
         response::ApiResponse,
@@ -19,6 +19,18 @@ use crate::{
     state::AppState,
     websocket::protocol::WebSocketMessage,
 };
+
+/// 解析 OAuth client_id 字符串为 Uuid
+/// RFC 6749 定义 client_id 为字符串，但 CapellaRoom 内部使用 UUID 作为 app 的主键
+fn parse_client_id(client_id: &str) -> Result<Uuid> {
+    Uuid::parse_str(client_id).map_err(|_| {
+        AppError::Validation(format!(
+            "client_id '{}' 不是合法的 UUID 格式。OAuth 应用 client_id 是 CapellaRoom 中应用的 UUID，\
+             请检查配置或通过 CapellaRoom 管理页面获取正确的 client_id",
+            client_id
+        ))
+    })
+}
 
 // ═══════════════════════════════════════════════
 // 3.1 OAuth App CRUD
@@ -183,7 +195,8 @@ pub async fn authorize_get(
     State(state): State<Arc<AppState>>,
     Query(params): Query<AuthorizeRequest>,
 ) -> Result<Response> {
-    let app = state.oauth_service().get_app(params.client_id).await?;
+    let client_id = parse_client_id(&params.client_id)?;
+    let app = state.oauth_service().get_app(client_id).await?;
     if !app.is_active {
         return Err(AppError::Auth("应用未激活".to_string()));
     }
@@ -198,7 +211,7 @@ pub async fn authorize_get(
 
     let login_html = include_str!("../oauth/templates/login.html");
     let html = login_html
-        .replace("{{client_id}}", &params.client_id.to_string())
+        .replace("{{client_id}}", &params.client_id)
         .replace("{{redirect_uri}}", &params.redirect_uri)
         .replace("{{state}}", &params.state.unwrap_or_default())
         .replace("{{scope}}", &params.scope.unwrap_or_default())
@@ -212,7 +225,8 @@ pub async fn authorize_post(
     State(state): State<Arc<AppState>>,
     Form(form): Form<AuthorizeFormRequest>,
 ) -> Result<Response> {
-    let app = state.oauth_service().get_app(form.client_id).await?;
+    let client_id = parse_client_id(&form.client_id)?;
+    let app = state.oauth_service().get_app(client_id).await?;
     if !app.is_active {
         return Err(AppError::Auth("应用未激活".to_string()));
     }
@@ -227,7 +241,7 @@ pub async fn authorize_post(
         Ok(None) => {
             let login_html = include_str!("../oauth/templates/login.html");
             let html = login_html
-                .replace("{{client_id}}", &form.client_id.to_string())
+                .replace("{{client_id}}", &form.client_id)
                 .replace("{{redirect_uri}}", &form.redirect_uri)
                 .replace("{{state}}", &form.state.unwrap_or_default())
                 .replace("{{scope}}", &form.scope.unwrap_or_default())
@@ -241,7 +255,7 @@ pub async fn authorize_post(
     if user.is_account_disabled() {
         let login_html = include_str!("../oauth/templates/login.html");
         let html = login_html
-            .replace("{{client_id}}", &form.client_id.to_string())
+            .replace("{{client_id}}", &form.client_id)
             .replace("{{redirect_uri}}", &form.redirect_uri)
             .replace("{{state}}", &form.state.unwrap_or_default())
             .replace("{{scope}}", &form.scope.unwrap_or_default())
@@ -254,7 +268,7 @@ pub async fn authorize_post(
     if !password_valid {
         let login_html = include_str!("../oauth/templates/login.html");
         let html = login_html
-            .replace("{{client_id}}", &form.client_id.to_string())
+            .replace("{{client_id}}", &form.client_id)
             .replace("{{redirect_uri}}", &form.redirect_uri)
             .replace("{{state}}", &form.state.unwrap_or_default())
             .replace("{{scope}}", &form.scope.unwrap_or_default())
@@ -264,14 +278,14 @@ pub async fn authorize_post(
     }
 
     // Create auth session token
-    let session_token = state.oauth_service().create_auth_session_token(user.id, form.client_id)?;
+    let session_token = state.oauth_service().create_auth_session_token(user.id, client_id)?;
 
     // Render consent page
     let consent_html = include_str!("../oauth/templates/consent.html");
     let app_name_short = app.name.chars().next().unwrap_or('?').to_string();
     let html = consent_html
         .replace("{{auth_session_token}}", &session_token)
-        .replace("{{client_id}}", &form.client_id.to_string())
+        .replace("{{client_id}}", &form.client_id)
         .replace("{{redirect_uri}}", &form.redirect_uri)
         .replace("{{response_type}}", &form.response_type)
         .replace("{{state}}", &form.state.unwrap_or_default())
@@ -287,9 +301,10 @@ pub async fn authorize_consent(
     State(state): State<Arc<AppState>>,
     Form(form): Form<ConsentFormRequest>,
 ) -> Result<Response> {
+    let client_id = parse_client_id(&form.client_id)?;
     let session = state.oauth_service().verify_auth_session_token(&form.auth_session_token)?;
 
-    if session.client_id != form.client_id {
+    if session.client_id != client_id {
         return Err(AppError::Auth("client_id 不匹配".to_string()));
     }
 
@@ -301,7 +316,7 @@ pub async fn authorize_consent(
 
     if form.approve.as_deref() == Some("true") {
         let auth_code = state.oauth_service().create_authorization_code(
-            form.client_id,
+            client_id,
             session.user_id,
             &form.redirect_uri,
             &scopes,
@@ -340,6 +355,8 @@ pub async fn token(
             .map_err(|e| AppError::Validation(format!("表单请求体格式错误: {}", e)))?
     };
 
+    let client_id = parse_client_id(&request.client_id)?;
+
     match request.grant_type.as_str() {
         "authorization_code" => {
             let code = request.code.ok_or_else(|| AppError::Validation("缺少 code".to_string()))?;
@@ -347,7 +364,7 @@ pub async fn token(
 
             let (auth_code, _) = state.oauth_service().exchange_code(
                 &code,
-                request.client_id,
+                client_id,
                 &request.client_secret,
                 &redirect_uri,
             ).await?;
@@ -355,7 +372,7 @@ pub async fn token(
             let scopes = auth_code.scopes.unwrap_or_default();
             let response = state.oauth_service().generate_tokens(
                 auth_code.user_id,
-                request.client_id,
+                client_id,
                 &scopes,
             ).await?;
 
@@ -366,7 +383,7 @@ pub async fn token(
 
             let response = state.oauth_service().exchange_refresh_token(
                 &refresh_token,
-                request.client_id,
+                client_id,
                 &request.client_secret,
             ).await?;
 
@@ -374,7 +391,7 @@ pub async fn token(
         }
         "client_credentials" => {
             let response = state.oauth_service().client_credentials_grant(
-                request.client_id,
+                client_id,
                 &request.client_secret,
             ).await?;
 
@@ -572,4 +589,61 @@ pub async fn unbind_resource(
     }
 
     Ok(Json(ApiResponse::success_with_message("资源已解绑")))
+}
+
+pub async fn bind_resource_auto_create(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<AppAuth>,
+    Json(request): Json<AutoCreateResourceRequest>,
+) -> Result<(StatusCode, Json<ApiResponse<serde_json::Value>>)> {
+    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let user_id = extract_user_id_from_auth(&auth)?;
+    let app_id = extract_app_id_from_auth(&auth)
+        .ok_or_else(|| AppError::Auth("此接口需要 OAuth access_token 认证".to_string()))?;
+
+    // 重复检查：同 app + resource_type + resource_id 返回 409
+    if let Some(existing) = state.oauth_service().lookup_resource(app_id, &request.resource_type, &request.resource_id).await? {
+        return Err(AppError::Conflict(format!(
+            "资源绑定已存在：room_id={}, binding_id={}", existing.room_id, existing.id
+        )));
+    }
+
+    let room_name = request.resource_name
+        .clone()
+        .map(|n| format!("{} 聊天室", n))
+        .unwrap_or_else(|| format!("{}:{} 聊天室", request.resource_type, request.resource_id));
+
+    let room = state.room_service().create_room(
+        &room_name,
+        Some(&format!("资源 {}:{} 的自动创建聊天室", request.resource_type, request.resource_id)),
+        user_id,
+        false,
+        100,
+    ).await?;
+
+    let binding_request = CreateResourceBindingRequest {
+        app_id,
+        resource_type: request.resource_type.clone(),
+        resource_id: request.resource_id.clone(),
+        resource_url: None,
+        resource_name: request.resource_name,
+        metadata: None,
+    };
+    let binding = state.oauth_service().create_resource_binding(room.id, binding_request).await?;
+
+    // WS 广播
+    if let Ok(json) = (WebSocketMessage::ResourceBound {
+        room_id: room.id,
+        binding: serde_json::to_value(&binding).unwrap_or_default(),
+    }).to_json() {
+        let _ = state.ws_manager().broadcast_to_room_all(room.id, json).await;
+    }
+
+    let response = serde_json::json!({
+        "room": room,
+        "binding": binding,
+    });
+
+    Ok((StatusCode::CREATED, Json(ApiResponse::success(response))))
 }

@@ -580,7 +580,7 @@ fn oauth_protected_routes() -> Router<Arc<AppState>> {
         .route("/oauth/apps/:app_id/rotate-secret", post(oauth::rotate_secret))
         .route("/oauth/mappings", post(oauth::create_mapping).get(oauth::lookup_mapping))
         .route("/oauth/mappings/:mapping_id", delete(oauth::delete_mapping_handler))
-        .route("/oauth/resources", get(oauth::lookup_resource))
+        .route("/oauth/resources", get(oauth::lookup_resource).post(oauth::bind_resource_auto_create))
 }
 
 /// 房间资源绑定路由（需要认证）
