@@ -231,13 +231,14 @@ watch(
 )
 
 onMounted(() => {
-  // 初始化日志流处理器
+  // 初始化日志流处理器并自动订阅
   systemLogsStore.init()
 })
 
 onUnmounted(() => {
-  // 组件卸载时取消订阅
+  // 组件卸载时取消订阅并注销处理器
   systemLogsStore.unsubscribe()
+  systemLogsStore.destroy()
 })
 </script>
 

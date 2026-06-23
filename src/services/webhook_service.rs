@@ -363,6 +363,7 @@ impl WebhookService {
 
 // ─── Standalone delivery function ───
 
+#[allow(clippy::too_many_arguments)]
 async fn deliver_once(
     http_client: &reqwest::Client,
     url: &str,

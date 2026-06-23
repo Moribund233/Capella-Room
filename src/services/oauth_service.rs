@@ -411,7 +411,7 @@ impl OAuthService {
         .bind(external_username)
         .fetch_one(self.db.pool())
         .await
-        .map_err(|e| AppError::Database(e))?;
+        .map_err(AppError::Database)?;
 
         Ok(mapping)
     }

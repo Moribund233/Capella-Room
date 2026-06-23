@@ -600,6 +600,7 @@ mod websocket_message_tests {
             room_id,
             content: "Hello, World!".to_string(),
             reply_to: None,
+            message_type: None,
         };
         write
             .send(Message::Text(chat_msg.to_json().unwrap()))
@@ -657,6 +658,7 @@ mod websocket_message_tests {
             room_id,
             content: "Hello!".to_string(),
             reply_to: None,
+            message_type: None,
         };
         write
             .send(Message::Text(chat_msg.to_json().unwrap()))
@@ -715,6 +717,7 @@ mod websocket_message_tests {
             room_id,
             content: "Original content".to_string(),
             reply_to: None,
+            message_type: None,
         };
         write
             .send(Message::Text(chat_msg.to_json().unwrap()))
@@ -808,6 +811,7 @@ mod websocket_message_tests {
             room_id,
             content: "To be deleted".to_string(),
             reply_to: None,
+            message_type: None,
         };
         write
             .send(Message::Text(chat_msg.to_json().unwrap()))
@@ -895,6 +899,7 @@ mod websocket_message_tests {
             room_id,
             content: "User1 message".to_string(),
             reply_to: None,
+            message_type: None,
         };
         write1
             .send(Message::Text(chat_msg.to_json().unwrap()))
@@ -1159,10 +1164,12 @@ mod websocket_protocol_tests {
                 room_id: rid,
                 content,
                 reply_to,
+                message_type,
             } => {
                 assert_eq!(rid, room_id);
                 assert_eq!(content, "Hello");
                 assert_eq!(reply_to, None);
+                assert!(message_type.is_none());
             }
             _ => panic!("Expected ChatMessage"),
         }
@@ -1180,6 +1187,7 @@ mod websocket_protocol_tests {
             sender_id: user_id,
             sender_name: "TestUser".to_string(),
             content: "Test message content".to_string(),
+            message_type: capella_room::models::message::MessageType::Text,
             reply_to: None,
             reply_to_message: None,
             created_at: chrono::Utc::now(),

@@ -414,8 +414,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                             continue;
                         }
 
-                        // ChatMessage/EditMessage/DeleteMessage/AddReaction/RemoveReaction 包含 DB 写入操作，
-                        // 耗时较长。spawn 到后台避免阻塞 recv_task 读取下一条消息
+                        // 下列消息会长时间阻塞或包含 DB 写入操作，spawn 到后台避免阻塞 recv_task
+                        // 处理后续消息（如 Pong 心跳响应）
                         if matches!(
                             ws_msg,
                             WebSocketMessage::ChatMessage { .. }
@@ -423,6 +423,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                                 | WebSocketMessage::DeleteMessage { .. }
                                 | WebSocketMessage::AddReaction { .. }
                                 | WebSocketMessage::RemoveReaction { .. }
+                                | WebSocketMessage::SubscribeLogs { .. }
                         ) {
                             let state = state_clone.clone();
                             let tx = tx_clone.clone();
@@ -1235,6 +1236,7 @@ async fn handle_leave_room(
 
 /// 处理聊天消息
 /// 使用批量写入解耦消息收发和持久化，确保实时广播不被数据库写入阻塞
+#[allow(clippy::too_many_arguments)]
 async fn handle_chat_message(
     room_id: Uuid,
     user_id: Uuid,
@@ -2304,6 +2306,7 @@ async fn handle_unpin_message(
 
 // ========== 外部服务自定义事件处理 ==========
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_custom_event(
     user_id: Uuid,
     event_name: &str,

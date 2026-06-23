@@ -35,6 +35,12 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
   /** 最大保留日志条数 */
   const MAX_LOGS_COUNT = 1000
 
+  /** 日志条目处理器引用（用于取消注册） */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let logEntryHandler: ((payload: any) => void) | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let subscriptionConfirmedHandler: ((payload: any) => void) | null = null
+
   // ========== 计算属性 ==========
 
   /** 过滤后的日志列表 */
@@ -166,22 +172,49 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
   }
 
   /**
-   * 初始化日志流（注册WebSocket消息处理器）
+   * 初始化日志流（注册WebSocket消息处理器并自动订阅）
    */
   function init(): void {
     const wsStore = useWebSocketStore()
 
-    // 注册日志条目处理器
-    wsStore.on<LogEntry>('LogEntry', (entry) => {
+    // 先清理已有处理器，避免重复注册
+    destroy()
+
+    // 注册日志条目处理器（保存引用以便后续取消）
+    logEntryHandler = (entry: LogEntry) => {
       handleLogEntry(entry)
-    })
+    }
+    wsStore.on<LogEntry>('LogEntry', logEntryHandler)
 
-    // 注册订阅确认处理器
-    wsStore.on<LogSubscriptionConfirmedPayload>('LogSubscriptionConfirmed', (payload) => {
+    // 注册订阅确认处理器（保存引用以便后续取消）
+    subscriptionConfirmedHandler = (payload: LogSubscriptionConfirmedPayload) => {
       handleSubscriptionConfirmed(payload)
-    })
+    }
+    wsStore.on<LogSubscriptionConfirmedPayload>('LogSubscriptionConfirmed', subscriptionConfirmedHandler)
 
-    console.log('[SystemLogs Store] 已初始化日志流处理器')
+    // WebSocket 全局已连接，自动订阅日志流
+    subscribe()
+
+    console.log('[SystemLogs Store] 已初始化日志流处理器并自动订阅')
+  }
+
+  /**
+   * 销毁日志流（取消注册WebSocket消息处理器）
+   */
+  function destroy(): void {
+    const wsStore = useWebSocketStore()
+
+    if (logEntryHandler) {
+      wsStore.off('LogEntry', logEntryHandler)
+      logEntryHandler = null
+    }
+
+    if (subscriptionConfirmedHandler) {
+      wsStore.off('LogSubscriptionConfirmed', subscriptionConfirmedHandler)
+      subscriptionConfirmedHandler = null
+    }
+
+    console.log('[SystemLogs Store] 已注销日志流处理器')
   }
 
   /**
@@ -226,6 +259,7 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
     subscribe,
     unsubscribe,
     init,
+    destroy,
     exportLogs,
     exportLogsAsText,
   }

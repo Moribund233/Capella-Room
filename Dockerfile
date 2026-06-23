@@ -95,6 +95,9 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuse
 # 创建上传目录
 RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 
+# 运行时以 user: "1000:1000" 运行（宿主机用户 UID），日志目录需对所有用户可写
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/target/release/capella-room /app/server
 

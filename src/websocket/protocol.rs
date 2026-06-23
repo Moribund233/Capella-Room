@@ -666,6 +666,7 @@ impl WebSocketMessage {
     }
 
     /// 创建聊天消息
+    #[allow(clippy::too_many_arguments)]
     pub fn new_chat_message(
         message_id: Uuid,
         room_id: Uuid,

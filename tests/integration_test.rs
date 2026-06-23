@@ -696,6 +696,7 @@ async fn test_websocket_complete_messaging_flow() {
         room_id: room_uuid,
         content: "Hello, WebSocket!".to_string(),
         reply_to: None,
+        message_type: None,
     };
     write
         .send(Message::Text(serde_json::to_string(&chat_msg).unwrap()))

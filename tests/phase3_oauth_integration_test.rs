@@ -79,7 +79,7 @@ impl TestServer {
 
 async fn start_test_server() -> Option<TestServer> {
     load_test_env();
-    std::env::set_var("JWT_SECRET", &create_test_jwt_secret());
+    std::env::set_var("JWT_SECRET", create_test_jwt_secret());
 
     let database_url = env::var("DATABASE_URL").ok()?;
     let db_config = DatabaseConfig {
@@ -670,6 +670,7 @@ mod custom_event_http_tests {
 mod webhook_subscription_tests {
     use super::*;
 
+    #[allow(clippy::needless_borrow)]
     async fn create_test_app_get_token(server: &TestServer, username: &str) -> Option<(Uuid, String)> {
         let user_service = UserService::new(server.db().clone());
         let (user_id, _) = create_test_user(&user_service, username).await;
