@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { messageApi } from '@/api/message'
 import { useWebSocketStore } from './websocket'
 import { useAuthStore } from './auth'
-import type { Message, ReplyToMessage, PinnedMessage } from '@/types/message'
+import type { Message, MessageType, ReplyToMessage, PinnedMessage } from '@/types/message'
 import type { NewMessagePayload, MessageEditedPayload, MessageDeletedPayload, MissedMessagesPayload, ReactionAddedPayload, ReactionRemovedPayload, MessagePinnedPayload, MessageUnpinnedPayload } from '@/types/websocket'
 
 export const useMessageStore = defineStore('message', () => {
@@ -43,7 +43,7 @@ export const useMessageStore = defineStore('message', () => {
         avatar_url: null,
       },
       content: payload.content,
-      message_type: payload.message_type || 'text',
+      message_type: (payload.message_type || 'text') as MessageType,
       reply_to: payload.reply_to,
       reply_to_message: replyToMessage,
       is_deleted: false,
@@ -118,7 +118,7 @@ export const useMessageStore = defineStore('message', () => {
         avatar_url: authStore.user?.avatar_url ?? null,
       },
       content: content.trim(),
-      message_type: messageType || 'text',
+      message_type: (messageType || 'text') as MessageType,
       reply_to: replyTo ?? null,
       reply_to_message: null,
       is_deleted: false,

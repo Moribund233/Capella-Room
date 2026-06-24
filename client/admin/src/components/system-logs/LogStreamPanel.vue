@@ -67,19 +67,19 @@
         v-for="(log, i) in systemLogsStore.pagedLogs"
         :key="globalStart + i"
         class="log-entry"
-        :class="[`log-${log.level}`, { expanded: expandedIndices.has(globalStart + i) }]"
+        :class="[`log-${log.level}`, { expanded: expandedIndices.includes(globalStart + i) }]"
         @click="toggleLog(globalStart + i)"
       >
         <div class="log-header">
-          <span class="log-expand-icon">{{ expandedIndices.has(globalStart + i) ? '▾' : '▸' }}</span>
+          <span class="log-expand-icon">{{ expandedIndices.includes(globalStart + i) ? '▾' : '▸' }}</span>
           <span class="log-time">{{ formatTime(log.timestamp) }}</span>
           <n-tag :type="getLevelTagType(log.level) as any" size="tiny" class="log-level">
             {{ log.level.toUpperCase() }}
           </n-tag>
           <span class="log-target">{{ log.target }}</span>
-          <span v-if="!expandedIndices.has(globalStart + i)" class="log-message-preview">{{ log.message }}</span>
+          <span v-if="!expandedIndices.includes(globalStart + i)" class="log-message-preview">{{ log.message }}</span>
         </div>
-        <div v-if="expandedIndices.has(globalStart + i)" class="log-detail">
+        <div v-if="expandedIndices.includes(globalStart + i)" class="log-detail">
           <div class="log-message">{{ log.message }}</div>
           <pre v-if="log.fields" class="log-fields">{{ JSON.stringify(log.fields, null, 2) }}</pre>
         </div>

@@ -92,7 +92,7 @@ async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
     if (response.status === 401) {
       const authStore = useAuthStore()
       authStore.clearAuth()
-      window.location.href = '/login'
+      window.location.href = `${import.meta.env.BASE_URL}login`
     }
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }

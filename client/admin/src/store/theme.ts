@@ -104,7 +104,7 @@ function updateThemeLink(theme: ThemeType): void {
     document.head.appendChild(link)
   }
 
-  link.href = `/Themes/${theme}.css`
+  link.href = `${import.meta.env.BASE_URL}Themes/${theme}.css`
 }
 
 /**

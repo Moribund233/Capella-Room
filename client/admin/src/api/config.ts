@@ -80,9 +80,13 @@ export interface ClientConfig {
  * @returns 客户端配置
  */
 export function getClientConfig(): Promise<ApiResponse<ClientConfig>> {
-  // 客户端配置端点不在 /api/v1 下，需要移除 v1 后缀
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace('/api/v1', '')
-  return http.get<ClientConfig>(`${baseUrl}/api/config/client`)
+  // 客户端配置端点路径固定为 /api/config/client（不在 /api/v1 下）
+  // 用完整 URL 避免 BASE_URL 拼接问题
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1'
+  const origin = apiBaseUrl.startsWith('http')
+    ? new URL(apiBaseUrl).origin
+    : window.location.origin
+  return http.get<ClientConfig>(`${origin}/api/config/client`)
 }
 
 /**

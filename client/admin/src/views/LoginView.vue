@@ -5,7 +5,7 @@
       <n-card class="login-card" :bordered="false">
         <!-- Logo Section -->
         <div class="logo-section">
-          <img src="/favicon.svg" alt="Capella Logo" class="logo-image" />
+          <img :src="`${baseUrl}favicon.svg`" alt="Capella Logo" class="logo-image" />
           <h1 class="logo-title">Capella Admin</h1>
         </div>
 
@@ -29,6 +29,7 @@ import LoginForm from '@/components/login/LoginForm.vue'
 import RegisterForm from '@/components/login/RegisterForm.vue'
 
 const activeTab = ref('login')
+const baseUrl = import.meta.env.BASE_URL
 </script>
 
 <style scoped>
