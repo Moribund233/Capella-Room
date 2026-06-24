@@ -127,14 +127,13 @@ ws://localhost:8080/ws
 | | `MarkNotificationRead` | C→S | 标记通知已读 (❌ 已移除) |
 | | `MarkAllNotificationsRead` | C→S | 标记所有已读 (❌ 已移除) |
 | | `NotificationReadConfirm` | S→C | 已读确认 |
-| | `RespondPendingAction` | C→S | 响应待办通知 |
 | | `GetPendingActions` | C→S | 获取待办列表 |
 | | `PendingActionsList` | S→C | 待办列表响应 |
 
 > **C→S**: Client to Server (客户端发送)  
 > **S→C**: Server to Client (服务端推送)
 >
-> **注意**: 通知的获取和已读标记已迁移到 HTTP API，详见 [通知接口文档](./v1/http/notifications.md)
+> **注意**: 通知的获取、已读标记和待办响应已迁移到 HTTP API，详见 [通知接口文档](./v1/http/notifications.md)
 
 ---
 

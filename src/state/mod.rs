@@ -93,10 +93,10 @@ impl AppState {
         metrics_collector: Arc<MetricsCollector>,
         config_manager: Arc<ConfigManager>,
         redis_manager: Option<Arc<RedisManager>>,
+        broadcaster: LogBroadcaster,
     ) -> anyhow::Result<Arc<Self>> {
-        let log_broadcaster = Arc::new(LogBroadcaster::new(1000));
-        // 初始化全局日志广播器
-        init_global_log_broadcaster((*log_broadcaster).clone());
+        init_global_log_broadcaster(broadcaster.clone());
+        let log_broadcaster = Arc::new(broadcaster);
         let logger = Arc::new(StructuredLogger);
 
         // 在 config 被移入 shared_config 前提取批量消息配置

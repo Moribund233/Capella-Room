@@ -81,10 +81,14 @@ function getHeaders(options: RequestOptions): Record<string, string> {
  * @returns 解析后的数据
  */
 async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
-  const data = await response.json() as ApiResponse<T>
+  let data: ApiResponse<T>
+  try {
+    data = await response.json() as ApiResponse<T>
+  } catch {
+    data = { success: false, message: response.statusText || `HTTP error ${response.status}` } as ApiResponse<T>
+  }
 
   if (!response.ok) {
-    // 处理特定状态码
     if (response.status === 401) {
       const authStore = useAuthStore()
       authStore.clearAuth()

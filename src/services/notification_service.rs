@@ -10,7 +10,7 @@ use crate::{
     services::user_settings_service::UserSettingsService,
     websocket::{
         manager::WebSocketManager,
-        protocol::{NotificationDbType, PendingActionInfo, PendingActionStatus, WebSocketMessage},
+        protocol::{NotificationDbType, PendingActionInfo, PendingActionStatus, PendingActionType, WebSocketMessage},
     },
 };
 
@@ -832,13 +832,13 @@ impl NotificationService {
         &self,
         admin_user_id: Uuid,
         action_id: Uuid,
-        approved: bool,
+        action: PendingActionType,
         comment: Option<String>,
     ) -> Result<()> {
-        let new_status = if approved {
-            PendingActionStatus::Approved
-        } else {
-            PendingActionStatus::Rejected
+        let new_status = match action {
+            PendingActionType::Approve => PendingActionStatus::Approved,
+            PendingActionType::Reject => PendingActionStatus::Rejected,
+            PendingActionType::Snooze => PendingActionStatus::Snoozed,
         };
 
         let result = sqlx::query(

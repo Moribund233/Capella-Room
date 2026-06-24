@@ -13,7 +13,7 @@ use capella_room::{
     routes::create_router,
     state::AppState,
     test_helpers,
-    utils::logging::MetricsCollector,
+    utils::logging::{LogBroadcaster, MetricsCollector},
     websocket::{
         manager::WebSocketManager,
         protocol::{PendingActionInfo, PendingActionStatus, PendingActionType},
@@ -107,6 +107,7 @@ async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'s
         metrics_collector,
         Arc::new(config_manager),
         None,
+        LogBroadcaster::default(),
     )
     .await
     .expect("Failed to create app state");
@@ -344,7 +345,7 @@ async fn test_handle_pending_action_approve() {
         .process_pending_action(
             admin_id,
             notification_id,
-            true, // approved
+            PendingActionType::Approve,
             Some("同意变更".to_string()),
         )
         .await;
@@ -401,7 +402,7 @@ async fn test_handle_pending_action_reject() {
         .process_pending_action(
             admin_id,
             notification_id,
-            false, // rejected
+            PendingActionType::Reject,
             Some("拒绝变更".to_string()),
         )
         .await;
@@ -443,14 +444,13 @@ async fn test_handle_pending_action_snooze() {
 
     let notification_id = actions[0].notification_id;
 
-    // 处理待办 - 延迟（使用 process_pending_action，但注意：当前实现不支持 snooze 状态）
-    // 这里我们简单地验证待办可以被处理
+    // 处理待办 - 延迟
     let result: Result<(), _> = state
         .notification_service()
         .process_pending_action(
             admin_id,
             notification_id,
-            true, // approved
+            PendingActionType::Snooze,
             Some("稍后处理".to_string()),
         )
         .await;
@@ -568,7 +568,7 @@ async fn test_pending_action_not_found() {
         .process_pending_action(
             admin_id,
             Uuid::new_v4(), // 不存在的ID
-            true,           // approved
+            PendingActionType::Approve,
             None,
         )
         .await;
@@ -617,7 +617,7 @@ async fn test_pending_action_wrong_user() {
         .process_pending_action(
             admin2_id,
             notification_id,
-            true, // approved
+            PendingActionType::Approve,
             None,
         )
         .await;

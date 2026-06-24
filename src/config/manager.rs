@@ -109,6 +109,10 @@ impl ConfigManager {
         self.config.clone()
     }
 
+    pub fn sync_manager(&self) -> Option<Arc<ConfigSyncManager>> {
+        self.sync_manager.clone()
+    }
+
     pub async fn get_config(&self) -> AppConfig {
         self.config.read().await.clone()
     }

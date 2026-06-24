@@ -36,10 +36,9 @@
 | `GetOfflineNotifications` | 获取离线通知 | ⚠️ 已弃用，请使用 HTTP API |
 | `MarkNotificationRead` | 标记通知已读 | ❌ 已移除，请使用 HTTP API |
 | `MarkAllNotificationsRead` | 标记所有通知已读 | ❌ 已移除，请使用 HTTP API |
-| `RespondPendingAction` | 响应待办通知 | ✅ 仍支持 |
 | `GetPendingActions` | 获取待办列表 | ✅ 仍支持 |
 
-> **重要变更**: 通知的获取和已读标记已迁移到 HTTP API，详见 [HTTP 通知接口文档](../http/notifications.md)
+> **重要变更**: 通知的获取、已读标记和待办响应已迁移到 HTTP API，详见 [HTTP 通知接口文档](../http/notifications.md)
 
 ---
 
@@ -332,49 +331,6 @@
 | data | object \| null | 附加数据 |
 | created_at | string (ISO 8601) | 创建时间 |
 
-### 响应待办通知
-
-```json
-{
-  "type": "RespondPendingAction",
-  "payload": {
-    "notification_id": "aa0e8400-e29b-41d4-a716-446655440001",
-    "action": "approve",
-    "comment": "同意变更"
-  }
-}
-```
-
-**字段说明**:
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| notification_id | string (UUID) | 是 | 待办通知 ID |
-| action | string | 是 | 响应动作: `approve`, `reject`, `snooze` |
-| comment | string | 否 | 备注说明 |
-
-**响应动作说明**:
-
-| 动作 | 说明 |
-|------|------|
-| `approve` | 确认执行 |
-| `reject` | 拒绝变更 |
-| `snooze` | 稍后提醒 |
-
-**响应**:
-
-```json
-{
-  "type": "PendingActionResponse",
-  "payload": {
-    "notification_id": "aa0e8400-e29b-41d4-a716-446655440001",
-    "success": true,
-    "message": "配置变更已确认",
-    "new_status": "approved"
-  }
-}
-```
-
 ### 获取待办列表
 
 ```json
@@ -455,18 +411,6 @@ class NotificationManager {
     }));
   }
 
-  // 响应待办通知
-  respondPendingAction(notificationId, action, comment = null) {
-    this.ws.send(JSON.stringify({
-      type: 'RespondPendingAction',
-      payload: {
-        notification_id: notificationId,
-        action: action,
-        comment: comment
-      }
-    }));
-  }
-
   // 获取待办列表
   getPendingActions(actionType = null) {
     this.ws.send(JSON.stringify({
@@ -501,9 +445,6 @@ class NotificationManager {
         break;
       case 'NotificationReadConfirm':
         this.handleNotificationReadConfirm(msg.payload);
-        break;
-      case 'PendingActionResponse':
-        this.handlePendingActionResponse(msg.payload);
         break;
       case 'PendingActionsList':
         this.handlePendingActionsList(msg.payload);
@@ -549,14 +490,6 @@ class NotificationManager {
 
   handleNotificationReadConfirm(payload) {
     console.log(`通知 ${payload.notification_id} 已标记为已读`);
-  }
-
-  handlePendingActionResponse(payload) {
-    if (payload.success) {
-      console.log(`待办响应成功: ${payload.message}`);
-    } else {
-      console.error(`待办响应失败: ${payload.message}`);
-    }
   }
 
   handlePendingActionsList(payload) {
@@ -624,19 +557,6 @@ class NotificationManager:
             "payload": {}
         }))
 
-    async def respond_pending_action(self, notification_id: str, action: str, comment: str = None):
-        """响应待办通知"""
-        payload = {
-            "type": "RespondPendingAction",
-            "payload": {
-                "notification_id": notification_id,
-                "action": action
-            }
-        }
-        if comment:
-            payload["payload"]["comment"] = comment
-        await self.ws.send(json.dumps(payload))
-
     async def get_pending_actions(self, action_type: str = None):
         """获取待办列表"""
         await self.ws.send(json.dumps({
@@ -658,7 +578,6 @@ class NotificationManager:
             "PendingAction": self._handle_pending_action,
             "OfflineNotifications": self._handle_offline_notifications,
             "NotificationReadConfirm": self._handle_notification_read_confirm,
-            "PendingActionResponse": self._handle_pending_action_response,
             "PendingActionsList": self._handle_pending_actions_list,
         }
 
@@ -700,13 +619,6 @@ class NotificationManager:
     def _handle_notification_read_confirm(self, payload: Dict[str, Any]):
         """处理通知已读确认"""
         print(f"通知 {payload['notification_id']} 已标记为已读")
-
-    def _handle_pending_action_response(self, payload: Dict[str, Any]):
-        """处理待办响应"""
-        if payload.get("success"):
-            print(f"待办响应成功: {payload['message']}")
-        else:
-            print(f"待办响应失败: {payload['message']}")
 
     def _handle_pending_actions_list(self, payload: Dict[str, Any]):
         """处理待办列表"""

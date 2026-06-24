@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type {
   LogEntry,
   LogLevel,
@@ -9,33 +9,50 @@ import type {
 } from '@/types'
 import { useWebSocketStore } from './websocket'
 
+const STORAGE_KEY = 'capella-room:system-logs'
+const MAX_LOGS_CACHE = 1000
+const DEFAULT_PAGE_SIZE = 50
+
 /**
- * 系统日志流 Store
+ * 日志流 Store
  *
- * 管理WebSocket系统日志流的订阅、接收和展示
+ * localStorage 持久化缓存 + 分页
  */
 export const useSystemLogsStore = defineStore('systemLogs', () => {
+  // ========== 缓存层 ==========
+
+  function loadCache(): LogEntry[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  }
+
+  function saveCache(logs: LogEntry[]) {
+    try {
+      const trimmed = logs.length > MAX_LOGS_CACHE
+        ? logs.slice(-MAX_LOGS_CACHE)
+        : logs
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed))
+    } catch {
+      // localStorage 满或不可用时静默忽略
+    }
+  }
+
   // ========== 状态 ==========
 
-  /** 日志条目列表 */
-  const logs = ref<LogEntry[]>([])
-
-  /** 是否已订阅 */
+  const logs = ref<LogEntry[]>(loadCache())
   const isSubscribed = ref(false)
-
-  /** 当前日志级别过滤 */
   const currentLevel = ref<LogLevel>('all')
-
-  /** 当前模块过滤 */
   const currentModule = ref<LogModule>('all')
-
-  /** 订阅确认消息 */
   const subscriptionMessage = ref<string>('')
 
-  /** 最大保留日志条数 */
-  const MAX_LOGS_COUNT = 1000
+  /** 分页 */
+  const pageSize = ref(DEFAULT_PAGE_SIZE)
+  const currentPage = ref(1)
 
-  /** 日志条目处理器引用（用于取消注册） */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let logEntryHandler: ((payload: any) => void) | null = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,7 +60,6 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
 
   // ========== 计算属性 ==========
 
-  /** 过滤后的日志列表 */
   const filteredLogs = computed(() => {
     return logs.value.filter((log) => {
       const levelMatch = currentLevel.value === 'all' || log.level === currentLevel.value
@@ -52,14 +68,24 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
     })
   })
 
-  /** 各级别日志数量 */
+  /** 分页后的当前页日志 */
+  const pagedLogs = computed(() => {
+    const start = (currentPage.value - 1) * pageSize.value
+    return filteredLogs.value.slice(start, start + pageSize.value)
+  })
+
+  /** 总页数 */
+  const totalPages = computed(() =>
+    Math.max(1, Math.ceil(filteredLogs.value.length / pageSize.value)),
+  )
+
+  /** 是否在最新页（自动跟随） */
+  const isOnLatestPage = computed(() =>
+    currentPage.value >= totalPages.value,
+  )
+
   const logStats = computed(() => {
-    const stats = {
-      error: 0,
-      warn: 0,
-      info: 0,
-      debug: 0,
-    }
+    const stats = { error: 0, warn: 0, info: 0, debug: 0 }
     logs.value.forEach((log) => {
       if (log.level in stats) {
         stats[log.level as keyof typeof stats]++
@@ -68,167 +94,128 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
     return stats
   })
 
-  /** 日志总数 */
   const totalLogs = computed(() => logs.value.length)
 
   // ========== 方法 ==========
 
-  /**
-   * 添加日志条目
-   * @param entry 日志条目
-   */
   function addLog(entry: LogEntry): void {
-    logs.value.push(entry)
+    const wasOnLatest = isOnLatestPage.value
 
-    // 限制日志数量，避免内存溢出
-    if (logs.value.length > MAX_LOGS_COUNT) {
-      logs.value = logs.value.slice(-MAX_LOGS_COUNT)
+    logs.value.push(entry)
+    if (logs.value.length > MAX_LOGS_CACHE) {
+      logs.value = logs.value.slice(-MAX_LOGS_CACHE)
+    }
+    saveCache(logs.value)
+
+    // 如果在最新页，新日志到达后自动翻到最新
+    if (wasOnLatest) {
+      currentPage.value = totalPages.value
     }
   }
 
-  /**
-   * 清空日志
-   */
   function clearLogs(): void {
     logs.value = []
+    currentPage.value = 1
+    saveCache(logs.value)
   }
 
-  /**
-   * 设置日志级别过滤
-   * @param level 日志级别
-   */
   function setLevel(level: LogLevel): void {
     currentLevel.value = level
+    currentPage.value = 1
   }
 
-  /**
-   * 设置模块过滤
-   * @param module 模块
-   */
   function setModule(module: LogModule): void {
     currentModule.value = module
+    currentPage.value = 1
   }
 
-  /**
-   * 订阅系统日志
-   * @param params 订阅参数
-   */
+  function goToPage(page: number): void {
+    currentPage.value = Math.max(1, Math.min(page, totalPages.value))
+  }
+
+  function goToLatest(): void {
+    currentPage.value = totalPages.value
+  }
+
   function subscribe(params: SubscribeLogsParams = {}): void {
     const wsStore = useWebSocketStore()
-
     if (!wsStore.isAuthenticated) {
       console.error('[SystemLogs Store] WebSocket未认证，无法订阅日志')
       return
     }
-
-    const message = {
+    wsStore.send({
       type: 'SubscribeLogs' as const,
       payload: {
         level: params.level || currentLevel.value,
         module: params.module || currentModule.value,
       },
-    }
-
-    wsStore.send(message)
-    console.log('[SystemLogs Store] 发送订阅请求:', message)
+    })
   }
 
-  /**
-   * 取消订阅系统日志
-   */
   function unsubscribe(): void {
     const wsStore = useWebSocketStore()
-
-    if (!wsStore.isAuthenticated) {
-      return
-    }
-
+    if (!wsStore.isAuthenticated) return
     wsStore.send({ type: 'UnsubscribeLogs' })
     isSubscribed.value = false
-    console.log('[SystemLogs Store] 取消订阅日志')
   }
 
-  /**
-   * 处理日志条目消息
-   * @param entry 日志条目
-   */
   function handleLogEntry(entry: LogEntry): void {
     addLog(entry)
   }
 
-  /**
-   * 处理订阅确认消息
-   * @param payload 确认消息
-   */
   function handleSubscriptionConfirmed(payload: LogSubscriptionConfirmedPayload): void {
     isSubscribed.value = payload.success
     subscriptionMessage.value = payload.message
-
-    if (payload.success) {
-      console.log('[SystemLogs Store] 日志订阅成功:', payload.message)
-    } else {
-      console.error('[SystemLogs Store] 日志订阅失败:', payload.message)
-    }
   }
 
-  /**
-   * 初始化日志流（注册WebSocket消息处理器并自动订阅）
-   */
   function init(): void {
     const wsStore = useWebSocketStore()
-
-    // 先清理已有处理器，避免重复注册
     destroy()
 
-    // 注册日志条目处理器（保存引用以便后续取消）
-    logEntryHandler = (entry: LogEntry) => {
-      handleLogEntry(entry)
-    }
+    logEntryHandler = (entry: LogEntry) => handleLogEntry(entry)
     wsStore.on<LogEntry>('LogEntry', logEntryHandler)
 
-    // 注册订阅确认处理器（保存引用以便后续取消）
-    subscriptionConfirmedHandler = (payload: LogSubscriptionConfirmedPayload) => {
+    subscriptionConfirmedHandler = (payload: LogSubscriptionConfirmedPayload) =>
       handleSubscriptionConfirmed(payload)
+    wsStore.on<LogSubscriptionConfirmedPayload>(
+      'LogSubscriptionConfirmed',
+      subscriptionConfirmedHandler,
+    )
+
+    // 首次打开自动跳到最新页
+    goToLatest()
+
+    if (wsStore.isAuthenticated) {
+      subscribe()
+    } else {
+      const stopWatch = watch(
+        () => wsStore.isAuthenticated,
+        (authenticated) => {
+          if (authenticated) {
+            subscribe()
+            stopWatch()
+          }
+        },
+      )
     }
-    wsStore.on<LogSubscriptionConfirmedPayload>('LogSubscriptionConfirmed', subscriptionConfirmedHandler)
-
-    // WebSocket 全局已连接，自动订阅日志流
-    subscribe()
-
-    console.log('[SystemLogs Store] 已初始化日志流处理器并自动订阅')
   }
 
-  /**
-   * 销毁日志流（取消注册WebSocket消息处理器）
-   */
   function destroy(): void {
     const wsStore = useWebSocketStore()
-
     if (logEntryHandler) {
       wsStore.off('LogEntry', logEntryHandler)
       logEntryHandler = null
     }
-
     if (subscriptionConfirmedHandler) {
       wsStore.off('LogSubscriptionConfirmed', subscriptionConfirmedHandler)
       subscriptionConfirmedHandler = null
     }
-
-    console.log('[SystemLogs Store] 已注销日志流处理器')
   }
 
-  /**
-   * 导出日志为JSON
-   * @returns JSON字符串
-   */
   function exportLogs(): string {
     return JSON.stringify(logs.value, null, 2)
   }
 
-  /**
-   * 导出日志为文本格式
-   * @returns 文本内容
-   */
   function exportLogsAsText(): string {
     return logs.value
       .map(
@@ -239,23 +226,27 @@ export const useSystemLogsStore = defineStore('systemLogs', () => {
   }
 
   return {
-    // 状态
     logs,
     isSubscribed,
     currentLevel,
     currentModule,
     subscriptionMessage,
+    pageSize,
+    currentPage,
 
-    // 计算属性
     filteredLogs,
+    pagedLogs,
+    totalPages,
+    isOnLatestPage,
     logStats,
     totalLogs,
 
-    // 方法
     addLog,
     clearLogs,
     setLevel,
     setModule,
+    goToPage,
+    goToLatest,
     subscribe,
     unsubscribe,
     init,

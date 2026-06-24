@@ -47,29 +47,6 @@ impl StreamMessage for AuditLogStreamMessage {
     }
 }
 
-/// 消息 Stream 消息（聊天消息）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MessageStreamMessage {
-    pub id: Uuid,
-    pub room_id: Uuid,
-    pub sender_id: Uuid,
-    pub content: String,
-    pub message_type: String,
-    pub reply_to: Option<Uuid>,
-    pub node_id: String,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-}
-
-impl StreamMessage for MessageStreamMessage {
-    fn stream_name() -> &'static str {
-        "capella:stream:messages"
-    }
-
-    fn message_id(&self) -> String {
-        self.id.to_string()
-    }
-}
-
 /// Redis Stream 生产者
 /// 用于向 Redis Stream 发送消息
 #[derive(Debug, Clone)]
@@ -559,25 +536,6 @@ mod tests {
         let deserialized: AuditLogStreamMessage = serde_json::from_str(&json).unwrap();
         assert_eq!(msg.id, deserialized.id);
         assert_eq!(msg.event_type, deserialized.event_type);
-    }
-
-    #[test]
-    fn test_message_stream_message_serialization() {
-        let msg = MessageStreamMessage {
-            id: Uuid::new_v4(),
-            room_id: Uuid::new_v4(),
-            sender_id: Uuid::new_v4(),
-            content: "Hello".to_string(),
-            message_type: "text".to_string(),
-            reply_to: None,
-            node_id: "node-test".to_string(),
-            timestamp: chrono::Utc::now(),
-        };
-
-        let json = serde_json::to_string(&msg).unwrap();
-        let deserialized: MessageStreamMessage = serde_json::from_str(&json).unwrap();
-        assert_eq!(msg.id, deserialized.id);
-        assert_eq!(msg.content, deserialized.content);
     }
 
     #[test]

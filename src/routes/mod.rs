@@ -72,10 +72,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .nest("/api/messages/", message_routes())
         // 通知路由
         .nest(
-            &format!("/api/{}/notifications/", API_VERSION),
+            &format!("/api/{}/notifications", API_VERSION),
             notification_routes(),
         )
-        .nest("/api/notifications/", notification_routes())
+        .nest("/api/notifications", notification_routes())
         // 文件路由
         .nest(&format!("/api/{}/files/", API_VERSION), file_routes())
         .nest("/api/files", file_routes())
@@ -393,6 +393,8 @@ fn admin_router() -> Router<Arc<AppState>> {
         .nest("/audit", audit_routes())
         // IP 安全路由
         .nest("/security", security_routes())
+        // 待办通知管理
+        .route("/pending-actions/:id/respond", post(admin::respond_pending_action))
         // Redis 管理路由
         .route("/redis/status", get(admin::get_redis_status))
         .route("/redis/stats", get(admin::get_redis_stats))

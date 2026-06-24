@@ -13,7 +13,7 @@ pub mod stream;
 pub use config_sync::{ConfigChangeType, ConfigSyncBridge, ConfigSyncManager, ConfigSyncMessage};
 pub use pubsub::{RedisPubSub, RoomBroadcastMessage};
 pub use stream::{
-    AuditLogStreamMessage, ConsumerGroupConfig, MessageStreamMessage, StreamConsumer,
+    AuditLogStreamMessage, ConsumerGroupConfig, StreamConsumer,
     StreamConsumerHandler, StreamManager, StreamMessage, StreamProducer,
 };
 
@@ -184,40 +184,6 @@ impl RedisPublisher {
         let _: () = self.connection.publish(channel, message).await?;
         debug!("Published message to channel: {}", channel);
         Ok(())
-    }
-
-    /// 获取节点 ID
-    pub fn node_id(&self) -> &str {
-        &self.node_id
-    }
-}
-
-/// Redis 订阅者
-/// 用于从 Redis 订阅消息
-#[derive(Debug)]
-pub struct RedisSubscriber {
-    #[allow(dead_code)]
-    client: Client,
-    node_id: String,
-}
-
-impl RedisSubscriber {
-    /// 创建新的 Redis 订阅者
-    ///
-    /// # 参数
-    /// - `manager`: Redis 管理器
-    ///
-    /// # 返回
-    /// - 如果客户端可用，返回 Ok(Some(RedisSubscriber))
-    /// - 如果客户端不可用，返回 Ok(None)
-    pub fn new(manager: Arc<RedisManager>) -> anyhow::Result<Option<Self>> {
-        match &manager.client {
-            Some(client) => Ok(Some(Self {
-                client: client.clone(),
-                node_id: manager.node_id().to_string(),
-            })),
-            None => Ok(None),
-        }
     }
 
     /// 获取节点 ID

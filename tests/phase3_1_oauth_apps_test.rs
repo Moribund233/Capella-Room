@@ -10,6 +10,7 @@ use capella_room::{
     models::user::UserRole,
     services::{auth_service::AuthService, oauth_service::OAuthService, user_service::UserService},
 };
+use capella_room::utils::logging::LogBroadcaster;
 
 fn load_test_env() {
     if std::path::Path::new(".env.test").exists() {
@@ -140,6 +141,7 @@ async fn start_oauth_test_server() -> Option<OAuthTestServer> {
             None,
         )),
         None,
+        LogBroadcaster::default(),
     )
     .await
     .ok()?;

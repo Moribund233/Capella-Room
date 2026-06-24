@@ -64,24 +64,54 @@
     <!-- 日志列表 -->
     <div ref="logContainerRef" class="log-container">
       <div
-        v-for="(log, index) in systemLogsStore.filteredLogs"
-        :key="index"
+        v-for="(log, i) in systemLogsStore.pagedLogs"
+        :key="globalStart + i"
         class="log-entry"
-        :class="`log-${log.level}`"
+        :class="[`log-${log.level}`, { expanded: expandedIndices.has(globalStart + i) }]"
+        @click="toggleLog(globalStart + i)"
       >
         <div class="log-header">
+          <span class="log-expand-icon">{{ expandedIndices.has(globalStart + i) ? '▾' : '▸' }}</span>
           <span class="log-time">{{ formatTime(log.timestamp) }}</span>
           <n-tag :type="getLevelTagType(log.level) as any" size="tiny" class="log-level">
             {{ log.level.toUpperCase() }}
           </n-tag>
           <span class="log-target">{{ log.target }}</span>
+          <span v-if="!expandedIndices.has(globalStart + i)" class="log-message-preview">{{ log.message }}</span>
         </div>
-        <div class="log-message">{{ log.message }}</div>
-        <pre v-if="log.fields" class="log-fields">{{ JSON.stringify(log.fields, null, 2) }}</pre>
+        <div v-if="expandedIndices.has(globalStart + i)" class="log-detail">
+          <div class="log-message">{{ log.message }}</div>
+          <pre v-if="log.fields" class="log-fields">{{ JSON.stringify(log.fields, null, 2) }}</pre>
+        </div>
       </div>
-      <div v-if="systemLogsStore.filteredLogs.length === 0" class="log-empty">
+      <div v-if="systemLogsStore.pagedLogs.length === 0" class="log-empty">
         <n-empty description="暂无日志" />
       </div>
+    </div>
+
+    <!-- 分页 + 最新页指示 -->
+    <div class="log-pagination-bar">
+      <n-space align="center">
+        <n-button
+          v-if="!systemLogsStore.isOnLatestPage"
+          size="tiny"
+          type="primary"
+          ghost
+          @click="systemLogsStore.goToLatest()"
+        >
+          回到最新
+        </n-button>
+        <n-pagination
+          v-model:page="systemLogsStore.currentPage"
+          :page-count="systemLogsStore.totalPages"
+          :page-size="systemLogsStore.pageSize"
+          :page-slot="5"
+          size="small"
+        />
+        <n-tag size="tiny" type="info">
+          {{ systemLogsStore.filteredLogs.length }} 条 / {{ systemLogsStore.totalLogs }} 总
+        </n-tag>
+      </n-space>
     </div>
   </div>
 </template>
@@ -94,6 +124,7 @@ import {
   NTag,
   NIcon,
   NSpace,
+  NPagination,
   NEmpty,
   useMessage,
 } from 'naive-ui'
@@ -109,6 +140,21 @@ import type { LogLevel, LogModule } from '@/types'
 const message = useMessage()
 const systemLogsStore = useSystemLogsStore()
 const logContainerRef = ref<HTMLElement>()
+const expandedIndices = ref<number[]>([])
+
+/** 当前页第一条在 filteredLogs 中的全局偏移 */
+const globalStart = computed(() =>
+  (systemLogsStore.currentPage - 1) * systemLogsStore.pageSize,
+)
+
+function toggleLog(globalIndex: number) {
+  const idx = expandedIndices.value.indexOf(globalIndex)
+  if (idx >= 0) {
+    expandedIndices.value.splice(idx, 1)
+  } else {
+    expandedIndices.value.push(globalIndex)
+  }
+}
 
 // 级别选项
 const levelOptions = [
@@ -218,10 +264,11 @@ function handleToggleSubscription() {
   }
 }
 
-// 自动滚动到底部
+// 在最新页时，新日志到达后自动滚到底部
 watch(
-  () => systemLogsStore.logs.length,
+  () => systemLogsStore.pagedLogs.length,
   () => {
+    if (!systemLogsStore.isOnLatestPage) return
     nextTick(() => {
       if (logContainerRef.value) {
         logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight
@@ -289,53 +336,87 @@ onUnmounted(() => {
 }
 
 .log-entry {
-  margin-bottom: 8px;
-  padding: 8px 12px;
+  margin-bottom: 4px;
+  padding: 6px 12px;
   border-radius: 4px;
   border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+
+  &.expanded {
+    margin-bottom: 8px;
+    padding: 8px 12px;
+  }
 
   &.log-error {
-    background: rgba(255, 77, 79, 0.05);
     border-left-color: #ff4d4f;
+    &.expanded { background: rgba(255, 77, 79, 0.05); }
   }
 
   &.log-warn {
-    background: rgba(250, 173, 20, 0.05);
     border-left-color: #faad14;
+    &.expanded { background: rgba(250, 173, 20, 0.05); }
   }
 
   &.log-info {
-    background: rgba(24, 144, 255, 0.05);
     border-left-color: #1890ff;
+    &.expanded { background: rgba(24, 144, 255, 0.05); }
   }
 
   &.log-debug {
-    background: rgba(82, 196, 26, 0.05);
     border-left-color: #52c41a;
+    &.expanded { background: rgba(82, 196, 26, 0.05); }
   }
 }
 
 .log-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 6px;
+}
+
+.log-expand-icon {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .log-time {
   color: var(--text-color-secondary);
   font-size: 12px;
   min-width: 80px;
+  flex-shrink: 0;
 }
 
 .log-level {
   min-width: 50px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .log-target {
   color: var(--text-color-secondary);
   font-size: 12px;
+  flex-shrink: 0;
+}
+
+.log-message-preview {
+  color: var(--text-color);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.log-detail {
+  margin-top: 6px;
 }
 
 .log-message {
@@ -350,6 +431,13 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 12px;
   overflow-x: auto;
+}
+
+.log-pagination-bar {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
 }
 
 .log-empty {

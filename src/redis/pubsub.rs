@@ -1,12 +1,13 @@
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::websocket::manager::WebSocketManager;
 
-use super::{RedisManager, RedisPublisher, RedisSubscriber};
+use super::{RedisManager, RedisPublisher};
 
 /// 房间广播消息
 /// 用于跨节点的房间消息广播
@@ -140,35 +141,84 @@ impl RedisPubSub {
     /// - `shutdown_rx`: 关闭信号接收器
     ///
     /// # 说明
-    /// 该方法会启动一个后台任务，持续监听 Redis 消息并转发给本地客户端
+    /// 该方法会启动一个后台任务，持续监听 Redis 房间广播消息并转发给本地客户端
     pub async fn start_subscriber(
         &self,
-        _ws_manager: Arc<WebSocketManager>,
+        ws_manager: Arc<WebSocketManager>,
         mut shutdown_rx: mpsc::Receiver<()>,
     ) -> anyhow::Result<()> {
-        let _subscriber = match RedisSubscriber::new(self.manager.clone())? {
-            Some(s) => s,
+        let client = match self.manager.get_client() {
+            Some(client) => client,
             None => {
-                warn!("Redis subscriber not available, skipping subscription");
+                warn!("Redis client not available, skipping subscription");
                 return Ok(());
             }
         };
 
-        let channels = vec![self.manager.broadcast_channel()];
+        let room_pattern = self.manager.channel_name("room:*");
         let node_id = self.manager.node_id().to_string();
         info!(
-            "Redis subscriber started, node_id: {}, channels: {:?}",
-            node_id, channels
+            "Redis subscriber starting, node_id: {}, pattern: {}",
+            node_id, room_pattern
         );
 
-        // 在后台任务中处理消息
         tokio::spawn(async move {
-            // 这里简化处理，实际应该使用 redis 的 PubSub 连接
-            // 由于 redis crate 的 API 限制，我们使用轮询方式
+            let conn = match client.get_async_connection().await {
+                Ok(conn) => conn,
+                Err(e) => {
+                    error!("Failed to create pubsub connection: {}", e);
+                    return;
+                }
+            };
+
+            let mut pubsub = conn.into_pubsub();
+            if let Err(e) = pubsub.psubscribe(&room_pattern).await {
+                error!("Failed to subscribe to room pattern: {}", e);
+                return;
+            }
+
+            info!("Subscribed to room broadcast pattern: {}", room_pattern);
+
             loop {
                 tokio::select! {
-                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
-                        // 轮询检查消息
+                    result = async { pubsub.on_message().next().await } => {
+                        match result {
+                            Some(msg) => {
+                                let payload: String = match msg.get_payload() {
+                                    Ok(p) => p,
+                                    Err(e) => {
+                                        warn!("Failed to get payload from message: {}", e);
+                                        continue;
+                                    }
+                                };
+
+                                match RoomBroadcastMessage::from_json(&payload) {
+                                    Ok(broadcast) => {
+                                        if broadcast.source_node == node_id {
+                                            continue;
+                                        }
+
+                                        debug!(
+                                            "Received room broadcast from node {}: room_id={}",
+                                            broadcast.source_node, broadcast.room_id
+                                        );
+
+                                        ws_manager.broadcast_local(
+                                            broadcast.room_id,
+                                            broadcast.message,
+                                            broadcast.exclude_user,
+                                        ).await;
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to parse broadcast message: {}", e);
+                                    }
+                                }
+                            }
+                            None => {
+                                error!("PubSub message stream ended");
+                                break;
+                            }
+                        }
                     }
                     _ = shutdown_rx.recv() => {
                         info!("Redis subscriber received shutdown signal");
@@ -176,6 +226,7 @@ impl RedisPubSub {
                     }
                 }
             }
+
             info!("Redis subscriber stopped");
         });
 

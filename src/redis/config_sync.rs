@@ -1,6 +1,10 @@
 use redis::AsyncCommands;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicI32, Ordering},
+    Arc,
+};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
@@ -100,6 +104,10 @@ pub struct ConfigSyncManager {
     node_id: String,
     /// 是否正在运行
     running: RwLock<bool>,
+    /// 最后同步时间
+    last_sync_at: RwLock<Option<chrono::DateTime<chrono::Utc>>>,
+    /// 待处理的配置变更数（本节点发布但尚未被确认的变更数）
+    pending_changes: AtomicI32,
 }
 
 impl ConfigSyncManager {
@@ -125,6 +133,8 @@ impl ConfigSyncManager {
             channel_name,
             node_id,
             running: RwLock::new(false),
+            last_sync_at: RwLock::new(None),
+            pending_changes: AtomicI32::new(0),
         })))
     }
 
@@ -146,6 +156,9 @@ impl ConfigSyncManager {
         }
 
         let json = message.to_json()?;
+        let now = chrono::Utc::now();
+        *self.last_sync_at.write().await = Some(now);
+        self.pending_changes.fetch_add(1, Ordering::SeqCst);
 
         if let Some(mut conn) = self.manager.get_connection().await {
             let _: () = conn.publish(&self.channel_name, json).await?;
@@ -188,8 +201,7 @@ impl ConfigSyncManager {
     ///
     /// # 说明
     /// 该方法会启动一个后台任务，持续监听 Redis 配置变更消息
-    pub async fn start_subscriber(self: Arc<Self>, _config_manager: Arc<ConfigManager>) {
-        // 设置运行状态
+    pub async fn start_subscriber(self: Arc<Self>, config_manager: Arc<ConfigManager>) {
         {
             let mut running = self.running.write().await;
             *running = true;
@@ -200,7 +212,6 @@ impl ConfigSyncManager {
             self.node_id, self.channel_name
         );
 
-        // 获取客户端用于订阅
         let client = match self.manager.get_client() {
             Some(client) => client,
             None => {
@@ -209,12 +220,11 @@ impl ConfigSyncManager {
             }
         };
 
-        let _node_id = self.node_id.clone();
+        let node_id = self.node_id.clone();
         let channel_name = self.channel_name.clone();
 
         tokio::spawn(async move {
-            // 获取异步 Pub/Sub 连接
-            let mut pubsub_conn = match client.get_async_connection().await {
+            let conn = match client.get_async_connection().await {
                 Ok(conn) => conn,
                 Err(e) => {
                     error!("Failed to create pubsub connection: {}", e);
@@ -222,31 +232,63 @@ impl ConfigSyncManager {
                 }
             };
 
-            // 转换为 Pub/Sub 模式并订阅频道
-            let _: () = match redis::cmd("SUBSCRIBE")
-                .arg(&channel_name)
-                .query_async::<_, ()>(&mut pubsub_conn)
-                .await
-            {
-                Ok(_) => {
-                    info!("Subscribed to config sync channel: {}", channel_name);
-                }
-                Err(e) => {
-                    error!("Failed to subscribe to channel: {}", e);
-                    return;
-                }
-            };
+            let mut pubsub = conn.into_pubsub();
+            if let Err(e) = pubsub.subscribe(&channel_name).await {
+                error!("Failed to subscribe to channel: {}", e);
+                return;
+            }
 
-            // 创建消息接收循环
+            info!("Subscribed to config sync channel: {}", channel_name);
+
             loop {
-                // 检查是否停止
-                if !*self.running.read().await {
-                    break;
-                }
+                tokio::select! {
+                    result = async { pubsub.on_message().next().await } => {
+                        match result {
+                            Some(msg) => {
+                                let payload: String = match msg.get_payload() {
+                                    Ok(p) => p,
+                                    Err(e) => {
+                                        warn!("Failed to get payload from message: {}", e);
+                                        continue;
+                                    }
+                                };
 
-                // 尝试获取消息
-                // 注意：这里简化了实现，实际应该使用更复杂的 Pub/Sub 消息解析
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                match ConfigSyncMessage::from_json(&payload) {
+                                    Ok(remote_msg) => {
+                                        if remote_msg.source_node == node_id {
+                                            continue;
+                                        }
+
+                                        info!(
+                                            "Received config change from node {}: key={:?}, type={:?}",
+                                            remote_msg.source_node, remote_msg.key, remote_msg.change_type
+                                        );
+
+                                        *self.last_sync_at.write().await = Some(chrono::Utc::now());
+
+                                        self.pending_changes.store(0, Ordering::SeqCst);
+
+                                        if let Err(e) = config_manager.reload_from_database().await {
+                                            error!("Failed to reload config after remote change: {}", e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to parse config sync message: {}", e);
+                                    }
+                                }
+                            }
+                            None => {
+                                error!("PubSub message stream ended");
+                                break;
+                            }
+                        }
+                    }
+                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(500)) => {
+                        if !*self.running.read().await {
+                            break;
+                        }
+                    }
+                }
             }
 
             info!("Config sync subscriber stopped");
@@ -273,6 +315,33 @@ impl ConfigSyncManager {
     /// 获取节点 ID
     pub fn node_id(&self) -> &str {
         &self.node_id
+    }
+
+    /// 获取待处理变更数
+    pub fn pending_changes(&self) -> i32 {
+        self.pending_changes.load(Ordering::SeqCst)
+    }
+
+    /// 获取最后同步时间
+    pub async fn last_sync_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        *self.last_sync_at.read().await
+    }
+
+    /// 获取当前订阅者数量
+    pub async fn subscriber_count(&self) -> i32 {
+        if let Some(mut conn) = self.manager.get_connection().await {
+            match redis::cmd("PUBSUB")
+                .arg("NUMSUB")
+                .arg(&self.channel_name)
+                .query_async::<_, Vec<(String, i32)>>(&mut conn)
+                .await
+            {
+                Ok(results) => results.first().map(|(_, count)| *count).unwrap_or(0),
+                Err(_) => 1,
+            }
+        } else {
+            0
+        }
     }
 }
 
@@ -320,6 +389,27 @@ impl ConfigSyncBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::RedisConfig;
+
+    fn make_redis_manager(prefix: &str, node_id: &str) -> Arc<RedisManager> {
+        let config = RedisConfig {
+            url: "redis://localhost:6379".to_string(),
+            enabled: true,
+            pool_size: 10,
+            timeout_secs: 5,
+            channel_prefix: prefix.to_string(),
+            config_sync_enabled: true,
+            consumer_batch_size: 100,
+            consumer_poll_interval_ms: 1000,
+            stream_max_len: 10000,
+        };
+        Arc::new(RedisManager {
+            client: None,
+            connection: RwLock::new(None),
+            config,
+            node_id: node_id.to_string(),
+        })
+    }
 
     #[test]
     fn test_config_sync_message_serialization() {
@@ -358,5 +448,88 @@ mod tests {
         assert!(msg.key.is_none());
         assert!(msg.value.is_none());
         assert!(msg.category.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_config_sync_manager_initial_state() {
+        let manager = make_redis_manager("test", "node-1");
+        let sync_mgr = ConfigSyncManager::new(manager).await.unwrap().unwrap();
+
+        assert_eq!(sync_mgr.node_id(), "node-1");
+        assert_eq!(sync_mgr.channel_name(), "test:config:sync");
+        assert_eq!(sync_mgr.pending_changes(), 0);
+        assert!(sync_mgr.last_sync_at().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_publish_change_increments_pending() {
+        let manager = make_redis_manager("test", "node-1");
+        let sync_mgr = ConfigSyncManager::new(manager).await.unwrap().unwrap();
+
+        let msg = ConfigSyncMessage::updated(
+            "node-1".to_string(),
+            "test.key".to_string(),
+            "test.value".to_string(),
+        );
+
+        assert!(sync_mgr.publish_change(msg).await.is_err());
+        assert_eq!(sync_mgr.pending_changes(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_publish_event_increments_pending() {
+        let manager = make_redis_manager("test", "node-1");
+        let sync_mgr = ConfigSyncManager::new(manager).await.unwrap().unwrap();
+
+        let event = ConfigChangeEvent::ConfigUpdated {
+            key: "jwt.expiration_hours".to_string(),
+            old_value: String::new(),
+            new_value: "48".to_string(),
+        };
+
+        assert!(sync_mgr.publish_event(&event).await.is_err());
+        assert_eq!(sync_mgr.pending_changes(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_pending_changes_accumulation() {
+        let manager = make_redis_manager("test", "node-1");
+        let sync_mgr = ConfigSyncManager::new(manager).await.unwrap().unwrap();
+
+        for i in 0..3 {
+            let msg = ConfigSyncMessage::updated(
+                "node-1".to_string(),
+                format!("key.{}", i),
+                format!("value.{}", i),
+            );
+            let _ = sync_mgr.publish_change(msg).await;
+        }
+
+        assert_eq!(sync_mgr.pending_changes(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_last_sync_at_updated_on_publish() {
+        let manager = make_redis_manager("test", "node-1");
+        let sync_mgr = ConfigSyncManager::new(manager).await.unwrap().unwrap();
+
+        assert!(sync_mgr.last_sync_at().await.is_none());
+
+        let msg = ConfigSyncMessage::updated(
+            "node-1".to_string(),
+            "test.key".to_string(),
+            "test.value".to_string(),
+        );
+        let _ = sync_mgr.publish_change(msg).await;
+
+        assert!(sync_mgr.last_sync_at().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_config_sync_bridge_creation() {
+        let manager = make_redis_manager("test", "node-1");
+        let sync_mgr = ConfigSyncManager::new(manager).await.unwrap().unwrap();
+        let bridge = ConfigSyncBridge::new(sync_mgr);
+        let _ = Arc::new(bridge);
     }
 }

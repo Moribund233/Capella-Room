@@ -11,7 +11,7 @@ use capella_room::{
     redis::{ConfigSyncManager, RedisManager},
     routes::create_router,
     state::AppState,
-    utils::logging::{init_logging, MetricsCollector},
+    utils::logging::{init_logging, LogBroadcaster, MetricsCollector},
     websocket::manager::WebSocketManager,
 };
 
@@ -20,8 +20,11 @@ async fn main() -> Result<()> {
     // 先加载配置以确定是否在维护模式
     let config = ConfigLoader::load()?;
 
+    // 创建全局日志广播器（在上层 init_logging 之前创建，使 tracing layer 能全程捕获日志）
+    let log_broadcaster = LogBroadcaster::new(1000);
+
     // 初始化日志系统（维护模式下打印更详细的日志）
-    init_logging(config.system.maintenance_mode);
+    init_logging(config.system.maintenance_mode, log_broadcaster.clone());
 
     info!("Starting Capella Room server...");
     info!("Configuration loaded successfully");
@@ -86,6 +89,7 @@ async fn main() -> Result<()> {
         Arc::clone(&metrics_collector),
         Arc::clone(&shared_config_manager),
         redis_manager.clone(),
+        log_broadcaster,
     )
     .await?;
 
@@ -229,6 +233,6 @@ mod tests {
 
     #[test]
     fn test_logging_init() {
-        init_logging(false);
+        init_logging(false, LogBroadcaster::new(100));
     }
 }

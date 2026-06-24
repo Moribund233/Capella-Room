@@ -15,7 +15,7 @@ WORKDIR /app
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
-# 配置 Cargo 稀疏索引 + 阿里云镜像源（必须在安装 cargo-chef 之前）
+# 配置 Cargo 稀疏索引 + 阿里云镜像源 + mold 链接器（必须在安装 cargo-chef 之前）
 RUN mkdir -p /usr/local/cargo && \
     cat <<'EOF' > /usr/local/cargo/config.toml
 [registries.crates-io]
@@ -26,17 +26,23 @@ replace-with = "aliyun-sparse"
 
 [registries.aliyun-sparse]
 index = "sparse+https://mirrors.aliyun.com/crates.io-index/"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 EOF
 
 # 设置环境变量确保 Cargo 能读取配置
 ENV CARGO_HOME=/usr/local/cargo
 
-# 安装 cargo-chef（使用阿里云源加速）
+# 安装 cargo-chef + mold 链接器（使用阿里云源加速）
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     build-essential \
+    mold \
+    clang \
     && rm -rf /var/lib/apt/lists/* && \
     cargo install cargo-chef
 
@@ -59,16 +65,19 @@ ENV CARGO_HOME=/usr/local/cargo
 # 从 planner 复制配方
 COPY --from=planner /app/recipe.json recipe.json
 
-# 编译依赖（使用 BuildKit 缓存）
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
+# 编译依赖（使用 BuildKit 缓存，共享 target 实现增量编译）
+RUN --mount=type=cache,target=/app/target \
+    --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     cargo chef cook --release --recipe-path recipe.json
 
 # 复制源代码并编译
 COPY . .
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
+RUN --mount=type=cache,target=/app/target \
+    --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git/db \
-    cargo build --release
+    cargo build --release && \
+    cp target/release/capella-room /app/server
 
 # =============================================================================
 # 阶段 4: 运行器
@@ -99,7 +108,7 @@ RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/target/release/capella-room /app/server
+COPY --from=builder /app/server /app/server
 
 # 复制配置文件
 COPY --from=builder /app/config.toml /app/config.toml

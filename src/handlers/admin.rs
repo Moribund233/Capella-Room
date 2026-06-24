@@ -5,9 +5,11 @@ use axum::{
 };
 
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use uuid::Uuid;
+use chrono::Utc;
 
 use crate::{
     config::SystemConfigItem,
@@ -19,8 +21,9 @@ use crate::{
         room::{MemberRole, RoomResponse},
         user::{UserResponse, UserRole},
     },
+    redis::ConfigSyncMessage,
     state::AppState,
-    websocket::protocol::WebSocketMessage,
+    websocket::protocol::{PendingActionInfo, PendingActionStatus, PendingActionType, WebSocketMessage},
 };
 
 #[derive(Debug, Deserialize)]
@@ -338,6 +341,30 @@ pub async fn update_config(
             .log_admin_action(admin_id, "config_update", "config", Uuid::nil(), ip)
             .await;
     });
+
+    // 如果配置项不支持热更新，创建待办通知提醒管理员重启
+    if !config.is_hot_reloadable {
+        let notification_service = Arc::clone(&state.notification_service);
+        let action_info = PendingActionInfo {
+            notification_id: Uuid::new_v4(),
+            action_type: "config_reload".to_string(),
+            title: "配置变更需要重启生效".to_string(),
+            description: format!(
+                "配置项 {} 已修改为 {}，该配置需要重启服务才能生效",
+                key, request.value
+            ),
+            deadline: Some(Utc::now() + chrono::Duration::days(7)),
+            action_status: PendingActionStatus::Pending,
+            related_config_key: Some(key.clone()),
+            related_config_value: Some(request.value.clone()),
+            created_at: Utc::now(),
+        };
+        tokio::spawn(async move {
+            if let Err(e) = notification_service.send_pending_action(admin_id, action_info).await {
+                warn!("发送配置重载待办通知失败: {}", e);
+            }
+        });
+    }
 
     Ok(Json(ApiResponse::success(config)))
 }
@@ -1061,7 +1088,7 @@ pub struct TriggerConfigSyncRequest {
 pub async fn trigger_config_sync(
     State(state): State<Arc<AppState>>,
     Extension(CurrentUserRole(current_role)): Extension<CurrentUserRole>,
-    Json(request): Json<TriggerConfigSyncRequest>,
+    Json(_request): Json<TriggerConfigSyncRequest>,
 ) -> Result<Json<ApiResponse<ConfigSyncResponse>>> {
     // 检查权限
     if current_role != UserRole::SuperAdmin {
@@ -1079,19 +1106,29 @@ pub async fn trigger_config_sync(
         })));
     }
 
-    // 触发配置同步
-    // 实际实现中应该通过 ConfigSyncManager 发布同步消息
-    let keys = request.config_keys.unwrap_or_default();
-    let message = if keys.is_empty() {
-        "Configuration synced to all nodes".to_string()
+    // 通过 ConfigSyncManager 发布同步消息
+    let sync_manager = state.config_manager().sync_manager();
+    let (nodes_count, synced_nodes, message) = if let Some(ref mgr) = sync_manager {
+        let msg = ConfigSyncMessage::reloaded(mgr.node_id().to_string());
+        if let Err(e) = mgr.publish_change(msg).await {
+            return Ok(Json(ApiResponse::success(ConfigSyncResponse {
+                synced: false,
+                nodes_count: 0,
+                synced_nodes: 0,
+                failed_nodes: 1,
+                message: format!("Failed to publish sync message: {}", e),
+            })));
+        }
+        let subs = mgr.subscriber_count().await;
+        (subs, subs, "Configuration synced to all nodes".to_string())
     } else {
-        format!("Configuration synced for keys: {:?}", keys)
+        (1, 1, "Configuration synced locally (no Redis)".to_string())
     };
 
     Ok(Json(ApiResponse::success(ConfigSyncResponse {
         synced: true,
-        nodes_count: 1,
-        synced_nodes: 1,
+        nodes_count,
+        synced_nodes,
         failed_nodes: 0,
         message,
     })))
@@ -1107,28 +1144,60 @@ pub struct ConfigSyncStatusResponse {
     pub sync_latency_ms: Option<f64>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RespondPendingActionRequest {
+    pub action: PendingActionType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+}
+
+pub async fn respond_pending_action(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
+    Json(request): Json<RespondPendingActionRequest>,
+) -> Result<Json<ApiResponse<()>>> {
+    state
+        .notification_service()
+        .process_pending_action(admin_id, id, request.action, request.comment)
+        .await?;
+
+    Ok(Json(ApiResponse::success(())))
+}
+
 pub async fn get_config_sync_status(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ApiResponse<ConfigSyncStatusResponse>>> {
-    let response = if let Some(ref redis_mgr) = state.redis_manager {
-        // 尝试获取实际的同步状态
+    let sync_manager = state.config_manager().sync_manager();
+
+    let response = if let Some(ref mgr) = sync_manager {
         let start = std::time::Instant::now();
-        let connected = redis_mgr.is_connected().await;
+        let connected = if let Some(ref redis_mgr) = state.redis_manager {
+            redis_mgr.is_connected().await
+        } else {
+            false
+        };
         let sync_latency_ms = if connected {
             Some(start.elapsed().as_secs_f64() * 1000.0)
         } else {
             None
         };
 
-        // 最后同步时间（当前简化实现，实际应从 ConfigManager 获取）
-        let last_sync_at = None;
+        let last_sync_at = mgr.last_sync_at().await
+            .map(|t| t.to_rfc3339());
+
+        let subs = if connected {
+            mgr.subscriber_count().await
+        } else {
+            0
+        };
 
         ConfigSyncStatusResponse {
-            sync_enabled: true,
+            sync_enabled: connected,
             last_sync_at,
-            nodes_total: if connected { 1 } else { 0 },
-            nodes_synced: if connected { 1 } else { 0 },
-            pending_changes: 0, // TODO: 实现待处理变更计数
+            nodes_total: subs,
+            nodes_synced: subs,
+            pending_changes: mgr.pending_changes(),
             sync_latency_ms,
         }
     } else {

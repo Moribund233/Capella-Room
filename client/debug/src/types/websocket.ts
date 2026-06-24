@@ -74,8 +74,6 @@ export type MessageType =
   | 'NotificationReadConfirm'
   // 待办通知
   | 'PendingAction'
-  | 'RespondPendingAction'
-  | 'PendingActionResponse'
   | 'GetPendingActions'
   | 'PendingActionsList'
   // 房间消息摘要

@@ -15,7 +15,7 @@ use capella_room::{
     routes::create_router,
     state::AppState,
     test_helpers,
-    utils::logging::MetricsCollector,
+    utils::logging::{LogBroadcaster, MetricsCollector},
     websocket::manager::WebSocketManager,
 };
 
@@ -107,6 +107,7 @@ async fn create_test_app() -> (Router, Arc<AppState>, tokio::sync::MutexGuard<'s
         metrics_collector,
         Arc::new(config_manager),
         None,
+        LogBroadcaster::default(),
     )
     .await
     .expect("Failed to create app state");

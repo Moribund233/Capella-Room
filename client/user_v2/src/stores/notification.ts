@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
+import httpClient from '@/services/http'
 import { wsService } from '@/services/websocket'
 import { useWebSocketStore } from './websocket'
 import { notificationApi, type NotificationResponse } from '@/api/notification'
@@ -469,22 +470,25 @@ export const useNotificationStore = defineStore('notification', () => {
   }
 
   /**
-   * 响应待办通知
+   * 响应待办通知（通过 HTTP API）
    */
-  function respondPendingAction(
+  async function respondPendingAction(
     notificationId: string,
     action: 'approve' | 'reject' | 'snooze',
     comment?: string,
   ) {
-    wsService.send(WSNotificationMessageType.RESPOND_PENDING_ACTION, {
-      notification_id: notificationId,
-      action,
-      comment,
-    })
-    // 从待办列表中移除
-    const index = pendingActions.value.findIndex(p => p.notification_id === notificationId)
-    if (index > -1) {
-      pendingActions.value.splice(index, 1)
+    try {
+      await httpClient.post(`/admin/pending-actions/${notificationId}/respond`, {
+        action,
+        comment,
+      })
+      // 从待办列表中移除
+      const index = pendingActions.value.findIndex(p => p.notification_id === notificationId)
+      if (index > -1) {
+        pendingActions.value.splice(index, 1)
+      }
+    } catch (e) {
+      console.error('Failed to respond to pending action:', e)
     }
   }
 

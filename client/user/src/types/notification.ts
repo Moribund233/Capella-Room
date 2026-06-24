@@ -91,13 +91,6 @@ export interface MarkNotificationReadPayload {
   notification_id: string
 }
 
-/** 响应待办通知 */
-export interface RespondPendingActionPayload {
-  notification_id: string
-  action: 'approve' | 'reject' | 'snooze'
-  comment?: string
-}
-
 /** 获取待办列表 */
 export interface GetPendingActionsPayload {
   action_type?: string | null
@@ -130,14 +123,6 @@ export interface OfflineNotificationsPayload {
 /** 通知已读确认 */
 export interface NotificationReadConfirmPayload {
   notification_id: string
-}
-
-/** 待办响应结果 */
-export interface PendingActionResponsePayload {
-  notification_id: string
-  success: boolean
-  message: string
-  new_status: string
 }
 
 /** 待办列表 */
@@ -191,13 +176,11 @@ export enum WSNotificationMessageType {
   PENDING_ACTION = 'PendingAction',
   OFFLINE_NOTIFICATIONS = 'OfflineNotifications',
   NOTIFICATION_READ_CONFIRM = 'NotificationReadConfirm',
-  PENDING_ACTION_RESPONSE = 'PendingActionResponse',
   PENDING_ACTIONS_LIST = 'PendingActionsList',
 
   // 客户端发送
   GET_OFFLINE_NOTIFICATIONS = 'GetOfflineNotifications',
   MARK_NOTIFICATION_READ = 'MarkNotificationRead',
   MARK_ALL_NOTIFICATIONS_READ = 'MarkAllNotificationsRead',
-  RESPOND_PENDING_ACTION = 'RespondPendingAction',
   GET_PENDING_ACTIONS = 'GetPendingActions',
 }

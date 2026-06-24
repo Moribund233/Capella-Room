@@ -29,7 +29,7 @@ use capella_room::{
     db::Database,
     routes::create_router,
     state::AppState,
-    utils::logging::MetricsCollector,
+    utils::logging::{LogBroadcaster, MetricsCollector},
     websocket::{manager::WebSocketManager, protocol::WebSocketMessage},
 };
 
@@ -84,6 +84,7 @@ async fn start_test_server() -> TestServer {
         metrics_collector,
         Arc::new(config_manager),
         None,
+        LogBroadcaster::default(),
     )
     .await
     .expect("Failed to create app state");

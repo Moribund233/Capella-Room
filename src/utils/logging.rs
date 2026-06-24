@@ -1,10 +1,11 @@
+use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
-use tracing::{info, warn};
+use tracing::{info, warn, Subscriber};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
@@ -35,11 +36,86 @@ pub fn init_windows_console() {
     }
 }
 
+/// tracing 层：将所有日志事件转发到 LogBroadcaster
+struct LogBroadcasterLayer {
+    broadcaster: LogBroadcaster,
+}
+
+impl<S: Subscriber> tracing_subscriber::Layer<S> for LogBroadcasterLayer {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
+        let meta = event.metadata();
+        let level = meta.level().to_string().to_lowercase();
+        let target = meta.target().to_string();
+
+        let mut message = String::new();
+        let mut fields = serde_json::Map::new();
+
+        struct TracingFieldVisitor<'a> {
+            message: &'a mut String,
+            fields: &'a mut serde_json::Map<String, serde_json::Value>,
+        }
+
+        impl<'a> tracing::field::Visit for TracingFieldVisitor<'a> {
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                if field.name() == "message" {
+                    self.message.push_str(value);
+                } else if field.name() == "log.file" || field.name() == "log.line"
+                    || field.name() == "log.target" || field.name() == "log.module_path"
+                {
+                    // skip internal tracing fields
+                } else {
+                    self.fields.insert(field.name().to_string(), serde_json::Value::String(value.to_string()));
+                }
+            }
+
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn fmt::Debug) {
+                if field.name() == "message" {
+                    self.message.push_str(&format!("{:?}", value));
+                } else if field.name() == "log.file" || field.name() == "log.line"
+                    || field.name() == "log.target" || field.name() == "log.module_path"
+                {
+                    // skip internal tracing fields
+                } else {
+                    self.fields.insert(field.name().to_string(), serde_json::Value::String(format!("{:?}", value)));
+                }
+            }
+
+            fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+                self.fields.insert(field.name().to_string(), serde_json::Value::Number(value.into()));
+            }
+
+            fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
+                self.fields.insert(field.name().to_string(), serde_json::Value::Number(value.into()));
+            }
+
+            fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
+                self.fields.insert(field.name().to_string(), serde_json::Value::Bool(value));
+            }
+        }
+
+        let mut visitor = TracingFieldVisitor { message: &mut message, fields: &mut fields };
+        event.record(&mut visitor);
+
+        if message.is_empty() {
+            message = format!("{} event", target);
+        }
+
+        self.broadcaster.broadcast(LogEntry {
+            level,
+            target,
+            message,
+            timestamp: chrono::Utc::now(),
+            fields: if fields.is_empty() { None } else { Some(serde_json::Value::Object(fields)) },
+        });
+    }
+}
+
 /// 初始化日志系统
 ///
 /// # Arguments
 /// * `is_maintenance_mode` - 是否在维护模式下（维护模式会打印更详细的日志，包括文件名和行号）
-pub fn init_logging(is_maintenance_mode: bool) {
+/// * `broadcaster` - 全局日志广播器，用于将日志实时推送到 WebSocket
+pub fn init_logging(is_maintenance_mode: bool, broadcaster: LogBroadcaster) {
     init_windows_console();
 
     // 创建日志目录
@@ -91,11 +167,15 @@ pub fn init_logging(is_maintenance_mode: bool) {
         .with_line_number(is_maintenance_mode)
         .with_ansi(false);
 
+    // 构建日志广播层
+    let log_layer = LogBroadcasterLayer { broadcaster };
+
     // 构建 subscriber
     tracing_subscriber::registry()
         .with(env_filter)
         .with(console_layer)
         .with(file_layer)
+        .with(log_layer)
         .init();
 
     info!(
@@ -256,20 +336,6 @@ pub struct MetricsSnapshot {
 pub struct StructuredLogger;
 
 impl StructuredLogger {
-    /// 广播日志条目
-    fn broadcast(level: &str, target: &str, message: &str, fields: Option<serde_json::Value>) {
-        if let Some(broadcaster) = get_global_log_broadcaster() {
-            let entry = LogEntry {
-                level: level.to_string(),
-                target: target.to_string(),
-                message: message.to_string(),
-                timestamp: chrono::Utc::now(),
-                fields,
-            };
-            broadcaster.broadcast(entry);
-        }
-    }
-
     /// 记录 WebSocket 连接事件
     pub fn websocket_connect(user_id: Uuid, username: &str, ip: Option<&str>) {
         let ip_str = ip.unwrap_or("unknown");
@@ -280,17 +346,6 @@ impl StructuredLogger {
             ip = ip_str,
             event = "connect",
             "WebSocket connection established"
-        );
-        Self::broadcast(
-            "info",
-            "websocket",
-            "WebSocket connection established",
-            Some(serde_json::json!({
-                "user_id": user_id,
-                "username": username,
-                "ip": ip_str,
-                "event": "connect"
-            })),
         );
     }
 
@@ -304,17 +359,6 @@ impl StructuredLogger {
             event = "disconnect",
             "WebSocket connection closed"
         );
-        Self::broadcast(
-            "info",
-            "websocket",
-            "WebSocket connection closed",
-            Some(serde_json::json!({
-                "user_id": user_id,
-                "username": username,
-                "reason": reason,
-                "event": "disconnect"
-            })),
-        );
     }
 
     /// 记录房间加入事件
@@ -327,17 +371,6 @@ impl StructuredLogger {
             event = "join",
             "User joined room"
         );
-        Self::broadcast(
-            "info",
-            "room",
-            "User joined room",
-            Some(serde_json::json!({
-                "user_id": user_id,
-                "username": username,
-                "room_id": room_id,
-                "event": "join"
-            })),
-        );
     }
 
     /// 记录房间离开事件
@@ -349,17 +382,6 @@ impl StructuredLogger {
             room_id = %room_id,
             event = "leave",
             "User left room"
-        );
-        Self::broadcast(
-            "info",
-            "room",
-            "User left room",
-            Some(serde_json::json!({
-                "user_id": user_id,
-                "username": username,
-                "room_id": room_id,
-                "event": "leave"
-            })),
         );
     }
 
@@ -383,20 +405,6 @@ impl StructuredLogger {
             event = "message_sent",
             "Message sent to room"
         );
-        Self::broadcast(
-            "info",
-            "message",
-            "Message sent to room",
-            Some(serde_json::json!({
-                "message_id": message_id,
-                "room_id": room_id,
-                "user_id": user_id,
-                "username": username,
-                "content_length": content_length,
-                "latency_ms": latency_ms,
-                "event": "message_sent"
-            })),
-        );
     }
 
     /// 记录错误事件
@@ -415,23 +423,10 @@ impl StructuredLogger {
             event = "error",
             "Error occurred"
         );
-        Self::broadcast(
-            "warn",
-            "error",
-            "Error occurred",
-            Some(serde_json::json!({
-                "error_code": error_code,
-                "error_message": error_message,
-                "user_id": user_id,
-                "room_id": room_id,
-                "event": "error"
-            })),
-        );
     }
 
     /// 记录性能事件
     pub fn performance_event(event_name: &str, duration_ms: u128, details: &str) {
-        let level = if duration_ms > 100 { "warn" } else { "info" };
         if duration_ms > 100 {
             warn!(
                 target: "performance",
@@ -451,21 +446,6 @@ impl StructuredLogger {
                 "Performance event"
             );
         }
-        Self::broadcast(
-            level,
-            "performance",
-            if duration_ms > 100 {
-                "Slow operation detected"
-            } else {
-                "Performance event"
-            },
-            Some(serde_json::json!({
-                "event_name": event_name,
-                "duration_ms": duration_ms,
-                "details": details,
-                "event": if duration_ms > 100 { "slow_operation" } else { "performance" }
-            })),
-        );
     }
 }
 

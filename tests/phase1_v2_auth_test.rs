@@ -7,7 +7,7 @@ use capella_room::{
     db::Database,
     routes::create_router,
     state::AppState,
-    utils::logging::MetricsCollector,
+    utils::logging::{LogBroadcaster, MetricsCollector},
     websocket::manager::WebSocketManager,
 };
 use tokio::time::sleep;
@@ -55,6 +55,7 @@ async fn start_test_server() -> Option<String> {
             None,
         )),
         None,
+        LogBroadcaster::default(),
     )
     .await
     .ok()?;

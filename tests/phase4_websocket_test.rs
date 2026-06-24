@@ -30,7 +30,7 @@ use capella_room::{
     routes::create_router,
     services::{auth_service::AuthService, room_service::RoomService, user_service::UserService},
     state::AppState,
-    utils::logging::MetricsCollector,
+    utils::logging::{LogBroadcaster, MetricsCollector},
     websocket::{manager::WebSocketManager, protocol::WebSocketMessage},
 };
 use std::sync::Arc;
@@ -201,6 +201,7 @@ async fn setup_test_server() -> (TestServer, Database) {
         metrics_collector,
         Arc::new(config_manager),
         None,
+        LogBroadcaster::default(),
     )
     .await
     .expect("Failed to create app state");

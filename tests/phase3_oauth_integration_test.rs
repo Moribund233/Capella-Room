@@ -14,6 +14,7 @@ use capella_room::{
         user_service::UserService,
     },
 };
+use capella_room::utils::logging::LogBroadcaster;
 
 fn load_test_env() {
     if std::path::Path::new(".env.test").exists() {
@@ -105,6 +106,7 @@ async fn start_test_server() -> Option<TestServer> {
             None,
         )),
         None,
+        LogBroadcaster::default(),
     ).await.ok()?;
 
     let app = capella_room::routes::create_router(state);

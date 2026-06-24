@@ -345,22 +345,6 @@ pub enum WebSocketMessage {
         created_at: DateTime<Utc>,
     },
 
-    /// 响应待办通知
-    RespondPendingAction {
-        notification_id: Uuid,
-        action: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        comment: Option<String>,
-    },
-
-    /// 待办响应确认
-    PendingActionResponse {
-        notification_id: Uuid,
-        success: bool,
-        message: String,
-        new_status: String,
-    },
-
     /// 获取待办列表
     GetPendingActions {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -553,15 +537,6 @@ pub struct PendingActionInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub related_config_value: Option<String>,
     pub created_at: DateTime<Utc>,
-}
-
-/// 待办响应请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingActionResponseRequest {
-    pub notification_id: Uuid,
-    pub action: PendingActionType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
 }
 
 /// 通知结构（用于离线通知同步）

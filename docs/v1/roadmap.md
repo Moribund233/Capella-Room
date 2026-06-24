@@ -930,11 +930,13 @@ CREATE TABLE system_configs (
 - 支持告警聚合，避免通知风暴
 - 告警状态变更通知相关管理员
 - **待办通知机制**：对于需要重启生效的配置变更，创建待办通知推送给管理员
-  - 通知类型：`ConfigReloadRequired`（配置重载需要确认）
+  - 复用 `NotificationService::send_pending_action()`，DB 类型为 `PendingAction`，`action_type = "config_reload"`
+  - 通过 `update_config` handler 中 `config.is_hot_reloadable == false` 触发
   - 支持操作：确认执行（Approve）、拒绝变更（Reject）、稍后提醒（Snooze）
-  - 状态追踪：pending → approved/rejected/snoozed，完整记录操作人和时间
-  - 多设备同步：待办状态持久化到数据库，管理员在任何设备都能看到一致的待办列表
-  - 审计集成：待办操作自动记录审计日志，满足合规要求
+  - 状态追踪：pending → approved/rejected/snoozed
+  - 多设备同步：待办持久化到 `notifications` 表，通过 HTTP API 获取 / WebSocket 实时推送
+  - 待办响应通过 HTTP API `POST /api/v1/admin/pending-actions/:id/respond` 处理（body: `{ action: "approve"|"reject"|"snooze", comment?: string }`）
+  - [ ] 审计集成：待办操作自动记录审计日志（尚未实现，`process_pending_action` 未调用 `audit_service.log_admin_action`）
 
 **与配置系统集成**：
 - 审计配置支持热更新
