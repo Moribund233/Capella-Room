@@ -265,3 +265,44 @@ pub fn get_allowed_types_for_usage(usage_type: &FileUsageType) -> Vec<&'static s
         .concat(),
     }
 }
+
+/// 初始化上传会话响应
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadInitResponse {
+    pub session_id: String,
+    pub chunk_size: u32,
+    pub total_chunks: u32,
+}
+
+/// 上传分片响应
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadChunkResponse {
+    pub received: u32,
+    pub total: u32,
+}
+
+/// 上传会话状态响应
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadSessionResponse {
+    pub session_id: String,
+    pub file_name: String,
+    pub file_size: u64,
+    pub mime_type: String,
+    pub status: String,
+    pub total_chunks: u32,
+    pub received_chunks: Vec<u32>,
+    pub missing_chunks: Vec<u32>,
+    pub created_at: String,
+}
+
+/// 初始化上传请求
+#[derive(Debug, Clone, Deserialize)]
+pub struct UploadInitRequest {
+    pub file_name: String,
+    pub file_size: u64,
+    pub mime_type: String,
+    pub usage_type: Option<FileUsageType>,
+    pub total_chunks: u32,
+}
+
+

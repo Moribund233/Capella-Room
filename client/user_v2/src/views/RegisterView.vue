@@ -1,32 +1,49 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElForm, ElFormItem, ElInput, ElButton } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { User, Message, Lock } from '@element-plus/icons-vue'
+import { User, Message, Lock, Key } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { ROUTE_PATHS } from '@/constants'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const codeSending = ref(false)
+const codeSent = ref(false)
+const countdown = ref(0)
+let timer: ReturnType<typeof setInterval> | null = null
 
 const form = reactive({
-  username: '',
   email: '',
+  code: '',
+  username: '',
   password: '',
   confirmPassword: '',
 })
 
+const codeBtnText = computed(() => {
+  if (codeSending.value) return '发送中...'
+  if (countdown.value > 0) return `${countdown.value}s`
+  if (codeSent.value) return '重新发送'
+  return '发送验证码'
+})
+
 const rules: FormRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 2, max: 20, message: '用户名长度 2-20 个字符', trigger: ['blur', 'change'] },
-  ],
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur', 'change'] },
+  ],
+  code: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { len: 6, message: '验证码为 6 位数字', trigger: ['blur', 'change'] },
+  ],
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 20, message: '用户名长度 2-20 个字符', trigger: ['blur', 'change'] },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -47,6 +64,36 @@ const rules: FormRules = {
   ],
 }
 
+function startCountdown(sec: number) {
+  countdown.value = sec
+  timer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      if (timer) clearInterval(timer)
+      timer = null
+    }
+  }, 1000)
+}
+
+async function handleSendCode() {
+  if (!form.email) {
+    ElMessage.warning('请先输入邮箱')
+    return
+  }
+
+  codeSending.value = true
+  try {
+    await authStore.registerSendCode(form.email)
+    codeSent.value = true
+    ElMessage.success('验证码已发送到邮箱')
+    startCountdown(60)
+  } catch {
+    ElMessage.error(authStore.error || '发送验证码失败')
+  } finally {
+    codeSending.value = false
+  }
+}
+
 async function handleRegister() {
   if (!formRef.value) return
 
@@ -55,17 +102,16 @@ async function handleRegister() {
 
   loading.value = true
   try {
-    const success = await authStore.register({
+    await authStore.register({
       username: form.username,
       email: form.email,
       password: form.password,
+      code: form.code,
     })
-    if (success) {
-      ElMessage.success('注册成功')
-      router.push('/login')
-    } else {
-      ElMessage.error(authStore.error || '注册失败')
-    }
+    ElMessage.success('注册成功')
+    router.push(ROUTE_PATHS.CHAT)
+  } catch {
+    ElMessage.error(authStore.error || '注册失败')
   } finally {
     loading.value = false
   }
@@ -89,21 +135,22 @@ function goToLogin() {
         class="register-form"
         @keyup.enter="handleRegister"
       >
-        <ElFormItem prop="username">
-          <ElInput
-            v-model="form.username"
-            placeholder="用户名"
-            size="large"
-            :prefix-icon="User"
-          />
-        </ElFormItem>
-
         <ElFormItem prop="email">
           <ElInput
             v-model="form.email"
             placeholder="邮箱"
             size="large"
             :prefix-icon="Message"
+            :disabled="codeSent"
+          />
+        </ElFormItem>
+
+        <ElFormItem prop="username">
+          <ElInput
+            v-model="form.username"
+            placeholder="用户名"
+            size="large"
+            :prefix-icon="User"
           />
         </ElFormItem>
 
@@ -127,6 +174,29 @@ function goToLogin() {
             show-password
             :prefix-icon="Lock"
           />
+        </ElFormItem>
+
+        <ElFormItem prop="code">
+          <div class="code-row">
+            <ElInput
+              v-model="form.code"
+              placeholder="验证码"
+              size="large"
+              maxlength="6"
+              :prefix-icon="Key"
+            />
+            <ElButton
+              type="primary"
+              size="large"
+              :loading="codeSending"
+              :disabled="countdown > 0 || !form.email"
+              class="code-btn"
+              @click="handleSendCode"
+            >
+              {{ codeBtnText }}
+            </ElButton>
+          </div>
+          <p v-if="codeSent" class="spam-tip">若未收到邮件，请检查垃圾箱</p>
         </ElFormItem>
 
         <ElButton
@@ -182,6 +252,27 @@ function goToLogin() {
 
 .register-form {
   margin-bottom: 24px;
+}
+
+.code-row {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.code-row .el-input {
+  flex: 1;
+}
+
+.code-btn {
+  flex-shrink: 0;
+}
+
+.spam-tip {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--el-color-warning);
+  line-height: 1.4;
 }
 
 .submit-btn {

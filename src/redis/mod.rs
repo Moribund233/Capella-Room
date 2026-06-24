@@ -7,10 +7,12 @@ use uuid::Uuid;
 use crate::config::RedisConfig;
 
 pub mod config_sync;
+pub mod dlq;
 pub mod pubsub;
 pub mod stream;
 
 pub use config_sync::{ConfigChangeType, ConfigSyncBridge, ConfigSyncManager, ConfigSyncMessage};
+pub use dlq::{DLQManager, DeadLetterMessage};
 pub use pubsub::{RedisPubSub, RoomBroadcastMessage};
 pub use stream::{
     AuditLogStreamMessage, ConsumerGroupConfig, StreamConsumer,
@@ -208,6 +210,8 @@ mod tests {
             consumer_batch_size: 100,
             consumer_poll_interval_ms: 1000,
             stream_max_len: 10000,
+            dlq_enabled: true,
+            dlq_max_retries: 3,
         };
 
         let manager = Arc::new(RedisManager {

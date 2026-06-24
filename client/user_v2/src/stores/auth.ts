@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '@/api/auth'
-import type { User, LoginCredentials, RegisterData } from '@/types/user'
+import type { User, LoginCredentials, RegisterData, AuthData } from '@/types/user'
 import { STORAGE_KEYS } from '@/constants'
 
 export const useAuthStore = defineStore(
@@ -13,6 +13,12 @@ export const useAuthStore = defineStore(
     const error = ref<string | null>(null)
 
     const isAuthenticated = computed(() => !!accessToken.value)
+
+    function applyAuthData(data: AuthData) {
+      user.value = data.user
+      accessToken.value = data.access_token
+      refreshTokenVal.value = data.refresh_token
+    }
 
     async function login(credentials: LoginCredentials) {
       error.value = null
@@ -27,13 +33,34 @@ export const useAuthStore = defineStore(
       return res
     }
 
+    async function loginSendCode(email: string) {
+      error.value = null
+      const res = await authApi.loginSendCode(email)
+      return res
+    }
+
+    async function loginWithCode(email: string, code: string) {
+      error.value = null
+      const res = await authApi.loginWithCode(email, code)
+      if (res.data) {
+        applyAuthData(res.data)
+      } else if (res.message) {
+        error.value = res.message
+      }
+      return res
+    }
+
+    async function registerSendCode(email: string) {
+      error.value = null
+      const res = await authApi.registerSendCode(email)
+      return res
+    }
+
     async function register(data: RegisterData) {
       error.value = null
       const res = await authApi.register(data)
       if (res.data) {
-        user.value = res.data
-      } else if (res.message) {
-        error.value = res.message
+        applyAuthData(res.data)
       }
       return res
     }
@@ -67,24 +94,15 @@ export const useAuthStore = defineStore(
       }
     }
 
-    /**
-     * 登出
-     * 先清除 localStorage，再清除状态，避免状态不一致
-     */
     async function logout() {
-      // 先清除 localStorage，确保持久化数据被删除
       localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
-
-      // 清除状态
       user.value = null
       accessToken.value = null
       refreshTokenVal.value = null
-
-      // 调用后端登出接口（不等待结果）
       try {
         await authApi.logout()
       } catch {
-        // 忽略后端错误
+        // ignore
       }
     }
 
@@ -101,6 +119,9 @@ export const useAuthStore = defineStore(
       error,
       isAuthenticated,
       login,
+      loginSendCode,
+      loginWithCode,
+      registerSendCode,
       register,
       fetchUser,
       refreshAccessToken,

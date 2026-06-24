@@ -27,9 +27,18 @@ export interface RegisterData {
   username: string
   email: string
   password: string
+  code: string
 }
 
 export interface AuthTokens {
   access_token: string
   refresh_token: string
+}
+
+export interface AuthData {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  token_type: string
+  user: User
 }

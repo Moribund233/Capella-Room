@@ -1,178 +1,154 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Message, ArrowLeft } from '@element-plus/icons-vue'
+import { User, Lock, Message, Key, ArrowLeft } from '@element-plus/icons-vue'
 import { Globe, CodeSquare } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
+import { ROUTE_PATHS } from '@/constants'
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
-const activeTab = ref<'login' | 'register'>('login')
 const loading = ref(false)
+const codeSending = ref(false)
+const codeSent = ref(false)
+const countdown = ref(0)
+let timer: ReturnType<typeof setInterval> | null = null
 
-// 登录表单
+type LoginMode = 'password' | 'code'
+const loginMode = ref<LoginMode>('password')
+
 const loginForm = ref({
   email: '',
   password: '',
+  code: '',
 })
 
-// 注册表单
-const registerForm = ref({
-  email: '',
-  username: '',
-  password: '',
-  agreeTerms: false,
+const codeBtnText = computed(() => {
+  if (codeSending.value) return '发送中...'
+  if (countdown.value > 0) return `${countdown.value}s`
+  return '发送验证码'
 })
 
-/**
- * 处理登录
- */
+function startCountdown(sec: number) {
+  countdown.value = sec
+  timer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      if (timer) clearInterval(timer)
+      timer = null
+    }
+  }, 1000)
+}
+
+async function handleSendCode() {
+  if (!loginForm.value.email) {
+    ElMessage.warning('请先输入邮箱')
+    return
+  }
+  codeSending.value = true
+  try {
+    await authStore.loginSendCode(loginForm.value.email)
+    codeSent.value = true
+    ElMessage.success('验证码已发送到邮箱')
+    startCountdown(60)
+  } catch {
+    ElMessage.error('发送验证码失败')
+  } finally {
+    codeSending.value = false
+  }
+}
+
 async function handleLogin() {
   if (!loginForm.value.email) {
     ElMessage.warning(t('auth.validation.emailRequired'))
     return
   }
-  if (!loginForm.value.password) {
-    ElMessage.warning(t('auth.validation.passwordRequired'))
-    return
+
+  if (loginMode.value === 'password') {
+    if (!loginForm.value.password) {
+      ElMessage.warning(t('auth.validation.passwordRequired'))
+      return
+    }
+  } else {
+    if (!loginForm.value.code) {
+      ElMessage.warning('请输入验证码')
+      return
+    }
   }
 
   loading.value = true
   try {
-    const result = await authStore.login({
-      email: loginForm.value.email,
-      password: loginForm.value.password,
-    })
+    let result
+    if (loginMode.value === 'password') {
+      result = await authStore.login({
+        email: loginForm.value.email,
+        password: loginForm.value.password,
+      })
+    } else {
+      result = await authStore.loginWithCode(loginForm.value.email, loginForm.value.code)
+    }
 
     if (result.data) {
       ElMessage.success(t('auth.loginSuccess'))
-      // 跳转到之前的页面或应用首页
       const redirect = route.query.redirect as string
       router.push(redirect || '/app')
     } else {
       ElMessage.error(result.message || t('auth.loginFailed'))
     }
   } catch (error: unknown) {
-    // 显示后端返回的具体错误消息
     console.error('[Login] Error:', error)
     const err = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
     const errorMessage = err?.response?.data?.message
       || err?.response?.data?.error
       || err?.message
       || t('auth.loginFailed')
-    ElMessage.error({
-      message: errorMessage,
-      duration: 3000,
-      showClose: true,
-    })
+    ElMessage.error({ message: errorMessage, duration: 3000, showClose: true })
   } finally {
     loading.value = false
   }
 }
 
-/**
- * 处理注册
- */
-async function handleRegister() {
-  if (!registerForm.value.email) {
-    ElMessage.warning(t('auth.validation.emailRequired'))
-    return
-  }
-  if (!registerForm.value.username) {
-    ElMessage.warning(t('auth.validation.usernameRequired'))
-    return
-  }
-  if (!registerForm.value.password) {
-    ElMessage.warning(t('auth.validation.passwordRequired'))
-    return
-  }
-  if (!registerForm.value.agreeTerms) {
-    ElMessage.warning(t('auth.validation.termsRequired'))
-    return
-  }
-
-  loading.value = true
-  try {
-    const result = await authStore.register({
-      email: registerForm.value.email,
-      username: registerForm.value.username,
-      password: registerForm.value.password,
-    })
-
-    if (result.data) {
-      ElMessage.success(t('auth.registerSuccess'))
-      // 注册成功后切换到登录页
-      activeTab.value = 'login'
-      loginForm.value.email = registerForm.value.email
-    } else {
-      ElMessage.error(result.message || t('auth.registerFailed'))
-    }
-  } catch (error: unknown) {
-    // 显示后端返回的具体错误消息
-    console.error('[Register] Error:', error)
-    const err = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
-    const errorMessage = err?.response?.data?.message
-      || err?.response?.data?.error
-      || err?.message
-      || t('auth.registerFailed')
-    ElMessage.error({
-      message: errorMessage,
-      duration: 3000,
-      showClose: true,
-    })
-  } finally {
-    loading.value = false
-  }
-}
-
-/**
- * 切换标签页
- * @param tab - 目标标签页
- */
-function switchTab(tab: 'login' | 'register') {
-  activeTab.value = tab
+function goToRegister() {
+  router.push(ROUTE_PATHS.REGISTER)
 }
 </script>
 
 <template>
   <div class="login-page">
     <div class="auth-card">
-      <!-- 返回链接 -->
       <a href="/" class="back-link">
         <el-icon><ArrowLeft /></el-icon>
         {{ t('common.back') }}
       </a>
 
-      <!-- Logo -->
       <div class="auth-logo">
         <img src="/favicon.svg" alt="Logo" class="auth-logo-img" />
         <span>{{ t('common.appName') }}</span>
       </div>
 
-      <!-- 标签页 -->
-      <div class="auth-tabs">
-        <button
-          class="auth-tab"
-          :class="{ active: activeTab === 'login' }"
-          @click="switchTab('login')"
-        >
-          {{ t('auth.signIn') }}
-        </button>
-        <button
-          class="auth-tab"
-          :class="{ active: activeTab === 'register' }"
-          @click="switchTab('register')"
-        >
-          {{ t('auth.createAccount') }}
-        </button>
-      </div>
-
       <!-- 登录表单 -->
-      <div v-show="activeTab === 'login'" class="tab-content">
+      <div class="tab-content">
+        <!-- 登录方式切换 -->
+        <div class="mode-toggle">
+          <button
+            :class="['mode-btn', { active: loginMode === 'password' }]"
+            @click="loginMode = 'password'"
+          >
+            <el-icon><Lock /></el-icon> 密码登录
+          </button>
+          <button
+            :class="['mode-btn', { active: loginMode === 'code' }]"
+            @click="loginMode = 'code'"
+          >
+            <el-icon><Key /></el-icon> 验证码登录
+          </button>
+        </div>
+
+        <!-- 邮箱 -->
         <div class="form-field">
           <label>{{ t('auth.email') }}</label>
           <el-input
@@ -183,21 +159,53 @@ function switchTab(tab: 'login' | 'register') {
             @keyup.enter="handleLogin"
           />
         </div>
-        <div class="form-field">
-          <div class="field-header">
-            <label>{{ t('auth.password') }}</label>
-            <a href="#" class="forgot-link">{{ t('auth.forgotPassword') }}</a>
+
+        <!-- 验证码登录模式 -->
+        <template v-if="loginMode === 'code'">
+          <div class="form-field">
+            <label>验证码</label>
+            <div class="code-row">
+              <el-input
+                v-model="loginForm.code"
+                placeholder="输入 6 位验证码"
+                size="large"
+                maxlength="6"
+                :prefix-icon="Key"
+              />
+              <el-button
+                type="primary"
+                size="large"
+                :loading="codeSending"
+                :disabled="countdown > 0 || !loginForm.email"
+                class="code-btn"
+                @click="handleSendCode"
+              >
+                {{ codeBtnText }}
+              </el-button>
+            </div>
+            <p v-if="codeSent" class="spam-tip">若未收到邮件，请检查垃圾箱</p>
           </div>
-          <el-input
-            v-model="loginForm.password"
-            type="password"
-            :placeholder="t('auth.passwordPlaceholder')"
-            :prefix-icon="Lock"
-            size="large"
-            show-password
-            @keyup.enter="handleLogin"
-          />
-        </div>
+        </template>
+
+        <!-- 密码登录模式 -->
+        <template v-if="loginMode === 'password'">
+          <div class="form-field">
+            <div class="field-header">
+              <label>{{ t('auth.password') }}</label>
+              <RouterLink to="/forgot-password" class="forgot-link">{{ t('auth.forgotPassword') }}</RouterLink>
+            </div>
+            <el-input
+              v-model="loginForm.password"
+              type="password"
+              :placeholder="t('auth.passwordPlaceholder')"
+              :prefix-icon="Lock"
+              size="large"
+              show-password
+              @keyup.enter="handleLogin"
+            />
+          </div>
+        </template>
+
         <el-button
           type="primary"
           size="large"
@@ -222,58 +230,8 @@ function switchTab(tab: 'login' | 'register') {
         </div>
 
         <div class="auth-footer">
-          {{ t('auth.noAccount') }} <a href="#" @click.prevent="switchTab('register')">{{ t('auth.createAccount') }}</a>
-        </div>
-      </div>
-
-      <!-- 注册表单 -->
-      <div v-show="activeTab === 'register'" class="tab-content">
-        <div class="form-field">
-          <label>{{ t('auth.email') }}</label>
-          <el-input
-            v-model="registerForm.email"
-            placeholder="your@example.com"
-            :prefix-icon="Message"
-            size="large"
-          />
-        </div>
-        <div class="form-field">
-          <label>{{ t('auth.username') }}</label>
-          <el-input
-            v-model="registerForm.username"
-            :placeholder="t('auth.usernamePlaceholder')"
-            :prefix-icon="User"
-            size="large"
-          />
-        </div>
-        <div class="form-field">
-          <label>{{ t('auth.password') }}</label>
-          <el-input
-            v-model="registerForm.password"
-            type="password"
-            :placeholder="t('auth.passwordMinLength')"
-            :prefix-icon="Lock"
-            size="large"
-            show-password
-          />
-        </div>
-        <div class="checkbox-field">
-          <el-checkbox v-model="registerForm.agreeTerms">
-            {{ t('auth.agreeTerms') }}
-          </el-checkbox>
-        </div>
-        <el-button
-          type="primary"
-          size="large"
-          class="submit-btn"
-          :loading="loading"
-          @click="handleRegister"
-        >
-          {{ t('auth.createAccount') }}
-        </el-button>
-
-        <div class="auth-footer">
-          {{ t('auth.hasAccount') }} <a href="#" @click.prevent="switchTab('login')">{{ t('auth.signIn') }}</a>
+          {{ t('auth.noAccount') }}
+          <a href="#" @click.prevent="goToRegister">{{ t('auth.createAccount') }}</a>
         </div>
       </div>
     </div>
@@ -335,32 +293,35 @@ function switchTab(tab: 'login' | 'register') {
   color: var(--fg);
 }
 
-.auth-tabs {
+.mode-toggle {
   display: flex;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   background: var(--bg);
-  padding: 4px;
+  padding: 3px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
 }
 
-.auth-tab {
+.mode-btn {
   flex: 1;
-  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
 }
 
-.auth-tab.active {
+.mode-btn.active {
   background: var(--surface);
   color: var(--fg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .tab-content {
@@ -402,8 +363,25 @@ function switchTab(tab: 'login' | 'register') {
   margin-top: 8px;
 }
 
-.checkbox-field {
-  margin-top: 4px;
+.code-row {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.code-row .el-input {
+  flex: 1;
+}
+
+.code-btn {
+  flex-shrink: 0;
+}
+
+.spam-tip {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--el-color-warning);
+  line-height: 1.4;
 }
 
 .social-row {

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::{
     handlers::{
-        account_security, admin, audit, auth, auth_v2, config, custom_event, file, message,
+        account_security, admin, audit, auth, auth_v2, config, custom_event, dlq_admin, file, message,
         message_reaction, notification, oauth, pin_message, room, security, ui_config, user,
         user_settings, webhook,
     },
@@ -329,6 +329,12 @@ fn upload_routes() -> Router<Arc<AppState>> {
         .route("/", post(file::upload_file))
         .route("/image", post(file::upload_image))
         .route("/avatar", post(file::upload_avatar))
+        // 分片上传
+        .route("/chunked/init", post(file::init_chunked_upload))
+        .route("/chunked/:session_id/:chunk_index", post(file::upload_chunk))
+        .route("/chunked/:session_id/status", get(file::get_upload_status))
+        .route("/chunked/:session_id/complete", post(file::complete_chunked_upload))
+        .route("/chunked/:session_id", delete(file::cancel_chunked_upload))
 }
 
 /// 管理员路由
@@ -395,6 +401,12 @@ fn admin_router() -> Router<Arc<AppState>> {
         .nest("/security", security_routes())
         // 待办通知管理
         .route("/pending-actions/:id/respond", post(admin::respond_pending_action))
+        // 死信队列管理
+        .route("/dlq/messages", get(dlq_admin::list_dlq_messages))
+        .route("/dlq/stats", get(dlq_admin::dlq_stats))
+        .route("/dlq/batch-requeue", post(dlq_admin::batch_requeue_dlq))
+        .route("/dlq/:id/requeue", post(dlq_admin::requeue_dlq_message))
+        .route("/dlq/:id", delete(dlq_admin::delete_dlq_message))
         // Redis 管理路由
         .route("/redis/status", get(admin::get_redis_status))
         .route("/redis/stats", get(admin::get_redis_stats))

@@ -49,6 +49,12 @@ expiration_hours = 24
 max_file_size = 10485760
 # 文件访问基础URL路径
 base_url = "/uploads"
+# 是否启用分片上传（默认 true）
+chunked_upload_enabled = true
+# 默认分片大小（字节），5MB
+default_chunk_size = 5242880
+# 上传会话过期时间（小时），24小时
+session_ttl_hours = 24
 
 # -----------------------------------------------------------------------------
 # WebSocket 配置
@@ -170,4 +176,52 @@ retry_scan_interval_secs = 30
 default_timeout_ms = 5000
 # 默认最大重试次数
 default_max_retries = 3
+
+# -----------------------------------------------------------------------------
+# Redis 配置
+# -----------------------------------------------------------------------------
+# REDIS_URL: Redis 连接地址（必须通过环境变量 REDIS_URL 设置）
+# REDIS_ENABLED: 是否启用 Redis（默认 false）
+# REDIS_POOL_SIZE: 连接池大小（默认 10）
+# REDIS_TIMEOUT_SECS: 连接超时时间（默认 5）
+# REDIS_CHANNEL_PREFIX: Pub/Sub 频道前缀（默认 "capella"）
+# REDIS_STREAM_MAX_LEN: Stream 最大长度（默认 100000）
+# REDIS_CONSUMER_BATCH_SIZE: Consumer 批量消费大小（默认 100）
+# REDIS_CONSUMER_POLL_INTERVAL_MS: Consumer 消费间隔毫秒（默认 1000）
+# REDIS_CONFIG_SYNC_ENABLED: 是否启用配置同步（默认 true）
+[redis]
+# 是否启用死信队列（默认 true）
+dlq_enabled = true
+# DLQ 最大重试次数（默认 3）
+dlq_max_retries = 3
+
+# -----------------------------------------------------------------------------
+# 邮件（SMTP）配置
+# -----------------------------------------------------------------------------
+# 以下敏感配置可通过环境变量注入：
+# - SMTP_PASSWORD: SMTP 登录密码或授权码（如 QQ 邮箱授权码）
+# - SMTP_HOST: SMTP 服务器地址（默认 smtp.qq.com）
+# - SMTP_PORT: SMTP 端口（默认 587）
+# - SMTP_USERNAME: SMTP 登录用户名（通常是邮箱地址）
+# - SMTP_FROM_ADDRESS: 发件人邮箱地址
+# - SMTP_FROM_NAME: 发件人显示名称
+[mail]
+# 邮件后端: "console"（仅日志）或 "smtp"（真实发送），默认 console
+backend = "smtp"
+# SMTP 服务器地址
+smtp_host = "smtp.qq.com"
+# SMTP 端口（465=SSL, 587=STARTTLS）
+smtp_port = 587
+# SMTP 登录用户名
+smtp_username = ""
+# SMTP 密码（建议通过 SMTP_PASSWORD 环境变量注入）
+smtp_password = ""
+# 是否启用 TLS
+smtp_use_tls = true
+# 发件人地址
+from_address = ""
+# 发件人名称
+from_name = "Capella Room"
+# 验证码有效期（分钟）
+verification_code_ttl = 10
 

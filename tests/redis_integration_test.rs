@@ -47,6 +47,8 @@ fn test_redis_config_from_env() {
         consumer_batch_size: 50,
         consumer_poll_interval_ms: 500,
         config_sync_enabled: false,
+        dlq_enabled: true,
+        dlq_max_retries: 3,
     };
 
     assert!(config.enabled);

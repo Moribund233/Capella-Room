@@ -248,6 +248,34 @@ impl ConfigLoader {
             debug!("Loading oauth.jwt_secret from environment");
             config.oauth.jwt_secret = Some(secret);
         }
+
+        // 邮件配置
+        if let Ok(password) = std::env::var("SMTP_PASSWORD") {
+            debug!("Loading mail.smtp_password from environment");
+            config.mail.smtp_password = password;
+        }
+        if let Ok(host) = std::env::var("SMTP_HOST") {
+            debug!("Loading mail.smtp_host from environment");
+            config.mail.smtp_host = host;
+        }
+        if let Ok(port) = std::env::var("SMTP_PORT") {
+            if let Ok(p) = port.parse() {
+                debug!("Loading mail.smtp_port from environment");
+                config.mail.smtp_port = p;
+            }
+        }
+        if let Ok(username) = std::env::var("SMTP_USERNAME") {
+            debug!("Loading mail.smtp_username from environment");
+            config.mail.smtp_username = username;
+        }
+        if let Ok(from) = std::env::var("SMTP_FROM_ADDRESS") {
+            debug!("Loading mail.from_address from environment");
+            config.mail.from_address = from;
+        }
+        if let Ok(name) = std::env::var("SMTP_FROM_NAME") {
+            debug!("Loading mail.from_name from environment");
+            config.mail.from_name = name;
+        }
     }
 
     fn validate_config(config: &mut AppConfig) -> Result<()> {
@@ -288,6 +316,35 @@ impl ConfigLoader {
             return Err(anyhow::anyhow!(
                 "REDIS_URL is required when Redis is enabled. Please set it via environment variable."
             ));
+        }
+
+        // 验证邮件配置（如果启用 SMTP）
+        if config.mail.backend == super::MailBackend::Smtp {
+            if config.mail.smtp_host.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "mail.smtp_host is required when mail.backend is 'smtp'. "
+                ));
+            }
+            if config.mail.from_address.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "mail.from_address is required when mail.backend is 'smtp'. "
+                ));
+            }
+            if config.mail.from_name.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "mail.from_name is required when mail.backend is 'smtp'. "
+                ));
+            }
+            if config.mail.smtp_username.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "mail.smtp_username is required when mail.backend is 'smtp'. "
+                ));
+            }
+            if config.mail.smtp_password.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "mail.smtp_password is required when mail.backend is 'smtp'. Set SMTP_PASSWORD environment variable."
+                ));
+            }
         }
 
         Ok(())

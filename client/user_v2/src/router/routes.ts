@@ -21,6 +21,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('@/views/ForgotPasswordView.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/invite/:code',
     name: 'invite',
     component: () => import('@/views/InviteValidationView.vue'),

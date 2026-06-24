@@ -14,6 +14,11 @@
 | POST | `/api/v1/upload` | 通用文件上传 |
 | POST | `/api/v1/upload/image` | 上传图片 |
 | POST | `/api/v1/upload/avatar` | 上传头像 |
+| POST | `/api/v1/upload/chunked/init` | 初始化分片上传会话 |
+| POST | `/api/v1/upload/chunked/:session_id/:chunk_index` | 上传单个分片 |
+| GET | `/api/v1/upload/chunked/:session_id/status` | 查询分片上传状态 |
+| POST | `/api/v1/upload/chunked/:session_id/complete` | 完成分片上传 |
+| DELETE | `/api/v1/upload/chunked/:session_id` | 取消分片上传 |
 
 ---
 
@@ -460,6 +465,279 @@ Content-Type: multipart/form-data
 
 ---
 
+## 分片上传
+
+> **说明**: 分片上传（Chunked Upload）用于大文件上传场景。前端将文件切分为多个分片，逐个上传，最后合并。
+>
+> **存储**: 分片临时存储在 `{UPLOAD_DIR}/.chunks/{session_id}/` 目录下，合并后自动清理。
+>
+> **有效期**: 上传会话默认 24 小时后过期（可通过 `upload.session_ttl_hours` 配置）。
+
+### 工作流程
+
+```
+1. POST /upload/chunked/init    → 初始化，获取 session_id
+2. POST /upload/chunked/:sid/:index  → 逐个上传分片（可并发）
+3. GET  /upload/chunked/:sid/status  → 查询已接收分片
+4. POST /upload/chunked/:sid/complete → 所有分片完成，服务器合并
+5. DELETE /upload/chunked/:sid        → (可选) 取消/清理
+```
+
+---
+
+## 初始化分片上传
+
+开始一个新的分片上传会话。
+
+### 请求
+
+```http
+POST /api/v1/upload/chunked/init
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### 请求体
+
+```json
+{
+  "file_name": "large_video.mp4",
+  "file_size": 104857600,
+  "mime_type": "video/mp4",
+  "usage_type": "message",
+  "total_chunks": 20
+}
+```
+
+### 参数说明
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `file_name` | string | 是 | 原始文件名 |
+| `file_size` | number | 是 | 文件总大小（字节） |
+| `mime_type` | string | 是 | MIME 类型 |
+| `usage_type` | string | 否 | 文件用途，默认 `general` |
+| `total_chunks` | number | 是 | 总分片数 |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "chunk_size": 5242880,
+  "total_chunks": 20
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (UUID) | 上传会话唯一标识 |
+| `chunk_size` | number | 建议分片大小（字节） |
+| `total_chunks` | number | 总分片数 |
+
+**失败 - 分片上传未启用 (400 Bad Request)**
+
+```json
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "error": "请求参数错误",
+  "message": "分片上传未启用"
+}
+```
+
+---
+
+## 上传分片
+
+上传单个文件分片。
+
+### 请求
+
+```http
+POST /api/v1/upload/chunked/{session_id}/{chunk_index}
+Authorization: Bearer {access_token}
+Content-Type: multipart/form-data
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (UUID) | 上传会话 ID |
+| `chunk_index` | number | 分片索引（从 0 开始） |
+
+### 请求体 (multipart/form-data)
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `chunk` | file | 是 | 分片二进制数据 |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "received": 5,
+  "total": 20
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `received` | number | 已接收的分片数 |
+| `total` | number | 总分片数 |
+
+### 说明
+
+- 支持**幂等上传**：同一分片重复上传不会报错，返回当前进度
+- 支持**并发上传**：多个分片可以同时上传
+- 分片索引越界返回 400
+
+---
+
+## 查询上传状态
+
+获取当前上传会话的详细信息，包括已接收和缺失的分片。
+
+### 请求
+
+```http
+GET /api/v1/upload/chunked/{session_id}/status
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (UUID) | 上传会话 ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "file_name": "large_video.mp4",
+  "file_size": 104857600,
+  "mime_type": "video/mp4",
+  "status": "active",
+  "total_chunks": 20,
+  "received_chunks": [0, 1, 2, 3, 4],
+  "missing_chunks": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+  "created_at": "2026-06-24T10:30:00+00:00"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (UUID) | 上传会话 ID |
+| `file_name` | string | 原始文件名 |
+| `file_size` | number | 文件总大小 |
+| `mime_type` | string | MIME 类型 |
+| `status` | string | 会话状态：`active` / `completed` / `cancelled` |
+| `total_chunks` | number | 总分片数 |
+| `received_chunks` | array[number] | 已接收的分片索引列表 |
+| `missing_chunks` | array[number] | 缺失的分片索引列表 |
+| `created_at` | string (ISO 8601) | 会话创建时间 |
+
+---
+
+## 完成分片上传
+
+所有分片上传完成后，调用此接口合并分片并保存文件。
+
+### 请求
+
+```http
+POST /api/v1/upload/chunked/{session_id}/complete
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (UUID) | 上传会话 ID |
+
+### 响应
+
+**成功 (200 OK)**
+
+```json
+{
+  "file": {
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "original_name": "large_video.mp4",
+    "file_url": "/uploads/videos/660e8400-e29b-41d4-a716-446655440001.mp4",
+    "file_size": 104857600,
+    "mime_type": "video/mp4",
+    "category": "video",
+    "usage_type": "message"
+  },
+  "session_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `file` | object | 合并后的文件信息（同通用上传响应） |
+| `session_id` | string | 原会话 ID |
+
+**失败 - 分片未上传完成 (400 Bad Request)**
+
+```json
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "error": "请求参数错误",
+  "message": "分片未上传完成: 5/20"
+}
+```
+
+### 说明
+
+- 只有所有分片都上传完成后才能合并
+- 合并后会清理临时分片文件
+- 返回的文件对象与 `POST /upload` 一致，可继续使用文件管理 API
+
+---
+
+## 取消分片上传
+
+取消并清理上传会话。
+
+### 请求
+
+```http
+DELETE /api/v1/upload/chunked/{session_id}
+Authorization: Bearer {access_token}
+```
+
+### 路径参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `session_id` | string (UUID) | 上传会话 ID |
+
+### 响应
+
+**成功 (204 No Content)**
+
+无响应体。
+
+### 说明
+
+- 会删除该会话的所有临时分片文件
+- 取消后无法恢复，需要重新初始化
+
+---
+
 ## 使用示例
 
 ### cURL 示例
@@ -493,6 +771,29 @@ curl -X POST "http://localhost:3000/api/v1/upload/image" \
 curl -X POST "http://localhost:3000/api/v1/upload/avatar" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -F "file=@/path/to/avatar.png"
+
+# 分片上传示例（100MB 文件，20 个分片）
+# 1. 初始化
+SESSION_ID=$(curl -s -X POST "http://localhost:3000/api/v1/upload/chunked/init" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{"file_name":"video.mp4","file_size":104857600,"mime_type":"video/mp4","total_chunks":20}' \
+  | jq -r '.session_id')
+
+# 2. 上传每个分片
+for i in $(seq 0 19); do
+  curl -s -X POST "http://localhost:3000/api/v1/upload/chunked/$SESSION_ID/$i" \
+    -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+    -F "chunk=@chunk_$i.dat"
+done
+
+# 3. 查询状态
+curl -s "http://localhost:3000/api/v1/upload/chunked/$SESSION_ID/status" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 4. 完成
+curl -s -X POST "http://localhost:3000/api/v1/upload/chunked/$SESSION_ID/complete" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ### JavaScript 示例
@@ -640,6 +941,119 @@ async function uploadAvatar(file) {
   } else {
     throw new Error(data.message);
   }
+}
+
+// 分片上传
+async function uploadChunked(file, usageType = 'message') {
+  const chunkSize = 5 * 1024 * 1024; // 5MB
+  const totalChunks = Math.ceil(file.size / chunkSize);
+
+  // 1. 初始化
+  const initRes = await fetch('/api/v1/upload/chunked/init', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      usage_type: usageType,
+      total_chunks: totalChunks
+    })
+  });
+  const { session_id } = await initRes.json();
+
+  // 2. 并发上传所有分片
+  const uploads = [];
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, file.size);
+    const chunk = file.slice(start, end);
+    const formData = new FormData();
+    formData.append('chunk', chunk);
+
+    uploads.push(
+      fetch(`/api/v1/upload/chunked/${session_id}/${i}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: formData
+      }).then(r => r.json())
+    );
+  }
+
+  // 3. 等待所有分片上传完成
+  const results = await Promise.all(uploads);
+  const lastResult = results[results.length - 1];
+  console.log(`Progress: ${lastResult.received}/${lastResult.total} chunks`);
+
+  // 4. 完成合并
+  const completeRes = await fetch(`/api/v1/upload/chunked/${session_id}/complete`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+    }
+  });
+  const completeData = await completeRes.json();
+  return completeData.file;
+}
+
+// 分片上传带进度回调
+async function uploadChunkedWithProgress(file, onProgress, usageType = 'message') {
+  const chunkSize = 5 * 1024 * 1024;
+  const totalChunks = Math.ceil(file.size / chunkSize);
+
+  const initRes = await fetch('/api/v1/upload/chunked/init', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      usage_type: usageType,
+      total_chunks: totalChunks
+    })
+  });
+  const { session_id } = await initRes.json();
+
+  let completed = 0;
+
+  // 串行上传（避免服务端负载过高）
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, file.size);
+    const chunk = file.slice(start, end);
+    const formData = new FormData();
+    formData.append('chunk', chunk);
+
+    await fetch(`/api/v1/upload/chunked/${session_id}/${i}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      },
+      body: formData
+    });
+
+    completed++;
+    if (onProgress) {
+      onProgress({ completed, total: totalChunks, percent: Math.round(completed / totalChunks * 100) });
+    }
+  }
+
+  const completeRes = await fetch(`/api/v1/upload/chunked/${session_id}/complete`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+    }
+  });
+  const completeData = await completeRes.json();
+  return completeData.file;
 }
 
 // 文件上传组件示例

@@ -5,13 +5,17 @@ use axum::{
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use crate::{
     error::{AppError, Result},
-    models::file::{FileQueryParams, FileUsageType},
+    models::file::{
+        FileQueryParams, FileUsageType, UploadChunkResponse, UploadInitRequest,
+        UploadInitResponse, UploadSessionResponse,
+    },
     services::auth_service::Claims,
+    services::upload_session::UploadSessionManager,
     state::AppState,
 };
 
@@ -278,6 +282,245 @@ pub async fn delete_file(
     let uploader_id = parse_user_id(&claims.sub)?;
 
     state.file_service().delete_file(file_id, uploader_id).await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ─── 分片上传 ────────────────────────────────────────────────
+
+/// 初始化分片上传会话
+pub async fn init_chunked_upload(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<UploadInitRequest>,
+) -> Result<Json<UploadInitResponse>> {
+    let config = state.config.read().await;
+
+    if !config.upload.chunked_upload_enabled {
+        return Err(AppError::Validation("分片上传未启用".to_string()));
+    }
+
+    let user_id = parse_user_id(&claims.sub)?;
+
+    if req.file_size == 0 {
+        return Err(AppError::Validation("文件大小不能为0".to_string()));
+    }
+    if req.total_chunks == 0 {
+        return Err(AppError::Validation("分片数不能为0".to_string()));
+    }
+
+    let usage_type = req.usage_type.unwrap_or(FileUsageType::General);
+    let manager = UploadSessionManager::new(&config.upload);
+    let meta = manager.create_session(
+        user_id, &req.file_name, req.file_size,
+        &req.mime_type, usage_type, req.total_chunks,
+    );
+
+    drop(config);
+
+    manager.save_metadata(&meta).await.map_err(|e| {
+        error!("保存上传会话元数据失败: {}", e);
+        AppError::Internal
+    })?;
+
+    Ok(Json(UploadInitResponse {
+        session_id: meta.session_id.to_string(),
+        chunk_size: meta.chunk_size,
+        total_chunks: meta.total_chunks,
+    }))
+}
+
+/// 上传单个分片
+pub async fn upload_chunk(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path((session_id, chunk_index)): Path<(String, u32)>,
+    mut multipart: Multipart,
+) -> Result<Json<UploadChunkResponse>> {
+    let user_id = parse_user_id(&claims.sub)?;
+    let sid = Uuid::parse_str(&session_id).map_err(|_| {
+        AppError::Validation("无效的会话ID".to_string())
+    })?;
+
+    let config = state.config.read().await;
+    let manager = UploadSessionManager::new(&config.upload);
+
+    let meta = manager.get_session_status(sid).await.map_err(|_| {
+        AppError::NotFound
+    })?;
+
+    if meta.user_id != user_id {
+        return Err(AppError::Auth("无权操作此上传会话".to_string()));
+    }
+
+    if chunk_index >= meta.total_chunks {
+        return Err(AppError::Validation(format!(
+            "分片索引超出范围: {} >= {}", chunk_index, meta.total_chunks
+        )));
+    }
+
+    drop(config);
+
+    if manager.chunk_exists(sid, chunk_index).await {
+        let meta = manager.get_session_status(sid).await.map_err(|_| {
+            AppError::NotFound
+        })?;
+        return Ok(Json(UploadChunkResponse {
+            received: meta.received_chunks.len() as u32,
+            total: meta.total_chunks,
+        }));
+    }
+
+    let mut chunk_data: Option<Vec<u8>> = None;
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!("读取分片数据失败: {}", e);
+        AppError::Validation(format!("读取分片数据失败: {}", e))
+    })? {
+        if field.name() == Some("chunk") {
+            chunk_data = Some(field.bytes().await.map_err(|e| {
+                error!("读取分片字节失败: {}", e);
+                AppError::Validation(format!("读取分片数据失败: {}", e))
+            })?.to_vec());
+            break;
+        }
+    }
+
+    let data = chunk_data.ok_or_else(|| {
+        AppError::Validation("未找到分片数据（字段名: chunk）".to_string())
+    })?;
+
+    manager.save_chunk(&meta, chunk_index, &data).await.map_err(|e| {
+        error!("保存分片失败: {}", e);
+        AppError::Internal
+    })?;
+
+    let meta = manager.update_received_chunk(sid, chunk_index).await.map_err(|e| {
+        error!("更新会话元数据失败: {}", e);
+        AppError::Internal
+    })?;
+
+    Ok(Json(UploadChunkResponse {
+        received: meta.received_chunks.len() as u32,
+        total: meta.total_chunks,
+    }))
+}
+
+/// 查询上传会话状态
+pub async fn get_upload_status(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(session_id): Path<String>,
+) -> Result<Json<UploadSessionResponse>> {
+    let user_id = parse_user_id(&claims.sub)?;
+    let sid = Uuid::parse_str(&session_id).map_err(|_| {
+        AppError::Validation("无效的会话ID".to_string())
+    })?;
+
+    let config = state.config.read().await;
+    let manager = UploadSessionManager::new(&config.upload);
+    drop(config);
+
+    let meta = manager.get_session_status(sid).await.map_err(|_| {
+        AppError::NotFound
+    })?;
+
+    if meta.user_id != user_id {
+        return Err(AppError::Auth("无权查看此上传会话".to_string()));
+    }
+
+    let total = meta.total_chunks;
+    let received: Vec<u32> = meta.received_chunks.clone();
+    let missing: Vec<u32> = (0..total).filter(|i| !received.contains(i)).collect();
+
+    Ok(Json(UploadSessionResponse {
+        session_id: meta.session_id.to_string(),
+        file_name: meta.file_name,
+        file_size: meta.file_size,
+        mime_type: meta.mime_type,
+        status: format!("{:?}", meta.status).to_lowercase(),
+        total_chunks: total,
+        received_chunks: received,
+        missing_chunks: missing,
+        created_at: meta.created_at.to_rfc3339(),
+    }))
+}
+
+/// 完成分片上传（合并分片并存储）
+pub async fn complete_chunked_upload(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(session_id): Path<String>,
+) -> Result<Json<Value>> {
+    let user_id = parse_user_id(&claims.sub)?;
+    let sid = Uuid::parse_str(&session_id).map_err(|_| {
+        AppError::Validation("无效的会话ID".to_string())
+    })?;
+
+    let config = state.config.read().await;
+    let manager = UploadSessionManager::new(&config.upload);
+    drop(config);
+
+    let meta = manager.get_session_status(sid).await.map_err(|_| {
+        AppError::NotFound
+    })?;
+
+    if meta.user_id != user_id {
+        return Err(AppError::Auth("无权完成此上传".to_string()));
+    }
+
+    if meta.received_chunks.len() as u32 != meta.total_chunks {
+        return Err(AppError::Validation(format!(
+            "分片未上传完成: {}/{}", meta.received_chunks.len(), meta.total_chunks
+        )));
+    }
+
+    let file_data = manager.merge_chunks(&meta).await.map_err(|e| {
+        error!("合并分片失败: {}", e);
+        AppError::Internal
+    })?;
+
+    let result = state
+        .file_service()
+        .upload_file(user_id, file_data, &meta.file_name, &meta.mime_type, meta.usage_type, None)
+        .await?;
+
+    if let Err(e) = manager.cleanup_session(sid).await {
+        warn!("清理临时分片失败: {}", e);
+    }
+
+    Ok(Json(json!({
+        "file": result,
+        "session_id": session_id,
+    })))
+}
+
+/// 取消分片上传
+pub async fn cancel_chunked_upload(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(session_id): Path<String>,
+) -> Result<StatusCode> {
+    let user_id = parse_user_id(&claims.sub)?;
+    let sid = Uuid::parse_str(&session_id).map_err(|_| {
+        AppError::Validation("无效的会话ID".to_string())
+    })?;
+
+    let config = state.config.read().await;
+    let manager = UploadSessionManager::new(&config.upload);
+    drop(config);
+
+    let meta = manager.get_session_status(sid).await.map_err(|_| {
+        AppError::NotFound
+    })?;
+
+    if meta.user_id != user_id {
+        return Err(AppError::Auth("无权取消此上传".to_string()));
+    }
+
+    manager.cleanup_session(sid).await.map_err(|e| {
+        error!("清理上传会话失败: {}", e);
+        AppError::Internal
+    })?;
 
     Ok(StatusCode::NO_CONTENT)
 }

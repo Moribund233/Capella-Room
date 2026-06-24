@@ -7,7 +7,7 @@ use tokio::time::interval;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use super::RedisManager;
+use super::{dlq::DLQManager, RedisManager};
 
 /// Stream 消息 trait
 /// 定义可以发送到 Redis Stream 的消息类型
@@ -152,6 +152,8 @@ pub struct ConsumerGroupConfig {
     pub poll_interval_ms: u64,
     /// 消息处理超时（毫秒）
     pub claim_timeout_ms: u64,
+    /// 最大重试次数（超过后入 DLQ，0 表示不启用 DLQ）
+    pub max_retries: u32,
 }
 
 impl Default for ConsumerGroupConfig {
@@ -162,6 +164,7 @@ impl Default for ConsumerGroupConfig {
             batch_size: 100,
             poll_interval_ms: 1000,
             claim_timeout_ms: 30000,
+            max_retries: 3,
         }
     }
 }
@@ -212,6 +215,7 @@ pub struct StreamConsumer {
     manager: Arc<RedisManager>,
     config: ConsumerGroupConfig,
     running: RwLock<bool>,
+    dlq_manager: Option<Arc<DLQManager>>,
 }
 
 impl StreamConsumer {
@@ -225,7 +229,14 @@ impl StreamConsumer {
             manager,
             config,
             running: RwLock::new(false),
+            dlq_manager: None,
         }
+    }
+
+    /// 设置死信队列管理器
+    pub fn with_dlq(mut self, dlq_manager: Arc<DLQManager>) -> Self {
+        self.dlq_manager = Some(dlq_manager);
+        self
     }
 
     /// 初始化 Consumer Group
@@ -394,14 +405,17 @@ impl StreamConsumer {
         info!("Stream consumer stopping...");
     }
 
-    /// 处理 Pending List 中的消息（死信队列处理）
+    /// 处理 Pending List 中的消息
+    ///
+    /// 检查消息的 delivery count，超过 `max_retries` 的自动转入死信队列（DLQ），
+    /// 未超限的通过 XCLAIM 转移给当前消费者。
     ///
     /// # 参数
     /// - `stream_name`: Stream 名称
     /// - `min_idle_time`: 最小空闲时间（毫秒）
     ///
     /// # 返回
-    /// 转移的消息数量
+    /// 成功处理的消息数量（含入 DLQ 的和被 claim 的）
     pub async fn claim_pending_messages(
         &self,
         stream_name: &str,
@@ -412,7 +426,7 @@ impl StreamConsumer {
             None => return Err(anyhow::anyhow!("Redis connection not available")),
         };
 
-        // 获取 Pending 消息
+        // 获取 Pending 消息，含 delivery count
         let pending: Vec<(String, String, usize, usize)> = conn
             .xpending_count(
                 stream_name,
@@ -427,26 +441,88 @@ impl StreamConsumer {
             return Ok(0);
         }
 
-        let message_ids: Vec<String> = pending.iter().map(|(id, _, _, _)| id.clone()).collect();
+        // 分离超限和未超限消息
+        let max_retries = self.config.max_retries;
+        let mut dlq_messages = Vec::new();
+        let mut claim_ids = Vec::new();
 
-        // 转移消息给当前消费者
-        let claimed: Vec<(String, std::collections::HashMap<String, redis::Value>)> = conn
-            .xclaim(
-                stream_name,
-                &self.config.group_name,
-                &self.config.consumer_name,
-                min_idle_time,
-                &message_ids,
-            )
-            .await?;
+        for (id, _consumer, _idle_ms, delivery_count) in &pending {
+            if max_retries > 0 && *delivery_count >= max_retries as usize {
+                dlq_messages.push(id.clone());
+            } else {
+                claim_ids.push(id.clone());
+            }
+        }
 
-        info!(
-            "Claimed {} pending messages from stream: {}",
-            claimed.len(),
-            stream_name
-        );
+        // 超限消息：读取 payload → 入 DLQ → XACK
+        if !dlq_messages.is_empty() {
+            for msg_id in &dlq_messages {
+                // 读取消息内容
+                let results: Vec<(String, std::collections::HashMap<String, redis::Value>)> = conn
+                    .xrange_count(stream_name, msg_id, msg_id, 1)
+                    .await?;
 
-        Ok(claimed.len())
+                if let Some((_, map)) = results.into_iter().next() {
+                    let payload = match map.get("payload") {
+                        Some(redis::Value::Data(bytes)) => {
+                            String::from_utf8_lossy(bytes).to_string()
+                        }
+                        _ => String::new(),
+                    };
+
+                    // 路由到 DLQ
+                    if let Some(ref dlq) = self.dlq_manager {
+                        let msg_id = msg_id.as_str();
+                        if let Err(e) = dlq
+                            .route_to_dlq(
+                                stream_name,
+                                msg_id,
+                                &payload,
+                                "retryable",
+                                "exceeded max retries",
+                                max_retries,
+                            )
+                            .await
+                        {
+                            error!("Failed to route message to DLQ: {}", e);
+                        }
+                    }
+                }
+
+                // ACK 原消息（从 Pending List 移除）
+                let _: Result<(), _> = conn
+                    .xack::<&str, &str, &str, ()>(stream_name, &self.config.group_name, &[msg_id])
+                    .await;
+            }
+
+            info!(
+                "Routed {} messages to DLQ from stream: {}",
+                dlq_messages.len(),
+                stream_name
+            );
+        }
+
+        // 未超限消息：XCLAIM
+        if !claim_ids.is_empty() {
+            let id_refs: Vec<&str> = claim_ids.iter().map(|s| s.as_str()).collect();
+            let claimed: Vec<(String, std::collections::HashMap<String, redis::Value>)> = conn
+                .xclaim(
+                    stream_name,
+                    &self.config.group_name,
+                    &self.config.consumer_name,
+                    min_idle_time,
+                    &id_refs,
+                )
+                .await?;
+
+            info!(
+                "Claimed {} pending messages from stream: {}",
+                claimed.len(),
+                stream_name
+            );
+        }
+
+        Ok(pending.len())
     }
 }
 

@@ -21,6 +21,7 @@ pub mod ui_config_service;
 pub mod user_service;
 pub mod webhook_service;
 
+pub mod upload_session;
 pub mod user_settings_service;
 // 为了保持命名一致性，同时暴露 user_settings
 pub use user_settings_service as user_settings;

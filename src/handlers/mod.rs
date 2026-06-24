@@ -5,6 +5,7 @@ pub mod auth;
 pub mod auth_v2;
 pub mod config;
 pub mod custom_event;
+pub mod dlq_admin;
 pub mod file;
 pub mod message;
 pub mod message_reaction;

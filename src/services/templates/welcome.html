@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>欢迎加入 Capella Room</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { background: #fff; border-radius: 8px; width: 100%; max-width: 560px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); padding: 32px; text-align: center; }
+        .header h1 { margin: 0; color: #fff; font-size: 22px; }
+        .body { padding: 32px; }
+        .body p { margin: 0 0 16px; color: #555; font-size: 14px; line-height: 1.7; }
+        .body p:last-child { margin-bottom: 0; }
+        .features { margin: 24px 0; }
+        .features td { padding: 8px; color: #555; font-size: 14px; vertical-align: top; }
+        .features .icon { color: #667eea; font-size: 16px; width: 30px; }
+        .footer { background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e8ecf4; text-align: center; }
+        .footer p { margin: 0; color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <h1>🎉 欢迎加入 Capella Room</h1>
+        </div>
+        <div class="body">
+            <p>尊敬的 <strong>{{username}}</strong>，</p>
+            <p>感谢您注册 Capella Room！我们非常高兴地欢迎您加入我们的社区。</p>
+            <p>现在您可以：</p>
+            <table class="features">
+                <tr><td class="icon">✨</td><td>创建和加入聊天室</td></tr>
+                <tr><td class="icon">💬</td><td>实时消息沟通</td></tr>
+                <tr><td class="icon">📎</td><td>共享文件与媒体</td></tr>
+                <tr><td class="icon">🔔</td><td>自定义通知偏好</td></tr>
+            </table>
+        </div>
+        <div class="footer">
+            <p>Capella Room — 实时聊天室平台</p>
+        </div>
+    </div>
+</body>
+</html>

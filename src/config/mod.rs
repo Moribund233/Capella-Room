@@ -78,6 +78,12 @@ pub struct UploadConfig {
     pub max_file_size: usize,
     #[serde(default)]
     pub base_url: String,
+    #[serde(default)]
+    pub chunked_upload_enabled: bool,
+    #[serde(default)]
+    pub default_chunk_size: u32,
+    #[serde(default)]
+    pub session_ttl_hours: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -185,6 +191,12 @@ pub struct RedisConfig {
     /// 是否启用配置同步（通过环境变量 REDIS_CONFIG_SYNC_ENABLED 设置，默认 true）
     #[serde(default)]
     pub config_sync_enabled: bool,
+    /// 是否启用死信队列（通过环境变量 REDIS_DLQ_ENABLED 设置，默认 true）
+    #[serde(default)]
+    pub dlq_enabled: bool,
+    /// DLQ 最大重试次数（通过环境变量 REDIS_DLQ_MAX_RETRIES 设置，默认 3）
+    #[serde(default)]
+    pub dlq_max_retries: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

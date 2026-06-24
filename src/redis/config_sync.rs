@@ -402,6 +402,8 @@ mod tests {
             consumer_batch_size: 100,
             consumer_poll_interval_ms: 1000,
             stream_max_len: 10000,
+            dlq_enabled: true,
+            dlq_max_retries: 3,
         };
         Arc::new(RedisManager {
             client: None,
