@@ -35,6 +35,12 @@ export interface ClientUploadConfig {
   max_file_size: number
   /** 人类可读的最大文件大小（如 "10MB"） */
   max_file_size_human: string
+  /** 是否启用分片上传 */
+  chunked_upload_enabled: boolean
+  /** 默认分片大小（字节） */
+  default_chunk_size: number
+  /** 上传会话过期时间（小时） */
+  session_ttl_hours: number
 }
 
 /**

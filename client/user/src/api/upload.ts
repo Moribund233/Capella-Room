@@ -23,11 +23,7 @@ export const uploadApi = {
     formData.append('file', file)
     formData.append('usage_type', usageType)
 
-    return httpClient.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    return httpClient.post('/upload', formData)
   },
 
   /**
@@ -40,11 +36,7 @@ export const uploadApi = {
     formData.append('file', file)
     formData.append('usage_type', usageType)
 
-    return httpClient.post('/upload/image', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    return httpClient.post('/upload/image', formData)
   },
 
   /**
@@ -55,11 +47,7 @@ export const uploadApi = {
     const formData = new FormData()
     formData.append('file', file)
 
-    return httpClient.post('/upload/avatar', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    return httpClient.post('/upload/avatar', formData)
   },
 
   /**

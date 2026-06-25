@@ -238,6 +238,24 @@ impl ConfigManager {
                 config.upload.base_url = item.value.clone();
                 debug!("Hot reloaded upload.base_url = {}", item.value);
             }
+            "upload.chunked_upload_enabled" => {
+                if let Ok(enabled) = item.value.parse() {
+                    config.upload.chunked_upload_enabled = enabled;
+                    debug!("Hot reloaded upload.chunked_upload_enabled = {}", enabled);
+                }
+            }
+            "upload.default_chunk_size" => {
+                if let Ok(size) = item.value.parse() {
+                    config.upload.default_chunk_size = size;
+                    debug!("Hot reloaded upload.default_chunk_size = {}", size);
+                }
+            }
+            "upload.session_ttl_hours" => {
+                if let Ok(hours) = item.value.parse() {
+                    config.upload.session_ttl_hours = hours;
+                    debug!("Hot reloaded upload.session_ttl_hours = {}", hours);
+                }
+            }
             "websocket.heartbeat_interval_secs" => {
                 if let Ok(secs) = item.value.parse() {
                     config.websocket.heartbeat_interval_secs = secs;
@@ -466,6 +484,33 @@ impl ConfigManager {
                 "/uploads",
                 "string",
                 "文件访问基础URL路径",
+                "upload",
+                true,
+                true,
+            ),
+            (
+                "upload.chunked_upload_enabled",
+                "true",
+                "bool",
+                "是否启用分片上传",
+                "upload",
+                true,
+                true,
+            ),
+            (
+                "upload.default_chunk_size",
+                "5242880",
+                "int",
+                "默认分片大小（字节），默认5MB",
+                "upload",
+                true,
+                true,
+            ),
+            (
+                "upload.session_ttl_hours",
+                "24",
+                "int",
+                "分片上传会话过期时间（小时）",
                 "upload",
                 true,
                 true,

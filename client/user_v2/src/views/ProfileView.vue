@@ -6,7 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
 import { useSettingsStore } from '@/stores/settings'
-import { uploadApi } from '@/api/upload'
+import { smartUpload } from '@/api/upload'
 import { userApi } from '@/api/user'
 import type { LocaleSettings } from '@/types/settings'
 import { getAvatarGradient, getAvatarShadow } from '@/utils/avatar'
@@ -40,6 +40,7 @@ const avatarStyle = computed(() => ({
 
 // 头像上传
 const uploadingAvatar = ref(false)
+const avatarUploadProgress = ref(0)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 function triggerAvatarUpload() {
@@ -53,8 +54,13 @@ async function handleAvatarSelected(event: Event) {
   input.value = ''
 
   uploadingAvatar.value = true
+  avatarUploadProgress.value = 0
   try {
-    const res = await uploadApi.uploadAvatar(file)
+    const res = await smartUpload(file, {
+      endpoint: 'avatar',
+      usageType: 'avatar',
+      onProgress: (p) => { avatarUploadProgress.value = p },
+    })
     if (res.success && res.data) {
       await authStore.fetchUser()
       ElMessage.success('Avatar updated')
@@ -65,6 +71,7 @@ async function handleAvatarSelected(event: Event) {
     ElMessage.error(t('common.error'))
   } finally {
     uploadingAvatar.value = false
+    avatarUploadProgress.value = 0
   }
 }
 
@@ -311,7 +318,10 @@ const imageQualityOptions = [
                   <span>{{ getInitials(currentUser?.username || '') }}</span>
                 </template>
                 <div class="profile-avatar__overlay">
-                  <span v-if="uploadingAvatar">…</span>
+                  <template v-if="uploadingAvatar">
+                    <span v-if="avatarUploadProgress > 0">{{ avatarUploadProgress }}%</span>
+                    <span v-else>…</span>
+                  </template>
                   <span v-else>Change</span>
                 </div>
                 <span class="status-big"></span>

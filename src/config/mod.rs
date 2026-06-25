@@ -433,6 +433,12 @@ pub struct ClientUploadConfig {
     pub max_file_size: usize,
     /// 人类可读的最大文件大小（如 "10MB"）
     pub max_file_size_human: String,
+    /// 是否启用分片上传
+    pub chunked_upload_enabled: bool,
+    /// 默认分片大小（字节）
+    pub default_chunk_size: u32,
+    /// 上传会话过期时间（小时）
+    pub session_ttl_hours: u64,
 }
 
 /// 客户端系统配置
@@ -466,6 +472,9 @@ impl ClientConfig {
             upload: ClientUploadConfig {
                 max_file_size: config.upload.max_file_size,
                 max_file_size_human: format_file_size(config.upload.max_file_size),
+                chunked_upload_enabled: config.upload.chunked_upload_enabled,
+                default_chunk_size: config.upload.default_chunk_size,
+                session_ttl_hours: config.upload.session_ttl_hours,
             },
             system: ClientSystemConfig {
                 name: config.system.name.clone(),

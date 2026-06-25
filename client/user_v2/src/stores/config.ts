@@ -20,6 +20,9 @@ const DEFAULT_CONFIG: ClientConfig = {
   upload: {
     max_file_size: 10485760,
     max_file_size_human: '10 MB',
+    chunked_upload_enabled: true,
+    default_chunk_size: 5242880,
+    session_ttl_hours: 24,
   },
   system: {
     name: 'Capella Room',

@@ -23,6 +23,9 @@ export interface ClientReconnectConfig {
 export interface ClientUploadConfig {
   max_file_size: number
   max_file_size_human: string
+  chunked_upload_enabled: boolean
+  default_chunk_size: number
+  session_ttl_hours: number
 }
 
 export interface ClientSystemConfig {

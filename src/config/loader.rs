@@ -169,6 +169,20 @@ impl ConfigLoader {
             config.upload.base_url = base_url;
         }
 
+        if let Ok(enabled) = std::env::var("UPLOAD_CHUNKED_ENABLED") {
+            if let Ok(e) = enabled.parse() {
+                debug!("Overriding upload.chunked_upload_enabled from environment");
+                config.upload.chunked_upload_enabled = e;
+            }
+        }
+
+        if let Ok(size) = std::env::var("UPLOAD_DEFAULT_CHUNK_SIZE") {
+            if let Ok(s) = size.parse() {
+                debug!("Overriding upload.default_chunk_size from environment");
+                config.upload.default_chunk_size = s;
+            }
+        }
+
         // 日志配置
         if let Ok(level) = std::env::var("LOG_LEVEL") {
             debug!("Overriding logging.level from environment");
@@ -250,6 +264,12 @@ impl ConfigLoader {
         }
 
         // 邮件配置
+        if let Ok(backend) = std::env::var("SMTP_BACKEND") {
+            if backend.eq_ignore_ascii_case("smtp") {
+                debug!("Loading mail.backend from environment: smtp");
+                config.mail.backend = super::MailBackend::Smtp;
+            }
+        }
         if let Ok(password) = std::env::var("SMTP_PASSWORD") {
             debug!("Loading mail.smtp_password from environment");
             config.mail.smtp_password = password;

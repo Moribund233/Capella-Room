@@ -1,4 +1,5 @@
 use axum::{
+    extract::DefaultBodyLimit,
     middleware,
     routing::{delete, get, patch, post, put},
     Router,
@@ -335,6 +336,7 @@ fn upload_routes() -> Router<Arc<AppState>> {
         .route("/chunked/:session_id/status", get(file::get_upload_status))
         .route("/chunked/:session_id/complete", post(file::complete_chunked_upload))
         .route("/chunked/:session_id", delete(file::cancel_chunked_upload))
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
 }
 
 /// 管理员路由

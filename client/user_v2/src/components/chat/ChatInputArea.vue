@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onUnmounted } from 'vue'
+import { ref, watch, nextTick, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWebSocketStore } from '@/stores/websocket'
-import { uploadApi } from '@/api/upload'
+import { smartUpload } from '@/api/upload'
 import { ElMessage } from 'element-plus'
 import type { ReplyToMessage } from '@/types/message'
 import { Close, UploadFilled, Promotion, Loading, Comment, Picture } from '@element-plus/icons-vue'
@@ -29,6 +29,7 @@ const inputText = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isFocused = ref(false)
 const uploading = ref(false)
+const uploadProgress = ref(0)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const showEmojiPicker = ref(false)
 const showGifPicker = ref(false)
@@ -159,11 +160,14 @@ async function handleFileSelected(event: Event) {
   input.value = ''
 
   uploading.value = true
+  uploadProgress.value = 0
   try {
     const isImage = file.type.startsWith('image/')
-    const res = isImage
-      ? await uploadApi.uploadImage(file, 'message')
-      : await uploadApi.uploadFile(file, 'message')
+    const res = await smartUpload(file, {
+      endpoint: isImage ? 'image' : 'file',
+      usageType: 'message',
+      onProgress: (p) => { uploadProgress.value = p },
+    })
     if (res.success && res.data) {
       emit('send', res.data.url, isImage ? 'image' : 'file')
     } else {
@@ -173,6 +177,7 @@ async function handleFileSelected(event: Event) {
     ElMessage.error(t('common.error'))
   } finally {
     uploading.value = false
+    uploadProgress.value = 0
   }
 }
 
@@ -238,6 +243,10 @@ onUnmounted(() => {
           />
         </div>
         <span v-if="uploading" class="uploading-spinner" />
+        <div v-if="uploading && uploadProgress > 0" class="upload-progress">
+          <div class="upload-progress__bar" :style="{ width: uploadProgress + '%' }" />
+          <span class="upload-progress__text">{{ uploadProgress }}%</span>
+        </div>
       </div>
 
       <textarea
@@ -470,6 +479,33 @@ onUnmounted(() => {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 80px;
+  height: 16px;
+  background: var(--bg);
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0 4px;
+
+  &__bar {
+    height: 6px;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 6px;
+  }
+
+  &__text {
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
 }
 
 @keyframes spin {
