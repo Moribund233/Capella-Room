@@ -16,7 +16,7 @@ import type {
  * 应用基础配置
  */
 export const appConfig: AppConfig = {
-  name: '聊天室管理后台',
+  name: 'Capella Admin',
   logo: '/favicon.svg',
   version: '1.0.0',
 }
