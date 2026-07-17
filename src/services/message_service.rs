@@ -852,7 +852,7 @@ impl MessageService {
     pub async fn get_message_hourly_distribution(&self) -> Result<Vec<MessageHourlyDistribution>> {
         let rows: Vec<(i32, i64)> = sqlx::query_as(
             r#"
-            SELECT 
+            SELECT
                 EXTRACT(HOUR FROM created_at)::int as hour,
                 COUNT(*) as count
             FROM messages
@@ -868,6 +868,33 @@ impl MessageService {
         Ok(rows
             .into_iter()
             .map(|(hour, count)| MessageHourlyDistribution { hour, count })
+            .collect())
+    }
+
+    /// 获取每日消息数量统计
+    pub async fn get_daily_message_stats(&self, days: i64) -> Result<Vec<DailyMessageCount>> {
+        let rows: Vec<(chrono::NaiveDate, i64)> = sqlx::query_as(
+            r#"
+            SELECT
+                DATE(created_at) as date,
+                COUNT(*) as count
+            FROM messages
+            WHERE created_at > NOW() - INTERVAL '1 day' * $1
+            AND is_deleted = false
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+            "#,
+        )
+        .bind(days)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(date, count)| DailyMessageCount {
+                date: date.format("%Y-%m-%d").to_string(),
+                count,
+            })
             .collect())
     }
 }
@@ -908,5 +935,12 @@ pub struct MessageTypeStats {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MessageHourlyDistribution {
     pub hour: i32,
+    pub count: i64,
+}
+
+/// 每日消息数量
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DailyMessageCount {
+    pub date: String,
     pub count: i64,
 }

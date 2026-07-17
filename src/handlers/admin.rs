@@ -21,7 +21,7 @@ use crate::{
         room::{MemberRole, RoomResponse},
         user::{UserResponse, UserRole},
     },
-    redis::ConfigSyncMessage,
+    redis::{ConfigSyncMessage, DLQManager},
     state::AppState,
     websocket::protocol::{PendingActionInfo, PendingActionStatus, PendingActionType, WebSocketMessage},
 };
@@ -760,6 +760,56 @@ pub async fn get_performance_metrics(
     })))
 }
 
+// ==================== 计数接口 ====================
+
+#[derive(Debug, Serialize)]
+pub struct BadgeCounts {
+    pub users: String,
+    pub rooms: i64,
+    pub security: i64,
+    pub dlq: i64,
+    pub monitor_live: bool,
+}
+
+pub async fn get_badge_counts(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ApiResponse<BadgeCounts>>> {
+    let total_users = state.user_service().count_users().await?;
+    let total_rooms = state.room_service().count_all_rooms().await?;
+    let security_stats = state.audit_service().get_security_stats().await?;
+
+    let dlq_total = if let Some(ref redis_mgr) = state.redis_manager {
+        let max_retries = {
+            let config = state.config.read().await;
+            config.redis.dlq_max_retries
+        };
+        let mgr = DLQManager::new(redis_mgr.clone(), max_retries);
+        mgr.message_count().await
+    } else {
+        0
+    };
+
+    let monitor_live = state.ws_manager().get_connection_count() > 0;
+
+    Ok(Json(ApiResponse::success(BadgeCounts {
+        users: format_number_compact(total_users),
+        rooms: total_rooms,
+        security: security_stats.pending_alerts,
+        dlq: dlq_total,
+        monitor_live,
+    })))
+}
+
+fn format_number_compact(n: i64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.1}k", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
+    }
+}
+
 // ==================== 系统监控接口 ====================
 
 use crate::services::monitor_service::MonitorData;
@@ -848,7 +898,7 @@ pub async fn get_redis_status(
 
 use crate::services::user_service::{UserGrowthStats, UserBehaviorStats, FriendStats};
 use crate::services::room_service::{RoomActivity, RoomStats};
-use crate::services::message_service::{MessageTypeStats, MessageHourlyDistribution};
+use crate::services::message_service::{MessageTypeStats, MessageHourlyDistribution, DailyMessageCount};
 use crate::services::audit_service::SecurityStats;
 
 /// 获取用户增长统计
@@ -900,6 +950,16 @@ pub async fn get_message_type_stats(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ApiResponse<MessageTypeStats>>> {
     let stats = state.message_service().get_message_type_stats().await?;
+    Ok(Json(ApiResponse::success(stats)))
+}
+
+/// 获取每日消息数量统计
+pub async fn get_daily_message_stats(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<DaysQuery>,
+) -> Result<Json<ApiResponse<Vec<DailyMessageCount>>>> {
+    let days = query.days.unwrap_or(7);
+    let stats = state.message_service().get_daily_message_stats(days).await?;
     Ok(Json(ApiResponse::success(stats)))
 }
 

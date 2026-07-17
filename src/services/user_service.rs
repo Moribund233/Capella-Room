@@ -595,6 +595,7 @@ pub struct UserGrowthStats {
     pub new_users_this_month: i64,
     pub total_users: i64,
     pub growth_by_day: Vec<DailyUserCount>,
+    pub active_users_by_day: Vec<DailyUserCount>,
 }
 
 /// 每日用户数量
@@ -977,10 +978,32 @@ impl UserService {
         // 获取每日用户增长数据
         let growth_by_day: Vec<DailyUserCount> = sqlx::query_as(
             r#"
-            SELECT 
+            SELECT
                 DATE(created_at) as date,
                 COUNT(*) as count
             FROM users
+            WHERE created_at > NOW() - INTERVAL '1 day' * $1
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+            "#,
+        )
+        .bind(days)
+        .fetch_all(self.db.pool())
+        .await?
+        .into_iter()
+        .map(|(date, count): (chrono::NaiveDate, i64)| DailyUserCount {
+            date: date.format("%Y-%m-%d").to_string(),
+            count,
+        })
+        .collect();
+
+        // 获取每日活跃用户数据（按发送消息的去重用户数统计）
+        let active_users_by_day: Vec<DailyUserCount> = sqlx::query_as(
+            r#"
+            SELECT
+                DATE(created_at) as date,
+                COUNT(DISTINCT sender_id) as count
+            FROM messages
             WHERE created_at > NOW() - INTERVAL '1 day' * $1
             GROUP BY DATE(created_at)
             ORDER BY date ASC
@@ -1002,6 +1025,7 @@ impl UserService {
             new_users_this_month,
             total_users,
             growth_by_day,
+            active_users_by_day,
         })
     }
 

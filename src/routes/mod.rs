@@ -377,6 +377,7 @@ fn admin_router() -> Router<Arc<AppState>> {
         .route("/stats", get(admin::get_stats))
         .route("/stats/activity", get(admin::get_activity_stats))
         .route("/stats/performance", get(admin::get_performance_metrics))
+        .route("/badge-counts", get(admin::get_badge_counts))
         // 增强统计接口
         .route("/stats/users/growth", get(admin::get_user_growth_stats))
         .route("/stats/users/behavior", get(admin::get_user_behavior_stats))
@@ -384,6 +385,7 @@ fn admin_router() -> Router<Arc<AppState>> {
         .route("/stats/rooms/activity", get(admin::get_room_activity_ranking))
         .route("/stats/rooms/overview", get(admin::get_room_stats))
         .route("/stats/messages/types", get(admin::get_message_type_stats))
+        .route("/stats/messages/daily", get(admin::get_daily_message_stats))
         .route("/stats/messages/hourly", get(admin::get_message_hourly_distribution))
         .route("/stats/security", get(admin::get_security_stats))
         // 系统监控
