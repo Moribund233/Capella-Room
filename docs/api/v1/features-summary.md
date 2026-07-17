@@ -1,8 +1,8 @@
 # Capella Room API v1 功能汇总
 
-> **文档版本**: v1.3  
+> **文档版本**: v1.4  
 > **最后更新**: 2026-06-14  
-> **适用范围**: 阶段 1-9、C1-C2 所有已实现功能
+> **适用范围**: 阶段 1-9、阶段 9.5、阶段 9.6、C1-C2 所有已实现功能
 
 ---
 
@@ -52,6 +52,8 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | 8.7.1 | IP 安全系统 | ✅ 已完成 | IP 黑名单/白名单系统、CIDR 支持、白名单模式 |
 | 8.7.2 | 账号安全系统 | ✅ 已完成 | 用户设置体系、设备管理、单设备登录、设备禁用 |
 | 9 | 后端细节优化 | ✅ 已完成 | 搜索功能、私聊、好友系统、房间邀请 |
+| 9.5 | OAuth 2.0 与 Webhook | ✅ 已完成 | OAuth 授权码流程、OAuth App 管理、资源绑定、Webhook 订阅、自定义事件 |
+| 9.6 | 死信队列与增强监控 | ✅ 已完成 | 死信队列(DLQ)、系统监控、增强统计、Redis 管理、配置同步 |
 | C1 | 账号注销 | ✅ 已完成 | 用户软删除、匿名化、Token 失效 |
 | C2 | 消息置顶 | ✅ 已完成 | 置顶/取消置顶、置顶列表、WebSocket 实时广播 |
 
@@ -112,12 +114,16 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | **DELETE** | **`/api/v1/users/friends/requests/:id`** | **取消好友请求** | **需要** |
 | **DELETE** | **`/api/v1/users/friends/:id`** | **删除好友** | **需要** |
 | **DELETE** | **`/api/v1/users/me`** | **注销账号（软删除）** | **需要** |
+| **GET** | **`/api/v1/users/me/stats`** | **用户统计** | **需要** |
+| **GET** | **`/api/v1/users/recommended`** | **推荐用户（在线优先+随机补充）** | **需要** |
 
 **功能特性**:
 - 用户名/邮箱模糊搜索
 - 分页支持 (limit/offset)
 - 用户在线状态显示
 - **用户搜索**: 支持隐私设置过滤（Everyone/Friends/Nobody）
+- **推荐用户**: 在线用户优先 + 随机补充
+- **用户统计**: 消息数、房间数、好友数等统计
 - **好友系统**:
   - 发送/接收好友请求（带附加消息）
   - 接受/拒绝好友请求
@@ -149,6 +155,17 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 
 **阶段归属**: 阶段 8.7.2 (账号安全系统)
 
+**房间级设置**（用户设置扩展）:
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/users/me/rooms/settings` | 列出所有房间级设置 |
+| GET | `/api/v1/users/me/rooms/:room_id/settings` | 获取指定房间的设置 |
+| PATCH | `/api/v1/users/me/rooms/:room_id/settings` | 更新指定房间的设置 |
+| DELETE | `/api/v1/users/me/rooms/:room_id/settings` | 删除指定房间的设置 |
+
+房间级设置覆盖同名字段的全局设置，支持按房间自定义通知偏好等。
+
 ---
 
 ### 5. 账号安全接口 ([user.md](./http/user.md))
@@ -177,7 +194,26 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 
 ---
 
-### 6. 聊天室接口 ([rooms.md](./http/rooms.md))
+### 6. 通知接口 ([notifications.md](./http/notifications.md))
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/api/v1/notifications` | 获取通知列表 | 需要 |
+| GET | `/api/v1/notifications/unread-count` | 获取未读通知数 | 需要 |
+| POST | `/api/v1/notifications/:id/read` | 标记通知已读 | 需要 |
+| POST | `/api/v1/notifications/read-all` | 标记所有通知已读 | 需要 |
+
+**功能特性**:
+- 通知列表分页
+- 未读计数
+- 单条/全部标记已读
+- WebSocket 实时推送 + HTTP 查询双通道
+
+**阶段归属**: 阶段 4.6 (消息通知系统)
+
+---
+
+### 7. 聊天室接口 ([rooms.md](./http/rooms.md))
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
@@ -223,7 +259,7 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 
 ---
 
-### 7. 消息接口 ([messages.md](./http/messages.md))
+### 8. 消息接口 ([messages.md](./http/messages.md))
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
@@ -263,7 +299,7 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 
 ---
 
-### 8. 文件接口 ([files.md](./http/files.md))
+### 9. 文件接口 ([files.md](./http/files.md))
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
@@ -273,6 +309,11 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | POST | `/api/v1/upload` | 通用文件上传 | 需要 |
 | POST | `/api/v1/upload/image` | 上传图片 | 需要 |
 | POST | `/api/v1/upload/avatar` | 上传头像 | 需要 |
+| **POST** | **`/api/v1/upload/chunked/init`** | **初始化分片上传** | **需要** |
+| **POST** | **`/api/v1/upload/chunked/:session_id/:chunk_index`** | **上传分片** | **需要** |
+| **GET** | **`/api/v1/upload/chunked/:session_id/status`** | **查询分片上传状态** | **需要** |
+| **POST** | **`/api/v1/upload/chunked/:session_id/complete`** | **完成分片上传** | **需要** |
+| **DELETE** | **`/api/v1/upload/chunked/:session_id`** | **取消分片上传** | **需要** |
 
 **功能特性**:
 - 文件分类存储：images / documents / videos / audio / others
@@ -281,12 +322,18 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 - 文件类型白名单验证
 - 文件大小限制（默认 10MB）
 - 用户只能删除自己的文件
+- **分片上传**:
+  - 初始化分片会话，返回 session_id
+  - 按索引顺序上传分片
+  - 查询已上传分片状态
+  - 完成后台合并文件
+  - 支持取消分片会话
 
 **阶段归属**: 阶段 6.5 (文件上传与资源管理)
 
 ---
 
-### 9. 管理员接口 ([admin.md](./http/admin.md))
+### 10. 管理员接口 ([admin.md](./http/admin.md))
 
 #### 用户管理
 
@@ -307,6 +354,8 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | GET | `/api/v1/admin/rooms/:room_id` | 获取房间详情 | Admin |
 | DELETE | `/api/v1/admin/rooms/:room_id` | 强制删除房间 | Admin |
 | GET | `/api/v1/admin/rooms/:room_id/messages` | 获取房间消息记录 | Admin |
+| DELETE | `/api/v1/admin/rooms/:room_id/members/:user_id` | 踢出房间成员 | Admin |
+| PUT | `/api/v1/admin/rooms/:room_id/members/:user_id/role` | 设置成员角色 | Admin |
 
 #### 消息审核
 
@@ -322,6 +371,20 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | GET | `/api/v1/admin/stats` | 系统统计概览 | Admin |
 | GET | `/api/v1/admin/stats/activity` | 活跃度统计 | Admin |
 | GET | `/api/v1/admin/stats/performance` | 性能指标 | Admin |
+| **GET** | **`/api/v1/admin/stats/users/growth`** | **用户增长统计** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/users/behavior`** | **用户行为统计** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/users/friends`** | **好友关系统计** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/rooms/activity`** | **房间活跃度排行** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/rooms/overview`** | **房间概览统计** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/messages/types`** | **消息类型分布** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/messages/hourly`** | **消息小时分布** | **Admin** |
+| **GET** | **`/api/v1/admin/stats/security`** | **安全统计** | **Admin** |
+
+#### 系统监控
+
+| 方法 | 路径 | 说明 | 最低权限 |
+|------|------|------|----------|
+| **GET** | **`/api/v1/admin/monitor`** | **系统监控数据** | **Admin** |
 
 #### 配置管理
 
@@ -362,17 +425,51 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | GET | `/api/v1/admin/security/whitelist-mode` | 获取白名单模式状态 | Admin |
 | POST | `/api/v1/admin/security/whitelist-mode` | 设置白名单模式 | SuperAdmin |
 
+#### 待办通知管理
+
+| 方法 | 路径 | 说明 | 最低权限 |
+|------|------|------|----------|
+| **POST** | **`/api/v1/admin/pending-actions/:id/respond`** | **处理待办通知** | **Admin** |
+
+#### 死信队列 (DLQ)
+
+| 方法 | 路径 | 说明 | 最低权限 |
+|------|------|------|----------|
+| **GET** | **`/api/v1/admin/dlq/messages`** | **查询死信队列消息列表** | **Admin** |
+| **GET** | **`/api/v1/admin/dlq/stats`** | **死信队列统计** | **Admin** |
+| **POST** | **`/api/v1/admin/dlq/batch-requeue`** | **批量重新入队** | **Admin** |
+| **POST** | **`/api/v1/admin/dlq/:id/requeue`** | **单条重新入队** | **Admin** |
+| **DELETE** | **`/api/v1/admin/dlq/:id`** | **删除死信消息** | **Admin** |
+
+#### Redis 管理
+
+| 方法 | 路径 | 说明 | 最低权限 |
+|------|------|------|----------|
+| **GET** | **`/api/v1/admin/redis/status`** | **Redis 连接状态** | **Admin** |
+| **GET** | **`/api/v1/admin/redis/stats`** | **Redis 运行统计** | **Admin** |
+| **POST** | **`/api/v1/admin/redis/refresh`** | **刷新 Redis 缓存** | **Admin** |
+
+#### 配置同步
+
+| 方法 | 路径 | 说明 | 最低权限 |
+|------|------|------|----------|
+| **POST** | **`/api/v1/admin/config/sync`** | **触发配置同步** | **SuperAdmin** |
+| **GET** | **`/api/v1/admin/config/sync/status`** | **查询配置同步状态** | **Admin** |
+
 **功能特性**:
 - 三级角色体系：User / Admin / SuperAdmin
 - 审计日志记录所有管理操作
 - IP 黑白名单支持 CIDR 范围
 - 内存缓存 + 定期刷新机制
+- **死信队列**: 消息处理失败自动进入 DLQ，支持查询、重新入队、删除
+- **Redis 管理**: 连接状态监控、运行统计、手动刷新缓存
+- **配置同步**: 跨节点热更新配置，支持触发和状态查询
 
-**阶段归属**: 阶段 8 (配置化与运维管理)、阶段 8.4 (安全审计系统)、阶段 8.7.1 (IP 安全系统)
+**阶段归属**: 阶段 8 (配置化与运维管理)、阶段 8.4 (安全审计系统)、阶段 8.7.1 (IP 安全系统)、阶段 9.6 (死信队列与增强监控)
 
 ---
 
-### 10. UI 配置接口 ([ui-config.md](./http/ui-config.md))
+### 11. UI 配置接口 ([ui-config.md](./http/ui-config.md))
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
@@ -386,6 +483,104 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 - 专为 CapellaUI 前端框架设计
 
 **阶段归属**: 阶段 8 (配置化与运维管理)
+
+---
+
+### 12. OAuth 2.0 与 Webhook 接口 ([oauth.md](./http/oauth.md), [webhook.md](./http/webhook.md))
+
+#### OAuth 授权流程（公开访问）
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/oauth/authorize` | OAuth 授权页面（浏览器） | 用户会话 |
+| POST | `/oauth/authorize` | 提交授权请求 | 用户会话 |
+| POST | `/oauth/authorize/consent` | 用户确认授权 | 用户会话 |
+| POST | `/oauth/token` | 获取 Access Token | Client Secret |
+| GET | `/oauth/userinfo` | 获取用户信息（OAuth） | Access Token |
+
+#### OAuth App 管理（需要用户认证）
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/oauth/apps` | 创建 OAuth App | 需要 |
+| GET | `/api/v1/oauth/apps` | 获取 App 列表 | 需要 |
+| GET | `/api/v1/oauth/apps/:app_id` | 获取 App 详情 | 需要 |
+| PUT | `/api/v1/oauth/apps/:app_id` | 更新 App | 需要 |
+| DELETE | `/api/v1/oauth/apps/:app_id` | 删除 App | 需要 |
+| POST | `/api/v1/oauth/apps/:app_id/rotate-secret` | 轮换 Client Secret | 需要 |
+
+#### 资源映射与绑定
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/oauth/mappings` | 创建资源映射 | 需要 |
+| GET | `/api/v1/oauth/mappings` | 查询资源映射 | 需要 |
+| DELETE | `/api/v1/oauth/mappings/:mapping_id` | 删除映射 | 需要 |
+| GET | `/api/v1/oauth/resources` | 查询资源 | 需要 |
+| POST | `/api/v1/oauth/resources` | 绑定资源（自动创建） | 需要 |
+| POST | `/api/v1/rooms/:room_id/resources` | 绑定资源到房间 | 需要 |
+| GET | `/api/v1/rooms/:room_id/resources` | 获取房间资源列表 | 需要 |
+| PUT | `/api/v1/rooms/:room_id/resources/:binding_id` | 更新资源绑定 | 需要 |
+| DELETE | `/api/v1/rooms/:room_id/resources/:binding_id` | 解绑资源 | 需要 |
+
+#### Webhook 订阅管理
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/webhook/subscriptions` | 创建 Webhook 订阅 | 需要 |
+| GET | `/api/v1/webhook/subscriptions` | 获取订阅列表 | 需要 |
+| GET | `/api/v1/webhook/subscriptions/:id` | 获取订阅详情 | 需要 |
+| PUT | `/api/v1/webhook/subscriptions/:id` | 更新订阅 | 需要 |
+| DELETE | `/api/v1/webhook/subscriptions/:id` | 删除订阅 | 需要 |
+| GET | `/api/v1/webhook/subscriptions/:id/deliveries` | 获取投递记录 | 需要 |
+| POST | `/api/v1/webhook/subscriptions/:id/deliveries/:delivery_id/redeliver` | 重新投递 | 需要 |
+
+#### 自定义事件
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v1/rooms/:room_id/custom-events` | 发送自定义事件 | OAuth |
+| GET | `/api/v1/rooms/:room_id/custom-events` | 获取错过事件 | OAuth |
+
+**功能特性**:
+- **OAuth 2.0**: 标准授权码流程 (Authorization Code Flow)
+- **OAuth App**: 注册和管理第三方应用，支持 Client Secret 轮换
+- **资源映射**: 外部资源与 Capella Room 资源的映射管理
+- **资源绑定**: 外部资源绑定到聊天室，支持 CRUD
+- **Webhook**: 事件订阅、签名验证、投递重试、投递记录查询
+- **自定义事件**: 外部服务通过 OAuth 向房间发送/接收自定义事件，支持 WebSocket 实时转发和离线同步
+
+**阶段归属**: 阶段 9.5 (OAuth 2.0 与 Webhook)
+
+---
+
+### 13. v2 API 接口 ([auth.md](./http/auth.md))
+
+#### 认证接口（公开访问）
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v2/auth/register/send-code` | 发送注册验证码 | 无需 |
+| POST | `/api/v2/auth/register` | 验证码注册 | 无需 |
+| POST | `/api/v2/auth/login/send-code` | 发送登录验证码 | 无需 |
+| POST | `/api/v2/auth/login` | 验证码登录 | 无需 |
+| POST | `/api/v2/auth/reset-password/send-code` | 发送重置密码验证码 | 无需 |
+| POST | `/api/v2/auth/reset-password` | 验证码重置密码 | 无需 |
+| POST | `/api/v2/auth/login-with-password` | 密码登录 | 无需 |
+| POST | `/api/v2/auth/refresh` | 刷新 Token | 无需 |
+
+#### 用户接口
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/api/v2/users/logout` | 登出 | 需要 |
+
+**功能特性**:
+- 验证码注册/登录（邮箱验证码）
+- 密码重置（验证码）
+- 与 v1 共享用户体系，Token 互通
+
+**阶段归属**: 阶段 9.5 (OAuth 2.0 与 Webhook)
 
 ---
 
@@ -492,12 +687,17 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | `MarkNotificationRead` | C→S | 标记通知已读 |
 | `MarkAllNotificationsRead` | C→S | 标记所有通知已读 |
 | `GetPendingActions` | C→S | 获取待办列表 |
+| `OfflineNotifications` | S→C | 离线通知列表响应 |
+| `NotificationReadConfirm` | S→C | 通知已读确认 |
+| `PendingActionsList` | S→C | 待办列表响应 |
 
 **功能特性**:
 - 在线实时推送
 - 离线通知存储（`notifications` 表）
 - 通知历史同步
 - 通知类型：new / important / warning
+- **通知管理**: 获取离线通知、标记已读、已读确认
+- **待办系统**: 待办通知推送、待办列表获取
 
 **阶段归属**: 阶段 4.6 (消息通知系统)
 
@@ -538,6 +738,39 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 - **管理员专用**：仅管理员可订阅系统日志
 
 **阶段归属**: 阶段 8 (配置化与运维管理)
+
+---
+
+### 房间消息摘要
+
+| 消息类型 | 方向 | 说明 |
+|----------|------|------|
+| `RoomMessageSummary` | S→C | 房间消息摘要（last_message + unread_count） |
+
+用于房间列表实时更新，显示最新消息预览和未读计数。
+
+**阶段归属**: 阶段 4 (WebSocket 通信)
+
+---
+
+### 外部服务与资源绑定
+
+| 消息类型 | 方向 | 说明 |
+|----------|------|------|
+| `CustomEvent` | C→S | 外部服务发送自定义事件 |
+| `CustomEventForward` | S→C | 自定义事件转发给客户端 |
+| `GetMissedCustomEvents` | C→S | 请求错过自定义事件 |
+| `MissedCustomEvents` | S→C | 错过自定义事件列表 |
+| `ResourceBound` | S→C | 资源已绑定到房间 |
+| `ResourceBindingUpdated` | S→C | 资源绑定已更新 |
+| `ResourceUnbound` | S→C | 资源已解绑 |
+
+**功能特性**:
+- **自定义事件**: 外部服务通过 OAuth 身份向房间发送自定义事件，客户端实时接收
+- **离线同步**: 重连后自动同步错过的自定义事件
+- **资源绑定**: 外部资源（如文件、外部链接）绑定到房间时实时通知
+
+**阶段归属**: 阶段 9.5 (OAuth 2.0 与 Webhook)
 
 ---
 
@@ -583,6 +816,34 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 
 **相关 API**: [user.md](./http/user.md)
 
+### OAuth 2.0 与 Webhook (阶段 9.5)
+
+- **OAuth 授权码流程**: 标准 Authorization Code Flow
+- **OAuth App 管理**: 注册第三方应用、Client Secret 轮换
+- **资源映射与绑定**: 外部资源映射到 Capella 资源，绑定到聊天室
+- **Webhook 订阅**: 事件订阅、签名验证、投递重试、投递记录
+- **自定义事件**: 外部服务通过 OAuth 向房间发送自定义事件
+
+**相关 API**: [oauth.md](./http/oauth.md), [webhook.md](./http/webhook.md)
+
+### 死信队列与增强监控 (阶段 9.6)
+
+- **死信队列 (DLQ)**: 消息处理失败自动进入死信队列，支持查询、重新入队、删除
+- **增强统计**: 用户增长、用户行为、好友关系、房间活跃度排行、消息类型/时间分布
+- **系统监控**: CPU/内存/连接数等实时监控数据
+- **Redis 管理**: 连接状态、运行统计、手动刷新
+- **配置同步**: 跨节点热更新配置
+
+**相关 API**: [admin.md](./http/admin.md)
+
+### 分片上传
+
+- **大文件支持**: 将大文件切分为多个分片依次上传
+- **断点续传**: 查询已上传分片状态，支持续传
+- **并发上传**: 分片可并发上传，后台合并
+
+**相关 API**: [files.md](./http/files.md)
+
 ---
 
 ## 文档索引
@@ -594,11 +855,14 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | [system.md](./http/system.md) | `/health`, `/api/version` | 系统接口 |
 | [auth.md](./http/auth.md) | `/api/v1/auth/*` | 认证接口 |
 | [user.md](./http/user.md) | `/api/v1/users/*` | 用户接口 |
+| [notifications.md](./http/notifications.md) | `/api/v1/notifications/*` | 通知接口 |
 | [rooms.md](./http/rooms.md) | `/api/v1/rooms/*` | 聊天室接口 |
 | [messages.md](./http/messages.md) | `/api/v1/messages/*` | 消息接口 |
 | [files.md](./http/files.md) | `/api/v1/files/*`, `/api/v1/upload/*` | 文件接口 |
 | [admin.md](./http/admin.md) | `/api/v1/admin/*` | 管理员接口 |
 | [ui-config.md](./http/ui-config.md) | `/api/v1/ui/*` | UI 配置接口 |
+| [oauth.md](./http/oauth.md) | `/oauth/*`, `/api/v1/oauth/*`, `/api/v1/rooms/*/resources/*` | OAuth 2.0 接口 |
+| [webhook.md](./http/webhook.md) | `/api/v1/webhook/*` | Webhook 接口 |
 
 ### WebSocket 文档
 
@@ -678,6 +942,7 @@ Capella Room 是一个基于 **Axum + WebSocket + PostgreSQL** 构建的实时�
 | v1.1 | 2026-05-07 | 添加阶段 9 功能：搜索、私聊、好友系统、房间邀请 |
 | v1.2 | 2026-06-13 | 添加消息表情反应功能（HTTP API + WebSocket） |
 | v1.3 | 2026-06-14 | 添加账号注销、消息置顶功能（HTTP API + WebSocket） |
+| v1.4 | 2026-06-14 | 补充通知 HTTP API、分片上传、房间级设置、推荐用户、增强统计、系统监控、死信队列、Redis 管理、配置同步、OAuth 2.0、Webhook、自定义事件、资源绑定、v2 API、WS 消息类型补全 |
 
 ---
 
