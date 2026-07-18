@@ -81,15 +81,16 @@ impl MonitorService {
         let mut system = System::new_all();
         system.refresh_all();
 
-        // 获取内存信息
+        // 获取内存信息（sysinfo 返回字节，转为 MB）
         let total_memory = system.total_memory();
         let used_memory = system.used_memory();
         let available_memory = system.available_memory();
+        const B_TO_MB: u64 = 1024 * 1024;
 
         let memory = MemoryInfo {
-            total_mb: total_memory / 1024,
-            used_mb: used_memory / 1024,
-            available_mb: available_memory / 1024,
+            total_mb: total_memory / B_TO_MB,
+            used_mb: used_memory / B_TO_MB,
+            available_mb: available_memory / B_TO_MB,
             usage_percent: if total_memory > 0 {
                 (used_memory as f64 / total_memory as f64) * 100.0
             } else {
@@ -97,22 +98,23 @@ impl MonitorService {
             },
         };
 
-        // 获取磁盘信息
+        // 获取主磁盘信息（仅跟踪根文件系统，避免 Docker/WSL 下累加宿主机挂载点）
         let disks = Disks::new_with_refreshed_list();
-        let mut total_space = 0;
-        let mut available_space = 0;
+        let root_disk = disks.iter().find(|d| d.mount_point() == std::path::Path::new("/"));
 
-        for disk in &disks {
-            total_space += disk.total_space();
-            available_space += disk.available_space();
-        }
+        let (total_space, available_space) = if let Some(disk) = root_disk {
+            (disk.total_space(), disk.available_space())
+        } else {
+            (0, 0)
+        };
 
         let used_space = total_space.saturating_sub(available_space);
+        const GB: u64 = 1024 * 1024 * 1024;
 
         let disk = DiskInfo {
-            total_gb: total_space / 1024 / 1024 / 1024,
-            used_gb: used_space / 1024 / 1024 / 1024,
-            available_gb: available_space / 1024 / 1024 / 1024,
+            total_gb: total_space / GB,
+            used_gb: used_space / GB,
+            available_gb: available_space / GB,
             usage_percent: if total_space > 0 {
                 (used_space as f64 / total_space as f64) * 100.0
             } else {
@@ -120,11 +122,11 @@ impl MonitorService {
             },
         };
 
-        // 获取当前进程内存占用
+        // 获取当前进程内存占用（sysinfo 返回字节，转为 MB）
         let current_pid = sysinfo::Pid::from_u32(std::process::id());
         let process_memory_mb = system
             .process(current_pid)
-            .map(|p| p.memory() / 1024)
+            .map(|p| p.memory() / B_TO_MB)
             .unwrap_or(0);
 
         SystemMonitorInfo {

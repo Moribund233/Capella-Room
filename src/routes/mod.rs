@@ -404,6 +404,7 @@ fn admin_router() -> Router<Arc<AppState>> {
         // IP 安全路由
         .nest("/security", security_routes())
         // 待办通知管理
+        .route("/pending-actions", get(admin::get_pending_actions))
         .route("/pending-actions/:id/respond", post(admin::respond_pending_action))
         // 死信队列管理
         .route("/dlq/messages", get(dlq_admin::list_dlq_messages))

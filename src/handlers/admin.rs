@@ -1204,6 +1204,29 @@ pub struct ConfigSyncStatusResponse {
     pub sync_latency_ms: Option<f64>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct PendingActionListResponse {
+    pub actions: Vec<PendingActionInfo>,
+    pub total: usize,
+}
+
+pub async fn get_pending_actions(
+    State(state): State<Arc<AppState>>,
+    Extension(CurrentUserId(admin_id)): Extension<CurrentUserId>,
+) -> Result<Json<ApiResponse<PendingActionListResponse>>> {
+    let actions = state
+        .notification_service()
+        .get_pending_actions(admin_id)
+        .await?;
+
+    let total = actions.len();
+
+    Ok(Json(ApiResponse::success(PendingActionListResponse {
+        actions,
+        total,
+    })))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RespondPendingActionRequest {
     pub action: PendingActionType,

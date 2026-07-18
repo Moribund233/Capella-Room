@@ -387,6 +387,9 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
     let state_clone = Arc::clone(&state);
     let tx_clone = tx.clone();
     let username_for_recv = username.clone();
+
+    // 日志订阅取消令牌，切换过滤器时用于取消旧订阅
+    let log_cancel = Arc::new(std::sync::Mutex::new(None::<CancellationToken>));
     let source_app_for_recv = oauth_app_name.clone();
 
     // 初始化连接状态为已认证（因为 wait_for_auth 已经成功返回）
@@ -394,6 +397,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
 
     // 启动消息接收任务
     let mut recv_task = tokio::spawn(async move {
+        let log_cancel = log_cancel;
         while let Some(Ok(message)) = receiver.next().await {
             match message {
                 Message::Text(text) => match WebSocketMessage::from_json(&text) {
@@ -414,6 +418,38 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                             continue;
                         }
 
+                        // 日志订阅：取消旧订阅后重新订阅
+                        if let WebSocketMessage::SubscribeLogs { level, module } = &ws_msg {
+                            if let Some(token) = log_cancel.lock().unwrap().take() {
+                                token.cancel();
+                            }
+                            let new_token = CancellationToken::new();
+                            *log_cancel.lock().unwrap() = Some(new_token.clone());
+                            let state = state_clone.clone();
+                            let tx = tx_clone.clone();
+                            let uid = user_id;
+                            let lvl = level.clone();
+                            let modl = module.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) = handle_subscribe_logs(
+                                    uid, lvl, modl, &state, &tx, new_token,
+                                )
+                                .await
+                                {
+                                    warn!("Error handling SubscribeLogs: {}", e);
+                                }
+                            });
+                            continue;
+                        }
+
+                        // 取消日志订阅
+                        if matches!(ws_msg, WebSocketMessage::UnsubscribeLogs) {
+                            if let Some(token) = log_cancel.lock().unwrap().take() {
+                                token.cancel();
+                            }
+                            continue;
+                        }
+
                         // 下列消息会长时间阻塞或包含 DB 写入操作，spawn 到后台避免阻塞 recv_task
                         // 处理后续消息（如 Pong 心跳响应）
                         if matches!(
@@ -423,7 +459,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, ctx: ConnectionC
                                 | WebSocketMessage::DeleteMessage { .. }
                                 | WebSocketMessage::AddReaction { .. }
                                 | WebSocketMessage::RemoveReaction { .. }
-                                | WebSocketMessage::SubscribeLogs { .. }
                         ) {
                             let state = state_clone.clone();
                             let tx = tx_clone.clone();
@@ -832,17 +867,6 @@ async fn handle_message(
             handle_get_pending_actions(user_id, action_type, state, tx).await?;
         }
 
-        // ========== 系统日志流 ==========
-        // 订阅系统日志
-        WebSocketMessage::SubscribeLogs { level, module } => {
-            handle_subscribe_logs(user_id, level, module, state, tx).await?;
-        }
-
-        // 取消订阅系统日志
-        WebSocketMessage::UnsubscribeLogs => {
-            handle_unsubscribe_logs(user_id, state, tx).await?;
-        }
-
         // ========== 外部服务自定义事件 ==========
         WebSocketMessage::CustomEvent {
             event_name,
@@ -925,11 +949,29 @@ async fn handle_subscribe_logs(
     module: Option<String>,
     state: &AppState,
     tx: &mpsc::Sender<String>,
+    cancel_token: CancellationToken,
 ) -> anyhow::Result<()> {
     debug!(
         "User {} subscribing to logs with level={:?}, module={:?}",
         user_id, level, module
     );
+
+    // 权限检查：仅 Admin 和 SuperAdmin 可订阅系统日志
+    let user = state
+        .user_service()
+        .get_user_by_id(user_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+    if !user.role.is_admin() {
+        let error_msg = WebSocketMessage::LogSubscriptionConfirmed {
+            success: false,
+            message: "Permission denied: Admin role required".to_string(),
+        };
+        if let Ok(json) = error_msg.to_json() {
+            let _ = tx.send(json).await;
+        }
+        return Ok(());
+    }
 
     // 获取日志广播器
     let broadcaster = state.log_broadcaster();
@@ -946,8 +988,6 @@ async fn handle_subscribe_logs(
         let _ = tx.send(json).await;
     }
 
-    // 创建取消令牌，用于在连接断开时终止任务
-    let cancel_token = CancellationToken::new();
     let cancel_token_clone = cancel_token.clone();
     let tx_for_logs = tx.clone();
 
@@ -1026,25 +1066,6 @@ async fn handle_subscribe_logs(
             debug!("Connection closed, cancelling log subscription for user {}", user_id);
             cancel_token.cancel();
         }
-    }
-
-    Ok(())
-}
-
-/// 处理取消订阅系统日志
-async fn handle_unsubscribe_logs(
-    user_id: Uuid,
-    #[allow(unused_variables)] state: &AppState,
-    tx: &mpsc::Sender<String>,
-) -> anyhow::Result<()> {
-    debug!("User {} unsubscribing from logs", user_id);
-
-    let confirm = WebSocketMessage::LogSubscriptionConfirmed {
-        success: true,
-        message: "Unsubscribed from logs".to_string(),
-    };
-    if let Ok(json) = confirm.to_json() {
-        let _ = tx.send(json).await;
     }
 
     Ok(())
