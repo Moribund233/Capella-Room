@@ -545,7 +545,7 @@ pub async fn create_direct_room(
         return Err(AppError::Validation("不能和自己创建私聊".to_string()));
     }
 
-    let room = state
+    let (room, is_new) = state
         .room_service()
         .get_or_create_direct_room(user_id, request.target_user_id)
         .await?;
@@ -554,30 +554,29 @@ pub async fn create_direct_room(
     state.ws_manager().join_room(room.id, user_id);
     state.ws_manager().join_room(room.id, request.target_user_id);
 
-    // 向对方用户推送私聊房间创建通知，使其客户端无需轮询即可发现新房间。
-    let created_by_username = match &claims.username {
-        Some(name) => name.clone(),
-        None => state
+    // 仅在真正新建房间时推送 DirectRoomCreated，避免重复通知
+    if is_new {
+        // 获取创建者完整信息（username fallback + avatar_url）
+        let creator = state
             .user_service()
             .get_user_by_id(user_id)
-            .await
-            .ok()
-            .and_then(|u| u.map(|u| u.username))
-            .unwrap_or_default(),
-    };
-    if let Ok(json) = (WebSocketMessage::DirectRoomCreated {
-        room_id: room.id,
-        created_by_user_id: user_id,
-        created_by_username,
-        created_by_avatar_url: None,
-        created_at: chrono::Utc::now(),
-    })
-    .to_json()
-    {
-        let _ = state
-            .ws_manager()
-            .send_to_user(request.target_user_id, json)
-            .await;
+            .await?
+            .ok_or_else(|| AppError::NotFound)?;
+        let created_by_username = claims.username.clone().unwrap_or(creator.username);
+        if let Ok(json) = (WebSocketMessage::DirectRoomCreated {
+            room_id: room.id,
+            created_by_user_id: user_id,
+            created_by_username,
+            created_by_avatar_url: creator.avatar_url,
+            created_at: chrono::Utc::now(),
+        })
+        .to_json()
+        {
+            let _ = state
+                .ws_manager()
+                .send_to_user(request.target_user_id, json)
+                .await;
+        }
     }
 
     // 记录审计日志

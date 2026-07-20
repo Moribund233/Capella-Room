@@ -1378,11 +1378,12 @@ impl RoomService {
 
     /// 获取或创建私聊房间
     /// 如果两个用户之间已存在私聊房间，则返回现有房间
+    /// 返回 (房间信息, 是否新建)
     pub async fn get_or_create_direct_room(
         &self,
         user_a_id: Uuid,
         user_b_id: Uuid,
-    ) -> Result<DirectRoomResponse> {
+    ) -> Result<(DirectRoomResponse, bool)> {
         // 不能和自己创建私聊
         if user_a_id == user_b_id {
             return Err(AppError::Validation("不能和自己创建私聊房间".to_string()));
@@ -1390,11 +1391,12 @@ impl RoomService {
 
         // 检查是否已存在私聊房间
         if let Some(room) = self.find_direct_room(user_a_id, user_b_id).await? {
-            return self.to_direct_room_response(room, user_a_id).await;
+            return Ok((self.to_direct_room_response(room, user_a_id).await?, false));
         }
 
         // 创建新的私聊房间
-        self.create_direct_room(user_a_id, user_b_id).await
+        let room = self.create_direct_room(user_a_id, user_b_id).await?;
+        Ok((room, true))
     }
 
     /// 查找两个用户之间的私聊房间
