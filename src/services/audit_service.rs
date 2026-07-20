@@ -950,70 +950,61 @@ impl AuditService {
 
     /// 查询告警列表
     pub async fn query_alerts(&self, query: AlertQuery) -> Result<(Vec<AuditAlertResponse>, i64)> {
-        let limit = query.limit.unwrap_or(50);
+        let limit = query.limit.unwrap_or(50).min(200);
         let offset = query.offset.unwrap_or(0);
 
-        let mut sql = String::from(
+        let mut sql = sqlx::QueryBuilder::new(
             "SELECT id, rule_id, alert_type, severity, title, description, related_logs,
              source_ip, affected_user_id, status, acknowledged_by, acknowledged_at,
              resolved_by, resolved_at, created_at, updated_at
              FROM audit_alerts WHERE 1=1",
         );
-        let mut count_sql = String::from("SELECT COUNT(*) FROM audit_alerts WHERE 1=1");
+        let mut count_sql = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM audit_alerts WHERE 1=1");
 
         if let Some(status) = &query.status {
-            sql.push_str(&format!(
-                " AND status = '{}'",
-                format!("{:?}", status).to_lowercase()
-            ));
-            count_sql.push_str(&format!(
-                " AND status = '{}'",
-                format!("{:?}", status).to_lowercase()
-            ));
+            sql.push(" AND status = ").push_bind(status);
+            count_sql.push(" AND status = ").push_bind(status);
         }
 
         if let Some(severity) = &query.severity {
-            sql.push_str(&format!(
-                " AND severity = '{}'",
-                format!("{:?}", severity).to_lowercase()
-            ));
-            count_sql.push_str(&format!(
-                " AND severity = '{}'",
-                format!("{:?}", severity).to_lowercase()
-            ));
+            sql.push(" AND severity = ").push_bind(severity);
+            count_sql.push(" AND severity = ").push_bind(severity);
         }
 
         if let Some(alert_type) = &query.alert_type {
-            sql.push_str(&format!(" AND alert_type = '{}'", alert_type));
-            count_sql.push_str(&format!(" AND alert_type = '{}'", alert_type));
+            sql.push(" AND alert_type = ").push_bind(alert_type);
+            count_sql.push(" AND alert_type = ").push_bind(alert_type);
         }
 
         if let Some(user_id) = query.affected_user_id {
-            sql.push_str(&format!(" AND affected_user_id = '{}'", user_id));
-            count_sql.push_str(&format!(" AND affected_user_id = '{}'", user_id));
+            sql.push(" AND affected_user_id = ").push_bind(user_id);
+            count_sql.push(" AND affected_user_id = ").push_bind(user_id);
         }
 
         if let Some(start_time) = query.start_time {
-            sql.push_str(&format!(" AND created_at >= '{}'", start_time));
-            count_sql.push_str(&format!(" AND created_at >= '{}'", start_time));
+            sql.push(" AND created_at >= ").push_bind(start_time);
+            count_sql.push(" AND created_at >= ").push_bind(start_time);
         }
 
         if let Some(end_time) = query.end_time {
-            sql.push_str(&format!(" AND created_at <= '{}'", end_time));
-            count_sql.push_str(&format!(" AND created_at <= '{}'", end_time));
+            sql.push(" AND created_at <= ").push_bind(end_time);
+            count_sql.push(" AND created_at <= ").push_bind(end_time);
         }
 
-        sql.push_str(" ORDER BY created_at DESC");
-        sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+        sql.push(" ORDER BY created_at DESC");
+        sql.push(" LIMIT ").push_bind(limit);
+        sql.push(" OFFSET ").push_bind(offset);
 
         let pool = self.db.pool();
 
-        let alerts: Vec<AuditAlert> = sqlx::query_as(&sql)
+        let alerts: Vec<AuditAlert> = sql
+            .build_query_as()
             .fetch_all(pool)
             .await
             .map_err(AppError::Database)?;
 
-        let total: i64 = sqlx::query_scalar(&count_sql)
+        let total: i64 = count_sql
+            .build_query_scalar()
             .fetch_one(pool)
             .await
             .map_err(AppError::Database)?;

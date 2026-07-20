@@ -279,42 +279,55 @@ impl FileService {
         uploader_id: Uuid,
         params: FileQueryParams,
     ) -> Result<FileListResponse> {
-        let mut query = String::from(
-            "SELECT * FROM file_resources WHERE is_deleted = false AND uploader_id = '",
+        let mut query = sqlx::QueryBuilder::new(
+            "SELECT * FROM file_resources WHERE is_deleted = false AND uploader_id = ",
         );
-        query.push_str(&uploader_id.to_string());
-        query.push('\'');
-
-        let mut count_query = String::from(
-            "SELECT COUNT(*) FROM file_resources WHERE is_deleted = false AND uploader_id = '",
-        );
-        count_query.push_str(&uploader_id.to_string());
-        count_query.push('\'');
+        query.push_bind(uploader_id);
 
         // 添加查询条件
         if let Some(ref category) = params.category {
-            query.push_str(&format!(" AND category = '{:?}'", category));
-            count_query.push_str(&format!(" AND category = '{:?}'", category));
+            query.push(" AND category = ");
+            query.push_bind(category);
         }
         if let Some(ref usage) = params.usage_type {
-            query.push_str(&format!(" AND usage_type = '{:?}'", usage));
-            count_query.push_str(&format!(" AND usage_type = '{:?}'", usage));
+            query.push(" AND usage_type = ");
+            query.push_bind(usage);
         }
 
         // 添加排序
-        query.push_str(" ORDER BY created_at DESC");
+        query.push(" ORDER BY created_at DESC");
 
         // 添加分页
         let limit = params.limit.unwrap_or(20).min(100);
         let offset = params.offset.unwrap_or(0);
-        query.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+        query.push(" LIMIT ");
+        query.push_bind(limit);
+        query.push(" OFFSET ");
+        query.push_bind(offset);
 
         // 执行查询
-        let files = sqlx::query_as::<_, FileResource>(&query)
+        let files = query
+            .build_query_as::<FileResource>()
             .fetch_all(self.db.pool())
             .await?;
 
-        let total: i64 = sqlx::query_scalar(&count_query)
+        let mut count_query = sqlx::QueryBuilder::new(
+            "SELECT COUNT(*) FROM file_resources WHERE is_deleted = false AND uploader_id = ",
+        );
+        count_query.push_bind(uploader_id);
+
+        // 添加查询条件
+        if let Some(ref category) = params.category {
+            count_query.push(" AND category = ");
+            count_query.push_bind(category);
+        }
+        if let Some(ref usage) = params.usage_type {
+            count_query.push(" AND usage_type = ");
+            count_query.push_bind(usage);
+        }
+
+        let total: i64 = count_query
+            .build_query_scalar()
             .fetch_one(self.db.pool())
             .await?;
 

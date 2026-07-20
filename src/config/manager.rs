@@ -23,6 +23,17 @@ pub enum ConfigChangeEvent {
     ConfigReloaded,
 }
 
+/// 运行时配置管理器
+///
+/// # 职责
+/// - 维护内存中的当前配置副本，供运行时读取。
+/// - 从数据库 `system_configs` 表加载配置并覆盖 `config.toml` 中的值。
+/// - 提供配置热重载能力，变更后即时通知订阅者。
+/// - （可选）通过 Redis 在多个节点间同步配置变更。
+///
+/// # 设计约定
+/// 服务启动后，运行时的有效配置以数据库 `system_configs` 表为准。
+/// `config.toml` 仅在启动加载和初始化数据库默认值时使用。
 pub struct ConfigManager {
     db: Database,
     config: SharedConfig,
@@ -117,6 +128,11 @@ impl ConfigManager {
         self.config.read().await.clone()
     }
 
+    /// 从数据库重新加载配置
+    ///
+    /// # 说明
+    /// 读取 `system_configs` 表中的所有配置项，通过 `ConfigLoader::apply_database_overrides`
+    /// 覆盖内存配置，并广播 `ConfigReloaded` 事件通知所有订阅者刷新。
     pub async fn reload_from_database(&self) -> Result<()> {
         info!("Reloading configuration from database...");
 
@@ -218,6 +234,14 @@ impl ConfigManager {
         Ok(item)
     }
 
+    /// 将单个数据库配置项热重载到内存配置
+    ///
+    /// # 说明
+    /// 当 `set_config` 修改了一个可热重载的配置项后，立即更新内存中的 `AppConfig`，
+    /// 无需重启服务即可生效。
+    ///
+    /// # 注意
+    /// 新增支持热重载的配置项时，必须在此处添加对应的处理分支。
     async fn apply_hot_reload(&self, item: &SystemConfigItem) -> Result<()> {
         let mut config = self.config.write().await;
 
@@ -283,6 +307,18 @@ impl ConfigManager {
             "logging.level" => {
                 config.logging.level = item.value.clone();
                 debug!("Hot reloaded logging.level = {}", item.value);
+            }
+            "server.login_rate_limit.max_requests" => {
+                if let Ok(max_requests) = item.value.parse() {
+                    config.server.login_rate_limit.max_requests = max_requests;
+                    debug!("Hot reloaded server.login_rate_limit.max_requests = {}", max_requests);
+                }
+            }
+            "server.login_rate_limit.window_secs" => {
+                if let Ok(window_secs) = item.value.parse() {
+                    config.server.login_rate_limit.window_secs = window_secs;
+                    debug!("Hot reloaded server.login_rate_limit.window_secs = {}", window_secs);
+                }
             }
             "batch_message.batch_size" => {
                 if let Ok(size) = item.value.parse() {
@@ -394,10 +430,42 @@ impl ConfigManager {
         Ok(records.into_iter().map(|r| r.into()).collect())
     }
 
+    /// 将默认配置初始化到数据库
+    ///
+    /// # 设计约定
+    /// `config.toml` 是项目默认值的唯一来源。本方法在启动时读取已经加载到内存的
+    /// `AppConfig`，将支持的配置项插入 `system_configs` 表（仅当该 key 不存在时）。
+    /// 这样部署人员只需修改 `config.toml` 即可调整后续实例的默认值，无需修改代码。
+    ///
+    /// # 注意
+    /// 新增非敏感配置项时，应将其加入此处，使其能被持久化到数据库并支持热重载。
     pub async fn initialize_default_configs(&self) -> Result<()> {
         info!("Initializing default system configurations...");
 
-        let defaults = Self::get_default_configs();
+        // 从当前已加载的配置中读取限流默认值，避免在代码中硬编码
+        let config = self.get_config().await;
+        let max_requests_str = config.server.login_rate_limit.max_requests.to_string();
+        let window_secs_str = config.server.login_rate_limit.window_secs.to_string();
+
+        let mut defaults = Self::get_default_configs();
+        defaults.push((
+            "server.login_rate_limit.max_requests",
+            &max_requests_str,
+            "int",
+            "登录接口每个窗口期允许的最大请求数",
+            "security",
+            true,
+            true,
+        ));
+        defaults.push((
+            "server.login_rate_limit.window_secs",
+            &window_secs_str,
+            "int",
+            "登录接口限流时间窗口（秒）",
+            "security",
+            true,
+            true,
+        ));
 
         for (key, value, value_type, description, category, is_editable, is_hot_reloadable) in
             defaults
@@ -433,6 +501,13 @@ impl ConfigManager {
         Ok(())
     }
 
+    /// 返回代码中保留的默认配置项列表
+    ///
+    /// # 设计约定
+    /// 本方法仅用于 `initialize_default_configs` 和 `reset_to_defaults`，将默认值写入数据库。
+    /// 业务默认值应来自 `config.toml`，并在 `initialize_default_configs` 中通过读取内存配置
+    /// 动态注入（如限流配置）。避免在此处直接硬编码业务默认值，以保持运维人员可通过
+    /// 修改 `config.toml` 调整默认行为。
     fn get_default_configs() -> Vec<(
         &'static str,
         &'static str,

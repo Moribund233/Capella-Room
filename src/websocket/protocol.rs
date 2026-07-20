@@ -57,6 +57,15 @@ pub enum WebSocketMessage {
         username: String,
     },
 
+    /// 私聊房间创建通知（推送给对方用户）
+    DirectRoomCreated {
+        room_id: Uuid,
+        created_by_user_id: Uuid,
+        created_by_username: String,
+        created_by_avatar_url: Option<String>,
+        created_at: DateTime<Utc>,
+    },
+
     /// 用户加入房间通知（广播给其他用户）
     UserJoined {
         room_id: Uuid,

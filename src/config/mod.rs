@@ -11,6 +11,20 @@ pub use listener::{start_config_listeners, LoggingConfigListener, WebSocketConfi
 pub use loader::ConfigLoader;
 pub use manager::{ConfigChangeEvent, ConfigManager};
 
+/// 应用配置
+///
+/// # 配置来源与优先级（从高到低）
+/// 1. **环境变量**：敏感配置（如数据库地址、JWT 密钥）必须通过环境变量提供；
+///    部分非敏感配置也可通过环境变量覆盖 `config.toml` 中的值。
+/// 2. **数据库 `system_configs` 表**：服务启动后，运行时的有效配置由 `ConfigManager`
+///    从数据库加载并支持热重载。数据库中的值会覆盖 `config.toml` 中的对应值。
+/// 3. **`config.toml`**：非敏感配置的默认值定义位置，仅在启动加载和初始化数据库默认值时使用。
+///
+/// # 设计约定
+/// - 敏感信息只允许通过环境变量传入，禁止写入 `config.toml`。
+/// - `config.toml` 中定义的为非敏感业务默认值，代码中不再硬编码业务默认值。
+/// - 新增非敏感配置项时，必须同时在 `config.toml` 中给出默认值，并在
+///   `ConfigManager::initialize_default_configs` 中初始化到数据库。
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
@@ -50,6 +64,20 @@ pub struct ServerConfig {
     pub host: String,
     #[serde(default)]
     pub port: u16,
+    #[serde(default)]
+    pub login_rate_limit: RateLimitConfig,
+}
+
+/// 限流配置
+///
+/// 业务默认值在 `config.toml` 的 `[server.login_rate_limit]` 中定义；
+/// 代码中不硬编码业务默认值，仅提供零值占位，启动时由 `validate_config` 校验有效性。
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+pub struct RateLimitConfig {
+    /// 每个时间窗口内允许的最大请求数
+    pub max_requests: usize,
+    /// 时间窗口长度（秒）
+    pub window_secs: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

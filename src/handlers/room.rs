@@ -19,6 +19,7 @@ use crate::{
     services::room_service::RoomMemberWithUser,
     state::AppState,
     utils::permission::is_admin,
+    websocket::protocol::WebSocketMessage,
 };
 
 /// 查询参数
@@ -548,6 +549,36 @@ pub async fn create_direct_room(
         .room_service()
         .get_or_create_direct_room(user_id, request.target_user_id)
         .await?;
+
+    // 将双方自动加入该私聊房间的 WS 订阅，确保 recipient 能实时收到消息与房间通知。
+    state.ws_manager().join_room(room.id, user_id);
+    state.ws_manager().join_room(room.id, request.target_user_id);
+
+    // 向对方用户推送私聊房间创建通知，使其客户端无需轮询即可发现新房间。
+    let created_by_username = match &claims.username {
+        Some(name) => name.clone(),
+        None => state
+            .user_service()
+            .get_user_by_id(user_id)
+            .await
+            .ok()
+            .and_then(|u| u.map(|u| u.username))
+            .unwrap_or_default(),
+    };
+    if let Ok(json) = (WebSocketMessage::DirectRoomCreated {
+        room_id: room.id,
+        created_by_user_id: user_id,
+        created_by_username,
+        created_by_avatar_url: None,
+        created_at: chrono::Utc::now(),
+    })
+    .to_json()
+    {
+        let _ = state
+            .ws_manager()
+            .send_to_user(request.target_user_id, json)
+            .await;
+    }
 
     // 记录审计日志
     let ip = addr.ip();

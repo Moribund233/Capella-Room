@@ -161,6 +161,9 @@ async fn setup_test_server() -> (TestServer, Database) {
         upload: UploadConfig {
             max_file_size: 10 * 1024 * 1024,
             base_url: "/uploads".to_string(),
+            chunked_upload_enabled: true,
+            default_chunk_size: 5 * 1024 * 1024,
+            session_ttl_hours: 24,
         },
         websocket: capella_room::config::WebSocketConfig {
             heartbeat_interval_secs: 30,

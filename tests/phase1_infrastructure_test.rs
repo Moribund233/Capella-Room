@@ -84,6 +84,7 @@ mod config_tests {
         let server_config = ServerConfig {
             host: "0.0.0.0".to_string(),
             port: 3000,
+            ..Default::default()
         };
         assert_eq!(server_config.host, "0.0.0.0");
         assert_eq!(server_config.port, 3000);
@@ -112,6 +113,7 @@ mod config_tests {
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
+                ..Default::default()
             },
             database: DatabaseConfig {
                 url: Some("postgres://localhost/test".to_string()),
@@ -159,6 +161,7 @@ mod config_tests {
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
+                ..Default::default()
             },
             database: DatabaseConfig {
                 url: Some("postgres://localhost/test".to_string()),
@@ -401,6 +404,7 @@ mod integration_tests {
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
+                ..Default::default()
             },
             database: DatabaseConfig {
                 url: Some("postgres://localhost:5432/capella_room".to_string()),
@@ -472,6 +476,7 @@ mod acceptance_tests {
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
+                ..Default::default()
             },
             database: DatabaseConfig {
                 url: Some("postgres://user:pass@localhost:5432/db".to_string()),

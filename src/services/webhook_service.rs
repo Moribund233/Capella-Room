@@ -1,4 +1,5 @@
 use chrono::{Duration, Utc};
+use std::net::IpAddr;
 use tracing::warn;
 use uuid::Uuid;
 
@@ -30,6 +31,12 @@ impl WebhookService {
         secret: &str,
         events: &[String],
     ) -> Result<WebhookSubscription> {
+        if is_private_url(url) {
+            return Err(AppError::Validation(
+                "Webhook URL 不能指向内网地址".to_string(),
+            ));
+        }
+
         let sub = sqlx::query_as::<_, WebhookSubscription>(
             r#"INSERT INTO webhook_subscriptions (app_id, url, secret, events)
                VALUES ($1, $2, $3, $4)
@@ -78,6 +85,12 @@ impl WebhookService {
         let existing = self.get_subscription(sub_id, app_id).await?;
 
         let new_url = url.unwrap_or(&existing.url);
+        if url.is_some() && is_private_url(new_url) {
+            return Err(AppError::Validation(
+                "Webhook URL 不能指向内网地址".to_string(),
+            ));
+        }
+
         let new_secret = secret.unwrap_or(&existing.secret);
         let new_events = events.unwrap_or(&existing.events);
         let new_active = is_active.unwrap_or(existing.is_active);
@@ -363,6 +376,51 @@ impl WebhookService {
 
 // ─── Standalone delivery function ───
 
+/// 检查 IP 地址是否属于私有/内网地址
+fn is_private_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => {
+            ip.is_loopback()
+                || ip.is_private()
+                || ip.is_link_local()
+                || ip.is_unspecified()
+        }
+        IpAddr::V6(ip) => {
+            // IPv6 回环与未指定地址；独特本地地址（fc00::/7）和链路本地（fe80::/10）
+            // 通过地址段前缀判断
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || (ip.segments()[0] & 0xfe00) == 0xfc00
+                || (ip.segments()[0] & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+/// 检查 Webhook URL 是否指向内网或私有地址，防止 SSRF
+fn is_private_url(url_str: &str) -> bool {
+    let Ok(parsed) = url::Url::parse(url_str) else {
+        return true; // 无效 URL 视为不安全
+    };
+
+    if let Some(host) = parsed.host_str() {
+        // 解析为 IP 地址后检查是否为私有/内网地址
+        if let Ok(ip) = host.parse::<IpAddr>() {
+            return is_private_ip(ip);
+        }
+
+        // 域名检查：禁止常见内网域名或以内网网段开头的域名
+        let private_domains = [
+            "localhost", "127.0.0.1", "0.0.0.0", "[::1]", "[::]", "10.", "172.16.",
+            "192.168.", "169.254.",
+        ];
+        if private_domains.iter().any(|d| host.starts_with(d)) {
+            return true;
+        }
+    }
+
+    false
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn deliver_once(
     http_client: &reqwest::Client,
@@ -374,6 +432,12 @@ async fn deliver_once(
     timeout_ms: i32,
     attempt: i32,
 ) -> Result<(i32, String)> {
+    if is_private_url(url) {
+        return Err(AppError::Validation(
+            "Webhook URL 不能指向内网地址".to_string(),
+        ));
+    }
+
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     type HmacSha256 = Hmac<Sha256>;
@@ -421,5 +485,34 @@ impl Clone for WebhookService {
             db: self.db.clone(),
             http_client: self.http_client.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_private_url;
+
+    #[test]
+    fn test_private_url_blocks_localhost() {
+        assert!(is_private_url("http://localhost:8080/webhook"));
+        assert!(is_private_url("http://127.0.0.1:8080/webhook"));
+    }
+
+    #[test]
+    fn test_private_url_blocks_private_ips() {
+        assert!(is_private_url("http://192.168.1.1/webhook"));
+        assert!(is_private_url("http://10.0.0.1/webhook"));
+        assert!(is_private_url("http://172.16.0.1/webhook"));
+    }
+
+    #[test]
+    fn test_private_url_blocks_invalid_url() {
+        assert!(is_private_url("not-a-valid-url"));
+    }
+
+    #[test]
+    fn test_private_url_allows_public_urls() {
+        assert!(!is_private_url("https://example.com/webhook"));
+        assert!(!is_private_url("https://hooks.example.com/path"));
     }
 }

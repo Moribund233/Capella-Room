@@ -4,6 +4,7 @@ use axum::{
     routing::{delete, get, patch, post, put},
     Router,
 };
+use axum::extract::Extension;
 use chrono::Utc;
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ use crate::{
     middleware::audit::audit_middleware,
     middleware::auth_middleware,
     middleware::oauth_auth::oauth_auth_middleware,
+    middleware::rate_limit::{rate_limit_middleware, RateLimitState},
     state::AppState,
     websocket::handler::ws_handler,
 };
@@ -25,7 +27,7 @@ use crate::{
 pub const API_VERSION: &str = "v1";
 
 /// 构建应用路由
-pub fn create_router(state: Arc<AppState>) -> Router {
+pub fn create_router(state: Arc<AppState>, login_rate_limit_state: RateLimitState) -> Router {
     // 创建公开路由（不需要认证）
     let public_routes = Router::new()
         // 健康检查
@@ -36,14 +38,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // API 版本信息
         .route("/api/version", get(api_version))
         // 客户端配置（公开访问）
-        .route("/api/config/client", get(config::get_client_config))
-        // WebSocket 端点
-        .route("/ws", get(ws_handler));
+        .route("/api/config/client", get(config::get_client_config));
 
     // 认证路由（公开访问）
     let auth_routes_router = Router::new()
-        .nest(&format!("/api/{}/auth/", API_VERSION), auth_routes())
-        .nest("/api/auth/", auth_routes())
+        .nest(
+            &format!("/api/{}/auth/", API_VERSION),
+            auth_routes(login_rate_limit_state.clone()),
+        )
+        .nest("/api/auth/", auth_routes(login_rate_limit_state.clone()))
         .nest("/api/v2/auth/", v2_auth_routes());
 
     // v1 注册端点（需要管理员权限）
@@ -61,6 +64,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
     // 创建受保护路由（需要认证）
     let protected_routes = Router::new()
+        // WebSocket 端点（需要认证）
+        .route("/ws", get(ws_handler))
         // 用户路由
         .nest(&format!("/api/{}/users/", API_VERSION), user_routes())
         .nest("/api/users/", user_routes())
@@ -139,9 +144,11 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 }
 
 /// 认证路由（公开访问）
-fn auth_routes() -> Router<Arc<AppState>> {
+fn auth_routes(login_rate_limit_state: RateLimitState) -> Router<Arc<AppState>> {
     Router::new()
         .route("/login", post(auth::login))
+        .route_layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(login_rate_limit_state))
         .route("/refresh", post(auth::refresh_token))
 }
 

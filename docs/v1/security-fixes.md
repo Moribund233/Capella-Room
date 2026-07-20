@@ -5,7 +5,7 @@
 
 ---
 
-## 0002-WebSocket 握手缺少 JWT 认证 [P1-高优先级] - 待修复
+## 0002-WebSocket 握手缺少 JWT 认证 [P1-高优先级] - 已修复
 
 **位置**: `src/routes/mod.rs` — 公开路由 `/ws` 直接注册，无认证层
 
@@ -45,9 +45,14 @@ let protected_routes = Router::new()
 **影响文件**:
 - `src/routes/mod.rs` — 将 `/ws` 从 public_routes 移到 protected_routes
 
+**修复状态**: 已修复（2026-07-21）
+
+**修复内容**:
+将 `/ws` 路由从 `public_routes` 迁移至 `protected_routes`，使其经过 `auth_middleware` JWT 认证。Axum 的 WebSocket 升级在认证中间件之后执行，因此未携带有效 Token 的请求会在 Upgrade 之前返回 401，无法建立 WebSocket 连接。
+
 ---
 
-## 0003-登录接口缺少速率限制 [P1-高优先级] - 待修复
+## 0003-登录接口缺少速率限制 [P1-高优先级] - 已修复
 
 **位置**: `src/routes/mod.rs` — `/api/auth/login` 无限流中间件
 
@@ -115,9 +120,14 @@ pub async fn rate_limit_middleware(
 - `src/middleware/mod.rs` — 新增 `rate_limit.rs`（如使用方案 B）
 - `src/state/mod.rs` — 可能需要暴露 Redis manager
 
+**修复状态**: 已修复（2026-07-21）
+
+**修复内容**:
+新增自定义基于客户端 IP 的内存限流中间件 `src/middleware/rate_limit.rs`，对 `/api/auth/login` 实施限流。默认配置为每个客户端 IP 在每个 60 秒窗口内最多允许 5 次登录请求，超过阈值返回 HTTP 429 并携带 `Retry-After` 响应头。限流参数接入配置系统，支持通过 `config.toml` 的 `[server.login_rate_limit]`、环境变量 `SERVER_LOGIN_RATE_LIMIT_*` 以及数据库 `system_configs` 热重载动态调整。
+
 ---
 
-## 0004-Webhook URL 未校验内网地址（SSRF） [P2-中优先级] - 待修复
+## 0004-Webhook URL 未校验内网地址（SSRF） [P2-中优先级] - 已修复
 
 **位置**: `src/services/webhook_service.rs` — `deliver_once()` 函数
 
@@ -219,9 +229,14 @@ pub async fn create_subscription(
 - `src/services/webhook_service.rs` — 添加 `is_private_url()` 校验函数，在 `deliver_once()` 和 `create_subscription()` 中调用
 - `src/utils/security.rs` — 可选，将 `is_private_url()` 提取到 security 工具模块
 
+**修复状态**: 已修复（2026-07-21）
+
+**修复内容**:
+在 `src/services/webhook_service.rs` 中新增 `is_private_url()` 校验函数，使用 `url::Url` 解析 URL 并检查 host 是否指向回环地址、私有地址、链路本地地址或未指定地址，同时拦截 `localhost`、`127.0.0.1`、`0.0.0.0`、`[::1]`、`[::]` 以及以 `10.`、`172.16.`、`192.168.`、`169.254.` 开头的域名。该校验在 `create_subscription`、`update_subscription` 和 `deliver_once` 三个入口统一执行，防止 Webhook 触发 SSRF。
+
 ---
 
-## 0005-audit_service.rs 使用 format!() 拼接 SQL [P2-中优先级] - 待修复
+## 0005-audit_service.rs 使用 format!() 拼接 SQL [P2-中优先级] - 已修复
 
 **位置**: `src/services/audit_service.rs:956-1010` — `query_alerts()` 函数
 
@@ -346,9 +361,14 @@ pub async fn query_alerts(&self, query: AlertQuery) -> Result<(Vec<AuditAlertRes
 - `src/services/audit_service.rs` — `query_alerts()` 及所有涉及 `format!()` SQL 拼接的位置（约 20 行）
 - 无需修改外部接口，`query_alerts` 的签名不变
 
+**修复状态**: 已修复（2026-07-21）
+
+**修复内容**:
+将 `query_alerts()` 中的 SQL 构建方式从字符串拼接改为 `sqlx::QueryBuilder` + `push_bind()` 参数化绑定。所有查询条件（`alert_type`、`affected_user_id`、`start_time`、`end_time`、`status`、`severity`）以及分页参数均通过参数绑定传入，彻底消除 SQL 注入风险。
+
 ---
 
-## 0006-file_service.rs 使用 format!() 拼接 SQL [P2-中优先级] - 待修复
+## 0006-file_service.rs 使用 format!() 拼接 SQL [P2-中优先级] - 已修复
 
 **位置**: `src/services/file_service.rs:282-310` — `get_files_by_uploader()` 函数
 
@@ -447,14 +467,19 @@ pub async fn get_files_by_uploader(
 - `src/services/file_service.rs` — `get_files_by_uploader()` 函数（约 30 行）
 - `src/models/file.rs` — 如果 `category`/`usage_type` 枚举未实现 `Display`，可能需要添加（或用 `serde_json::Value` 序列化）
 
+**修复状态**: 已修复（2026-07-21）
+
+**修复内容**:
+将 `get_files_by_uploader()` 中的 SQL 构建方式从字符串拼接改为 `sqlx::QueryBuilder` + `push_bind()` 参数化绑定。`uploader_id`、`category`、`usage_type`、分页参数等均通过参数绑定传入，避免 SQL 注入风险。
+
 ---
 
 ## 汇总
 
-| # | 问题 | 严重性 | 影响路径 | 是否需要新依赖 |
-|---|------|--------|---------|--------------|
-| 0002 | WebSocket 无认证 | P1-高 | `routes/mod.rs` | 无 |
-| 0003 | 登录无限流 | P1-高 | `routes/mod.rs` | `tower_http`（已在 Cargo.toml）|
-| 0004 | Webhook SSRF | P2-中 | `webhook_service.rs` | `url` crate |
-| 0005 | audit_service 格式 SQL | P2-中 | `audit_service.rs` | 无（sqlx::QueryBuilder 已内置）|
-| 0006 | file_service 格式 SQL | P2-中 | `file_service.rs` | 无（sqlx::QueryBuilder 已内置）|
+| # | 问题 | 严重性 | 影响路径 | 是否需要新依赖 | 状态 |
+|---|------|--------|---------|--------------|------|
+| 0002 | WebSocket 无认证 | P1-高 | `routes/mod.rs` | 无 | 已修复 |
+| 0003 | 登录无限流 | P1-高 | `routes/mod.rs` | 无（自定义中间件）| 已修复 |
+| 0004 | Webhook SSRF | P2-中 | `webhook_service.rs` | `url` crate | 已修复 |
+| 0005 | audit_service 格式 SQL | P2-中 | `audit_service.rs` | 无（sqlx::QueryBuilder 已内置）| 已修复 |
+| 0006 | file_service 格式 SQL | P2-中 | `file_service.rs` | 无（sqlx::QueryBuilder 已内置）| 已修复 |

@@ -6,8 +6,9 @@ use anyhow::Result;
 use tracing::{info, warn};
 
 use capella_room::{
-    config::{ConfigLoader, ConfigManager},
+    config::{ConfigChangeEvent, ConfigLoader, ConfigManager},
     db::Database,
+    middleware::rate_limit::RateLimitState,
     redis::{ConfigSyncManager, RedisManager},
     routes::create_router,
     state::AppState,
@@ -95,7 +96,51 @@ async fn main() -> Result<()> {
 
     initialize_super_admin(&state, &config.admin.initial).await?;
 
-    let app = create_router(state.clone());
+    let login_rate_limit_state = RateLimitState::new(
+        config.server.login_rate_limit.max_requests,
+        config.server.login_rate_limit.window_secs,
+    );
+    info!(
+        "Login rate limit configured: {} requests per {} seconds",
+        config.server.login_rate_limit.max_requests,
+        config.server.login_rate_limit.window_secs
+    );
+
+    // 监听限流配置热更新
+    let rate_limit_state_for_listener = login_rate_limit_state.clone();
+    let config_manager_for_listener = Arc::clone(&shared_config_manager);
+    tokio::spawn(async move {
+        let mut rx = config_manager_for_listener.subscribe_config_changes();
+        loop {
+            match rx.recv().await {
+                Ok(ConfigChangeEvent::ConfigUpdated { ref key, .. })
+                    if key.starts_with("server.login_rate_limit.") =>
+                {
+                    let config = config_manager_for_listener.get_config().await;
+                    rate_limit_state_for_listener.update_config(
+                        config.server.login_rate_limit.max_requests,
+                        config.server.login_rate_limit.window_secs,
+                    );
+                    info!(
+                        "Login rate limit hot reloaded: {} requests per {} seconds",
+                        config.server.login_rate_limit.max_requests,
+                        config.server.login_rate_limit.window_secs
+                    );
+                }
+                Ok(ConfigChangeEvent::ConfigReloaded) => {
+                    let config = config_manager_for_listener.get_config().await;
+                    rate_limit_state_for_listener.update_config(
+                        config.server.login_rate_limit.max_requests,
+                        config.server.login_rate_limit.window_secs,
+                    );
+                }
+                Ok(_) => {}
+                Err(_) => break,
+            }
+        }
+    });
+
+    let app = create_router(state.clone(), login_rate_limit_state);
 
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port)
         .parse()

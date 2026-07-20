@@ -12,6 +12,18 @@ impl ConfigLoader {
         Self::load_with_path(None)
     }
 
+    /// 加载应用配置
+    ///
+    /// # 加载顺序
+    /// 1. 读取 `.env` 文件（如果存在）注入环境变量。
+    /// 2. 读取 `config.toml` 获得非敏感配置的默认值。
+    /// 3. 从环境变量加载**必须存在**的敏感配置，缺失则启动失败。
+    /// 4. 从环境变量加载可选配置，覆盖 `config.toml` 中的对应值。
+    /// 5. 执行 `validate_config` 启动校验。
+    ///
+    /// # 注意
+    /// 此方法仅负责启动时的配置加载。服务运行期间的配置变更和热重载由
+    /// `ConfigManager` 从数据库 `system_configs` 表管理。
     pub fn load_with_path(config_path: Option<&str>) -> Result<AppConfig> {
         info!("Loading configuration...");
 
@@ -76,8 +88,10 @@ impl ConfigLoader {
 
     /// 从环境变量加载必须存在的敏感配置
     ///
-    /// # 说明
-    /// 这些配置必须通过环境变量设置，不存在时会立即返回错误
+    /// # 设计约定
+    /// 敏感配置（如数据库连接、JWT 密钥、服务器监听地址）**必须**通过环境变量设置，
+    /// 不允许写入 `config.toml`。缺失任一必需环境变量时，服务将立即启动失败，
+    /// 防止使用不安全的默认值运行。
     fn load_required_env_configs(config: &mut AppConfig) -> Result<()> {
         debug!("Loading required environment variable configs...");
 
@@ -121,8 +135,13 @@ impl ConfigLoader {
 
     /// 从环境变量加载可选配置
     ///
-    /// # 说明
-    /// 这些配置可以通过环境变量覆盖，如果不存在则使用 config.toml 中的值或默认值
+    /// # 设计约定
+    /// 非敏感配置的业务默认值在 `config.toml` 中定义。环境变量在此处仅作为**覆盖**手段，
+    /// 用于部署时临时调整或 CI/CD 场景。若未设置对应环境变量，则保留 `config.toml`
+    /// 中的值。
+    ///
+    /// # 注意
+    /// 新增非敏感配置项时，如需支持环境变量覆盖，应在此处添加对应读取逻辑。
     fn load_optional_env_configs(config: &mut AppConfig) {
         debug!("Loading optional environment variable configs...");
 
@@ -153,6 +172,21 @@ impl ConfigLoader {
             if let Ok(h) = hours.parse() {
                 debug!("Overriding jwt.expiration_hours from environment");
                 config.jwt.expiration_hours = h;
+            }
+        }
+
+        // 登录限流配置（非敏感，可选覆盖）
+        if let Ok(max_requests) = std::env::var("SERVER_LOGIN_RATE_LIMIT_MAX_REQUESTS") {
+            if let Ok(m) = max_requests.parse() {
+                debug!("Overriding server.login_rate_limit.max_requests from environment");
+                config.server.login_rate_limit.max_requests = m;
+            }
+        }
+
+        if let Ok(window_secs) = std::env::var("SERVER_LOGIN_RATE_LIMIT_WINDOW_SECS") {
+            if let Ok(w) = window_secs.parse() {
+                debug!("Overriding server.login_rate_limit.window_secs from environment");
+                config.server.login_rate_limit.window_secs = w;
             }
         }
 
@@ -298,11 +332,28 @@ impl ConfigLoader {
         }
     }
 
+    /// 启动时校验配置有效性
+    ///
+    /// # 设计约定
+    /// 由于代码中不硬编码业务默认值，`config.toml` 中缺失或为零值的配置项可能表示
+    /// 部署人员未正确设置。本函数在启动阶段拦截这些非法配置，避免服务以无效参数运行。
     fn validate_config(config: &mut AppConfig) -> Result<()> {
         // 验证上传配置
         if config.upload.max_file_size == 0 {
             return Err(anyhow::anyhow!(
                 "upload.max_file_size cannot be 0. Please set a valid value in config.toml"
+            ));
+        }
+
+        // 验证登录限流配置
+        if config.server.login_rate_limit.max_requests == 0 {
+            return Err(anyhow::anyhow!(
+                "server.login_rate_limit.max_requests cannot be 0. Please set a valid value in config.toml"
+            ));
+        }
+        if config.server.login_rate_limit.window_secs == 0 {
+            return Err(anyhow::anyhow!(
+                "server.login_rate_limit.window_secs cannot be 0. Please set a valid value in config.toml"
             ));
         }
 
@@ -375,6 +426,16 @@ impl ConfigLoader {
             .map_err(|_| anyhow::anyhow!("UPLOAD_DIR environment variable is required"))
     }
 
+    /// 使用数据库中的配置覆盖内存配置
+    ///
+    /// # 设计约定
+    /// 服务启动后，`ConfigManager` 会从 `system_configs` 表读取配置并调用此方法覆盖
+    /// `config.toml` 中的值。因此运行时的有效配置以数据库为准，支持通过管理接口或
+    /// `set_config` 进行热重载。
+    ///
+    /// # 注意
+    /// 新增支持热重载的配置项时，应同时在此处和 `ConfigManager::apply_hot_reload` 中
+    /// 添加对应处理逻辑。
     pub fn apply_database_overrides(config: &mut AppConfig, db_configs: &HashMap<String, String>) {
         debug!("Applying database configuration overrides...");
 
@@ -424,6 +485,18 @@ impl ConfigLoader {
 
         if let Some(value) = db_configs.get("system.maintenance_message") {
             config.system.maintenance_message = value.clone();
+        }
+
+        if let Some(value) = db_configs.get("server.login_rate_limit.max_requests") {
+            if let Ok(max_requests) = value.parse() {
+                config.server.login_rate_limit.max_requests = max_requests;
+            }
+        }
+
+        if let Some(value) = db_configs.get("server.login_rate_limit.window_secs") {
+            if let Ok(window_secs) = value.parse() {
+                config.server.login_rate_limit.window_secs = window_secs;
+            }
         }
     }
 }
