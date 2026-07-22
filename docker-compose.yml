@@ -1,0 +1,87 @@
+# =============================================================================
+# Capella Room - Docker Compose 完整部署（含 PostgreSQL + Redis）
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: capella-pg
+    environment:
+      POSTGRES_USER: capella
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-Capella_Room_2024!}
+      POSTGRES_DB: capella_room
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U capella -d capella_room"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
+
+  redis:
+    image: redis:7-alpine
+    container_name: capella-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 128m
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: capella-room:latest
+    container_name: capella-room-prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./config.toml:/app/config.toml
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "8"
+          memory: 6g
+        reservations:
+          memory: 2g
+
+volumes:
+  pg_data:
+  redis_data:

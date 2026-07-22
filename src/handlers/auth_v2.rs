@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use validator::Validate;
 
 use crate::error::{AppError, Result};
 use crate::models::account_security::{CreateSessionRequest, LoginStatus, RecordLoginRequest};
@@ -42,8 +43,9 @@ pub struct ResetPasswordRequest {
 }
 
 /// 密码登录请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct LoginWithPasswordRequest {
+    #[validate(email(message = "邮箱格式不正确"))]
     pub email: String,
     pub password: String,
     pub device_name: Option<String>,
@@ -232,25 +234,54 @@ pub async fn login_with_password(
     connect_info: Option<axum::extract::ConnectInfo<SocketAddr>>,
     Json(request): Json<LoginWithPasswordRequest>,
 ) -> Result<Json<ApiResponse<AuthData>>> {
-    let email = request.email.trim().to_lowercase();
+    // 获取客户端IP
+    let ip = connect_info
+        .map(|ci| ci.0.ip())
+        .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
 
-    if email.is_empty() {
-        return Err(AppError::Validation("邮箱不能为空".to_string()));
-    }
+    // 验证请求
+    request
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    let user = state.user_service().get_user_by_email(&email).await?
-        .ok_or_else(|| AppError::Auth("邮箱或密码错误".to_string()))?;
+    // 查找用户
+    let user = state.user_service().get_user_by_email(&request.email).await?
+        .ok_or_else(|| {
+            let email = request.email.clone();
+            let audit_service = Arc::clone(&state.audit_service);
+            tokio::spawn(async move {
+                let _ = audit_service
+                    .log_login_failure(&email, ip, "用户不存在")
+                    .await;
+            });
+            AppError::Auth("邮箱或密码错误".to_string())
+        })?;
 
+    // 检查用户账号是否被禁用
     if user.is_account_disabled() {
+        let email = request.email.clone();
+        let audit_service = Arc::clone(&state.audit_service);
+        tokio::spawn(async move {
+            let _ = audit_service
+                .log_login_failure(&email, ip, "账号已被禁用")
+                .await;
+        });
         return Err(AppError::Auth("账号已被禁用，请联系管理员".to_string()));
     }
 
+    // 验证密码
     let password_valid = state.auth_service().verify_password(&request.password, &user.password_hash)?;
     if !password_valid {
+        let email = request.email.clone();
+        let audit_service = Arc::clone(&state.audit_service);
+        tokio::spawn(async move {
+            let _ = audit_service
+                .log_login_failure(&email, ip, "密码错误")
+                .await;
+        });
         return Err(AppError::Auth("邮箱或密码错误".to_string()));
     }
 
-    let ip = connect_info.map(|ci| ci.0.ip()).unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
     issue_auth_tokens(&state, user, ip).await
 }
 

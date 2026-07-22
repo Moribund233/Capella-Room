@@ -37,7 +37,7 @@ load_dotenv('../.env')
 
 # 配置
 TEST_HOST = os.getenv('TEST_HOST', 'localhost')
-TEST_PORT = int(os.getenv('TEST_PORT', '8765'))
+TEST_PORT = int(os.getenv('TEST_PORT', '3000'))
 
 
 def get_base_url(port: int) -> str:
@@ -110,6 +110,7 @@ class StressTestClient:
         try:
             ws = await websockets.connect(
                 self.ws_url,
+                additional_headers={"Authorization": f"Bearer {token}"},
                 open_timeout=10,
                 close_timeout=5
             )
@@ -199,7 +200,7 @@ class StressTestClient:
             # 发送消息
             for i in range(messages_per_user):
                 msg = {
-                    "type": "SendMessage",
+                    "type": "ChatMessage",
                     "payload": {
                         "room_id": room_id,
                         "content": f"压力测试消息-{user_email}-{i}-{int(time.time())}"
@@ -259,7 +260,7 @@ class StressTester:
         import subprocess
         try:
             result = subprocess.run(
-                ['wsl', 'docker', 'stats', '--no-stream', 'capella-room-prod'],
+                ['docker', 'stats', '--no-stream', 'capella-room-prod'],
                 capture_output=True,
                 text=True
             )
@@ -288,7 +289,7 @@ class StressTester:
         
         try:
             async with client.session.post(
-                f"{self.base_url}/api/rooms",
+                f"{self.base_url}/api/rooms/",
                 headers={"Authorization": f"Bearer {token}"},
                 json={
                     "name": room_name,
