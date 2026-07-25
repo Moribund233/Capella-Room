@@ -17,24 +17,19 @@ pub struct ClusterInfoResponse {
     pub started_at: String,
 }
 
+/// 返回集群标识信息，供客户端判断是否需要清空本地缓存。
+/// 所有动态字段（node_id、started_at）在进程启动时确定，请求间不变。
 pub async fn get_cluster_info(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ApiResponse<ClusterInfoResponse>>> {
     let config = state.config_manager().get_config().await;
-    let now = chrono::Utc::now().to_rfc3339();
-
-    let node_id = state
-        .redis_manager
-        .as_ref()
-        .map(|r| r.node_id().to_string())
-        .unwrap_or_else(|| format!("node-{}", uuid::Uuid::new_v4()));
 
     let resp = ClusterInfoResponse {
         cluster_id: config.cluster.id,
         cluster_name: config.cluster.name,
-        node_id,
+        node_id: state.node_id.clone(),
         version: config.system.version,
-        started_at: now,
+        started_at: state.started_at.to_rfc3339(),
     };
 
     Ok(Json(ApiResponse::success(resp)))

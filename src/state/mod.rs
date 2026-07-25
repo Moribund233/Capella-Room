@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use tracing::info;
+use chrono;
 
 use crate::config::{start_config_listeners, AppConfig, ConfigManager};
 use crate::db::Database;
@@ -60,6 +61,10 @@ pub struct AppState {
     pub config: Arc<tokio::sync::RwLock<AppConfig>>,
     pub config_manager: Arc<ConfigManager>,
     pub redis_manager: Option<Arc<RedisManager>>,
+    /// 进程启动时间（UTC），用于 cluster info 端点
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    /// 节点唯一标识。优先从 Redis ConfigSyncManager 获取，否则用随机 UUID。
+    pub node_id: String,
 }
 
 impl fmt::Debug for AppState {
@@ -189,6 +194,14 @@ impl AppState {
         }
 
         let batch_service_for_listener = batch_message_service.clone();
+
+        // 计算节点标识
+        let started_at = chrono::Utc::now();
+        let node_id = redis_manager
+            .as_ref()
+            .and_then(|r| r.node_id().to_string().into())
+            .unwrap_or_else(|| format!("node-{}", uuid::Uuid::new_v4()));
+
         let state = Arc::new(Self {
             db,
             ws_manager: ws_manager.clone(),
@@ -216,6 +229,8 @@ impl AppState {
             config: shared_config,
             config_manager: config_manager.clone(),
             redis_manager,
+            started_at,
+            node_id,
         });
 
         // 启动配置监听器（WebSocket + 日志 + 批量消息）
@@ -374,6 +389,8 @@ impl Clone for AppState {
             config: self.config.clone(),
             config_manager: self.config_manager.clone(),
             redis_manager: self.redis_manager.clone(),
+            started_at: self.started_at,
+            node_id: self.node_id.clone(),
         }
     }
 }

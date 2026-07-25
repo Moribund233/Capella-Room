@@ -81,6 +81,11 @@ async fn main() -> Result<()> {
 
     let config = config_manager.get_config().await;
 
+    // 集群配置检查：默认 cluster_id 在生产环境应被覆盖
+    if config.cluster.id == "00000000-0000-0000-0000-000000000000" {
+        warn!("CLUSTER_ID is using the default value. Set CLUSTER_ID environment variable or configure cluster.id in database for multi-node deployments.");
+    }
+
     let shared_config_manager = Arc::new(config_manager);
 
     let state = AppState::new(
