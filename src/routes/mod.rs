@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::{
     handlers::{
-        account_security, admin, audit, auth, auth_v2, config, custom_event, dlq_admin, file, message,
+        account_security, admin, audit, auth, auth_v2, cluster, config, custom_event, dlq_admin, file, message,
         message_reaction, notification, oauth, pin_message, room, security, ui_config, user,
         user_settings, webhook,
     },
@@ -38,7 +38,9 @@ pub fn create_router(state: Arc<AppState>, login_rate_limit_state: RateLimitStat
         // API 版本信息
         .route("/api/version", get(api_version))
         // 客户端配置（公开访问）
-        .route("/api/config/client", get(config::get_client_config));
+        .route("/api/config/client", get(config::get_client_config))
+        // 集群信息（公开访问）
+        .route("/api/cluster/info", get(cluster::get_cluster_info));
 
     // 认证路由（公开访问）
     let auth_routes_router = Router::new()

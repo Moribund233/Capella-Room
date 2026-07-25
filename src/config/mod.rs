@@ -55,6 +55,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub oauth: OAuthConfig,
     #[serde(default)]
+    pub cluster: ClusterConfig,
+    #[serde(default)]
     pub webhook: WebhookConfig,
 }
 
@@ -339,6 +341,35 @@ impl Default for OAuthConfig {
     }
 }
 
+/// 集群配置
+///
+/// 多节点部署时，同一集群内的所有节点必须使用相同的 `id`。
+/// 桌面客户端通过 `GET /api/cluster/info` 获取此值，判断是否切换了集群。
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClusterConfig {
+    /// 集群唯一 ID
+    /// 可通过环境变量 `CLUSTER_ID` 覆盖
+    #[serde(default = "default_cluster_id")]
+    pub id: String,
+    /// 集群可读名称（如 "production"、"staging"）
+    /// 可通过环境变量 `CLUSTER_NAME` 覆盖
+    #[serde(default)]
+    pub name: String,
+}
+
+fn default_cluster_id() -> String {
+    "00000000-0000-0000-0000-000000000000".to_string()
+}
+
+impl Default for ClusterConfig {
+    fn default() -> Self {
+        Self {
+            id: default_cluster_id(),
+            name: "default".to_string(),
+        }
+    }
+}
+
 /// Webhook 配置
 #[derive(Debug, Clone, Deserialize)]
 pub struct WebhookConfig {
@@ -568,6 +599,7 @@ mod tests {
             },
             mail: MailConfig::default(),
             oauth: OAuthConfig::default(),
+            cluster: ClusterConfig::default(),
             webhook: WebhookConfig::default(),
         };
         assert_eq!(config.mail.from_address, "");

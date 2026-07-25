@@ -3,6 +3,7 @@ pub mod admin;
 pub mod audit;
 pub mod auth;
 pub mod auth_v2;
+pub mod cluster;
 pub mod config;
 pub mod custom_event;
 pub mod dlq_admin;

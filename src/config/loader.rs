@@ -175,6 +175,17 @@ impl ConfigLoader {
             }
         }
 
+        // 集群配置
+        if let Ok(cluster_id) = std::env::var("CLUSTER_ID") {
+            debug!("Overriding cluster.id from environment");
+            config.cluster.id = cluster_id;
+        }
+
+        if let Ok(cluster_name) = std::env::var("CLUSTER_NAME") {
+            debug!("Overriding cluster.name from environment");
+            config.cluster.name = cluster_name;
+        }
+
         // 登录限流配置（非敏感，可选覆盖）
         if let Ok(max_requests) = std::env::var("SERVER_LOGIN_RATE_LIMIT_MAX_REQUESTS") {
             if let Ok(m) = max_requests.parse() {
