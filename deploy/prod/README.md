@@ -8,11 +8,11 @@
 - `postgres.yaml` - PostgreSQL 16 StatefulSet + 服务
 - `redis.yaml` - Redis 7 StatefulSet + 服务
 - `app.yaml` - 应用 Deployment + uploads PVC + NodePort(30081)
-- `sealed/` - SealedSecret（`capella-env`、`acr-secret` 加密清单，纳入 GitOps）
+- `secrets.yaml` - SealedSecret（`capella-env`、`acr-secret` 加密清单，纳入 GitOps）
 
 ## 敏感配置（不在仓库中明文）
 
-配置经 SealedSecret（`sealed/*.yaml`）加密提交，由 sealed-secrets controller 解密注入
+配置经 SealedSecret（`secrets.yaml`）加密提交，由 sealed-secrets controller 解密注入
 `capella/capella-env` 与 `capella/acr-secret`。更新方式：改 Secret 后重新 `kubeseal` 加密并提交。
 
 | Key | 用途 |
