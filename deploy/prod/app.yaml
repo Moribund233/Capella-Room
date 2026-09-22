@@ -6,7 +6,7 @@ metadata:
   labels:
     app: capella-room
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: capella-room
@@ -56,21 +56,7 @@ spec:
               mountPath: /app/uploads
       volumes:
         - name: uploads
-          persistentVolumeClaim:
-            claimName: capella-uploads
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: capella-uploads
-  namespace: capella
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 1Gi
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
