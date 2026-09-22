@@ -33,3 +33,6 @@
 `crpi-a7uhzxza3co1oh1t.cn-shenzhen.personal.cr.aliyuncs.com/moribund-projects/capella-room:<tag>`
 
 升级：改 `app.yaml` 的镜像 tag → 提交 → Fleet 自动滚动更新（tag 使用不可变版本号，如 `v0.1.0`）。
+
+> GitOps 说明：SealedSecret 与 Secret 由 controller 从 `secrets.yaml` 解密产生。若手工删除 Secret，
+> sealed-secrets controller 会在 SealedSecret 变更时重建；外部删除需 commit 触发 Fleet 重新下发。
