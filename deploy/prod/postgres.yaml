@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: capella-postgres
+  namespace: capella
+spec:
+  selector:
+    app: capella-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: capella-postgres
+  namespace: capella
+spec:
+  serviceName: capella-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capella-postgres
+  template:
+    metadata:
+      labels:
+        app: capella-postgres
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: capella
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: capella-env
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: capella_room
+          resources:
+            limits:
+              cpu: "4000m"
+              memory: 2Gi
+            requests:
+              cpu: "250m"
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 2Gi

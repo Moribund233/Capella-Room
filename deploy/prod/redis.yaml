@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: capella-redis
+  namespace: capella
+spec:
+  selector:
+    app: capella-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: capella-redis
+  namespace: capella
+spec:
+  serviceName: capella-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capella-redis
+  template:
+    metadata:
+      labels:
+        app: capella-redis
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: 512Mi
+            requests:
+              cpu: "100m"
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi

@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capella-room
+  namespace: capella
+  labels:
+    app: capella-room
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capella-room
+  template:
+    metadata:
+      labels:
+        app: capella-room
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: capella-room
+          image: crpi-a7uhzxza3co1oh1t.cn-shenzhen.personal.cr.aliyuncs.com/moribund-projects/capella-room:v0.1.0
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: capella-env
+          env:
+            - name: RUST_LOG
+              value: info
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: 1Gi
+            requests:
+              cpu: "100m"
+              memory: 128Mi
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: capella-uploads
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: capella-uploads
+  namespace: capella
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capella-room
+  namespace: capella
+spec:
+  type: NodePort
+  selector:
+    app: capella-room
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30081
