@@ -175,9 +175,12 @@ impl AppState {
         // 如果 Redis 启用，设置 WebSocketManager 的 Redis Pub/Sub
         if let Some(ref redis_mgr) = redis_manager {
             if let Some(redis_pubsub) = RedisPubSub::new(redis_mgr.clone()).await? {
-                // 启动跨节点房间广播订阅器：接收其他节点发布的消息并转发给本机客户端
+                // 启动跨节点房间广播订阅器：接收其他节点发布的消息并转发给本机客户端。
+                // 注意：必须保持 shutdown sender 存活，否则 receiver 立即返回导致订阅器秒退。
                 let ws_for_subscriber = ws_manager.clone();
-                let (_, subscriber_shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
+                let (subscriber_shutdown_tx, subscriber_shutdown_rx) =
+                    tokio::sync::mpsc::channel::<()>(1);
+                std::mem::forget(subscriber_shutdown_tx);
                 if let Err(e) = redis_pubsub
                     .start_subscriber(ws_for_subscriber, subscriber_shutdown_rx)
                     .await
