@@ -191,6 +191,10 @@ impl AppState {
             }
         }
 
+        // 启动配置同步：订阅其他节点的配置变更（跨节点配置热更新广播），
+        // 并将本地变更桥接到 Redis。start_sync 内部自行 spawn 且立即返回，不阻塞。
+        config_manager.clone().start_sync().await;
+
         // 如果 Redis 启用，启动审计日志 Stream 消费者
         if let Some(ref redis_mgr) = redis_manager {
             let consumer = Arc::new(StreamConsumer::new(
