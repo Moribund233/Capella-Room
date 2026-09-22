@@ -5,3 +5,5 @@ resources:
   - postgres.yaml
   - redis.yaml
   - app.yaml
+  - sealed/capella-env.yaml
+  - sealed/acr-secret.yaml
