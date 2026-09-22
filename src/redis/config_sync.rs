@@ -268,7 +268,8 @@ impl ConfigSyncManager {
 
                                         self.pending_changes.store(0, Ordering::SeqCst);
 
-                                        if let Err(e) = config_manager.reload_from_database().await {
+                                        // 静默重载：避免再次广播 ConfigReloaded 造成跨节点回环
+                                        if let Err(e) = config_manager.reload_from_database_silent().await {
                                             error!("Failed to reload config after remote change: {}", e);
                                         }
                                     }

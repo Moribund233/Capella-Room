@@ -134,6 +134,20 @@ impl ConfigManager {
     /// 读取 `system_configs` 表中的所有配置项，通过 `ConfigLoader::apply_database_overrides`
     /// 覆盖内存配置，并广播 `ConfigReloaded` 事件通知所有订阅者刷新。
     pub async fn reload_from_database(&self) -> Result<()> {
+        self.reload_from_database_with_broadcast(true).await
+    }
+
+    /// 从数据库静默重载配置（不广播 `ConfigReloaded` 事件）
+    ///
+    /// # 说明
+    /// 用于响应远端节点的配置同步消息。若此处再次广播 `ConfigReloaded`，
+    /// 桥接器会把该事件重新发布到 Redis，导致多节点之间“重载→广播→对端重载”
+    /// 的无限回环。
+    pub async fn reload_from_database_silent(&self) -> Result<()> {
+        self.reload_from_database_with_broadcast(false).await
+    }
+
+    async fn reload_from_database_with_broadcast(&self, broadcast: bool) -> Result<()> {
         info!("Reloading configuration from database...");
 
         let db_configs = self.load_all_from_database().await?;
@@ -142,7 +156,9 @@ impl ConfigManager {
         super::loader::ConfigLoader::apply_database_overrides(&mut config, &db_configs);
 
         // 广播配置重载事件
-        self.notify_config_change(ConfigChangeEvent::ConfigReloaded);
+        if broadcast {
+            self.notify_config_change(ConfigChangeEvent::ConfigReloaded);
+        }
 
         info!("Configuration reloaded from database");
         Ok(())
